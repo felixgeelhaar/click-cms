@@ -1,0 +1,11 @@
+{
+    "name": "SQLite Storage",
+    "description": "SQLite database storage backend for production use",
+    "version": "1.0.0",
+    "author": "Click CMS",
+    "dependencies": [],
+    "hooks": ["storage.init"],
+    "config": {
+        "database_path": "data/content.db"
+    }
+}

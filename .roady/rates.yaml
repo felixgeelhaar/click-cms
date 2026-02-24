@@ -1,0 +1,6 @@
+currency: ""
+rates:
+    - id: staff-engineer
+      name: Staff Engineer
+      hourly_rate: 120
+      default: false

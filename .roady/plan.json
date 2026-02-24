@@ -1,0 +1,371 @@
+{
+  "id": "plan-click-cms-1771362173",
+  "spec_id": "click-cms",
+  "tasks": [
+    {
+      "id": "PLUGIN-CACHE",
+      "title": "Redis/Memcached Caching Plugin",
+      "description": "Implement caching layer for faster page loads. Cache rendered pages, API responses, and database queries with TTL support and cache invalidation on content updates.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": null,
+      "feature_id": "performance"
+    },
+    {
+      "id": "PLUGIN-REDIRECTS",
+      "title": "Redirects Manager Plugin",
+      "description": "301/302 redirect manager with wildcard patterns, bulk import/export, and redirect loop detection. Track redirect performance and analytics.",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": null,
+      "feature_id": "operations"
+    },
+    {
+      "id": "PLUGIN-FORMS",
+      "title": "Forms Plugin",
+      "description": "Drag-and-drop form builder with text, email, textarea, select, checkbox, radio field types. Form submissions stored in database with email notifications. Anti-spam protection.",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": null,
+      "feature_id": "content-enhancement"
+    },
+    {
+      "id": "PLUGIN-SEARCH",
+      "title": "Full-Text Search Plugin",
+      "description": "Lunr.js integration for client-side search or Elasticsearch for server-side. Index all content, provide search API endpoint, search result highlighting, and faceted search.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": null,
+      "feature_id": "user-experience"
+    },
+    {
+      "id": "PLUGIN-TAGS",
+      "title": "Tags \u0026 Categories Plugin",
+      "description": "Taxonomy system for organizing content. Create tag/category clouds, filter content by taxonomy, and auto-generate taxonomy archive pages.",
+      "priority": "medium",
+      "estimate": "3h",
+      "depends_on": null,
+      "feature_id": "content-enhancement"
+    },
+    {
+      "id": "PLUGIN-RELATIONSHIPS",
+      "title": "Content Relationships Plugin",
+      "description": "Link pages to each other with relationship types (related, parent-child, references). Display related content on pages and build content graphs.",
+      "priority": "medium",
+      "estimate": "3h",
+      "depends_on": null,
+      "feature_id": "content-enhancement"
+    },
+    {
+      "id": "PLUGIN-CUSTOMFIELDS",
+      "title": "Custom Fields Plugin",
+      "description": "Extend pages with custom field types: text, textarea, number, date, select, checkbox, repeater. Field groups with conditional logic.",
+      "priority": "medium",
+      "estimate": "4h",
+      "depends_on": null,
+      "feature_id": "content-enhancement"
+    },
+    {
+      "id": "PLUGIN-BLOCKS",
+      "title": "Content Blocks Plugin",
+      "description": "Reusable content snippets (like WordPress reusable blocks). Create once, use anywhere. Sync across pages when block is updated.",
+      "priority": "medium",
+      "estimate": "3h",
+      "depends_on": null,
+      "feature_id": "content-enhancement"
+    },
+    {
+      "id": "PLUGIN-IMAGES",
+      "title": "Image Optimization Plugin",
+      "description": "Automatic WebP conversion, responsive image generation, lazy loading, CDN integration. Image compression and optimization pipeline.",
+      "priority": "medium",
+      "estimate": "3h",
+      "depends_on": null,
+      "feature_id": "performance"
+    },
+    {
+      "id": "PLUGIN-NAVIGATION",
+      "title": "Navigation Builder Plugin",
+      "description": "Drag-and-drop menu builder for site navigation. Multiple menus, nested items, visibility conditions. Auto-generate from page hierarchy.",
+      "priority": "medium",
+      "estimate": "2h",
+      "depends_on": null,
+      "feature_id": "user-experience"
+    },
+    {
+      "id": "PLUGIN-COMMENTS",
+      "title": "Comments System Plugin",
+      "description": "Comment system with threaded replies, moderation queue, spam filtering (Akismet integration), email notifications, and admin dashboard.",
+      "priority": "medium",
+      "estimate": "4h",
+      "depends_on": null,
+      "feature_id": "user-experience"
+    },
+    {
+      "id": "PLUGIN-BACKUPS",
+      "title": "Automated Backups Plugin",
+      "description": "Scheduled automated backups with multiple storage backends (local, S3, Dropbox). Incremental backups, one-click restore, backup encryption.",
+      "priority": "medium",
+      "estimate": "4h",
+      "depends_on": null,
+      "feature_id": "operations"
+    },
+    {
+      "id": "PLUGIN-MAINTENANCE",
+      "title": "Maintenance Mode Plugin",
+      "description": "Site maintenance page with countdown timer, whitelist IPs, scheduled maintenance windows, and custom maintenance messages.",
+      "priority": "low",
+      "estimate": "2h",
+      "depends_on": null,
+      "feature_id": "operations"
+    },
+    {
+      "id": "PLUGIN-I18N",
+      "title": "Multi-language (i18n) Plugin",
+      "description": "Translation management for multiple languages. Language switcher, translation editor, RTL support, and language-specific content routing.",
+      "priority": "low",
+      "estimate": "5h",
+      "depends_on": null,
+      "feature_id": "user-experience"
+    },
+    {
+      "id": "PLUGIN-WEBHOOKS",
+      "title": "Webhooks Plugin",
+      "description": "Trigger HTTP webhooks on content events (create, update, delete, publish). Custom payload templates, retry logic, webhook logs, and signature verification.",
+      "priority": "low",
+      "estimate": "3h",
+      "depends_on": null,
+      "feature_id": "integrations"
+    },
+    {
+      "id": "PLUGIN-EMAIL",
+      "title": "Email/SMTP Plugin",
+      "description": "Email delivery for notifications, password resets, form submissions. SMTP configuration, email templates, queue management.",
+      "priority": "low",
+      "estimate": "3h",
+      "depends_on": null,
+      "feature_id": "integrations"
+    },
+    {
+      "id": "PLUGIN-IMPORT",
+      "title": "Import/Export Plugin",
+      "description": "Import from WordPress (WXR), JSON, CSV. Full site export with all content and media. Scheduled imports with mapping configuration.",
+      "priority": "low",
+      "estimate": "4h",
+      "depends_on": null,
+      "feature_id": "integrations"
+    },
+    {
+      "id": "PLUGIN-SOCIAL",
+      "title": "Social Sharing Plugin",
+      "description": "Auto-generate OpenGraph/Twitter Card images, share buttons, social analytics. Integration with Facebook, Twitter, LinkedIn APIs.",
+      "priority": "low",
+      "estimate": "3h",
+      "depends_on": null,
+      "feature_id": "integrations"
+    },
+    {
+      "id": "PLUGIN-GDPR",
+      "title": "GDPR/CCPA Compliance Plugin",
+      "description": "Cookie consent banner, data export (portability), right to be forgotten (data deletion), privacy policy generator, consent logs.",
+      "priority": "low",
+      "estimate": "4h",
+      "depends_on": null,
+      "feature_id": "security-compliance"
+    },
+    {
+      "id": "PLUGIN-2FA",
+      "title": "Two-Factor Authentication Plugin",
+      "description": "TOTP/Email 2FA for admin accounts. QR code generation, backup codes, enforced 2FA for specific roles.",
+      "priority": "low",
+      "estimate": "3h",
+      "depends_on": null,
+      "feature_id": "security-compliance"
+    },
+    {
+      "id": "task-10",
+      "title": "Implement Plugin Marketplace",
+      "description": "Plugin marketplace with ZIP upload, browse/install, auto-updates",
+      "priority": "low",
+      "estimate": "4h",
+      "depends_on": [
+        "task-2"
+      ],
+      "feature_id": "plugin-marketplace"
+    },
+    {
+      "id": "task-5",
+      "title": "Create JSON Storage plugin",
+      "description": "Create JSON storage plugin as default backend - read/write JSON files in content/ directory",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "task-2",
+        "task-3",
+        "task-4"
+      ],
+      "feature_id": "storage-abstraction"
+    },
+    {
+      "id": "task-plugin-marketplace",
+      "title": "Implement Plugin Marketplace",
+      "description": "Implement the feature: Plugin Marketplace. Easy plugin discovery and installation. ZIP upload, marketplace browse, auto-updates for plugins.",
+      "priority": "medium",
+      "estimate": "",
+      "depends_on": [],
+      "feature_id": "plugin-marketplace"
+    },
+    {
+      "id": "task-4",
+      "title": "Create plugin.json schema",
+      "description": "Define plugin.json schema, create base Plugin class all plugins extend from",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "task-1"
+      ],
+      "feature_id": "core-plugin-system"
+    },
+    {
+      "id": "task-1",
+      "title": "Initialize project structure",
+      "description": "Initialize project structure with directories, autoloading, entry point, and basic config system",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [],
+      "feature_id": "core-foundation"
+    },
+    {
+      "id": "task-8",
+      "title": "Build GraphQL plugin",
+      "description": "GraphQL API plugin with query/mutation support for content",
+      "priority": "medium",
+      "estimate": "3h",
+      "depends_on": [
+        "task-6"
+      ],
+      "feature_id": "api-first-headless"
+    },
+    {
+      "id": "task-7",
+      "title": "Implement SQLite storage plugin",
+      "description": "Create StorageInterface abstraction, implement SQLite storage plugin",
+      "priority": "medium",
+      "estimate": "3h",
+      "depends_on": [
+        "task-1",
+        "task-5"
+      ],
+      "feature_id": "storage-abstraction"
+    },
+    {
+      "id": "task-core-foundation",
+      "title": "Implement Core Foundation",
+      "description": "Implement the feature: Core Foundation. The essential building blocks of the project.",
+      "priority": "medium",
+      "estimate": "",
+      "depends_on": [],
+      "feature_id": "core-foundation"
+    },
+    {
+      "id": "task-9",
+      "title": "Build Admin UI plugin",
+      "description": "Admin UI plugin with Vue/React SPA - manage content, plugins, settings",
+      "priority": "medium",
+      "estimate": "6h",
+      "depends_on": [
+        "task-2",
+        "task-5",
+        "task-6"
+      ],
+      "feature_id": "admin-ui-plugin"
+    },
+    {
+      "id": "task-storage-abstraction",
+      "title": "Implement Storage Abstraction",
+      "description": "Implement the feature: Storage Abstraction. Pluggable storage backends with unified interface. Default JSON files (Bludit-style), with plugins for SQLite, MySQL, PostgreSQL support.",
+      "priority": "medium",
+      "estimate": "",
+      "depends_on": [],
+      "feature_id": "storage-abstraction"
+    },
+    {
+      "id": "task-3",
+      "title": "Implement Event Dispatcher",
+      "description": "Event Dispatcher using mediator pattern - dispatch/listen to events (cms.page.render, api.content.get, etc.)",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "task-1"
+      ],
+      "feature_id": "core-plugin-system"
+    },
+    {
+      "id": "task-core-plugin-system",
+      "title": "Implement Core Plugin System",
+      "description": "Implement the feature: Core Plugin System. Full WordPress-like plugin architecture with hooks, events, lifecycle (install/activate/deactivate/uninstall), routing, and dependency resolution. Core of the CMS extensibility.",
+      "priority": "medium",
+      "estimate": "",
+      "depends_on": [],
+      "feature_id": "core-plugin-system"
+    },
+    {
+      "id": "task-6",
+      "title": "Build REST API plugin",
+      "description": "REST API plugin with endpoints: /api/pages, /api/content/{key}, /api/users",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "task-2",
+        "task-4"
+      ],
+      "feature_id": "api-first-headless"
+    },
+    {
+      "id": "task-2",
+      "title": "Implement Plugin Manager",
+      "description": "Plugin Manager with discovery (scan /plugins), lifecycle (install/activate/deactivate/uninstall), dependency resolution",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [
+        "task-1"
+      ],
+      "feature_id": "core-plugin-system"
+    },
+    {
+      "id": "task-11",
+      "title": "Write unit tests",
+      "description": "Write unit tests for core plugin system, storage, and API",
+      "priority": "medium",
+      "estimate": "3h",
+      "depends_on": [
+        "task-2",
+        "task-3",
+        "task-5",
+        "task-6"
+      ],
+      "feature_id": "core-foundation"
+    },
+    {
+      "id": "task-admin-ui-plugin",
+      "title": "Implement Admin UI Plugin",
+      "description": "Implement the feature: Admin UI Plugin. Optional admin panel plugin for non-engineers to manage content, plugins, and settings. Easy deployment via admin UI.",
+      "priority": "medium",
+      "estimate": "",
+      "depends_on": [],
+      "feature_id": "admin-ui-plugin"
+    },
+    {
+      "id": "task-api-first-headless",
+      "title": "Implement API-First Headless",
+      "description": "Implement the feature: API-First Headless. REST API for headless content access. Default API endpoints for pages, content, users. Plugins can extend with custom endpoints.",
+      "priority": "medium",
+      "estimate": "",
+      "depends_on": [],
+      "feature_id": "api-first-headless"
+    }
+  ],
+  "approval_status": "approved",
+  "created_at": "2026-02-17T22:02:53.333801+01:00",
+  "updated_at": "2026-02-24T10:21:40.688875+01:00"
+}

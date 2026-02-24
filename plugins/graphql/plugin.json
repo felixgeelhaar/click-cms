@@ -1,0 +1,8 @@
+{
+    "name": "GraphQL API",
+    "description": "GraphQL API for flexible content querying",
+    "version": "1.0.0",
+    "author": "Click CMS",
+    "dependencies": ["json-storage"],
+    "hooks": ["api.routes"]
+}

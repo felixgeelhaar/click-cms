@@ -1,0 +1,37 @@
+name: Build Marketplace Registry
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Write private key
+        env:
+          MARKETPLACE_PRIVATE_KEY: ${{ secrets.MARKETPLACE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$MARKETPLACE_PRIVATE_KEY" ]; then
+            echo "MARKETPLACE_PRIVATE_KEY secret is missing" >&2
+            exit 1
+          fi
+          mkdir -p .tmp
+          printf "%s" "$MARKETPLACE_PRIVATE_KEY" > .tmp/marketplace-private-key.pem
+
+      - name: Build registry
+        run: |
+          php scripts/marketplace/build-registry-from-manifests.php marketplace/manifests .tmp/marketplace-private-key.pem marketplace/registry.json
+
+      - name: Upload registry artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketplace-registry
+          path: marketplace/registry.json

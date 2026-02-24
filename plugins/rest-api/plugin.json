@@ -1,0 +1,8 @@
+{
+    "name": "REST API",
+    "description": "REST API for headless content access",
+    "version": "1.0.0",
+    "author": "Click CMS",
+    "dependencies": ["json-storage"],
+    "hooks": ["api.routes", "storage.init"]
+}

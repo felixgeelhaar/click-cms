@@ -1,0 +1,23 @@
+{
+  "name": "click-cms-admin",
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/vue": "^4.0.0",
+    "@types/d3": "^7.4.0",
+    "astro": "^4.0.0",
+    "d3": "^7.8.0",
+    "vue": "^3.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vite-tsconfig-paths": "^6.1.1"
+  }
+}

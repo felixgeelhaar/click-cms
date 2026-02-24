@@ -1,0 +1,31 @@
+{
+  "core": {
+    "restApi": {
+      "enabled": true
+    },
+    "graphql": {
+      "enabled": true
+    },
+    "auth": {
+      "enabled": true,
+      "sessionTtlSeconds": 28800,
+      "rememberTtlSeconds": 2592000,
+      "idleTimeoutSeconds": 1800,
+      "lockoutMaxAttempts": 5,
+      "lockoutWindowSeconds": 900,
+      "lockoutDurationSeconds": 900,
+      "passwordMinLength": 8
+    },
+    "marketplace": {
+      "enabled": true,
+      "registryUrl": "https://felixgeelhaar.github.io/click-cms-marketplace/registry.json",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAypFUoKgilcs9UJjiu6oT\nMc8/ev7iKapB4Pm4xfqPHHUk7KpWvaWrKcQPy7qYLohHLwFnAQQ+07y73VEqlWbg\nQl1/MhdruF3lZbwQ1NXdmB9bWs4a90KwXydretUmpg6EZgPEvh66cUdiQjJZ/XL1\n9Jqc2UzIkxPVFeN+a+V20io3hog7bxjGhBkcQITF/Ky0LBJgQeHFpiisqhu3A+vq\nSmFYqmYWh7bf9vgn5IXT20xfKfoiJ+cXH5iNe1IMyTS/YHHdEBSl0nI3evyRa6mA\nDK0LXHoMRnyJXMix4CqRZpe62/QRXlHpqFSV9apz6SJKfe417mnLZsORQod9dpAJ\n5QIDAQAB\n-----END PUBLIC KEY-----"
+    },
+    "plugins": {
+      "exclude": {
+        "ids": ["admin-ui", "authentication"],
+        "dirs": ["admin-ui", "auth"]
+      }
+    }
+  }
+}

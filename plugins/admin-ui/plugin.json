@@ -1,0 +1,8 @@
+{
+    "name": "Admin UI",
+    "description": "Web-based admin panel for managing content and plugins",
+    "version": "1.0.0",
+    "author": "Click CMS",
+    "dependencies": ["json-storage"],
+    "hooks": ["api_routes"]
+}

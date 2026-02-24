@@ -1,0 +1,11 @@
+{
+  "id": "auth",
+  "name": "Authentication",
+  "description": "User authentication and session management",
+  "version": "1.0.0",
+  "author": "Click CMS",
+  "hooks": [
+    "api.routes"
+  ],
+  "dependencies": []
+}
