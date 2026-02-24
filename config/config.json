@@ -1,0 +1,24 @@
+{
+    "app": {
+        "name": "Click CMS",
+        "version": "0.1.0",
+        "debug": false,
+        "timezone": "UTC",
+        "url": "http://localhost"
+    },
+    "plugins": {
+        "directory": "plugins",
+        "autoload": true
+    },
+    "storage": {
+        "default": "json"
+    },
+    "api": {
+        "enabled": true,
+        "prefix": "/api"
+    },
+    "admin": {
+        "enabled": false,
+        "path": "/admin"
+    }
+}

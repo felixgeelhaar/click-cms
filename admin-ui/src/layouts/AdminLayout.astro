@@ -1,0 +1,131 @@
+---
+const { title = 'Click CMS Admin' } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style is:global>
+        :root {
+            --font-body: 'Source Sans 3', ui-sans-serif, sans-serif;
+            --font-display: 'Sora', ui-sans-serif, sans-serif;
+
+            --color-primary-50: #e7f5f4;
+            --color-primary-100: #ccefed;
+            --color-primary-500: #0ea5a4;
+            --color-primary-600: #0f766e;
+            --color-primary-700: #0f5e57;
+
+            --color-gray-50: #f6f7f9;
+            --color-gray-100: #eef1f4;
+            --color-gray-200: #e0e5ea;
+            --color-gray-300: #c7ced8;
+            --color-gray-400: #97a3b3;
+            --color-gray-500: #6b7585;
+            --color-gray-600: #4a5260;
+            --color-gray-700: #303641;
+            --color-gray-800: #1f232b;
+            --color-gray-900: #14181f;
+
+            --color-success-500: #22c55e;
+            --color-warning-500: #f59e0b;
+            --color-danger-500: #ef4444;
+
+            --app-bg: linear-gradient(180deg, #f7f9fb 0%, #eef2f5 100%);
+            --app-surface: #ffffff;
+            --app-surface-strong: #f7f9fb;
+            --app-text: #14181f;
+            --app-text-muted: #4a5260;
+            --app-border: #e0e5ea;
+            --app-elevation: 0 18px 40px rgba(15, 23, 42, 0.12);
+            --sidebar-bg: linear-gradient(180deg, #ffffff 0%, #f6f8fb 100%);
+            --sidebar-border: rgba(15, 23, 42, 0.08);
+            --sidebar-glow: 0 8px 20px rgba(14, 165, 164, 0.12);
+            --sidebar-active: rgba(14, 165, 164, 0.12);
+            --sidebar-active-text: #0f5e57;
+            --sidebar-hover: rgba(15, 23, 42, 0.04);
+            --sidebar-icon-bg: rgba(14, 165, 164, 0.12);
+            --card-bg: #ffffff;
+            --card-border: rgba(15, 23, 42, 0.08);
+            --card-radius: 16px;
+            --card-radius-sm: 12px;
+            --card-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+            --card-shadow-soft: 0 12px 28px rgba(15, 23, 42, 0.08);
+        }
+
+        [data-theme="dark"] {
+            --color-primary-50: #0f1b1a;
+            --color-primary-100: #13312f;
+            --color-primary-500: #14b8a6;
+            --color-primary-600: #0f766e;
+            --color-primary-700: #0c5b55;
+
+            --color-gray-50: #0c0f14;
+            --color-gray-100: #141923;
+            --color-gray-200: #1d2430;
+            --color-gray-300: #2b3443;
+            --color-gray-400: #4a5565;
+            --color-gray-500: #7a8799;
+            --color-gray-600: #a6b0bd;
+            --color-gray-700: #c9d0d9;
+            --color-gray-800: #e1e6ec;
+            --color-gray-900: #f7f8fa;
+
+            --app-bg: radial-gradient(circle at top, #0f1720 0%, #0a0d12 55%, #080b10 100%);
+            --app-surface: #121720;
+            --app-surface-strong: #161c27;
+            --app-text: #f7f8fa;
+            --app-text-muted: #a6b0bd;
+            --app-border: #1f2835;
+            --app-elevation: 0 18px 40px rgba(2, 6, 23, 0.45);
+            --sidebar-bg: linear-gradient(180deg, #141b26 0%, #101621 100%);
+            --sidebar-border: rgba(148, 163, 184, 0.2);
+            --sidebar-glow: 0 8px 20px rgba(20, 184, 166, 0.18);
+            --sidebar-active: rgba(20, 184, 166, 0.18);
+            --sidebar-active-text: #7ee7d9;
+            --sidebar-hover: rgba(148, 163, 184, 0.12);
+            --sidebar-icon-bg: rgba(20, 184, 166, 0.2);
+            --card-bg: #121720;
+            --card-border: rgba(148, 163, 184, 0.2);
+            --card-radius: 16px;
+            --card-radius-sm: 12px;
+            --card-shadow: 0 18px 40px rgba(2, 6, 23, 0.45);
+            --card-shadow-soft: 0 12px 28px rgba(2, 6, 23, 0.45);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            background: var(--app-bg);
+        }
+
+        body {
+            font-family: var(--font-body);
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--app-text);
+            background: var(--app-bg);
+            min-height: 100vh;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        h1, h2, h3 {
+            font-family: var(--font-display);
+            letter-spacing: -0.02em;
+        }
+    </style>
+</head>
+<body>
+    <slot />
+</body>
+</html>

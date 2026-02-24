@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../layouts/AdminLayout.astro';
+import AdminApp from '../components/AdminApp.vue';
+---
+
+<AdminLayout title="Dashboard - Click CMS Admin">
+  <AdminApp client:only="vue" />
+</AdminLayout>

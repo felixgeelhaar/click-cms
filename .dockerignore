@@ -1,0 +1,10 @@
+node_modules/
+admin-ui/node_modules/
+vendor/
+.git/
+.gitignore
+*.md
+tests/
+coverage/
+.phpunit.cache/
+.DS_Store

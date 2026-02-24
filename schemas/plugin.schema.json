@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://click-cms.dev/plugin.json",
+  "title": "Click CMS Plugin",
+  "description": "Schema for Click CMS plugin configuration",
+  "type": "object",
+  "required": ["name", "version"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9 -]*$",
+      "minLength": 2,
+      "maxLength": 50,
+      "examples": ["JSON Storage", "REST API", "My Plugin"]
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-z0-9.-]+)?$",
+      "examples": ["1.0.0", "1.0.0-beta.1"]
+    },
+    "author": {
+      "type": "string",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "url": { "type": "string", "format": "uri" }
+      }
+    },
+    "license": {
+      "type": "string",
+      "default": "MIT"
+    },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri"
+    },
+    "repository": {
+      "type": "string",
+      "format": "uri"
+    },
+    "require": {
+      "type": "object",
+      "description": "Plugin dependencies",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      },
+      "examples": [
+        { "json-storage": "1.0.0" }
+      ]
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "examples": [
+        ["json-storage"]
+      ]
+    },
+    "hooks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "boot",
+          "init",
+          "storage.init",
+          "api.routes",
+          "api.middleware",
+          "content.created",
+          "content.updated",
+          "content.deleted",
+          "response",
+          "request",
+          "admin.menu",
+          "admin.routes",
+          "web.render"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "routes": {
+      "type": "object",
+      "description": "API routes defined by this plugin",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "handler": { "type": "string" },
+          "methods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            }
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "description": "Plugin configuration schema"
+    },
+    "autoload": {
+      "type": "object",
+      "description": "PHP autoload configuration",
+      "properties": {
+        "psr4": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

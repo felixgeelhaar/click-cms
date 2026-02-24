@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  click-cms:
+    build: .
+    container_name: click-cms
+    ports:
+      - "8080:80"
+    volumes:
+      - ./content:/var/www/html/content
+      - ./data:/var/www/html/data
+      - ./plugins:/var/www/html/plugins
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html/public
+    restart: unless-stopped
+
+  # Optional: Admin UI development server
+  admin-ui-dev:
+    image: node:20-alpine
+    container_name: click-cms-admin-dev
+    working_dir: /app
+    volumes:
+      - ./admin-ui:/app
+    ports:
+      - "3000:3000"
+    command: sh -c "npm install && npm run dev -- --host"
+    profiles:
+      - dev

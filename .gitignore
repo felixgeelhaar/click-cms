@@ -1,0 +1,49 @@
+# Secrets
+config/marketplace-private.pem
+*.pem
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+admin-ui/dist/
+admin-ui/.astro/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Data & Content
+data/
+content/
+storage/
+*.sqlite
+*.sqlite3
+
+# PHP
+.phpunit.result.cache
+
+# Test coverage
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Marketplace registry (separate repo)
+marketplace-registry/
+
+# Roady project management
+.roady/

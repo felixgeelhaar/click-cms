@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://click-cms.dev/visual-builder.json",
+  "title": "Click CMS Visual Builder",
+  "description": "Schema for Visual Builder page layout data",
+  "type": "object",
+  "required": ["version", "root", "nodes"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\d+\.\d+$",
+      "examples": ["1.0"]
+    },
+    "root": {
+      "type": "string",
+      "description": "Root node id"
+    },
+    "nodes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["section", "text", "image", "button", "grid", "spacer", "chart"]
+          },
+          "props": {
+            "type": "object",
+            "description": "Component props"
+          },
+          "styles": {
+            "type": "object",
+            "description": "Base styles"
+          },
+          "children": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "responsive": {
+            "type": "object",
+            "description": "Per-breakpoint overrides",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "props": { "type": "object" },
+                "styles": { "type": "object" }
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "breakpoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "minWidth"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "minWidth": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "assets": {
+      "type": "object",
+      "properties": {
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "url"],
+            "properties": {
+              "id": { "type": "string" },
+              "url": { "type": "string", "format": "uri" },
+              "alt": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "createdBy": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
