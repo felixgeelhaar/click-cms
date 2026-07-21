@@ -3,6 +3,9 @@
     <div v-if="!isLoggedIn" class="login-screen">
       <Login @loggedIn="handleLoginSuccess" />
     </div>
+    <div v-else-if="mustChangePassword" class="login-screen">
+      <ChangePassword forced @changed="handlePasswordChanged" />
+    </div>
     <div v-else class="admin-layout">
       <header class="topbar">
         <button class="icon-button" @click="toggleSidebar">
@@ -47,6 +50,7 @@ import PluginDetail from './PluginDetail.vue';
 import Marketplace from './Marketplace.vue';
 import Analytics from './Analytics.vue';
 import Builder from './Builder.vue';
+import ChangePassword from './ChangePassword.vue';
 
 const currentRoute = ref('/admin');
 const isLoggedIn = ref(false);
@@ -55,6 +59,10 @@ const installedPluginIds = ref([]);
 const theme = ref('light');
 const isCollapsed = ref(false);
 const branding = ref({ name: '', primaryColor: '' });
+
+// An account still using the installed password may reach nothing but the
+// password screen — the API enforces this too, so the UI is only the courtesy.
+const mustChangePassword = computed(() => currentUser.value?.mustChangePassword === true);
 
 const brandLabel = computed(() => branding.value.name || currentUser.value?.displayName || currentUser.value?.username || 'Workspace');
 const hasBuilder = computed(() => installedPluginIds.value.includes('visual-builder'));
@@ -78,6 +86,10 @@ const loadInstalledPlugins = async () => {
 };
 
 const handleLoginSuccess = async (user) => { currentUser.value = user; isLoggedIn.value = true; currentRoute.value = '/admin'; await checkAuth(); };
+const handlePasswordChanged = async () => {
+  await checkAuth();
+};
+
 const handleLogout = async () => { await fetch('/api/auth/logout', { method: 'POST' }); currentUser.value = null; isLoggedIn.value = false; };
 const toggleSidebar = () => { isCollapsed.value = !isCollapsed.value; };
 const toggleTheme = () => { theme.value = theme.value === 'light' ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', theme.value); };
@@ -90,6 +102,7 @@ const getRouteComponent = () => {
   if (path === '/admin/media') return Media;
   if (path === '/admin/users') return Users;
   if (path === '/admin/profile') return Profile;
+  if (path === '/admin/password') return ChangePassword;
   if (path === '/admin/plugins') return Plugins;
   if (path === '/admin/marketplace') return currentUser.value?.role === 'admin' ? Marketplace : Dashboard;
   if (path === '/admin/builder') return currentUser.value?.role === 'admin' && hasBuilder.value ? Builder : Dashboard;

@@ -15,6 +15,12 @@ use Click\Cms\Infrastructure\Storage\JsonStorage;
 
 class Application
 {
+    /**
+     * The password the installer seeds. Published in the documentation and
+     * therefore not a secret — the account is unusable until it is changed.
+     */
+    private const INITIAL_PASSWORD = 'admin';
+
     private bool $booted = false;
     private ?PluginManager $pluginManager = null;
     private ?ContentService $contentService = null;
@@ -348,6 +354,18 @@ class Application
 
     private function enforceAuthForApi(string $path, string $method): ?array
     {
+        // An account with an outstanding password change may do nothing else.
+        // Checked before the per-path rules so that no endpoint, present or
+        // future, can be reached while the seeded password is still in place.
+        $session = $this->getSessionUser();
+        if ($session !== null && ($session['mustChangePassword'] ?? false)) {
+            return [
+                'status' => 403,
+                'error' => 'Set a new password before continuing.',
+                'mustChangePassword' => true,
+            ];
+        }
+
         $protectedPrefixes = [
             'users',
             'plugins',
@@ -437,6 +455,10 @@ class Application
             return $this->handleLogin();
         }
 
+        if ($method === 'POST' && $action === 'password') {
+            return $this->handleChangePassword();
+        }
+
         if ($method === 'POST' && $action === 'logout') {
             return $this->handleLogout();
         }
@@ -513,7 +535,8 @@ class Application
                 'username' => $userData['username'] ?? $username,
                 'displayName' => $userData['displayName'] ?? $username,
                 'email' => $userData['email'] ?? '',
-                'role' => $userData['role'] ?? 'editor'
+                'role' => $userData['role'] ?? 'editor',
+                'mustChangePassword' => (bool) ($userData['mustChangePassword'] ?? false)
             ]
         ];
 
@@ -521,6 +544,100 @@ class Application
         $this->clearFailedLogin($username);
 
         return ['data' => ['success' => true, 'user' => $session['user']]];
+    }
+
+    /**
+     * Change the signed-in account's password.
+     *
+     * Requires the current password even though the session is already
+     * authenticated: it is what stops a borrowed or hijacked session from
+     * locking the real owner out of their own account.
+     *
+     * @return array<string, mixed>
+     */
+    private function handleChangePassword(): array
+    {
+        $session = $this->getSessionUser();
+        if ($session === null) {
+            return ['status' => 401, 'error' => 'Not authenticated'];
+        }
+
+        $data = $this->getJsonBody();
+        $current = (string) ($data['currentPassword'] ?? '');
+        $new = (string) ($data['newPassword'] ?? '');
+
+        if ($current === '' || $new === '') {
+            return ['status' => 400, 'error' => 'Both the current and the new password are required.'];
+        }
+
+        $username = (string) ($session['username'] ?? '');
+        $account = $this->contentService?->user($username);
+        if ($account === null) {
+            return ['status' => 404, 'error' => 'Account not found'];
+        }
+
+        $hash = $account->data['password'] ?? null;
+        if (!is_string($hash) || !password_verify($current, $hash)) {
+            $this->recordFailedLogin($username);
+            return ['status' => 403, 'error' => 'The current password is not correct.'];
+        }
+
+        $minimum = $this->getPasswordMinLength();
+        if (mb_strlen($new) < $minimum) {
+            return ['status' => 422, 'error' => "The new password must be at least {$minimum} characters."];
+        }
+
+        if ($new === $current) {
+            return ['status' => 422, 'error' => 'The new password must differ from the current one.'];
+        }
+
+        // The seeded password is published, so it can never be the answer even
+        // if it satisfies the length rule.
+        if ($new === self::INITIAL_PASSWORD) {
+            return ['status' => 422, 'error' => 'That password cannot be used.'];
+        }
+
+        $account->update([
+            'password' => password_hash($new, PASSWORD_DEFAULT),
+            'mustChangePassword' => null,
+            'passwordChangedAt' => gmdate('c'),
+        ]);
+        $this->contentService->save($account);
+
+        $this->clearFailedLogin($username);
+        $this->refreshSessionUser($username);
+
+        return ['data' => ['success' => true]];
+    }
+
+    /**
+     * Re-read the account into the session after it changes, so a stale flag
+     * cannot keep an account locked out of the rest of the API.
+     */
+    private function refreshSessionUser(string $username): void
+    {
+        $sessionFile = $this->getSessionFile();
+        if (!file_exists($sessionFile)) {
+            return;
+        }
+
+        $session = json_decode((string) file_get_contents($sessionFile), true);
+        if (!is_array($session)) {
+            return;
+        }
+
+        $account = $this->contentService?->user($username);
+        if ($account === null) {
+            return;
+        }
+
+        $session['user']['mustChangePassword'] = (bool) ($account->data['mustChangePassword'] ?? false);
+        file_put_contents($sessionFile, json_encode($session, JSON_PRETTY_PRINT));
+    }
+
+    private function getPasswordMinLength(): int
+    {
+        return max(8, (int) ($this->coreConfig['core']['auth']['passwordMinLength'] ?? 8));
     }
 
     private function handleLogout(): array
@@ -819,7 +936,10 @@ class Application
             'email' => 'admin@example.com',
             'role' => 'admin',
             'status' => 'active',
-            'password' => password_hash('admin', PASSWORD_DEFAULT),
+            'password' => password_hash(self::INITIAL_PASSWORD, PASSWORD_DEFAULT),
+            // The seeded account has a published, guessable password. It can log
+            // in and do exactly one thing: choose a real one.
+            'mustChangePassword' => true,
             'createdAt' => gmdate('c'),
         ];
 
