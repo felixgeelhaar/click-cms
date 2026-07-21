@@ -15,18 +15,22 @@ use InvalidArgumentException;
  * A piece of content is identified by its {@see ContentKey} (type + slug) and
  * carries an open-ended `data` map. Keeping the payload open is deliberate:
  * plugins define their own fields, and the core must not need changing when
- * they do. The few keys the core itself relies on — `title`, `content`,
- * `status` — are read through accessors so callers never depend on the raw
- * shape.
+ * they do. The few keys the core itself relies on — `title`, `content` — are
+ * read through accessors so callers never depend on the raw shape.
+ *
+ * There is deliberately no publication field. A document used to carry
+ * `status: draft|published` while the public read path decided visibility by
+ * whether the file was in `content/` at all, which is two sources of truth for
+ * one fact: a page could say it was published and 404 to every visitor, and
+ * nothing here could say which answer was right. Publication is presence in
+ * `content/`, and what a UI needs on top of that is derived by
+ * {@see \Click\Cms\Domain\Publishing\PublicationState}.
  *
  * Instances are mutable through {@see update()} only, which merges rather than
  * replaces so a partial update cannot silently drop fields it did not mention.
  */
 final class Content
 {
-    public const STATUS_PUBLISHED = 'published';
-    public const STATUS_DRAFT = 'draft';
-
     private function __construct(
         public readonly ContentKey $key,
         public array $data,
@@ -102,18 +106,6 @@ final class Content
         $content = $this->data['content'] ?? null;
 
         return is_string($content) ? $content : '';
-    }
-
-    public function status(): string
-    {
-        $status = $this->data['status'] ?? null;
-
-        return $status === self::STATUS_DRAFT ? self::STATUS_DRAFT : self::STATUS_PUBLISHED;
-    }
-
-    public function isPublished(): bool
-    {
-        return $this->status() === self::STATUS_PUBLISHED;
     }
 
     public function updatedAt(): DateTimeImmutable

@@ -9,6 +9,7 @@ use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Domain\Schema\SectionTypeRepository;
 use Click\Cms\Domain\Content\ResolvedContent;
+use Click\Cms\Domain\Publishing\PublicationState;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 
@@ -25,6 +26,14 @@ use Click\Cms\Domain\ValueObjects\Locale;
  * an editor who asks to change the German page and is quietly given the English
  * one will overwrite English text believing they are writing German. Reading
  * with fallback is {@see resolve()}, and it is deliberately separate.
+ *
+ * Everything here reads and writes the *working copy*, not the live page. That
+ * is what management means now that a save no longer goes straight to the
+ * public site: {@see all()} and {@see find()} show an editor what they are
+ * working on, including pages nobody has published, while {@see resolve()}
+ * remains the reader's path and shows only what is live. Publication is a
+ * separate act — {@see publish()} — and per language, because `page:de:home`
+ * and `page:en:home` are two documents and always have been.
  */
 final class PageService
 {
@@ -46,17 +55,39 @@ final class PageService
     }
 
     /**
+     * Every page as it is being worked on, live or not.
+     *
      * @return list<Content>
      */
     public function all(string|Locale|null $locale = null): array
     {
+        return $this->content->draftPages($locale);
+    }
+
+    /**
+     * Only what the public can read — the list a delivery path wants.
+     *
+     * @return list<Content>
+     */
+    public function published(string|Locale|null $locale = null): array
+    {
         return $this->content->pages($locale);
     }
 
-    /** The page in exactly this language, or nothing. */
+    /** The working copy in exactly this language, or nothing. */
     public function find(string $slug, string|Locale|null $locale = null): ?Content
     {
-        return $this->content->page($slug, $locale);
+        return $this->content->draftPage($slug, $locale);
+    }
+
+    /** Where this page stands: live, edited since, or never published. */
+    public function publicationOf(string $slug, string|Locale|null $locale = null): PublicationState
+    {
+        $parsed = $this->parseLocale(is_string($locale) ? $locale : $locale?->code);
+
+        return $this->content->publicationOf(
+            ContentKey::page($slug, $parsed['locale'] ?? $this->content->defaultLocale())
+        );
     }
 
     /**
@@ -138,7 +169,11 @@ final class PageService
 
         // Per language: `page/de/home` existing is not a reason to refuse
         // `page/en/home`. Translations share an address by design.
-        if ($this->content->page($slug, $locale) !== null) {
+        //
+        // The working copy, not the live page. An unpublished draft occupies the
+        // address just as firmly, and refusing to notice it would let a second
+        // "create" silently start a fresh chain over somebody's unfinished work.
+        if ($this->content->draftPage($slug, $locale) !== null) {
             return $this->failure('A page with that address already exists.', 409);
         }
 
@@ -150,6 +185,10 @@ final class PageService
 
         // Recorded so per-author permissions have something to check against.
         $data['owner'] ??= $user['username'] ?? 'unknown';
+
+        // See `unset()` in `update()`: publication is not a field, and a client
+        // sending one must not be able to put it back.
+        unset($data['status']);
 
         $page = Content::create(ContentKey::page($slug, $locale), $data);
         $this->content->save($page);
@@ -171,7 +210,11 @@ final class PageService
         // No fallback on the write path. A 404 here means "that translation
         // does not exist yet"; silently editing the language it would have
         // fallen back to is how English pages get German text written into them.
-        $page = $this->content->page($slug, $parsed['locale']);
+        //
+        // The working copy, so a second edit builds on the first rather than on
+        // whatever happens to be live. Editing an unpublished page twice would
+        // otherwise 404 the second time.
+        $page = $this->content->draftPage($slug, $parsed['locale']);
         if ($page === null) {
             return $this->failure('Page not found.', 404);
         }
@@ -189,7 +232,13 @@ final class PageService
 
         // The address and the language both identify the page; changing either
         // here would silently orphan every link to it.
-        unset($data['slug'], $data['locale']);
+        //
+        // `status` goes with them because publication is no longer a field on
+        // the document — it is presence in `content/`. Letting a client write
+        // one would recreate exactly the two-sources-of-truth problem this
+        // change removed: a page claiming to be published while the public gets
+        // a 404, with nothing able to say which was right.
+        unset($data['slug'], $data['locale'], $data['status']);
 
         $page->update($data);
         $this->content->save($page);
@@ -207,7 +256,7 @@ final class PageService
             return $this->failure($parsed['error'], 400);
         }
 
-        $page = $this->content->page($slug, $parsed['locale']);
+        $page = $this->content->draftPage($slug, $parsed['locale']);
         if ($page === null) {
             return $this->failure('Page not found.', 404);
         }
@@ -222,6 +271,87 @@ final class PageService
         $this->content->delete(ContentKey::page($slug, $parsed['locale']));
 
         return ['page' => null, 'error' => null, 'status' => 200, 'errors' => []];
+    }
+
+    /* ------------------------------------------------------- publication -- */
+
+    /**
+     * Put the working copy of this page, in this language, in front of the
+     * public.
+     *
+     * One language at a time and no cross-language grouping, because there is
+     * nothing to group: `page:de:home` and `page:en:home` are two documents, and
+     * publishing a German translation the moment its English original is
+     * approved is exactly the accident this avoids.
+     *
+     * @param array<string, mixed> $user
+     * @return array{page: ?Content, error: ?string, status: int, errors: array<string, string>}
+     */
+    public function publish(string $slug, array $user, string|Locale|null $locale = null): array
+    {
+        $parsed = $this->parseLocale(is_string($locale) ? $locale : $locale?->code);
+        if ($parsed['error'] !== null) {
+            return $this->failure($parsed['error'], 400);
+        }
+
+        $page = $this->content->draftPage($slug, $parsed['locale']);
+        if ($page === null) {
+            return $this->failure('Page not found.', 404);
+        }
+
+        $role = Role::fromName($user['role'] ?? null);
+        if (!$role->canPublishContentOwnedBy($page->data['owner'] ?? null, $user['username'] ?? null)) {
+            return $this->failure('You do not have permission to publish this page.', 403);
+        }
+
+        $published = $this->content->publish(ContentKey::page($slug, $parsed['locale']));
+
+        if ($published === null) {
+            // The working copy was there a moment ago, so this is a storage
+            // failure rather than a missing page, and saying "not found" would
+            // send the editor looking for the wrong problem.
+            return $this->failure('This page could not be published.', 500);
+        }
+
+        return ['page' => $published, 'error' => null, 'status' => 200, 'errors' => []];
+    }
+
+    /**
+     * Take the live page down. The working copy and every version survive.
+     *
+     * @param array<string, mixed> $user
+     * @return array{page: ?Content, error: ?string, status: int, errors: array<string, string>}
+     */
+    public function unpublish(string $slug, array $user, string|Locale|null $locale = null): array
+    {
+        $parsed = $this->parseLocale(is_string($locale) ? $locale : $locale?->code);
+        if ($parsed['error'] !== null) {
+            return $this->failure($parsed['error'], 400);
+        }
+
+        $key = ContentKey::page($slug, $parsed['locale']);
+
+        $page = $this->content->draftPage($slug, $parsed['locale']);
+        if ($page === null) {
+            return $this->failure('Page not found.', 404);
+        }
+
+        $role = Role::fromName($user['role'] ?? null);
+        if (!$role->canUnpublishContentOwnedBy($page->data['owner'] ?? null, $user['username'] ?? null)) {
+            return $this->failure('You do not have permission to unpublish this page.', 403);
+        }
+
+        // Refused rather than reported as a success. An editor who is told
+        // "unpublished" about a page that was never live has been told the
+        // system did something, and will not go looking for the reason their
+        // change is still not visible.
+        if (!$this->content->exists($key)) {
+            return $this->failure('This page is not published.', 409);
+        }
+
+        $this->content->unpublish($key);
+
+        return ['page' => $page, 'error' => null, 'status' => 200, 'errors' => []];
     }
 
     /**

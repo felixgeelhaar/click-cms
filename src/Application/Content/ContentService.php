@@ -6,6 +6,8 @@ namespace Click\Cms\Application\Content;
 
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Content\ResolvedContent;
+use Click\Cms\Domain\Publishing\PublicationState;
+use Click\Cms\Domain\Publishing\PublishingStorage;
 use Click\Cms\Domain\Storage\StorageInterface;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
@@ -20,6 +22,14 @@ use Click\Cms\Domain\ValueObjects\Locale;
  * read configuration and storage should not decide policy, so the rule "a
  * missing translation falls back to the default language" is applied here, once,
  * rather than in every caller that reads a page.
+ *
+ * Two families of read live here and they are not interchangeable. {@see get()},
+ * {@see page()} and {@see all()} answer the reader's question — the live
+ * document — and are what a public render or a delivery API wants. {@see draft()}
+ * and {@see workingCopies()} answer the editor's, and include work that has not
+ * been published. Handing a reader a working copy publishes it by accident;
+ * handing an editor the live document loses their afternoon's work when they
+ * save over it.
  */
 final class ContentService
 {
@@ -157,14 +167,93 @@ final class ContentService
     /**
      * Published pages only — what a public site should ever render.
      *
+     * Now the same list as {@see pages()}, and kept as its own name because
+     * plugins call it and because the name is the clearer statement of intent
+     * at a call site that is rendering to the public. It used to filter on a
+     * stored `status` field; that field is gone, and everything in `content/`
+     * is by definition published.
+     *
      * @return list<Content>
      */
     public function publishedPages(string|Locale|null $locale = null): array
     {
-        return array_values(array_filter(
-            $this->pages($locale),
-            static fn (Content $page): bool => $page->isPublished()
-        ));
+        return $this->pages($locale);
+    }
+
+    /* ------------------------------------------------------- publication -- */
+
+    /**
+     * The copy being worked on, which for a published page is not what the
+     * public is reading.
+     *
+     * A backend with no version chain behind it has no drafts to offer, so the
+     * stored document is the honest answer. That is not a fallback papering
+     * over a failure: a bare {@see StorageInterface} genuinely has one document
+     * per key, and saving to it genuinely is publishing.
+     */
+    public function draft(ContentKey $key): ?Content
+    {
+        return $this->storage instanceof PublishingStorage
+            ? $this->storage->draft($key)
+            : $this->storage->find($key);
+    }
+
+    public function draftPage(string $slug, string|Locale|null $locale = null): ?Content
+    {
+        return $this->draft(ContentKey::page($slug, $this->locale($locale)));
+    }
+
+    /**
+     * Every document of a type as it is being worked on — what an editor's
+     * listing needs, as against what a reader's does.
+     *
+     * @return list<Content>
+     */
+    public function workingCopies(string $type, string|Locale|null $locale = null): array
+    {
+        return $this->storage instanceof PublishingStorage
+            ? $this->storage->workingCopies($type, $this->locale($locale))
+            : $this->all($type, $locale);
+    }
+
+    /**
+     * Pages as they are being worked on, newest first.
+     *
+     * @return list<Content>
+     */
+    public function draftPages(string|Locale|null $locale = null): array
+    {
+        return $this->sortByRecency($this->workingCopies('page', $locale));
+    }
+
+    /**
+     * Promote the working copy to the live site.
+     *
+     * @return ?Content What went live, or null when there was nothing to promote.
+     */
+    public function publish(ContentKey $key): ?Content
+    {
+        if ($this->storage instanceof PublishingStorage) {
+            return $this->storage->publish($key);
+        }
+
+        // Without a version chain the document is already as public as it can
+        // be. Saying so beats pretending to do something.
+        return $this->storage->find($key);
+    }
+
+    public function unpublish(ContentKey $key): bool
+    {
+        return $this->storage instanceof PublishingStorage
+            ? $this->storage->unpublish($key)
+            : $this->storage->delete($key);
+    }
+
+    public function publicationOf(ContentKey $key): PublicationState
+    {
+        return $this->storage instanceof PublishingStorage
+            ? $this->storage->publicationOf($key)
+            : PublicationState::of($this->storage->find($key), null, null);
     }
 
     public function save(Content $content): void

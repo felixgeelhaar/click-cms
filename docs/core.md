@@ -122,6 +122,44 @@ Deliberately out of scope: judging compression artefacts, sharpness or subject
 matter. Those need heuristics that are wrong often enough to erode trust in the
 warnings that are right.
 
+### Draft and publish
+
+Saving a page does not publish it. Every save records a new version; the newest
+version is the working copy, and `content/{type}/{locale}/{slug}.json` holds
+published documents only. Presence there **is** publication — that is what the
+public read path consults, and keeping that path a single file read is the
+constraint shared hosting imposes.
+
+The document therefore carries no `status` field any more. It used to, beside a
+read path that decided visibility by whether the file existed at all, which is
+two answers to one question: a page could claim to be published and 404 to every
+visitor, with nothing able to say which was right. What a UI needs is derived
+instead — `published`, `hasUnpublishedChanges`, `neverPublished` — from facts
+that cannot contradict each other.
+
+Four consequences worth stating, because each was a choice:
+
+- **Publication is per language.** `page:de:home` and `page:en:home` are already
+  two documents, so publishing one is publishing that document. There is no
+  cross-language grouping, and adding one would mean a German translation going
+  live the moment its English original was approved.
+- **Only some types are publishable**, and the list is stated in
+  `Domain\Publishing\Publishable` rather than inferred from a payload. Pages
+  are; users and media are not. Nobody drafts a login, and an account that
+  existed only as a version would make signing in depend on somebody having
+  pressed Publish.
+- **Restoring restores the working copy**, not the live page. Undo would
+  otherwise be the one editing action that reaches the public with no review
+  step.
+- **Unpublishing records no version.** The newest version is the working copy,
+  so appending the state being taken down would rewind whatever replacement was
+  being written for it. What was live is already retained by the publish that
+  put it there.
+
+`content.publish` and `content.unpublish` are separate capabilities. An editor
+holds both, an author neither — which is what the role comments have claimed
+since they were written, and what nothing enforced while saving was publishing.
+
 ### Choosing a storage backend
 
 Core ships two, and `config/core.json` decides which one runs:
@@ -261,7 +299,12 @@ Still open:
   forward — the restored state becomes the newest version — so a restore of the
   wrong version is itself undoable. Retention keeps the newest
   `core.history.retainVersions` (twenty by default) per document, oldest
-  discarded first, with no exemptions.
+  discarded first, with two exemptions: the newest version, which is now the
+  working copy, and the version a publish recorded, which is what the live site
+  is serving. That said "no exemptions" until draft-and-publish landed, at which
+  point it became a data-loss bug — twenty-one edits without publishing would
+  have discarded the version the public was reading, leaving the site serving a
+  state nothing could name or put back.
 - **Preview shows the stored document, not an unsaved edit.** Capability 12 is
   built: a signed, expiring link renders any page through the same
   `SectionRenderer` the public site uses, per language — the token signs the
@@ -269,17 +312,12 @@ Still open:
   and a preview of a translation that does not exist is a 404 rather than a
   quiet fallback to the language that does.
 
-  What it cannot yet do is show a change to an *already published* page without
-  publishing it, because there is nowhere to keep that change: a page has one
-  stored document, and saving it is publishing it. History supplies versions of
-  what *was*, not a draft of what is next, so it does not close this on its own.
-
-  Closing it needs a decision rather than more code. Either a published page
-  gains a separate working copy that preview reads and publishing promotes — the
-  WordPress model, and a second state for every consumer of a page to reason
-  about — or editing a published page is understood to be immediate, and preview
-  serves drafts and new pages only. The second is honest and much smaller; it
-  should be chosen deliberately rather than remaining true by accident.
+  It now also shows a change to an *already published* page without publishing
+  it, which it could not do while a page had one stored document and saving that
+  document was publishing it. The decision that gap was waiting on has been
+  made — see **Draft and publish** above — and preview reads the working copy,
+  saying on the page itself when what is shown is not what the public is
+  reading.
 - **No audit trail.** Who changed what, and when, is not recorded anywhere.
 - **The two install paths are not equally trusted.** Registry installs verify a
   signed manifest with `openssl_verify` against a configured public key, which
@@ -313,9 +351,10 @@ second storage backend finally reachable. What remains:
 2. **History has no admin UI either, and only pages have endpoints.** Media and
    user documents are versioned at the storage layer but there is no way to
    reach those versions.
-3. **Decide what preview means for a published page.** See the gap above: either
-   a working copy, or an explicit decision that editing a published page is
-   immediate.
+3. **The admin UI has no publish control.** The API exposes publication state
+   and both endpoints, and the capability model refuses an author, but the
+   editor offers no button — so publishing is reachable only through the API,
+   which is the same gap languages and history have.
 4. **Restore does not re-validate against the current schema.** Restoring a
    version whose section type has since been removed puts back content the
    schema no longer declares. Verbatim recovery is the right default for a

@@ -10,7 +10,9 @@ use Click\Cms\Application\Preview\PreviewLinks;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
+use Click\Cms\Infrastructure\Storage\VersioningStorage;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -31,11 +33,17 @@ final class PreviewApiTest extends TestCase
 
         $_COOKIE = [];
 
-        $this->content = new ContentService(new JsonStorage($this->base . '/content'));
+        // Versioned storage rather than a bare backend, because a draft has
+        // nowhere to exist without it: a save no longer writes to `content/`,
+        // so the version chain is what "unpublished" now means.
+        $this->content = new ContentService(new VersioningStorage(
+            new JsonStorage($this->base . '/content'),
+            new JsonVersionStore($this->base . '/data/versions'),
+        ));
         $this->api = new CoreApiRoutes($this->base, $this->content);
 
-        $this->savePage('secret-plans', 'draft');
-        $this->savePage('about', 'published');
+        $this->savePage('secret-plans', publish: false);
+        $this->savePage('about', publish: true);
     }
 
     protected function tearDown(): void
@@ -44,12 +52,21 @@ final class PreviewApiTest extends TestCase
         $this->removeTree($this->base);
     }
 
-    private function savePage(string $slug, string $status): void
+    /**
+     * Rewritten for draft-and-publish. A page used to be made a draft by
+     * writing `status: draft` into it while the document sat in `content/`
+     * regardless; now saving is what leaves it out of `content/`, and
+     * publishing is what puts it there.
+     */
+    private function savePage(string $slug, bool $publish): void
     {
         $this->content->save(Content::create(ContentKey::page($slug), [
             'title' => ucfirst($slug),
-            'status' => $status,
         ]));
+
+        if ($publish) {
+            $this->content->publish(ContentKey::page($slug));
+        }
     }
 
     private function signIn(string $role): void

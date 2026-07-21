@@ -160,6 +160,14 @@ final class HistoryServiceTest extends TestCase
 
     /* ------------------------------------------------------------ restore -- */
 
+    /**
+     * Rewritten for draft-and-publish. These restore tests all asserted through
+     * `find()`, which was the same thing as the working copy while a save went
+     * straight into `content/`. It no longer is: a restore replaces what the
+     * editor is working on and leaves publication alone, so the assertions moved
+     * to `draft()`. Putting an earlier version straight in front of the public
+     * would make undo the one editing action with no review step.
+     */
     public function testRestoringPutsTheEarlierStateBack(): void
     {
         $ids = $this->writeEach(['Original', 'Mistake']);
@@ -167,7 +175,7 @@ final class HistoryServiceTest extends TestCase
         $result = $this->history->restore($this->key(), $ids[0], $this->admin());
 
         $this->assertNull($result['error']);
-        $this->assertSame('Original', $this->storage->find($this->key())?->title());
+        $this->assertSame('Original', $this->storage->draft($this->key())?->title());
     }
 
     /**
@@ -193,13 +201,13 @@ final class HistoryServiceTest extends TestCase
         $ids = $this->writeEach(['One', 'Two', 'Three']);
 
         $this->history->restore($this->key(), $ids[0], $this->admin());
-        $this->assertSame('One', $this->storage->find($this->key())?->title());
+        $this->assertSame('One', $this->storage->draft($this->key())?->title());
 
         // Changed their mind: the state before the restore is still listed.
         $before = $this->history->all($this->key(), $this->admin())['versions'][1];
         $this->history->restore($this->key(), $before['id'], $this->admin());
 
-        $this->assertSame('Three', $this->storage->find($this->key())?->title());
+        $this->assertSame('Three', $this->storage->draft($this->key())?->title());
     }
 
     public function testARestoreIsMarkedAsOneInTheHistory(): void
@@ -226,11 +234,11 @@ final class HistoryServiceTest extends TestCase
     public function testARestoredDocumentCountsAsJustEdited(): void
     {
         $ids = $this->writeEach(['Original', 'Mistake']);
-        $before = $this->storage->find($this->key())?->updatedAt();
+        $before = $this->storage->draft($this->key())?->updatedAt();
 
         $this->history->restore($this->key(), $ids[0], $this->admin());
 
-        $this->assertGreaterThanOrEqual($before, $this->storage->find($this->key())?->updatedAt());
+        $this->assertGreaterThanOrEqual($before, $this->storage->draft($this->key())?->updatedAt());
     }
 
     /**
@@ -245,7 +253,7 @@ final class HistoryServiceTest extends TestCase
         $result = $this->history->restore($this->key(), $ids[0], $this->admin());
 
         $this->assertNull($result['error']);
-        $this->assertSame('Wanted after all', $this->storage->find($this->key())?->title());
+        $this->assertSame('Wanted after all', $this->storage->draft($this->key())?->title());
     }
 
     public function testRestoringAnUnknownVersionIsNotFound(): void
@@ -255,7 +263,7 @@ final class HistoryServiceTest extends TestCase
         $result = $this->history->restore($this->key(), '20260721T104512.123456Z-a3f9', $this->admin());
 
         $this->assertSame(404, $result['status']);
-        $this->assertSame('One', $this->storage->find($this->key())?->title());
+        $this->assertSame('One', $this->storage->draft($this->key())?->title());
     }
 
     /**
@@ -280,7 +288,7 @@ final class HistoryServiceTest extends TestCase
         );
 
         $this->assertContains('Never recorded', $titles);
-        $this->assertSame('Original', $this->storage->find($this->key())?->title());
+        $this->assertSame('Original', $this->storage->draft($this->key())?->title());
     }
 
     public function testAnAlreadyRetainedStateIsNotRetainedTwice(): void
@@ -306,7 +314,7 @@ final class HistoryServiceTest extends TestCase
         );
 
         $this->assertNull($result['error']);
-        $this->assertSame('Original', $this->storage->find($this->key())?->title());
+        $this->assertSame('Original', $this->storage->draft($this->key())?->title());
     }
 
     public function testAnAuthorMayNotRestoreSomebodyElsesPage(): void
@@ -320,7 +328,7 @@ final class HistoryServiceTest extends TestCase
         );
 
         $this->assertSame(403, $result['status']);
-        $this->assertSame('Mistake', $this->storage->find($this->key())?->title());
+        $this->assertSame('Mistake', $this->storage->draft($this->key())?->title());
     }
 
     public function testAViewerMayReadHistoryButNotRestore(): void
@@ -333,7 +341,7 @@ final class HistoryServiceTest extends TestCase
         $result = $this->history->restore($this->key(), $ids[0], $viewer);
 
         $this->assertSame(403, $result['status']);
-        $this->assertSame('Mistake', $this->storage->find($this->key())?->title());
+        $this->assertSame('Mistake', $this->storage->draft($this->key())?->title());
     }
 
     /**
