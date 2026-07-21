@@ -6,6 +6,8 @@ namespace Click\Cms\Core;
 
 use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Authentication\CsrfGuard;
+use Click\Cms\Application\Authentication\LoginThrottle;
+use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Application\Event\EventBus;
 use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Domain\Content\Content;
@@ -29,6 +31,8 @@ class Application
     private ?EventBus $eventBus = null;
     private array $apiRoutes = [];
     private ?CoreApiRoutes $coreApiRoutes = null;
+    private ?SessionStore $sessions = null;
+    private ?LoginThrottle $throttle = null;
     private array $coreConfig = [];
 
     private string $basePath;
@@ -89,6 +93,19 @@ class Application
         $this->contentService = new ContentService($storage);
 
         $this->coreApiRoutes = new CoreApiRoutes($this->basePath, $this->contentService);
+
+        // Sessions and login throttling are collaborators rather than methods on
+        // this class, so each can be understood and tested on its own.
+        $this->sessions = new SessionStore(
+            $this->getSessionFile(),
+            $this->getIdleTimeoutSeconds()
+        );
+        $this->throttle = new LoginThrottle(
+            $this->basePath . '/data/lockouts.json',
+            (int) ($this->coreConfig['core']['auth']['lockoutMaxAttempts'] ?? 5),
+            (int) ($this->coreConfig['core']['auth']['lockoutWindowSeconds'] ?? 900),
+            (int) ($this->coreConfig['core']['auth']['lockoutDurationSeconds'] ?? 900)
+        );
         
         $pluginConfig = $this->coreConfig['core']['plugins'] ?? [];
         $excludeConfig = $pluginConfig['exclude'] ?? [];
@@ -575,7 +592,7 @@ class Application
             ]
         ];
 
-        file_put_contents($this->getSessionFile(), json_encode($session, JSON_PRETTY_PRINT));
+        $this->sessions->write($session);
         $this->clearFailedLogin($username);
 
         return ['data' => ['success' => true, 'user' => $session['user']]];
@@ -651,23 +668,14 @@ class Application
      */
     private function refreshSessionUser(string $username): void
     {
-        $sessionFile = $this->getSessionFile();
-        if (!file_exists($sessionFile)) {
-            return;
-        }
-
-        $session = json_decode((string) file_get_contents($sessionFile), true);
-        if (!is_array($session)) {
-            return;
-        }
-
         $account = $this->contentService?->user($username);
         if ($account === null) {
             return;
         }
 
-        $session['user']['mustChangePassword'] = (bool) ($account->data['mustChangePassword'] ?? false);
-        file_put_contents($sessionFile, json_encode($session, JSON_PRETTY_PRINT));
+        $this->sessions?->merge([
+            'user' => ['mustChangePassword' => (bool) ($account->data['mustChangePassword'] ?? false)],
+        ]);
     }
 
     private function getPasswordMinLength(): int
@@ -677,9 +685,7 @@ class Application
 
     private function handleLogout(): array
     {
-        if (file_exists($this->getSessionFile())) {
-            unlink($this->getSessionFile());
-        }
+        $this->sessions?->clear();
 
         return ['data' => ['success' => true]];
     }
@@ -751,60 +757,17 @@ class Application
 
     private function getSessionUser(): ?array
     {
-        $session = $this->getSessionData();
-
-        return $session['user'] ?? null;
+        return $this->sessions?->user();
     }
 
     private function getSessionData(): array
     {
-        $sessionFile = $this->getSessionFile();
-        if (!file_exists($sessionFile)) {
-            return [];
-        }
-
-        $session = json_decode(file_get_contents($sessionFile), true);
-        if (!is_array($session)) {
-            return [];
-        }
-
-        $expiresAt = $session['expiresAt'] ?? null;
-        if ($expiresAt !== null && time() > (int) $expiresAt) {
-            unlink($sessionFile);
-            return [];
-        }
-
-        $idleTimeout = $this->getIdleTimeoutSeconds();
-        $lastActivity = $session['lastActivity'] ?? null;
-
-        if ($idleTimeout > 0 && $lastActivity !== null) {
-            if (time() - (int) $lastActivity > $idleTimeout) {
-                unlink($sessionFile);
-                return [];
-            }
-        }
-
-        return $session;
+        return $this->sessions?->read() ?? [];
     }
 
     private function touchSession(): void
     {
-        if (!$this->isCoreAuthEnabled()) {
-            return;
-        }
-
-        $sessionFile = $this->getSessionFile();
-        if (!file_exists($sessionFile)) {
-            return;
-        }
-
-        $session = $this->getSessionData();
-        if (empty($session)) {
-            return;
-        }
-
-        $session['lastActivity'] = time();
-        file_put_contents($sessionFile, json_encode($session, JSON_PRETTY_PRINT));
+        $this->sessions?->touch();
     }
 
     private function getSessionTtlSeconds(bool $remember): int
@@ -866,82 +829,34 @@ class Application
 
     private function checkLockout(string $username): ?array
     {
-        $lockout = $this->getLockoutData();
-        $entry = $lockout[$username] ?? null;
+        $remaining = $this->throttle?->secondsRemaining($username);
 
-        if (!$entry) {
+        if ($remaining === null) {
             return null;
         }
 
-        $lockedUntil = $entry['lockedUntil'] ?? null;
-        if ($lockedUntil !== null && time() < (int) $lockedUntil) {
-            return ['status' => 429, 'error' => 'Account locked. Try again later.'];
-        }
+        $minutes = (int) ceil($remaining / 60);
 
-        return null;
+        return [
+            'status' => 429,
+            'error' => "Too many failed attempts. Try again in {$minutes} minute(s).",
+            'retryAfter' => $remaining,
+        ];
     }
 
     private function recordFailedLogin(string $username): void
     {
-        $authConfig = $this->coreConfig['core']['auth'] ?? [];
-        $maxAttempts = (int) ($authConfig['lockoutMaxAttempts'] ?? 5);
-        $windowSeconds = (int) ($authConfig['lockoutWindowSeconds'] ?? 900);
-        $lockoutSeconds = (int) ($authConfig['lockoutDurationSeconds'] ?? 900);
-
-        $lockout = $this->getLockoutData();
-        $entry = $lockout[$username] ?? [
-            'attempts' => [],
-            'lockedUntil' => null,
-        ];
-
-        $now = time();
-        $attempts = array_filter(
-            $entry['attempts'] ?? [],
-            fn($ts) => $now - (int) $ts <= $windowSeconds
-        );
-
-        $attempts[] = $now;
-        $entry['attempts'] = array_values($attempts);
-
-        if (count($attempts) >= $maxAttempts) {
-            $entry['lockedUntil'] = $now + $lockoutSeconds;
-        }
-
-        $lockout[$username] = $entry;
-        $this->saveLockoutData($lockout);
+        $this->throttle?->recordFailure($username);
     }
 
     private function clearFailedLogin(string $username): void
     {
-        $lockout = $this->getLockoutData();
-        if (!isset($lockout[$username])) {
-            return;
-        }
-
-        unset($lockout[$username]);
-        $this->saveLockoutData($lockout);
+        $this->throttle?->clear($username);
     }
 
-    private function getLockoutData(): array
-    {
-        $path = $this->basePath . '/data/auth-lockout.json';
-        if (!file_exists($path)) {
-            return [];
-        }
 
-        $data = json_decode(file_get_contents($path), true);
-        if (!is_array($data)) {
-            return [];
-        }
 
-        return $data;
-    }
 
-    private function saveLockoutData(array $data): void
-    {
-        $path = $this->basePath . '/data/auth-lockout.json';
-        file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT));
-    }
 
     /**
      * The delivery APIs are deliberately not required.
