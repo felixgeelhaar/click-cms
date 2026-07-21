@@ -470,7 +470,16 @@ final class CoreApiRoutes
      */
     public function listPageVersions(string $slug): array
     {
-        $result = $this->history()->all(ContentKey::page($slug), $this->currentUser());
+        // Versions belong to one translation. Without the locale this answered
+        // for the default language whatever was asked for, so a German page
+        // showed English history — and, far worse, restoring from it rewound the
+        // English working copy.
+        $locale = $this->requestedLocale();
+        if ($locale['error'] !== null) {
+            return ['status' => 400, 'error' => $locale['error']];
+        }
+
+        $result = $this->history()->all(ContentKey::page($slug, $locale['locale']), $this->currentUser());
 
         if ($result['error'] !== null) {
             return ['status' => $result['status'], 'error' => $result['error']];
@@ -484,7 +493,12 @@ final class CoreApiRoutes
      */
     public function getPageVersion(string $slug, string $id): array
     {
-        $result = $this->history()->get(ContentKey::page($slug), $id, $this->currentUser());
+        $locale = $this->requestedLocale();
+        if ($locale['error'] !== null) {
+            return ['status' => 400, 'error' => $locale['error']];
+        }
+
+        $result = $this->history()->get(ContentKey::page($slug, $locale['locale']), $id, $this->currentUser());
 
         if ($result['error'] !== null) {
             return ['status' => $result['status'], 'error' => $result['error']];
@@ -498,7 +512,16 @@ final class CoreApiRoutes
      */
     public function restorePageVersion(string $slug, string $id): array
     {
-        $result = $this->history()->restore(ContentKey::page($slug), $id, $this->currentUser());
+        $locale = $this->requestedLocale();
+        if ($locale['error'] !== null) {
+            return ['status' => 400, 'error' => $locale['error']];
+        }
+
+        $result = $this->history()->restore(
+            ContentKey::page($slug, $locale['locale']),
+            $id,
+            $this->currentUser()
+        );
 
         if ($result['error'] !== null) {
             return ['status' => $result['status'], 'error' => $result['error']];
@@ -507,8 +530,10 @@ final class CoreApiRoutes
         // The page as it now stands, so the editor sees the result of the
         // restore rather than the version they asked for — those differ in
         // their timestamps, and showing the old one invites the reader to think
-        // nothing happened.
-        $page = $this->pages()->find($slug);
+        // nothing happened. In the language that was restored, not the default
+        // one, or a German restore would answer with the English page and look
+        // as though it had done nothing.
+        $page = $this->pages()->find($slug, $locale['locale']);
 
         return [
             'data' => [

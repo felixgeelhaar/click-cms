@@ -6,6 +6,9 @@ namespace Click\Cms\Tests\Unit\Http;
 
 use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Application\Content\ContentService;
+use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
@@ -241,4 +244,48 @@ final class PublicationRoutesTest extends TestCase
         $_COOKIE = [];
         $this->assertSame('Published text', $this->api->getPage('home')['data']['data']['title']);
     }
+    /**
+     * Versions belong to one translation. The endpoints built the key from the
+     * slug alone, so they answered for the default language whatever was asked
+     * for — and a restore issued from the German page rewound the *English*
+     * working copy while reporting success.
+     */
+    public function testRestoringAGermanVersionLeavesTheEnglishCopyAlone(): void
+    {
+        $this->signIn('editor');
+
+        $de = Locale::fromString('de');
+
+        // Two German versions, so there is an earlier one to go back to.
+        $this->content->save(Content::create(ContentKey::page('kontakt', $de), ['title' => 'Kontakt eins']));
+        $this->content->save(Content::create(ContentKey::page('kontakt', $de), ['title' => 'Kontakt zwei']));
+
+        // And an English page that must not move.
+        $this->content->save(Content::create(ContentKey::page('kontakt'), ['title' => 'Contact english']));
+
+        $_GET['locale'] = 'de';
+        $versions = $this->api->listPageVersions('kontakt');
+
+        $this->assertArrayNotHasKey('error', $versions);
+        $this->assertNotEmpty($versions['data'], 'German history should not be empty');
+
+        $oldest = end($versions['data'])['id'];
+        $restored = $this->api->restorePageVersion('kontakt', $oldest);
+
+        $this->assertArrayNotHasKey('error', $restored);
+
+        // The working copy, not the published document — nothing here was ever
+        // published, and under draft-and-publish that is exactly the point.
+        $this->assertSame(
+            'Contact english',
+            $this->content->draft(ContentKey::page('kontakt'))?->title(),
+            'restoring a German version must not touch the English working copy'
+        );
+        $this->assertSame(
+            'Kontakt eins',
+            $this->content->draft(ContentKey::page('kontakt', $de))?->title(),
+            'the German working copy should be the restored one'
+        );
+    }
+
 }
