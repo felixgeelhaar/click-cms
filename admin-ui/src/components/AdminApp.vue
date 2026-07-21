@@ -66,7 +66,13 @@ const branding = ref({ name: '', primaryColor: '' });
 const mustChangePassword = computed(() => currentUser.value?.mustChangePassword === true);
 
 const brandLabel = computed(() => branding.value.name || currentUser.value?.displayName || currentUser.value?.username || 'Workspace');
-const hasBuilder = computed(() => installedPluginIds.value.includes('visual-builder'));
+// Capability rather than role: the rules live on the server, and the UI asks
+// what this account may do rather than re-deriving it from a role name.
+const can = (capability) => (currentUser.value?.capabilities ?? []).includes(capability);
+
+const hasBuilder = computed(
+  () => installedPluginIds.value.includes('visual-builder') && can('edit.freeform')
+);
 
 const checkAuth = async () => {
   try {
@@ -104,12 +110,12 @@ const getRouteComponent = () => {
   if (path === '/admin' || path === '/admin/') return Dashboard;
   if (path === '/admin/pages') return Pages;
   if (path === '/admin/media') return Media;
-  if (path === '/admin/users') return Users;
+  if (path === '/admin/users') return can('users.manage') ? Users : Dashboard;
   if (path === '/admin/profile') return Profile;
   if (path === '/admin/password') return ChangePassword;
   if (path === '/admin/plugins') return Plugins;
-  if (path === '/admin/marketplace') return currentUser.value?.role === 'admin' ? Marketplace : Dashboard;
-  if (path === '/admin/builder') return currentUser.value?.role === 'admin' && hasBuilder.value ? Builder : Dashboard;
+  if (path === '/admin/marketplace') return can('plugins.install') ? Marketplace : Dashboard;
+  if (path === '/admin/builder') return hasBuilder.value ? Builder : Dashboard;
   if (path === '/admin/analytics') return Analytics;
   if (path.startsWith('/admin/pages/edit/')) return PageEdit;
   if (path === '/admin/pages/new') return PageEdit;

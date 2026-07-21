@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Application\Content;
 
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Domain\Schema\SectionTypeRepository;
 use Click\Cms\Domain\ValueObjects\ContentKey;
@@ -189,25 +190,13 @@ final class PageService
      */
     public function canModify(array $pageData, array $user): bool|string
     {
-        $role = $user['role'] ?? 'editor';
+        $role = Role::fromName($user['role'] ?? null);
 
-        if ($role === 'admin' || $role === 'editor') {
+        if ($role->canEditContentOwnedBy($pageData['owner'] ?? null, $user['username'] ?? null)) {
             return true;
         }
 
-        if ($role === 'author') {
-            $owner = $pageData['owner'] ?? null;
-
-            if ($owner === null) {
-                return 'This page has no owner, so it cannot be edited by an author.';
-            }
-
-            return $owner === ($user['username'] ?? null)
-                ? true
-                : 'Authors may only edit their own pages.';
-        }
-
-        return 'You do not have permission to edit pages.';
+        return 'You do not have permission to edit this page.';
     }
 
     /**
@@ -216,23 +205,15 @@ final class PageService
      */
     public function canDelete(array $pageData, array $user): bool|string
     {
-        // Deleting is destructive and unlike editing cannot be partially undone,
-        // so it is held to the stricter rule.
-        $role = $user['role'] ?? 'editor';
+        // Deleting cannot be partially undone, so the role map holds it to a
+        // stricter rule than editing.
+        $role = Role::fromName($user['role'] ?? null);
 
-        if ($role === 'admin') {
+        if ($role->canDeleteContentOwnedBy($pageData['owner'] ?? null, $user['username'] ?? null)) {
             return true;
         }
 
-        if ($role === 'editor' || $role === 'author') {
-            $owner = $pageData['owner'] ?? null;
-
-            return $owner === ($user['username'] ?? null)
-                ? true
-                : 'You may only delete your own pages.';
-        }
-
-        return 'You do not have permission to delete pages.';
+        return 'You do not have permission to delete this page.';
     }
 
     private function slugify(string $text): string

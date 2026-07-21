@@ -12,6 +12,8 @@ use Click\Cms\Application\Event\EventBus;
 use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Event\EventDispatcher;
+use Click\Cms\Domain\Identity\Capability;
+use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
@@ -449,12 +451,21 @@ class Application
             return ['status' => 401, 'error' => 'Not authenticated'];
         }
 
-        if (str_starts_with($path, 'users') && ($user['role'] ?? '') !== 'admin') {
-            return ['status' => 403, 'error' => 'Admin access required'];
+        // Asked as capability questions rather than role comparisons, so the
+        // rules live in one place and can be changed without hunting for every
+        // `=== 'admin'` in the codebase.
+        $role = Role::fromName($user['role'] ?? null);
+
+        if (str_starts_with($path, 'users') && !$role->can(Capability::ManageUsers)) {
+            return ['status' => 403, 'error' => 'You do not have permission to manage users.'];
         }
 
-        if (str_starts_with($path, 'marketplace') && ($user['role'] ?? '') !== 'admin') {
-            return ['status' => 403, 'error' => 'Admin access required'];
+        if (str_starts_with($path, 'marketplace') && !$role->can(Capability::InstallPlugins)) {
+            return ['status' => 403, 'error' => 'You do not have permission to install plugins.'];
+        }
+
+        if (str_starts_with($path, 'plugins') && $method !== 'GET' && !$role->can(Capability::ManagePlugins)) {
+            return ['status' => 403, 'error' => 'You do not have permission to manage plugins.'];
         }
 
         return null;
@@ -588,6 +599,7 @@ class Application
                 'displayName' => $userData['displayName'] ?? $username,
                 'email' => $userData['email'] ?? '',
                 'role' => $userData['role'] ?? 'editor',
+                'capabilities' => Role::fromName($userData['role'] ?? null)->capabilityNames(),
                 'mustChangePassword' => (bool) ($userData['mustChangePassword'] ?? false)
             ]
         ];
