@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Http;
 
+use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Content\PageService;
 use Click\Cms\Application\Media\MediaService;
@@ -32,10 +33,12 @@ final class CoreApiRoutes
     private ?JsonSectionTypeRepository $sectionTypes = null;
     private ?MediaService $media = null;
     private ?PageService $pages = null;
+    private ?ContentService $contentService = null;
 
     public function __construct(
         private readonly string $basePath,
         private readonly ?ContentService $content = null,
+        private readonly ?CoreConfig $config = null,
     ) {}
 
     /**
@@ -73,10 +76,23 @@ final class CoreApiRoutes
      */
     public function listPages(): array
     {
+        $locale = $this->requestedLocale();
+        if ($locale['error'] !== null) {
+            return ['status' => 400, 'error' => $locale['error']];
+        }
+
         return [
             'data' => array_map(
                 static fn ($page): array => $page->toArray(),
-                $this->pages()->all()
+                $this->pages()->all($locale['locale'])
+            ),
+            // Echoed so a client can tell which language it is looking at
+            // without having to remember what it asked for, and so the admin UI
+            // can offer the rest.
+            'locale' => $locale['locale']->code,
+            'locales' => array_map(
+                static fn ($l): string => $l->code,
+                $this->config?->locales() ?? [$locale['locale']]
             ),
         ];
     }
@@ -86,13 +102,32 @@ final class CoreApiRoutes
      */
     public function getPage(string $slug): array
     {
-        $page = $this->pages()->find($slug);
+        $requested = $this->requestedLocale();
+        if ($requested['error'] !== null) {
+            return ['status' => 400, 'error' => $requested['error']];
+        }
 
-        if ($page === null) {
+        // Read with fallback: a front end asking for a language that has no
+        // translation should get the page rather than a 404. What it must not
+        // get is the fallback without being told, so the served language and
+        // the fact that it was a fallback are part of the response — a client
+        // that shows German chrome around English prose is at least able to
+        // know it is doing so.
+        $resolved = $this->pages()->resolve($slug, $requested['locale']);
+
+        if ($resolved === null) {
             return ['status' => 404, 'error' => 'Page not found'];
         }
 
-        $response = ['data' => $page->toArray()];
+        $page = $resolved->content;
+        $response = ['data' => $page->toArray()] + $resolved->toArray();
+
+        // Which other languages this page exists in, so an editor sees at a
+        // glance what is still untranslated.
+        $response['availableLocales'] = array_map(
+            static fn ($l): string => $l->code,
+            $this->contentService()->translationsOf('page', $slug)
+        );
 
         // Every image the page references, resolved.
         //
@@ -158,7 +193,7 @@ final class CoreApiRoutes
     public function createPage(): array
     {
         return $this->pageResponse(
-            $this->pages()->create($this->jsonBody(), $this->currentUser())
+            $this->pages()->create($this->jsonBody(), $this->currentUser(), $this->localeParam())
         );
     }
 
@@ -168,7 +203,7 @@ final class CoreApiRoutes
     public function updatePage(string $slug): array
     {
         return $this->pageResponse(
-            $this->pages()->update($slug, $this->jsonBody(), $this->currentUser())
+            $this->pages()->update($slug, $this->jsonBody(), $this->currentUser(), $this->localeParam())
         );
     }
 
@@ -177,13 +212,39 @@ final class CoreApiRoutes
      */
     public function deletePage(string $slug): array
     {
-        $result = $this->pages()->delete($slug, $this->currentUser());
+        $locale = $this->localeParam();
+        $result = $this->pages()->delete($slug, $this->currentUser(), $locale);
 
         if ($result['error'] !== null) {
             return ['status' => $result['status'], 'error' => $result['error']];
         }
 
-        return ['data' => ['deleted' => true, 'slug' => $slug]];
+        return ['data' => [
+            'deleted' => true,
+            'slug' => $slug,
+            'locale' => $this->pages()->parseLocale($locale)['locale']?->code,
+        ]];
+    }
+
+    /**
+     * The `?locale=` of the current request, unparsed.
+     *
+     * Query string rather than a path segment because the management API is
+     * addressed by slug and adding a segment would change every existing URL.
+     */
+    private function localeParam(): ?string
+    {
+        $locale = $_GET['locale'] ?? null;
+
+        return is_string($locale) && trim($locale) !== '' ? $locale : null;
+    }
+
+    /**
+     * @return array{locale: ?\Click\Cms\Domain\ValueObjects\Locale, error: ?string}
+     */
+    private function requestedLocale(): array
+    {
+        return $this->pages()->parseLocale($this->localeParam());
     }
 
     /**
@@ -438,10 +499,21 @@ final class CoreApiRoutes
     private function pages(): PageService
     {
         return $this->pages ??= new PageService(
-            $this->content ?? new ContentService(
-                new \Click\Cms\Infrastructure\Storage\JsonStorage($this->basePath . '/content')
+            $this->contentService(),
+            $this->sectionTypes(),
+            new SectionValidator(),
+            $this->config?->locales() ?? [],
+        );
+    }
+
+    private function contentService(): ContentService
+    {
+        return $this->contentService ??= $this->content ?? new ContentService(
+            new \Click\Cms\Infrastructure\Storage\JsonStorage(
+                $this->basePath . '/content',
+                $this->config?->defaultLocale()
             ),
-            $this->sectionTypes()
+            $this->config?->defaultLocale()
         );
     }
 

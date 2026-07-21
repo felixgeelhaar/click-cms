@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Click\Cms\Application\Config;
 
+use Click\Cms\Domain\ValueObjects\Locale;
+
 /**
  * Typed access to `config/core.json`.
  *
@@ -79,6 +81,61 @@ final class CoreConfig
     public function deliveryAllowedOrigins(): array
     {
         return $this->stringList('core.delivery.allowedOrigins', []);
+    }
+
+    /* ---------------------------------------------------------- languages -- */
+
+    /**
+     * The language a document is in when nothing says otherwise.
+     *
+     * Also the language served when a translation is missing, and the one the
+     * pre-languages storage layout is taken to hold. `en` by default so a site
+     * that has never heard of this setting behaves exactly as it did before.
+     */
+    public function defaultLocale(): Locale
+    {
+        return Locale::tryFromString($this->string('core.languages.default', Locale::DEFAULT))
+            ?? Locale::default();
+    }
+
+    /**
+     * Every language this site publishes in.
+     *
+     * The default locale is always a member, whatever the file says: a site
+     * whose configuration excludes the language its fallback serves would have
+     * a fallback nobody is allowed to ask for.
+     *
+     * @return list<Locale>
+     */
+    public function locales(): array
+    {
+        $default = $this->defaultLocale();
+
+        $locales = [$default->code => $default];
+
+        foreach ($this->stringList('core.languages.available', []) as $code) {
+            $locale = Locale::tryFromString($code);
+
+            // An unparseable tag is dropped rather than thrown: a typo in the
+            // list of languages should cost that one language, not the site.
+            if ($locale !== null) {
+                $locales[$locale->code] ??= $locale;
+            }
+        }
+
+        return array_values($locales);
+    }
+
+    /** Whether this site publishes in a given language at all. */
+    public function supportsLocale(Locale $locale): bool
+    {
+        foreach ($this->locales() as $known) {
+            if ($known->equals($locale)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /* --------------------------------------------------------------- auth -- */

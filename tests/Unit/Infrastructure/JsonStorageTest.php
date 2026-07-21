@@ -27,13 +27,34 @@ final class JsonStorageTest extends TestCase
         if (!is_dir($this->dir)) {
             return;
         }
-        foreach (glob($this->dir . '/*/*') ?: [] as $f) {
-            @unlink($f);
+        self::removeTree($this->dir);
+    }
+
+    private static function removeTree(string $dir): void
+    {
+        foreach (glob($dir . '/*') ?: [] as $entry) {
+            is_dir($entry) ? self::removeTree($entry) : @unlink($entry);
         }
-        foreach (glob($this->dir . '/*') ?: [] as $d) {
-            @rmdir($d);
+
+        @rmdir($dir);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function jsonFilesUnder(string $dir): array
+    {
+        $out = [];
+
+        foreach (glob($dir . '/*') ?: [] as $entry) {
+            if (is_dir($entry)) {
+                $out = array_merge($out, $this->jsonFilesUnder($entry));
+            } elseif (str_ends_with($entry, '.json')) {
+                $out[] = $entry;
+            }
         }
-        @rmdir($this->dir);
+
+        return $out;
     }
 
     public function testSaveThenFindRoundTrips(): void
@@ -58,15 +79,15 @@ final class JsonStorageTest extends TestCase
         $this->storage->save(Content::create(ContentKey::page('home')));
         $this->storage->save(Content::create(ContentKey::user('admin')));
 
-        $this->assertFileExists($this->dir . '/page/home.json');
-        $this->assertFileExists($this->dir . '/user/admin.json');
+        $this->assertFileExists($this->dir . '/page/en/home.json');
+        $this->assertFileExists($this->dir . '/user/en/admin.json');
     }
 
     public function testSaveLeavesNoTemporaryFilesBehind(): void
     {
         $this->storage->save(Content::create(ContentKey::page('home')));
 
-        $this->assertSame([], glob($this->dir . '/page/*.tmp') ?: []);
+        $this->assertSame([], glob($this->dir . '/page/en/*.tmp') ?: []);
     }
 
     public function testFindByTypeReturnsOnlyThatTypeInStableOrder(): void
@@ -114,13 +135,13 @@ final class JsonStorageTest extends TestCase
         $this->storage->save($content);
 
         $this->assertSame('Second', $this->storage->find(ContentKey::page('home'))?->title());
-        $this->assertCount(1, glob($this->dir . '/page/*.json') ?: []);
+        $this->assertCount(1, glob($this->dir . '/page/en/*.json') ?: []);
     }
 
     public function testCorruptFileIsTreatedAsAbsentRatherThanThrowing(): void
     {
         $this->storage->save(Content::create(ContentKey::page('home')));
-        file_put_contents($this->dir . '/page/home.json', '{ this is not json');
+        file_put_contents($this->dir . '/page/en/home.json', '{ this is not json');
 
         $this->assertNull($this->storage->find(ContentKey::page('home')));
         // And it must not break a listing of its siblings.
@@ -163,7 +184,7 @@ final class JsonStorageTest extends TestCase
             // expected
         }
 
-        $this->assertSame([], glob($this->dir . '/*/*.json') ?: []);
+        $this->assertSame([], $this->jsonFilesUnder($this->dir));
     }
 
     public function testUnicodeAndSlashesInContentSurviveRoundTrip(): void

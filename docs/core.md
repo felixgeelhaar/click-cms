@@ -184,9 +184,12 @@ Still open:
   one of them is unreachable.
 - **Media reports nothing about quality.** See above. The ladder silently
   produces fewer variants for a small upload.
-- **No languages, history or preview.** Capabilities 10 to 12, none started.
-  `ContentKey` is `type/slug` with no locale dimension, which is the specific
-  thing that has to change first.
+- **No history or preview.** Capabilities 11 and 12, neither started.
+  Languages (capability 10) is done: a locale is part of `ContentKey`, flat-file
+  storage is `{type}/{locale}/{slug}.json`, and a request that cannot be
+  answered in the language it asked for is answered in the default language and
+  says so rather than pretending. Documents in the pre-languages layout are
+  still read, and migrate the next time they are saved.
 - **No audit trail.** Who changed what, and when, is not recorded anywhere.
 - **The two install paths are not equally trusted.** Registry installs verify a
   signed manifest with `openssl_verify` against a configured public key, which
@@ -209,11 +212,11 @@ CRUD in core, extracting authentication, the capability model — is done.
 
 What remains, in this order:
 
-1. **Languages.** First because it changes how every document is addressed, and
-   because every day it waits, more content exists to migrate. A locale belongs
-   in `ContentKey`, which means storage layout, the management API, the delivery
-   payload and the admin UI all move with it. Nothing else on this list should
-   start until the content model has settled.
+1. **Languages.** Done in core; the admin UI has not caught up. The API can
+   list, create and edit a document in any configured language, and a rendered
+   page declares the language it actually served, but nothing in the editor
+   offers a language picker yet, so a second language is reachable only through
+   the API.
 2. **History.** Second because it is also storage-shaped, and doing it after
    languages means versioning a key that already has its final form rather than
    versioning one and then migrating it.

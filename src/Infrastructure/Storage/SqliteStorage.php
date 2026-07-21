@@ -7,6 +7,7 @@ namespace Click\Cms\Infrastructure\Storage;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Storage\StorageInterface;
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Domain\ValueObjects\Locale;
 use PDO;
 use PDOException;
 use RuntimeException;
@@ -26,14 +27,29 @@ final class SqliteStorage implements StorageInterface
 {
     private ?PDO $pdo = null;
 
-    public function __construct(private readonly string $databasePath) {}
+    private readonly Locale $defaultLocale;
+
+    /**
+     * @param ?Locale $defaultLocale Which language rows written before the
+     *        locale column existed are taken to hold.
+     */
+    public function __construct(
+        private readonly string $databasePath,
+        ?Locale $defaultLocale = null,
+    ) {
+        $this->defaultLocale = $defaultLocale ?? Locale::default();
+    }
 
     public function find(ContentKey $key): ?Content
     {
         $stmt = $this->pdo()->prepare(
-            'SELECT payload FROM content WHERE type = :type AND slug = :slug LIMIT 1'
+            'SELECT payload FROM content WHERE type = :type AND locale = :locale AND slug = :slug LIMIT 1'
         );
-        $stmt->execute(['type' => $key->type, 'slug' => $key->slug]);
+        $stmt->execute([
+            'type' => $key->type,
+            'locale' => $key->locale->code,
+            'slug' => $key->slug,
+        ]);
 
         $payload = $stmt->fetchColumn();
         if (!is_string($payload)) {
@@ -43,18 +59,24 @@ final class SqliteStorage implements StorageInterface
         return $this->decode($payload, $key);
     }
 
-    public function findByType(string $type): array
+    public function findByType(string $type, ?Locale $locale = null): array
     {
-        $stmt = $this->pdo()->prepare(
-            'SELECT slug, payload FROM content WHERE type = :type ORDER BY slug ASC'
-        );
-        $stmt->execute(['type' => $type]);
+        $sql = 'SELECT locale, slug, payload FROM content WHERE type = :type';
+        $params = ['type' => $type];
+
+        if ($locale !== null) {
+            $sql .= ' AND locale = :locale';
+            $params['locale'] = $locale->code;
+        }
+
+        $stmt = $this->pdo()->prepare($sql . ' ORDER BY locale ASC, slug ASC');
+        $stmt->execute($params);
 
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $content = $this->decode(
                 (string) $row['payload'],
-                ContentKey::fromString($type . ':' . $row['slug'])
+                ContentKey::fromString($type . ':' . $row['locale'] . ':' . $row['slug'])
             );
             if ($content !== null) {
                 $out[] = $content;
@@ -72,15 +94,16 @@ final class SqliteStorage implements StorageInterface
         );
 
         $stmt = $this->pdo()->prepare(
-            'INSERT INTO content (type, slug, payload, updated_at)
-             VALUES (:type, :slug, :payload, :updated_at)
-             ON CONFLICT(type, slug) DO UPDATE SET
+            'INSERT INTO content (type, locale, slug, payload, updated_at)
+             VALUES (:type, :locale, :slug, :payload, :updated_at)
+             ON CONFLICT(type, locale, slug) DO UPDATE SET
                  payload = excluded.payload,
                  updated_at = excluded.updated_at'
         );
 
         $stmt->execute([
             'type' => $content->key->type,
+            'locale' => $content->key->locale->code,
             'slug' => $content->key->slug,
             'payload' => $payload,
             'updated_at' => $content->updatedAt()->format(DATE_ATOM),
@@ -89,8 +112,14 @@ final class SqliteStorage implements StorageInterface
 
     public function delete(ContentKey $key): bool
     {
-        $stmt = $this->pdo()->prepare('DELETE FROM content WHERE type = :type AND slug = :slug');
-        $stmt->execute(['type' => $key->type, 'slug' => $key->slug]);
+        $stmt = $this->pdo()->prepare(
+            'DELETE FROM content WHERE type = :type AND locale = :locale AND slug = :slug'
+        );
+        $stmt->execute([
+            'type' => $key->type,
+            'locale' => $key->locale->code,
+            'slug' => $key->slug,
+        ]);
 
         return $stmt->rowCount() > 0;
     }
@@ -98,9 +127,13 @@ final class SqliteStorage implements StorageInterface
     public function exists(ContentKey $key): bool
     {
         $stmt = $this->pdo()->prepare(
-            'SELECT 1 FROM content WHERE type = :type AND slug = :slug LIMIT 1'
+            'SELECT 1 FROM content WHERE type = :type AND locale = :locale AND slug = :slug LIMIT 1'
         );
-        $stmt->execute(['type' => $key->type, 'slug' => $key->slug]);
+        $stmt->execute([
+            'type' => $key->type,
+            'locale' => $key->locale->code,
+            'slug' => $key->slug,
+        ]);
 
         return $stmt->fetchColumn() !== false;
     }
@@ -113,7 +146,9 @@ final class SqliteStorage implements StorageInterface
             return null;
         }
 
-        $row['key'] ??= $key->toString();
+        // The row's own coordinates decide what it is: a payload written before
+        // languages carries a key with no locale in it.
+        $row['key'] = $key->toString();
 
         return Content::fromArray($row);
     }
@@ -149,14 +184,44 @@ final class SqliteStorage implements StorageInterface
         $pdo->exec(
             'CREATE TABLE IF NOT EXISTS content (
                 type       TEXT NOT NULL,
+                locale     TEXT NOT NULL DEFAULT \'' . $this->defaultLocale->code . '\',
                 slug       TEXT NOT NULL,
                 payload    TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                PRIMARY KEY (type, slug)
+                PRIMARY KEY (type, locale, slug)
             )'
         );
-        $pdo->exec('CREATE INDEX IF NOT EXISTS content_type_idx ON content (type)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS content_type_idx ON content (type, locale)');
+
+        $this->addLocaleColumnIfMissing($pdo);
 
         return $this->pdo = $pdo;
+    }
+
+    /**
+     * Bring a pre-languages database up to the current shape.
+     *
+     * A table created before this change has no locale column and a primary key
+     * of (type, slug), so `CREATE TABLE IF NOT EXISTS` above leaves it alone and
+     * every query would fail on a column that is not there. Adding the column
+     * with a default puts the existing rows in the site's default language,
+     * which is what they are. The old primary key stays — SQLite cannot change
+     * one in place, and (type, slug) merely constrains more than it needs to
+     * until the table is rebuilt.
+     */
+    private function addLocaleColumnIfMissing(PDO $pdo): void
+    {
+        $columns = $pdo->query('PRAGMA table_info(content)')->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($columns as $column) {
+            if (($column['name'] ?? null) === 'locale') {
+                return;
+            }
+        }
+
+        $pdo->exec(
+            'ALTER TABLE content ADD COLUMN locale TEXT NOT NULL DEFAULT \''
+            . $this->defaultLocale->code . '\''
+        );
     }
 }
