@@ -23,8 +23,14 @@
     },
     "plugins": {
       "exclude": {
-        "ids": ["admin-ui", "authentication"],
-        "dirs": ["admin-ui", "auth"]
+        "ids": [
+          "admin-ui",
+          "authentication"
+        ],
+        "dirs": [
+          "admin-ui",
+          "auth"
+        ]
       }
     }
   }
