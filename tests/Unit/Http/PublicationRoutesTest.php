@@ -288,4 +288,27 @@ final class PublicationRoutesTest extends TestCase
         );
     }
 
+    /**
+     * A translation that exists but has never been published is exactly the one
+     * an editor needs told about. `availableLocales` was built from published
+     * documents, so a German draft reported as "no German version" — and an
+     * editor believing that would start the translation a second time.
+     */
+    public function testAvailableLocalesIncludesAnUnpublishedTranslation(): void
+    {
+        $this->signIn('editor');
+
+        $this->content->save(Content::create(ContentKey::page('kontakt'), ['title' => 'Contact']));
+        $this->content->save(Content::create(
+            ContentKey::page('kontakt', Locale::fromString('de')),
+            ['title' => 'Kontakt']
+        ));
+
+        // Neither is published; both exist as working copies.
+        $response = $this->api->getPage('kontakt');
+
+        $this->assertContains('de', $response['availableLocales'] ?? []);
+        $this->assertContains('en', $response['availableLocales'] ?? []);
+    }
+
 }
