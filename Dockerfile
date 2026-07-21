@@ -22,7 +22,23 @@ RUN composer install \
         --optimize-autoloader
 
 # ---------------------------------------------------------------------------
-# Stage 2 — Runtime
+# Stage 2 — Admin UI
+#
+# Built here so the image is self-contained. Without this the admin route falls
+# back to proxying an Astro dev server on localhost:4321, which exists only on a
+# developer's machine — a container built without this stage has no admin UI.
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS admin-ui
+
+WORKDIR /app
+COPY admin-ui/package.json admin-ui/package-lock.json* ./
+RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+COPY admin-ui/ ./
+RUN npm run build
+
+# ---------------------------------------------------------------------------
+# Stage 3 — Runtime
 # ---------------------------------------------------------------------------
 FROM php:8.3-apache AS runtime
 
@@ -55,6 +71,11 @@ WORKDIR /var/www/html
 COPY --from=vendor /app/vendor ./vendor
 COPY . .
 COPY docker/health.php ./public/health.php
+
+# Serving the built admin UI as static files under the document root means
+# Apache answers /admin directly — the rewrite to index.php only fires for paths
+# that do not exist on disk, so PHP never sees these requests.
+COPY --from=admin-ui /app/dist ./public/admin
 
 # content/ and data/ are volume mount points. They are created and owned here so
 # the container still starts when no volume is mounted, and www-data can write

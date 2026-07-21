@@ -457,23 +457,30 @@ class Application
             return $lockout;
         }
 
-        $userFile = $this->basePath . '/content/users/' . $username . '.json';
-        if (!file_exists($userFile)) {
+        // Read through the content service rather than guessing at a path. This
+        // previously looked in content/users/ (plural) while users are stored
+        // under content/user/, so no account was ever found and every login
+        // failed — including the default admin the installer creates.
+        $account = $this->contentService?->user($username);
+        if ($account === null) {
             $this->recordFailedLogin($username);
             return ['status' => 401, 'error' => 'Invalid credentials'];
         }
 
-        $userData = json_decode(file_get_contents($userFile), true);
-        if (!is_array($userData)) {
-            return ['status' => 500, 'error' => 'Invalid user data'];
+        // Content nests its payload under `data`; the password lives there, not
+        // at the top level of the stored document.
+        $userData = $account->data;
+
+        $hash = $userData['password'] ?? null;
+        if (!is_string($hash) || $hash === '') {
+            // No usable hash means the account cannot be authenticated. There is
+            // deliberately no fallback: a hardcoded admin/admin escape hatch here
+            // would let anyone in whenever a user document lost its password.
+            $this->recordFailedLogin($username);
+            return ['status' => 401, 'error' => 'Invalid credentials'];
         }
 
-        $validPassword = false;
-        if (isset($userData['password'])) {
-            $validPassword = password_verify($password, $userData['password']);
-        } elseif ($username === 'admin' && $password === 'admin') {
-            $validPassword = true;
-        }
+        $validPassword = password_verify($password, $hash);
 
         if (!$validPassword) {
             $this->recordFailedLogin($username);
