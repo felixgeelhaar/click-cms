@@ -76,7 +76,7 @@ Nine, and nothing else.
 | 5 | **Identity** — accounts, authentication, sessions, roles | Security must not be removable |
 | 6 | **HTTP kernel** — request to response, route matching, security headers | It is the entry point |
 | 7 | **Management API** — the endpoints the admin UI depends on | The admin UI is how the product is used |
-| 8 | **Extension points** — plugin discovery and lifecycle, events, hooks | The plugin system cannot itself be a plugin |
+| 8 | **Extension points** — plugin discovery, installation and lifecycle, events, hooks | The plugin system cannot itself be a plugin, and a plugin system with no way to install plugins is developer-only |
 | 9 | **Configuration and health** — loading settings, reporting readiness | Needed to run and to operate |
 
 ### Explicitly not core
@@ -88,8 +88,8 @@ Nine, and nothing else.
   analytics. Most sites want some and no site wants all.
 - **Alternative storage backends** — MySQL, PostgreSQL. Implementations of an
   existing port is exactly what plugins are for.
-- **Marketplace** — installing third-party code is a deployment policy, not a
-  CMS function.
+- **Publishing a registry** — hosting a catalogue of plugins for others is a
+  separate product. *Consuming* one is core; running one is not.
 - **Free-form building** — see `backlog.md`; a mode a site opts into.
 
 ## Where core is today
@@ -111,7 +111,7 @@ all of:
 - the HTTP kernel and router
 - authentication, sessions, idle timeout and login lockout
 - configuration loading and validation
-- the marketplace endpoints
+- plugin installation endpoints
 - health checks
 - proxying the admin UI to a development server
 - rendering public pages
@@ -146,8 +146,18 @@ small enough to review.
 - **Management API (7)** is incomplete: page CRUD still lives in the `rest-api`
   plugin, so disabling that plugin leaves the admin UI unable to manage pages.
   Full CRUD belongs in core; read-only delivery stays in the plugin.
-- **Marketplace** is in core and should not be. An unexercised path that
-  installs arbitrary code is a liability.
+- **Installing plugins has no CSRF protection.** This is the sharpest edge in
+  the codebase. The endpoint is correctly restricted to administrators, but with
+  no CSRF token an administrator who loads a hostile page while logged in can be
+  made to install a plugin without knowing. On an endpoint that installs
+  executable code, a cross-site request forgery becomes remote code execution.
+  CSRF is listed below as a general gap; this is the reason it is urgent.
+- **The two install paths are not equally trusted.** Registry installs verify a
+  signed manifest with `openssl_verify` against a configured public key, which
+  is sound. Uploading a ZIP verifies nothing. That asymmetry matches what
+  WordPress does and is defensible for an administrator-only action, but it
+  should be a stated decision rather than an accident, and the UI should say
+  which path is verified.
 - **`serveAdminUi()`** proxies a development server on hardcoded
   `localhost:4321`. Development convenience in the production path.
 - **`loadLegacyAdminUser()`** reads a path no current code writes. Dead
@@ -158,18 +168,23 @@ small enough to review.
 Correctness before tidiness, and nothing that changes behaviour mixed with
 anything that does not.
 
-1. **Force a password change on first run.** Small, and the only item here that
-   is actively dangerous.
-2. **Move page CRUD into the management API.** Completes capability 7 and makes
+The first two are security work and come before everything else.
+
+1. **Force a password change on first run.** The installer creates `admin` with
+   the password `admin`. Anyone who finds a deployment owns it, with no user
+   interaction required at all.
+2. **Add CSRF protection**, starting with plugin installation. An
+   administrator's session is otherwise one hostile page away from installing
+   executable code.
+3. **Move page CRUD into the management API.** Completes capability 7 and makes
    the delivery plugins genuinely optional.
-3. **Extract authentication, sessions and lockout out of `Application`.** Pure
+4. **Extract authentication, sessions and lockout out of `Application`.** Pure
    refactor, no behaviour change, and the precondition for taking identity
    seriously.
-4. **Add a capability model.** Roles that mean something, so editing modes and
+5. **Add a capability model.** Roles that mean something, so editing modes and
    permissions can be expressed at all.
-5. **Extract the kernel, router, config and health.** What remains of
+6. **Extract the kernel, router, config and health.** What remains of
    `Application` should fit on a screen.
-6. **Move the marketplace out of core**, or remove it.
 
 Only then go through the plugins one at a time. Each should have to justify
 itself against the test at the top of this document, and anything that fails it
