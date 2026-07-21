@@ -34,15 +34,12 @@ class Plugin_rest_api extends \Click\Cms\Application\Plugin\BasePlugin
     public function hook_api_routes(array $params): array
     {
         return [
-            // Pages
-            'GET /api/pages' => [$this, 'getPages'],
-            'GET /api/pages/:slug' => [$this, 'getPage'],
+            // Page CRUD moved to core: editing is management and must not be
+            // something a site can uninstall. What remains here is version
+            // history, which is delivery-adjacent and optional.
             'GET /api/pages/:slug/versions' => [$this, 'getPageVersions'],
             'GET /api/pages/:slug/versions/:versionId' => [$this, 'getPageVersion'],
             'POST /api/pages/:slug/versions/:versionId/restore' => [$this, 'restorePageVersion'],
-            'POST /api/pages' => [$this, 'createPage'],
-            'PUT /api/pages/:slug' => [$this, 'updatePage'],
-            'DELETE /api/pages/:slug' => [$this, 'deletePage'],
             
             // Users
             'GET /api/users' => [$this, 'getUsers'],

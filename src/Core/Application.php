@@ -88,7 +88,7 @@ class Application
         $storage = new JsonStorage($this->basePath . '/content');
         $this->contentService = new ContentService($storage);
 
-        $this->coreApiRoutes = new CoreApiRoutes($this->basePath);
+        $this->coreApiRoutes = new CoreApiRoutes($this->basePath, $this->contentService);
         
         $pluginConfig = $this->coreConfig['core']['plugins'] ?? [];
         $excludeConfig = $pluginConfig['exclude'] ?? [];
