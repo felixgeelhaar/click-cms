@@ -54,6 +54,24 @@ final class RoleTest extends TestCase
         $this->assertTrue(Role::Author->can(Capability::UseSectionEditor));
     }
 
+    /**
+     * Preview hands unpublished work to whoever holds the link, so it is
+     * granted to the roles that write and reviewed — and withheld from the one
+     * an unrecognised role falls back into.
+     */
+    public function testPreviewIsForThoseWhoEditAndNotForTheFallbackRole(): void
+    {
+        $this->assertTrue(Role::Admin->can(Capability::PreviewContent));
+        $this->assertTrue(Role::Editor->can(Capability::PreviewContent));
+
+        // An author cannot publish, so preview is the only way their work can
+        // be seen by whoever decides that it should be.
+        $this->assertTrue(Role::Author->can(Capability::PreviewContent));
+
+        $this->assertFalse(Role::Viewer->can(Capability::PreviewContent));
+        $this->assertFalse(Role::fromName('wizard')->can(Capability::PreviewContent));
+    }
+
     public function testViewersMayOnlyRead(): void
     {
         $this->assertTrue(Role::Viewer->can(Capability::ViewContent));

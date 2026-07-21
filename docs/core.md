@@ -85,8 +85,9 @@ expensive the longer it waits.
 | 11 | **History** — a previous version of a document, and a way back to it | An editor who cannot undo is one mistake away from unrecoverable loss. It is a property of how documents are stored, so nothing above storage can supply it |
 | 12 | **Preview** — seeing an unpublished change rendered before it is public | An editor who cannot see their work before publishing is guessing. Rendering already exists; without this it is only reachable by publishing |
 
-Twelve, and the last three are gaps rather than implementations. They are listed
-as core because of where they have to live, not because they are written.
+Twelve, and the last three were listed as core because of where they have to
+live rather than because they were written. Preview is now written; languages
+and history remain gaps.
 
 ### Media quality is part of media
 
@@ -246,6 +247,7 @@ Still open:
   says so rather than pretending. Documents in the pre-languages layout are
   still read, and migrate the next time they are saved.
 - **No languages or preview.** Capabilities 10 and 12, neither started.
+- **No languages or history.** Capabilities 10 and 11, neither started.
   `ContentKey` is `type/slug` with no locale dimension, which is the specific
   thing that has to change first.
 - **History is in.** Capability 11. Storage is wrapped in a decorator, so every
@@ -259,6 +261,12 @@ Still open:
   wrong version is itself undoable. Retention keeps the newest
   `core.history.retainVersions` (twenty by default) per document, oldest
   discarded first, with no exemptions.
+- **Preview shows the stored document, not an unsaved edit.** Capability 12 is
+  built: a signed, expiring link renders any page through the same
+  `SectionRenderer` the public site uses. What it cannot yet do is show a change
+  to an *already published* page without publishing it, because there is nowhere
+  to keep that change — a page has one stored version. History (capability 11)
+  is what supplies the second version; preview will read it when it exists.
 - **No audit trail.** Who changed what, and when, is not recorded anywhere.
 - **The two install paths are not equally trusted.** Registry installs verify a
   signed manifest with `openssl_verify` against a configured public key, which
@@ -294,6 +302,14 @@ What remains, in this order:
 4. **Preview.** Cheap once rendering and history exist — an unpublished version
    rendered at a URL that does not require the viewer to be signed in.
 5. **Extract the kernel, router, config and health.** What remains of
+4. **Preview.** Done, in the form that does not depend on history: a page
+   rendered at a signed, expiring URL that does not require the viewer to be
+   signed in. What remains is to point it at a stored previous version once
+   history exists, so a change to a published page can be seen before it
+   replaces what is live.
+5. **Wire `SqliteStorage`,** or withdraw the claim that core has two storage
+   backends.
+6. **Extract the kernel, router, config and health.** What remains of
    `Application` should fit on a screen.
 6. **Settings out of files.** Bootstrap stays on disk because storage
    configuration cannot live in storage; everything else becomes a document,
