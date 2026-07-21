@@ -303,9 +303,13 @@ class Plugin_rest_api extends \Click\Cms\Application\Plugin\BasePlugin
     public function createPage(): array
     {
         $data = $this->getJsonBody();
-        
-        if (!isset($data['title']) && !isset($data['content'])) {
-            return ['error' => 'Title or content required', 'status' => 400];
+
+        if (!isset($data['title']) && !isset($data['content']) && !isset($data['sections'])) {
+            return ['error' => 'Title, content or sections required', 'status' => 400];
+        }
+
+        if ($invalid = $this->validateSections($data)) {
+            return $invalid;
         }
 
         $slugInput = trim((string) ($data['slug'] ?? ''));
@@ -352,6 +356,11 @@ class Plugin_rest_api extends \Click\Cms\Application\Plugin\BasePlugin
     public function updatePage(string $slug): array
     {
         $data = $this->getJsonBody();
+
+        if ($invalid = $this->validateSections($data)) {
+            return $invalid;
+        }
+
         $contentService = $this->pluginManager->getContentService();
         $user = $this->getSessionUser();
         
@@ -1012,6 +1021,78 @@ class Plugin_rest_api extends \Click\Cms\Application\Plugin\BasePlugin
         imagedestroy($thumb);
 
         return $result;
+    }
+
+    /**
+     * Validate a page payload's sections against their declared types.
+     *
+     * The HTTP boundary is where untrusted input stops, so this runs before any
+     * page is stored: a section may only ever hold the shape its type declares,
+     * and any key the schema does not mention is discarded rather than saved.
+     *
+     * Returns an error response, or null when the payload is acceptable. On
+     * success $data['sections'] is replaced with the normalised values.
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>|null
+     */
+    private function validateSections(array &$data): ?array
+    {
+        if (!array_key_exists('sections', $data)) {
+            return null;
+        }
+
+        $sections = $data['sections'];
+
+        if (!is_array($sections) || !array_is_list($sections)) {
+            return ['error' => 'Sections must be a list.', 'status' => 422];
+        }
+
+        $repository = new \Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository(
+            $this->pluginManager->getBasePath() . '/config/sections'
+        );
+        $validator = new \Click\Cms\Domain\Schema\SectionValidator();
+
+        $errors = [];
+        $clean = [];
+
+        foreach ($sections as $index => $section) {
+            if (!is_array($section) || !isset($section['type']) || !is_string($section['type'])) {
+                $errors["{$index}.type"] = 'Section is missing a type.';
+                continue;
+            }
+
+            $type = $repository->find($section['type']);
+            if ($type === null) {
+                $errors["{$index}.type"] = "Unknown section type \"{$section['type']}\".";
+                continue;
+            }
+
+            $values = $section['values'] ?? [];
+            if (!is_array($values)) {
+                $errors["{$index}.values"] = 'Section values must be an object.';
+                continue;
+            }
+
+            $result = $validator->validate($type, $values);
+
+            if (!$result->isValid()) {
+                foreach ($result->errors as $field => $message) {
+                    $errors["{$index}.{$field}"] = $message;
+                }
+                continue;
+            }
+
+            $clean[] = ['type' => $type->id, 'values' => $result->values];
+        }
+
+        if ($errors !== []) {
+            return ['error' => 'Some sections are invalid.', 'errors' => $errors, 'status' => 422];
+        }
+
+        $data['sections'] = $clean;
+
+        return null;
     }
 
     private function getJsonBody(): array
