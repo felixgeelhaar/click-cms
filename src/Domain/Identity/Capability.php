@@ -27,7 +27,26 @@ enum Capability: string
     case EditOwnContent = 'content.edit.own';
     case DeleteAnyContent = 'content.delete.any';
     case DeleteOwnContent = 'content.delete.own';
+    /**
+     * Promoting the working copy of a document to the live site.
+     *
+     * This was declared before there was anything for it to guard: saving was
+     * publishing, so a role without it could still put text in front of every
+     * visitor by pressing Save. Now it is the only way content becomes public.
+     */
     case PublishContent = 'content.publish';
+
+    /**
+     * Taking a live document down again.
+     *
+     * Separate from publishing rather than folded into it, because they are not
+     * the same risk. Publishing makes something visible that was not; this makes
+     * something disappear that people may be linking to, and a site may
+     * reasonably want the second held to a higher bar even where the first is
+     * granted widely. Both are recoverable — the versions survive either way —
+     * which is why neither needs to be as narrow as deletion.
+     */
+    case UnpublishContent = 'content.unpublish';
     /**
      * Handing out a link that shows unpublished work to whoever holds it.
      * Distinct from editing: it is the decision to let content out of the
@@ -67,6 +86,7 @@ enum Capability: string
             self::DeleteAnyContent => "Delete anyone's content",
             self::DeleteOwnContent => 'Delete own content',
             self::PublishContent => 'Publish content',
+            self::UnpublishContent => 'Take published content down',
             self::RestoreContent => 'Restore a previous version',
             self::PreviewContent => 'Share a preview of unpublished content',
             self::ViewMedia => 'View media',

@@ -9,6 +9,7 @@ use Click\Cms\Domain\History\RetentionPolicy;
 use Click\Cms\Domain\History\Version;
 use Click\Cms\Domain\History\VersionStoreInterface;
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Domain\ValueObjects\Locale;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use RuntimeException;
@@ -74,7 +75,7 @@ final class JsonVersionStore implements VersionStoreInterface
         $version = $this->mint($dir, $content, $author, $reason);
 
         $this->write($dir . '/' . $version->id . '.json', $version);
-        $this->prune($dir);
+        $this->prune($content->key);
 
         return $version;
     }
@@ -83,25 +84,108 @@ final class JsonVersionStore implements VersionStoreInterface
     {
         $dir = $this->dirFor($key);
 
-        if ($dir === null || !is_dir($dir)) {
+        if ($dir === null) {
             return [];
         }
 
-        $files = glob($dir . '/*.json') ?: [];
-        // Identifiers are fixed-width timestamps, so a string sort is a
-        // chronological one. Reversed because a history screen reads newest
-        // first.
-        rsort($files, SORT_STRING);
-
         $out = [];
-        foreach ($files as $file) {
-            $version = $this->read($file);
+        foreach ($this->idsFor($key, newestFirst: true) as $id) {
+            $version = $this->read($dir . '/' . $id . '.json');
             if ($version !== null) {
                 $out[] = $version;
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Retained identifiers for a document, in the order asked for.
+     *
+     * Identifiers are fixed-width timestamps, so a string sort is a
+     * chronological one — which is what lets listing, retention and "the newest
+     * one" all be answered without opening a single file.
+     *
+     * @return list<string>
+     */
+    private function idsFor(ContentKey $key, bool $newestFirst): array
+    {
+        $dir = $this->dirFor($key);
+
+        if ($dir === null || !is_dir($dir)) {
+            return [];
+        }
+
+        $files = glob($dir . '/*.json') ?: [];
+        $newestFirst ? rsort($files, SORT_STRING) : sort($files, SORT_STRING);
+
+        return array_map(
+            static fn (string $file): string => basename($file, '.json'),
+            $files
+        );
+    }
+
+    public function newest(ContentKey $key): ?Version
+    {
+        // One directory listing and, in the ordinary case, one file read —
+        // rather than reading the whole chain to look at one end of it.
+        foreach ($this->idsFor($key, newestFirst: true) as $id) {
+            $version = $this->read($this->dirFor($key) . '/' . $id . '.json');
+
+            // A damaged newest version falls through to the one behind it, for
+            // the same reason `all()` skips unreadable entries: nineteen
+            // recoverable states beat an error because the twentieth is broken.
+            if ($version !== null) {
+                return $version;
+            }
+        }
+
+        return null;
+    }
+
+    public function lastPublished(ContentKey $key): ?Version
+    {
+        $dir = $this->dirFor($key);
+
+        foreach ($this->idsFor($key, newestFirst: true) as $id) {
+            $version = $this->read($dir . '/' . $id . '.json');
+
+            if ($version !== null && $version->reason === Version::REASON_PUBLISH) {
+                return $version;
+            }
+        }
+
+        return null;
+    }
+
+    public function keysOfType(string $type, ?Locale $locale = null): array
+    {
+        if (!$this->isSafeSegment($type)) {
+            return [];
+        }
+
+        // The layout mirrors the key's own string form — {type}/{locale}/{slug}
+        // — so listing a type is a glob rather than an index that could drift
+        // out of step with what is on disk.
+        $pattern = $this->versionsDir . '/' . $type . '/'
+            . ($locale === null ? '*' : $locale->code) . '/*';
+
+        $keys = [];
+        foreach (glob($pattern, GLOB_ONLYDIR) ?: [] as $dir) {
+            $slug = basename($dir);
+            $code = basename(dirname($dir));
+
+            $parsed = Locale::tryFromString($code);
+            if ($parsed === null) {
+                // A directory that is not a language tag was not written by
+                // this store. Skipping it beats inventing a key for it.
+                continue;
+            }
+
+            $keys[] = ContentKey::fromString($type . ':' . $parsed->code . ':' . $slug);
+        }
+
+        return $keys;
     }
 
     public function find(ContentKey $key, string $versionId): ?Version
@@ -184,17 +268,28 @@ final class JsonVersionStore implements VersionStoreInterface
         }
     }
 
-    private function prune(string $dir): void
+    private function prune(ContentKey $key): void
     {
-        $files = glob($dir . '/*.json') ?: [];
-        sort($files, SORT_STRING);
+        $ids = $this->idsFor($key, newestFirst: false);
 
-        $ids = array_map(
-            static fn (string $file): string => basename($file, '.json'),
-            $files
-        );
+        // Under the limit there is nothing to discard, and working out what is
+        // exempt would mean opening files to no purpose — which is every save
+        // on a document with a short history, so it is worth the early exit.
+        if (count($ids) <= $this->retention->limit) {
+            return;
+        }
 
-        foreach ($this->retention->expired($ids) as $id) {
+        // The working copy is the last entry, the chain being oldest-first.
+        $spare = [$ids[count($ids) - 1]];
+
+        $published = $this->lastPublished($key);
+        if ($published !== null) {
+            $spare[] = $published->id;
+        }
+
+        $dir = $this->dirFor($key);
+
+        foreach ($this->retention->expired($ids, $spare) as $id) {
             @unlink($dir . '/' . $id . '.json');
         }
     }

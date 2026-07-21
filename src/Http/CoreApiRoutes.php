@@ -69,6 +69,13 @@ final class CoreApiRoutes
             'PUT /api/pages/:slug' => [$this, 'updatePage'],
             'DELETE /api/pages/:slug' => [$this, 'deletePage'],
 
+            // Publication. A POST because it is a thing that happens rather
+            // than a field being set — and because being unsafe means it
+            // carries the CSRF token, so no other site can put a page live by
+            // getting an editor to load an image.
+            'POST /api/pages/:slug/publish' => [$this, 'publishPage'],
+            'POST /api/pages/:slug/unpublish' => [$this, 'unpublishPage'],
+
             // History. Nested under the page rather than a top-level
             // /api/versions, because a version has no meaning apart from the
             // document it is a version of, and the address should say so.
@@ -107,25 +114,29 @@ final class CoreApiRoutes
             return ['status' => 400, 'error' => $locale['error']];
         }
 
-        $pages = $this->pages()->all($locale['locale']);
-
         // Anonymous callers see published pages only.
         //
         // This endpoint is deliberately public — a headless front end reads it
-        // with no account — but it was returning drafts to anyone who asked,
-        // which made every unpublished page world-readable and would have made
-        // signed preview links pointless. Editing is unaffected: the admin UI
-        // has a session and still sees everything.
-        if ($this->currentUser() === []) {
-            $pages = array_values(array_filter(
-                $pages,
-                static fn ($page): bool => $page->isPublished()
-            ));
-        }
+        // with no account — but it must not be a way to read unpublished work,
+        // which would make signed preview links pointless. That is now a choice
+        // of which list to ask for rather than a filter applied afterwards: the
+        // public list is what is in `content/`, and there is nothing in it that
+        // needs excluding.
+        $signedIn = $this->currentUser() !== [];
+
+        $pages = $signedIn
+            ? $this->pages()->all($locale['locale'])
+            : $this->pages()->published($locale['locale']);
 
         return [
             'data' => array_map(
-                static fn ($page): array => $page->toArray(),
+                // Publication state only for an editor. An anonymous reader is
+                // looking at the live site by definition, and telling them which
+                // pages have unpublished edits pending leaks the shape of work
+                // in progress for no benefit.
+                fn ($page): array => $signedIn
+                    ? $page->toArray() + ['publication' => $this->publicationOf($page)]
+                    : $page->toArray(),
                 $pages
             ),
             // Echoed so a client can tell which language it is looking at
@@ -149,13 +160,33 @@ final class CoreApiRoutes
             return ['status' => 400, 'error' => $requested['error']];
         }
 
+        $signedIn = $this->currentUser() !== [];
+
+        // An editor gets the copy they are working on, in exactly the language
+        // they asked for. No fallback on this path: the working copy of a
+        // translation that does not exist is not the English one.
+        $draft = $signedIn ? $this->pages()->find($slug, $requested['locale']) : null;
+
         // Read with fallback: a front end asking for a language that has no
         // translation should get the page rather than a 404. What it must not
         // get is the fallback without being told, so the served language and
         // the fact that it was a fallback are part of the response — a client
         // that shows German chrome around English prose is at least able to
         // know it is doing so.
-        $resolved = $this->pages()->resolve($slug, $requested['locale']);
+        //
+        // Anonymous callers only ever reach this branch, and it reads `content/`,
+        // so an unpublished page is a 404 by construction rather than by a check
+        // somebody could forget to write. Not found rather than forbidden was
+        // always the intent: telling an anonymous caller that a page exists but
+        // is unpublished leaks the thing being protected — which slugs are being
+        // worked on — even while withholding the content.
+        $resolved = $draft === null
+            ? $this->pages()->resolve($slug, $requested['locale'])
+            : new \Click\Cms\Domain\Content\ResolvedContent(
+                $draft,
+                $requested['locale'],
+                $requested['locale']
+            );
 
         if ($resolved === null) {
             return ['status' => 404, 'error' => 'Page not found'];
@@ -163,14 +194,11 @@ final class CoreApiRoutes
 
         $page = $resolved->content;
 
-        // Not found rather than forbidden: telling an anonymous caller that a
-        // page exists but is unpublished leaks the thing being protected —
-        // which slugs are being worked on — even while withholding the content.
-        if (!$page->isPublished() && $this->currentUser() === []) {
-            return ['status' => 404, 'error' => 'Page not found'];
-        }
-
         $response = ['data' => $page->toArray()] + $resolved->toArray();
+
+        if ($signedIn) {
+            $response['publication'] = $this->publicationOf($page);
+        }
 
         // Which other languages this page exists in, so an editor sees at a
         // glance what is still untranslated.
@@ -277,6 +305,64 @@ final class CoreApiRoutes
     }
 
     /**
+     * Put this page, in this language, in front of the public.
+     *
+     * @return array<string, mixed>
+     */
+    public function publishPage(string $slug): array
+    {
+        return $this->publicationResponse(
+            $slug,
+            $this->pages()->publish($slug, $this->currentUser(), $this->localeParam())
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function unpublishPage(string $slug): array
+    {
+        return $this->publicationResponse(
+            $slug,
+            $this->pages()->unpublish($slug, $this->currentUser(), $this->localeParam())
+        );
+    }
+
+    /**
+     * @param array{page: ?\Click\Cms\Domain\Content\Content, error: ?string, status: int, errors: array<string, string>} $result
+     * @return array<string, mixed>
+     */
+    private function publicationResponse(string $slug, array $result): array
+    {
+        if ($result['error'] !== null) {
+            return ['status' => $result['status'], 'error' => $result['error']];
+        }
+
+        // The state afterwards rather than a bare "done". The editor's next
+        // question is always whether anything is still pending, and answering
+        // it here saves a round trip that would otherwise race the write.
+        return [
+            'status' => $result['status'],
+            'data' => [
+                'page' => $result['page']->toArray(),
+                'publication' => $this->pages()
+                    ->publicationOf($slug, $this->localeParam())
+                    ->toArray(),
+            ],
+        ];
+    }
+
+    /**
+     * Where a page stands, as a plain array for a JSON response.
+     *
+     * @return array<string, mixed>
+     */
+    private function publicationOf(\Click\Cms\Domain\Content\Content $page): array
+    {
+        return $this->contentService()->publicationOf($page->key)->toArray();
+    }
+
+    /**
      * The `?locale=` of the current request, unparsed.
      *
      * Query string rather than a path segment because the management API is
@@ -329,11 +415,16 @@ final class CoreApiRoutes
 
         $key = ContentKey::page($slug, $locale['locale']);
 
+        // The working copy, because that is what the link will render and an
+        // unpublished page is the main thing anybody mints one for. Asking
+        // whether the document is live would refuse a link to precisely the
+        // work preview exists to show.
+        //
         // Exactly this translation, with no fallback: a link minted for a German
         // page that does not exist yet would otherwise verify and then show the
         // English one, which is how a translation gets approved without anybody
         // having read it.
-        if ($this->contentService()->get($key) === null) {
+        if ($this->contentService()->draft($key) === null) {
             return ['status' => 404, 'error' => 'Page not found'];
         }
 

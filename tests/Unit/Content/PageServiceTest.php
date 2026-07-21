@@ -130,9 +130,19 @@ final class PageServiceTest extends TestCase
         $this->assertArrayHasKey('0.type', $result['errors']);
     }
 
+    /**
+     * The "untouched fields survive" half of this used to be demonstrated with
+     * `status`, which is no longer a field a page may carry — publication is
+     * presence in `content/`, not something written into the document. An
+     * ordinary field makes the same point without asserting a model that is
+     * gone, and the discarding of `status` is pinned down separately below.
+     */
     public function testUpdateMergesAndCannotChangeTheAddress(): void
     {
-        $this->service->create(['title' => 'Home', 'slug' => 'home', 'status' => 'draft'], $this->admin());
+        $this->service->create(
+            ['title' => 'Home', 'slug' => 'home', 'summary' => 'Written once'],
+            $this->admin()
+        );
 
         $result = $this->service->update('home', ['title' => 'Renamed', 'slug' => 'somewhere-else'], $this->admin());
 
@@ -140,7 +150,26 @@ final class PageServiceTest extends TestCase
         $this->assertSame('home', $result['page']->slug());
         $this->assertSame('Renamed', $result['page']->title());
         // Untouched fields survive.
-        $this->assertSame('draft', $result['page']->data['status']);
+        $this->assertSame('Written once', $result['page']->data['summary']);
+    }
+
+    /**
+     * Two sources of truth for one fact is the thing this whole change removed.
+     * A client that goes on sending the old field must not be able to create a
+     * page that claims to be published while the public gets a 404.
+     */
+    public function testAClientCannotWriteAPublicationStatusOntoAPage(): void
+    {
+        $created = $this->service->create(
+            ['title' => 'Home', 'slug' => 'home', 'status' => 'published'],
+            $this->admin()
+        );
+
+        $this->assertArrayNotHasKey('status', $created['page']->data);
+
+        $updated = $this->service->update('home', ['status' => 'published'], $this->admin());
+
+        $this->assertArrayNotHasKey('status', $updated['page']->data);
     }
 
     public function testUpdatingAMissingPageIsNotFound(): void

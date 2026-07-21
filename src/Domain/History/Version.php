@@ -37,6 +37,21 @@ final class Version
     /** Written by putting an earlier version back. */
     public const REASON_RESTORE = 'restore';
 
+    /**
+     * The state that was promoted into `content/` and is now the live site.
+     *
+     * A publish records a version even though it changes nothing about the
+     * document, because otherwise nothing anywhere records *which* of twenty
+     * versions the public is actually reading. It is also what stops retention
+     * discarding that version — see {@see RetentionPolicy}.
+     *
+     * There is no matching `unpublish` reason on purpose. The newest version is
+     * the working copy, so appending one on unpublish would rewind an editor's
+     * unsaved-to-live edits to whatever was last live, which is the opposite of
+     * what taking a page down should do to the draft of its replacement.
+     */
+    public const REASON_PUBLISH = 'publish';
+
     /** The state the document was in immediately before it was deleted. */
     public const REASON_DELETE = 'delete';
 
@@ -218,8 +233,13 @@ final class Version
      */
     private static function normaliseReason(string $reason): string
     {
-        return in_array($reason, [self::REASON_SAVE, self::REASON_RESTORE, self::REASON_DELETE], true)
-            ? $reason
-            : self::REASON_SAVE;
+        $known = [
+            self::REASON_SAVE,
+            self::REASON_RESTORE,
+            self::REASON_DELETE,
+            self::REASON_PUBLISH,
+        ];
+
+        return in_array($reason, $known, true) ? $reason : self::REASON_SAVE;
     }
 }

@@ -32,11 +32,39 @@ final class RoleTest extends TestCase
 
     /**
      * An author drafts; someone else decides it goes live.
+     *
+     * This assertion has been here since the role model was written and was
+     * decorative until draft-and-publish existed: saving was publishing, so an
+     * author without this capability could still put their words in front of
+     * every visitor by pressing Save. It now describes something the system
+     * actually enforces.
      */
     public function testAuthorsCannotPublish(): void
     {
         $this->assertFalse(Role::Author->can(Capability::PublishContent));
+        $this->assertFalse(Role::Author->can(Capability::UnpublishContent));
         $this->assertTrue(Role::Editor->can(Capability::PublishContent));
+        $this->assertTrue(Role::Editor->can(Capability::UnpublishContent));
+        $this->assertTrue(Role::Admin->can(Capability::PublishContent));
+    }
+
+    /**
+     * Publishing is an act on a particular document, so the capability alone is
+     * not enough — otherwise granting it would quietly grant the ability to push
+     * somebody else's half-written draft live.
+     */
+    public function testPublishingNeedsTheReachToEditThatDocumentToo(): void
+    {
+        // An author owns the reach but not the capability.
+        $this->assertFalse(Role::Author->canPublishContentOwnedBy('ada', 'ada'));
+
+        // An editor has both, over anyone's work.
+        $this->assertTrue(Role::Editor->canPublishContentOwnedBy('ada', 'evan'));
+        $this->assertTrue(Role::Editor->canUnpublishContentOwnedBy('ada', 'evan'));
+
+        // A viewer has neither, and is where an unrecognised role lands.
+        $this->assertFalse(Role::Viewer->canPublishContentOwnedBy('val', 'val'));
+        $this->assertFalse(Role::fromName('ghost')->canPublishContentOwnedBy('x', 'x'));
     }
 
     /**
