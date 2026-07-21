@@ -28,13 +28,16 @@ final class PageServiceTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob($this->dir . '/*/*') ?: [] as $f) {
-            @unlink($f);
+        self::removeTree($this->dir);
+    }
+
+    private static function removeTree(string $dir): void
+    {
+        foreach (glob($dir . '/*') ?: [] as $entry) {
+            is_dir($entry) ? self::removeTree($entry) : @unlink($entry);
         }
-        foreach (glob($this->dir . '/*') ?: [] as $d) {
-            @rmdir($d);
-        }
-        @rmdir($this->dir);
+
+        @rmdir($dir);
     }
 
     /** @return array<string, mixed> */

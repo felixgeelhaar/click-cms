@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Tests\Unit\Config;
 
 use Click\Cms\Application\Config\CoreConfig;
+use Click\Cms\Domain\ValueObjects\Locale;
 use PHPUnit\Framework\TestCase;
 
 final class CoreConfigTest extends TestCase
@@ -107,5 +108,69 @@ final class CoreConfigTest extends TestCase
         // unaffected, so this must simply be allowed.
         $this->assertFalse($config->restApiEnabled());
         $this->assertFalse($config->graphqlEnabled());
+    }
+
+    /* ---------------------------------------------------------- languages -- */
+
+    public function testASiteWithNoLanguageConfigurationIsEnglishOnly(): void
+    {
+        $config = CoreConfig::fromArray([]);
+
+        $this->assertSame('en', $config->defaultLocale()->code);
+        $this->assertSame(['en'], $this->codes($config->locales()));
+    }
+
+    public function testTheDefaultAndAvailableLanguagesAreRead(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['languages' => ['default' => 'de', 'available' => ['de', 'en', 'fr']]],
+        ]);
+
+        $this->assertSame('de', $config->defaultLocale()->code);
+        $this->assertSame(['de', 'en', 'fr'], $this->codes($config->locales()));
+    }
+
+    /**
+     * A site whose configuration excluded the language its fallback serves
+     * would have a fallback nobody is allowed to ask for.
+     */
+    public function testTheDefaultLanguageIsAlwaysAvailable(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['languages' => ['default' => 'de', 'available' => ['fr']]],
+        ]);
+
+        $this->assertSame(['de', 'fr'], $this->codes($config->locales()));
+        $this->assertTrue($config->supportsLocale(Locale::fromString('de')));
+        $this->assertFalse($config->supportsLocale(Locale::fromString('it')));
+    }
+
+    /** A typo should cost that one language, not the site. */
+    public function testAnUnparseableLanguageIsDroppedRatherThanFatal(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['languages' => ['default' => '../escape', 'available' => ['de', 'not a tag']]],
+        ]);
+
+        $this->assertSame('en', $config->defaultLocale()->code);
+        $this->assertSame(['en', 'de'], $this->codes($config->locales()));
+    }
+
+    public function testLanguagesAreNormalisedAndDeduplicated(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['languages' => ['default' => 'EN', 'available' => ['en', 'pt-br', 'PT-BR']]],
+        ]);
+
+        $this->assertSame(['en', 'pt-BR'], $this->codes($config->locales()));
+    }
+
+    /**
+     * @param list<Locale> $locales
+     * @return list<string>
+     */
+    private function codes(array $locales): array
+    {
+        return array_map(static fn (Locale $l): string => $l->code, $locales);
     }
 }

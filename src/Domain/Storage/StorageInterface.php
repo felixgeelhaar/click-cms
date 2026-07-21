@@ -6,6 +6,7 @@ namespace Click\Cms\Domain\Storage;
 
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Domain\ValueObjects\Locale;
 
 /**
  * Persistence port for content.
@@ -24,9 +25,13 @@ interface StorageInterface
     /**
      * All content of a type, in stable order.
      *
+     * Pass a locale to list one language. Null lists every language, which is
+     * what a caller wants when it is reporting which translations exist; it is
+     * not what a listing screen wants, so callers say which they mean.
+     *
      * @return list<Content>
      */
-    public function findByType(string $type): array;
+    public function findByType(string $type, ?Locale $locale = null): array;
 
     public function save(Content $content): void;
 

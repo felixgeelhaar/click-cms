@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Domain\Content;
 
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Domain\ValueObjects\Locale;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
@@ -82,6 +83,11 @@ final class Content
         return $this->key->slug;
     }
 
+    public function locale(): Locale
+    {
+        return $this->key->locale;
+    }
+
     public function title(): string
     {
         $title = $this->data['title'] ?? null;
@@ -150,6 +156,9 @@ final class Content
             'key' => $this->key->toString(),
             'type' => $this->key->type,
             'slug' => $this->key->slug,
+            // Alongside the composite key so a front end never has to parse the
+            // key string to find out which language it is holding.
+            'locale' => $this->key->locale->code,
             'data' => $this->data,
             'createdAt' => $this->createdAt->format(DATE_ATOM),
             'updatedAt' => $this->updatedAt->format(DATE_ATOM),

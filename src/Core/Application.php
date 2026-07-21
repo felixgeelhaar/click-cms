@@ -16,6 +16,7 @@ use Click\Cms\Domain\Event\EventDispatcher;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\SectionRenderer;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
@@ -54,6 +55,15 @@ class Application
         
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+        // Route on the path alone. The query string was previously matched as
+        // part of it, so `/api/pages?locale=de` looked to the router like a path
+        // named "pages?locale=de" and answered "Endpoint not found" — every
+        // query parameter core has ever wanted to read was unreachable.
+        $queryStart = strpos($uri, '?');
+        if ($queryStart !== false) {
+            $uri = substr($uri, 0, $queryStart);
+        }
 
         $this->applySecurityHeaders();
         $this->touchSession();
@@ -96,10 +106,14 @@ class Application
         
         // Storage is constructed directly rather than resolved from a plugin:
         // the application cannot boot without one, so it is not optional.
-        $storage = new JsonStorage($this->basePath . '/content');
-        $this->contentService = new ContentService($storage);
+        // The default locale reaches storage because the pre-languages layout —
+        // `content/page/home.json`, with no language segment — has to be read as
+        // *something*, and the only honest answer is the language the site says
+        // it is written in.
+        $storage = new JsonStorage($this->basePath . '/content', $this->config->defaultLocale());
+        $this->contentService = new ContentService($storage, $this->config->defaultLocale());
 
-        $this->coreApiRoutes = new CoreApiRoutes($this->basePath, $this->contentService);
+        $this->coreApiRoutes = new CoreApiRoutes($this->basePath, $this->contentService, $this->config);
 
         // Sessions and login throttling are collaborators rather than methods on
         // this class, so each can be understood and tested on its own.
@@ -201,31 +215,67 @@ class Application
 
     private function handlePublicPage(string $uri): array
     {
-        $slug = trim($uri, '/');
+        $path = trim($uri, '/');
+        [$locale, $slug] = $this->splitLocaleFromPath($path);
+
         if ($slug === '') {
             $slug = 'home';
         }
 
-        $page = $this->contentService?->page($slug);
-        if ($page === null) {
+        $resolved = $this->contentService?->resolve(ContentKey::page($slug, $locale));
+        if ($resolved === null) {
             header('Content-Type: text/html');
             http_response_code(404);
-            echo '<!doctype html><html><head><meta charset="utf-8"><title>Not Found</title></head><body><h1>Page not found</h1></body></html>';
+            echo '<!doctype html><html lang="' . htmlspecialchars($locale->code, ENT_QUOTES) . '">'
+                . '<head><meta charset="utf-8"><title>Not Found</title></head>'
+                . '<body><h1>Page not found</h1></body></html>';
             return ['raw' => true];
         }
 
-        $rendered = $this->renderPageHtml($page);
+        $rendered = $this->renderPageHtml($resolved->content, $resolved->served);
 
         header('Content-Type: text/html');
+        // So a cache, and anyone debugging why they are reading English, can see
+        // that this URL was answered in a language other than the one asked for.
+        header('Content-Language: ' . $resolved->served->code);
+        if ($resolved->isFallback()) {
+            header('Vary: Accept-Language');
+        }
         echo $rendered;
         return ['raw' => true];
     }
 
-    private function renderPageHtml(Content $page): string
+    /**
+     * Split a leading language segment off a public URL.
+     *
+     * `/de/kontakt` is the German contact page; `/kontakt` is the contact page
+     * in the site's default language. Only a segment that names a *configured*
+     * language is treated as one, so a page whose slug happens to look like a
+     * language tag — `/de` for a page about Germany — is still reachable on a
+     * monolingual site.
+     *
+     * @return array{0: Locale, 1: string}
+     */
+    private function splitLocaleFromPath(string $path): array
+    {
+        $default = $this->config?->defaultLocale() ?? Locale::default();
+
+        $slash = strpos($path, '/');
+        $first = $slash === false ? $path : substr($path, 0, $slash);
+
+        $candidate = Locale::tryFromString($first);
+        if ($candidate === null || $this->config === null || !$this->config->supportsLocale($candidate)) {
+            return [$default, $path];
+        }
+
+        return [$candidate, $slash === false ? '' : substr($path, $slash + 1)];
+    }
+
+    private function renderPageHtml(Content $page, ?Locale $locale = null): string
     {
         // A plugin may take over rendering entirely — a theme, or the free-form
         // builder for a page built that way.
-        foreach ($this->pluginManager->executeHook('web.render', ['page' => $page]) as $result) {
+        foreach ($this->pluginManager?->executeHook('web.render', ['page' => $page]) ?? [] as $result) {
             if (is_string($result) && $result !== '') {
                 return $result;
             }
@@ -248,8 +298,19 @@ class Application
                 . '</div>';
         }
 
+        // The language actually served, not the one requested. A German URL
+        // showing English prose because the translation is missing must still
+        // say `lang="en"` — a screen reader that pronounces English with German
+        // phonemes is unintelligible, and that is precisely the case a fallback
+        // creates.
+        $lang = htmlspecialchars(
+            ($locale ?? $page->locale())->code,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+
         return '<!doctype html>
-<html lang="en">
+<html lang="' . $lang . '">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

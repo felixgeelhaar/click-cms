@@ -6,6 +6,12 @@
     "graphql": {
       "enabled": true
     },
+    "languages": {
+      "default": "en",
+      "available": [
+        "en"
+      ]
+    },
     "auth": {
       "enabled": true,
       "sessionTtlSeconds": 28800,
