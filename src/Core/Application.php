@@ -580,7 +580,11 @@ class Application
 
     private function handleApiRequest(string $uri, string $method): array
     {
-        $path = ltrim(preg_replace('#^/api/#', '', $uri), '/');
+        // The query string is not part of the route. Without this, any endpoint
+        // taking a parameter — `/api/media?displayWidth=360`, which asks for the
+        // library judged against a field's slot — matched no route at all and
+        // came back 404.
+        $path = ltrim(preg_replace('#^/api/#', '', strtok($uri, '?') ?: $uri), '/');
 
         // Before anything else acts on the request. A forged POST that reaches
         // a handler has already done its damage, and on plugin installation

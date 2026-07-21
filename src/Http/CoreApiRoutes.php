@@ -536,12 +536,37 @@ final class CoreApiRoutes
      */
     public function listMedia(): array
     {
+        // An image field that declares the width it displays at asks for the
+        // library through this parameter, so the "too small for this slot"
+        // verdict and its wording come from the domain rather than being
+        // recomputed — and worded differently — in every client.
+        $displayWidth = $this->requestedDisplayWidth();
+
         return [
             'data' => array_map(
-                static fn ($item): array => $item->toArray(),
+                static fn ($item): array => $item->toArray($displayWidth),
                 $this->media()->all()
             ),
         ];
+    }
+
+    /**
+     * The display width a client asked media to be judged against, if any.
+     *
+     * Anything unparseable or non-positive is treated as absent: a bad query
+     * string should fall back to the general verdict, never to a wrong one.
+     */
+    private function requestedDisplayWidth(): ?int
+    {
+        $raw = $_GET['displayWidth'] ?? null;
+
+        if (!is_string($raw) && !is_int($raw)) {
+            return null;
+        }
+
+        $width = (int) $raw;
+
+        return $width > 0 ? $width : null;
     }
 
     /**
@@ -553,7 +578,7 @@ final class CoreApiRoutes
 
         return $item === null
             ? ['status' => 404, 'error' => 'Media not found']
-            : ['data' => $item->toArray()];
+            : ['data' => $item->toArray($this->requestedDisplayWidth())];
     }
 
     /**

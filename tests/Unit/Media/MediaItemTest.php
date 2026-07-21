@@ -68,6 +68,58 @@ final class MediaItemTest extends TestCase
         $this->assertEquals([ImageSize::Small, ImageSize::Medium], $restored->variants);
     }
 
+    public function testQualityIsReportedInThePayloadSoAnyClientCanShowIt(): void
+    {
+        $small = MediaItem::create(
+            id: 'narrow-logo-a1b2c3',
+            extension: 'png',
+            mimeType: 'image/png',
+            originalName: 'logo.png',
+            bytes: 40_000,
+            width: 1022,
+            height: 575,
+            variants: [ImageSize::Small],
+        );
+
+        $quality = $small->toArray()['quality'];
+
+        $this->assertTrue($quality['warning']);
+        $this->assertSame('low', $quality['level']);
+        $this->assertSame(['md', 'lg', 'xl'], $quality['missingVariants']);
+    }
+
+    public function testQualityIsAnsweredForASlotWhenTheFieldDeclaresOne(): void
+    {
+        $item = MediaItem::create(
+            id: 'narrow-logo-a1b2c3',
+            extension: 'png',
+            mimeType: 'image/png',
+            originalName: 'logo.png',
+            bytes: 40_000,
+            width: 1022,
+            height: 575,
+        );
+
+        // The same file: fine in a card, wrong in a header.
+        $this->assertFalse($item->toArray(400)['quality']['warning']);
+        $this->assertTrue($item->toArray(1200)['quality']['warning']);
+    }
+
+    /** A width nobody measured must not produce a verdict. */
+    public function testQualityIsAbsentWhenThereAreNoPixelsToCount(): void
+    {
+        $unmeasured = MediaItem::create(
+            id: 'unmeasured-a1b2c3',
+            extension: 'gif',
+            mimeType: 'image/gif',
+            originalName: 'x.gif',
+            bytes: 100,
+        );
+
+        $this->assertNull($unmeasured->quality());
+        $this->assertNull($unmeasured->toArray()['quality']);
+    }
+
     public function testRejectsAnIdThatCouldEscapeItsDirectory(): void
     {
         $this->expectException(InvalidArgumentException::class);
