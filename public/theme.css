@@ -1,0 +1,58 @@
+/*
+ * The default theme.
+ *
+ * Deliberately minimal: enough that a site serves something presentable out of
+ * the box, styled entirely through the stable class names the renderer emits,
+ * so replacing it means replacing one file and nothing else.
+ */
+:root {
+  --ink: #1a1a1a;
+  --muted: #4a5568;
+  --rule: #e2e8f0;
+  --accent: #0066cc;
+  --measure: 68rem;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 1rem/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: #fff;
+}
+
+main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
+
+.cms-section { padding: 3.5rem 0; border-bottom: 1px solid var(--rule); }
+.cms-section:last-child { border-bottom: 0; }
+.cms-section h2 { margin: 0 0 1rem; font-size: 1.75rem; letter-spacing: -0.01em; }
+.cms-section p { margin: 0 0 1rem; color: var(--muted); }
+.cms-section a { color: var(--accent); }
+
+.cms-field--body { max-width: 44rem; }
+.cms-section--width-wide .cms-field--body { max-width: 100%; }
+
+.cms-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.5rem; }
+.cms-items h2 { font-size: 1.125rem; margin: 0.75rem 0 0.35rem; }
+.cms-items img { width: 100%; height: auto; display: block; border-radius: 6px; }
+
+/* Grid width follows the editor's column choice. */
+.cms-section--columns-2 .cms-items { grid-template-columns: repeat(2, 1fr); }
+.cms-section--columns-3 .cms-items { grid-template-columns: repeat(3, 1fr); }
+.cms-section--columns-4 .cms-items { grid-template-columns: repeat(4, 1fr); }
+
+/* A facts row: figures large, captions quiet. */
+.cms-section--facts .cms-items { grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); text-align: center; }
+.cms-section--facts .cms-items h2 { font-size: 2.25rem; margin: 0; }
+.cms-section--facts .cms-items p { margin: 0.25rem 0 0; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.cms-section--call-to-action { text-align: center; }
+.cms-section--call-to-action .cms-field--buttonUrl a {
+  display: inline-block; padding: 0.7rem 1.5rem; border-radius: 6px;
+  background: var(--accent); color: #fff; text-decoration: none;
+}
+
+@media (max-width: 48rem) {
+  .cms-items { grid-template-columns: 1fr !important; }
+}
