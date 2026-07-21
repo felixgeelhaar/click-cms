@@ -54,3 +54,6 @@ marketplace-registry/
 
 # Roady project management
 .roady/
+
+# Agent worktrees and local session state.
+.claude/

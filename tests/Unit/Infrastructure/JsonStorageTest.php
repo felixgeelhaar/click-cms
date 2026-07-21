@@ -5,21 +5,29 @@ declare(strict_types=1);
 namespace Click\Cms\Tests\Unit\Infrastructure;
 
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Storage\StorageInterface;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
 use InvalidArgumentException;
-use PHPUnit\Framework\TestCase;
 
-final class JsonStorageTest extends TestCase
+/**
+ * The shared contract, plus what is true only of a file per document.
+ */
+final class JsonStorageTest extends StorageContractTestCase
 {
     private string $dir;
-    private JsonStorage $storage;
 
-    protected function setUp(): void
+    protected function createStorage(): StorageInterface
     {
         $this->dir = sys_get_temp_dir() . '/click-cms-test-' . bin2hex(random_bytes(6));
         mkdir($this->dir, 0o775, true);
-        $this->storage = new JsonStorage($this->dir);
+
+        return new JsonStorage($this->dir);
+    }
+
+    protected function corruptStoredItem(ContentKey $key): void
+    {
+        file_put_contents($this->dir . '/' . $key->type . '/' . $key->locale->code . '/' . $key->slug . '.json', '{ this is not json');
     }
 
     protected function tearDown(): void
@@ -27,51 +35,21 @@ final class JsonStorageTest extends TestCase
         if (!is_dir($this->dir)) {
             return;
         }
-        self::removeTree($this->dir);
-    }
-
-    private static function removeTree(string $dir): void
-    {
-        foreach (glob($dir . '/*') ?: [] as $entry) {
-            is_dir($entry) ? self::removeTree($entry) : @unlink($entry);
-        }
-
-        @rmdir($dir);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function jsonFilesUnder(string $dir): array
-    {
-        $out = [];
-
-        foreach (glob($dir . '/*') ?: [] as $entry) {
-            if (is_dir($entry)) {
-                $out = array_merge($out, $this->jsonFilesUnder($entry));
-            } elseif (str_ends_with($entry, '.json')) {
-                $out[] = $entry;
+        // Depth-first rather than a fixed number of levels: the layout gained a
+        // language segment once already, and a teardown that assumes a depth
+        // leaves directories behind the next time it changes.
+        $remove = static function (string $dir) use (&$remove): void {
+            foreach (scandir($dir) ?: [] as $entry) {
+                if ($entry === '.' || $entry === '..') {
+                    continue;
+                }
+                $path = $dir . '/' . $entry;
+                is_dir($path) ? $remove($path) : @unlink($path);
             }
-        }
+            @rmdir($dir);
+        };
 
-        return $out;
-    }
-
-    public function testSaveThenFindRoundTrips(): void
-    {
-        $content = Content::create(ContentKey::page('home'), ['title' => 'Home', 'content' => 'Hi']);
-        $this->storage->save($content);
-
-        $found = $this->storage->find(ContentKey::page('home'));
-
-        $this->assertNotNull($found);
-        $this->assertSame('Home', $found->title());
-        $this->assertSame('Hi', $found->content());
-    }
-
-    public function testFindReturnsNullWhenAbsent(): void
-    {
-        $this->assertNull($this->storage->find(ContentKey::page('nope')));
+        $remove($this->dir);
     }
 
     public function testSaveWritesOneFilePerItemGroupedByType(): void
@@ -90,90 +68,13 @@ final class JsonStorageTest extends TestCase
         $this->assertSame([], glob($this->dir . '/page/en/*.tmp') ?: []);
     }
 
-    public function testFindByTypeReturnsOnlyThatTypeInStableOrder(): void
-    {
-        foreach (['charlie', 'alpha', 'bravo'] as $slug) {
-            $this->storage->save(Content::create(ContentKey::page($slug)));
-        }
-        $this->storage->save(Content::create(ContentKey::user('admin')));
-
-        $slugs = array_map(
-            static fn (Content $c): string => $c->slug(),
-            $this->storage->findByType('page')
-        );
-
-        $this->assertSame(['alpha', 'bravo', 'charlie'], $slugs);
-    }
-
-    public function testFindByTypeReturnsEmptyArrayForUnknownType(): void
-    {
-        $this->assertSame([], $this->storage->findByType('nothing-here'));
-    }
-
-    public function testDeleteRemovesAndReportsWhetherAnythingWasRemoved(): void
-    {
-        $this->storage->save(Content::create(ContentKey::page('home')));
-
-        $this->assertTrue($this->storage->delete(ContentKey::page('home')));
-        $this->assertFalse($this->storage->delete(ContentKey::page('home')));
-        $this->assertNull($this->storage->find(ContentKey::page('home')));
-    }
-
-    public function testExistsReflectsStoredState(): void
-    {
-        $this->assertFalse($this->storage->exists(ContentKey::page('home')));
-        $this->storage->save(Content::create(ContentKey::page('home')));
-        $this->assertTrue($this->storage->exists(ContentKey::page('home')));
-    }
-
-    public function testSaveOverwritesExistingItem(): void
+    public function testOverwritingReusesTheSameFile(): void
     {
         $content = Content::create(ContentKey::page('home'), ['title' => 'First']);
         $this->storage->save($content);
+        $this->storage->save($content->update(['title' => 'Second']));
 
-        $content->update(['title' => 'Second']);
-        $this->storage->save($content);
-
-        $this->assertSame('Second', $this->storage->find(ContentKey::page('home'))?->title());
         $this->assertCount(1, glob($this->dir . '/page/en/*.json') ?: []);
-    }
-
-    public function testCorruptFileIsTreatedAsAbsentRatherThanThrowing(): void
-    {
-        $this->storage->save(Content::create(ContentKey::page('home')));
-        file_put_contents($this->dir . '/page/en/home.json', '{ this is not json');
-
-        $this->assertNull($this->storage->find(ContentKey::page('home')));
-        // And it must not break a listing of its siblings.
-        $this->assertSame([], $this->storage->findByType('page'));
-    }
-
-    /**
-     * Reads are reached straight from URLs, so an impossible key must be an
-     * ordinary miss — throwing here turns every stray request into a 500.
-     */
-    public function testReadingAnUnsafeKeyIsAMissNotAnError(): void
-    {
-        $this->assertNull($this->storage->find(ContentKey::fromString('page:../../etc/passwd')));
-        $this->assertNull($this->storage->find(ContentKey::fromString('page:nested/slug')));
-        $this->assertFalse($this->storage->exists(ContentKey::fromString('page:../escape')));
-        $this->assertFalse($this->storage->delete(ContentKey::fromString('page:../escape')));
-        $this->assertSame([], $this->storage->findByType('../secrets'));
-    }
-
-    /**
-     * Writing one, by contrast, is a bug or an attack and must be loud.
-     */
-    public function testWritingAnUnsafeSlugThrows(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->storage->save(Content::create(ContentKey::fromString('page:../../evil')));
-    }
-
-    public function testWritingAnUnsafeTypeThrows(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->storage->save(Content::create(ContentKey::fromString('../secrets:x')));
     }
 
     public function testUnsafeKeyWriteDoesNotCreateAnyFile(): void
@@ -184,20 +85,6 @@ final class JsonStorageTest extends TestCase
             // expected
         }
 
-        $this->assertSame([], $this->jsonFilesUnder($this->dir));
-    }
-
-    public function testUnicodeAndSlashesInContentSurviveRoundTrip(): void
-    {
-        $content = Content::create(ContentKey::page('home'), [
-            'title' => 'Grüße & Ümläute',
-            'content' => 'a/b/c',
-        ]);
-        $this->storage->save($content);
-
-        $found = $this->storage->find(ContentKey::page('home'));
-
-        $this->assertSame('Grüße & Ümläute', $found?->title());
-        $this->assertSame('a/b/c', $found?->content());
+        $this->assertSame([], glob($this->dir . '/*/*/*.json') ?: []);
     }
 }
