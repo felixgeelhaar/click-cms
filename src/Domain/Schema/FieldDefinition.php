@@ -16,8 +16,15 @@ use InvalidArgumentException;
 final class FieldDefinition
 {
     /**
-     * @param list<string>          $options Allowed values, for Select fields.
-     * @param list<FieldDefinition> $fields  Sub-fields, for Repeater fields.
+     * @param list<string>          $options    Allowed values, for Select fields.
+     * @param list<FieldDefinition> $fields     Sub-fields, for Repeater fields.
+     * @param ?string               $labelField For Url fields: the name of the field
+     *                                          holding the link's text. A link and its
+     *                                          wording are one control to a reader, but
+     *                                          two fields to an editor; without this the
+     *                                          renderer has no way to know they belong
+     *                                          together and prints the raw address on
+     *                                          the page next to a separate label.
      */
     private function __construct(
         public readonly string $name,
@@ -30,6 +37,7 @@ final class FieldDefinition
         public readonly array $fields,
         public readonly ?int $min,
         public readonly ?int $max,
+        public readonly ?string $labelField,
     ) {}
 
     /**
@@ -86,6 +94,9 @@ final class FieldDefinition
             fields: $fields,
             min: isset($spec['min']) ? (int) $spec['min'] : null,
             max: isset($spec['max']) ? (int) $spec['max'] : null,
+            labelField: $type === FieldType::Url && is_string($spec['labelField'] ?? null)
+                ? trim($spec['labelField'])
+                : null,
         );
     }
 
@@ -121,6 +132,9 @@ final class FieldDefinition
         }
         if ($this->max !== null) {
             $out['max'] = $this->max;
+        }
+        if ($this->labelField !== null) {
+            $out['labelField'] = $this->labelField;
         }
 
         return $out;

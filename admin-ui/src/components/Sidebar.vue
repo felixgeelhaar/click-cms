@@ -1,8 +1,20 @@
 <template>
   <nav class="sidebar" :class="{ collapsed }">
     <div class="nav-items">
-      <a v-for="item in navItems" :key="item.href" :class="['nav-item', { active: isActive(item.href) }]" @click.prevent="emit('navigate', item.href)">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <!-- A real `href` is what makes these links: without one an `<a>` is not
+           focusable, cannot be reached by keyboard, and is not announced as a
+           link. `@click.prevent` keeps navigation client-side for ordinary
+           clicks; the href still carries the destination, so the browser can
+           show it on hover and open it in a new tab. -->
+      <a
+        v-for="item in navItems"
+        :key="item.href"
+        :href="item.href"
+        :class="['nav-item', { active: isActive(item.href) }]"
+        :aria-current="isActive(item.href) ? 'page' : undefined"
+        @click="navigate($event, item.href)"
+      >
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path v-for="(d, i) in iconPaths[item.icon]" :key="i" :d="d" />
         </svg>
         <span class="label">{{ item.label }}</span>
@@ -43,6 +55,19 @@ const navItems = computed(() => {
   items.push({ href: '/admin/profile', icon: 'profile', label: 'Profile' });
   return items;
 });
+
+/**
+ * Route in the client for an ordinary click, and stay out of the way otherwise.
+ *
+ * Cmd/Ctrl/Shift-click and middle-click mean "open this somewhere else". Calling
+ * preventDefault on those would break an expectation every link on the web sets,
+ * so they are left to the browser and the href handles them.
+ */
+const navigate = (event, href) => {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+  event.preventDefault();
+  emit('navigate', href);
+};
 
 const isActive = (href) => {
   if (href === '/admin') return props.activeRoute === '/admin' || props.activeRoute === '/admin/';

@@ -123,9 +123,9 @@ Known gaps:
 
 - Rich text is a plain textarea. The seam exists to drop an editor in without
   touching anything else.
-- Sidebar navigation uses `<a>` elements with no `href`, so it is not
-  keyboard-focusable and is not announced as navigation. An accessibility
-  defect, not a cosmetic one.
+- ~~Sidebar navigation uses `<a>` elements with no `href`.~~ Fixed: the links
+  carry their destination and mark the current page, so they are keyboard
+  reachable, announced as links, and open in a new tab on Cmd/Ctrl-click.
 - Section and repeater reordering is arrow buttons rather than drag and drop.
   Accessible and dependency-free, but not what people expect.
 - No preview of what a page will look like once rendered.
@@ -158,15 +158,21 @@ size limits, path-traversal defence on media serving, and removal of the
 hardcoded `admin`/`admin` fallback that applied when a user document had no
 password field.
 
-Outstanding, and the first one matters most:
+Done since:
 
-- The installer creates `admin` with the password `admin` and never forces a
-  change. Fine for a demo, unacceptable for anything reachable. A first-run
-  password change should be mandatory.
-- No CSRF protection on state-changing API requests.
+- The installer's `admin`/`admin` now forces a password change before anything
+  else is reachable, and the server enforces the minimum length itself.
+- State-changing API requests require a CSRF token sent as a header.
+- Sessions are one file per session, named by a random identifier held in an
+  HttpOnly cookie. They were a single shared file, which meant any anonymous
+  visitor was treated as whoever had last logged in.
+
+Outstanding:
+
 - No rate limiting on login beyond the existing lockout.
-- Sessions are a single file, so concurrent logins from different users will
-  fight over it.
+- Capabilities are enforced only where a handler remembers to ask for them.
+  Nothing structural stops a new endpoint from skipping the check.
+- No audit trail: nothing records who changed what.
 
 ---
 
@@ -176,3 +182,28 @@ Plugin discovery and installation, with signed manifests. Present in core but
 not exercised. Needs a decision on whether it is a product direction or should
 be removed — an unused path that installs arbitrary code is a liability, not a
 feature.
+
+---
+
+## Theming
+
+A page rendered by the CMS itself links one stylesheet, `/theme.css`, served
+straight off disk by Apache. `SectionRenderer` emits no styling of its own —
+only semantic markup with stable class names (`cms-section--<type>`,
+`cms-field--<name>`, presentation modifiers such as `cms-section--columns-4`)
+that the stylesheet targets. That separation is right and should stay.
+
+What is missing is a way to *supply* a theme:
+
+- The path is hardcoded in core. A site cannot point at its own stylesheet
+  without editing the renderer.
+- `public/theme.css` lives inside the application, so replacing it means editing
+  a file the CMS owns and a deploy overwrites it. A theme should be site-owned
+  and live outside the image.
+- There is no notion of more than one theme, or of choosing between them, or of
+  a plugin shipping one.
+- No cache-busting: an edited `theme.css` sits in browser caches with no version
+  in the URL.
+
+The current file exists to make a fresh install render something presentable. It
+is a default, not a theming system, and should not be mistaken for one.
