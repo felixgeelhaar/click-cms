@@ -98,6 +98,62 @@ final class SectionRendererTest extends TestCase
         $this->assertStringNotContainsString('<p class="cms-field--width">wide</p>', $html);
     }
 
+    /**
+     * A link and its wording are one control to a reader. Rendering them as two
+     * fields put the raw address on the page beside a separate label.
+     */
+    public function testALinkUsesItsDeclaredLabelAsTheLinkText(): void
+    {
+        $html = $this->renderer->render($this->page([
+            ['type' => 'call-to-action', 'values' => [
+                'heading' => 'Talk to us',
+                'buttonLabel' => 'Request a quote',
+                'buttonUrl' => 'https://example.com/contact',
+            ]],
+        ]));
+
+        $this->assertStringContainsString(
+            '<a href="https://example.com/contact" rel="noopener noreferrer">Request a quote</a>',
+            $html
+        );
+        // The address must not appear as visible wording, and the label must not
+        // also be printed on its own.
+        $this->assertStringNotContainsString('>https://example.com/contact<', $html);
+        $this->assertSame(1, substr_count($html, 'Request a quote'));
+    }
+
+    /**
+     * The label field may be empty even when the link is not, so the link still
+     * has to render something rather than becoming unclickable text.
+     */
+    public function testALinkWithoutItsLabelFallsBackToTheAddress(): void
+    {
+        $html = $this->renderer->render($this->page([
+            ['type' => 'call-to-action', 'values' => [
+                'heading' => 'Talk to us',
+                'buttonUrl' => 'https://example.com/contact',
+            ]],
+        ]));
+
+        $this->assertStringContainsString(
+            '<a href="https://example.com/contact" rel="noopener noreferrer">https://example.com/contact</a>',
+            $html
+        );
+    }
+
+    public function testLinkTextIsEscaped(): void
+    {
+        $html = $this->renderer->render($this->page([
+            ['type' => 'call-to-action', 'values' => [
+                'buttonLabel' => '<script>alert(1)</script>',
+                'buttonUrl' => 'https://example.com',
+            ]],
+        ]));
+
+        $this->assertStringNotContainsString('<script', $html);
+        $this->assertStringContainsString('&lt;script&gt;', $html);
+    }
+
     public function testHeadingsBecomeHeadings(): void
     {
         $html = $this->renderer->render($this->page([
@@ -142,6 +198,21 @@ final class SectionRendererTest extends TestCase
 
         $this->assertStringContainsString('<img src="/api/media/file/some-old-reference"', $html);
         $this->assertStringNotContainsString('srcset', $html);
+    }
+
+    /**
+     * Without a media service nothing resolves, so a card's title is all the
+     * renderer has to describe the picture with.
+     */
+    public function testACardTitleDescribesAnUnresolvableImage(): void
+    {
+        $html = $this->renderer->render($this->page([
+            ['type' => 'card-grid', 'values' => ['cards' => [
+                ['title' => 'Balancing', 'image' => 'some-reference'],
+            ]]],
+        ]));
+
+        $this->assertStringContainsString('alt="Balancing"', $html);
     }
 
     public function testMalformedSectionsAreIgnoredRatherThanFatal(): void

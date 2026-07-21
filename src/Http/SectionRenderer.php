@@ -74,8 +74,17 @@ final class SectionRenderer
         $body = '';
         $modifiers = '';
 
+        // Fields consumed as another field's link text must not also be printed
+        // on their own, or the page shows the wording twice.
+        $consumed = [];
         foreach ($type->fields as $field) {
-            if (!array_key_exists($field->name, $values)) {
+            if ($field->type === FieldType::Url && $field->labelField !== null) {
+                $consumed[$field->labelField] = true;
+            }
+        }
+
+        foreach ($type->fields as $field) {
+            if (!array_key_exists($field->name, $values) || isset($consumed[$field->name])) {
                 continue;
             }
 
@@ -89,7 +98,15 @@ final class SectionRenderer
                 continue;
             }
 
-            $body .= $this->renderField($field, $values[$field->name]);
+            $linkText = null;
+            if ($field->type === FieldType::Url && $field->labelField !== null) {
+                $candidate = $values[$field->labelField] ?? null;
+                if (is_scalar($candidate) && (string) $candidate !== '') {
+                    $linkText = (string) $candidate;
+                }
+            }
+
+            $body .= $this->renderField($field, $values[$field->name], $linkText);
         }
 
         if (trim($body) === '') {
@@ -101,18 +118,18 @@ final class SectionRenderer
         return '<section class="' . $class . '">' . $body . '</section>';
     }
 
-    private function renderField(FieldDefinition $field, mixed $value): string
+    private function renderField(FieldDefinition $field, mixed $value, ?string $linkText = null): string
     {
         return match ($field->type) {
             FieldType::Repeater => $this->renderRepeater($field, $value),
             FieldType::Image => $this->renderImage($field, $value),
             FieldType::RichText, FieldType::Textarea => $this->renderProse($field, $value),
             FieldType::Boolean => '',
-            default => $this->renderScalar($field, $value),
+            default => $this->renderScalar($field, $value, $linkText),
         };
     }
 
-    private function renderScalar(FieldDefinition $field, mixed $value): string
+    private function renderScalar(FieldDefinition $field, mixed $value, ?string $linkText = null): string
     {
         if (!is_scalar($value) || (string) $value === '') {
             return '';
@@ -127,7 +144,12 @@ final class SectionRenderer
         }
 
         if ($field->type === FieldType::Url) {
-            return '<p class="' . $class . '"><a href="' . $text . '" rel="noopener noreferrer">' . $text . '</a></p>';
+            // Showing the address as the link's wording is what a reader sees as
+            // "https://…/kontakt" sitting on the page. When the section declares a
+            // field for the wording, that is what the link says instead.
+            $label = $linkText !== null ? $this->escape($linkText) : $text;
+
+            return '<p class="' . $class . '"><a href="' . $text . '" rel="noopener noreferrer">' . $label . '</a></p>';
         }
 
         if ($field->type === FieldType::Email) {
@@ -173,7 +195,7 @@ final class SectionRenderer
      * that do not exist: an upload narrower than a rung is never scaled up, so
      * the browser would pick a URL that 404s and show nothing at all.
      */
-    private function imageTag(string $reference, string $alt): string
+    private function imageTag(string $reference, string $alt, string $fallbackAlt = ''): string
     {
         $item = $this->media?->find($reference);
 
@@ -181,13 +203,16 @@ final class SectionRenderer
             // The reference does not resolve — most likely content written
             // before the media library, or an item since deleted.
             $src = rtrim($this->mediaBaseUrl, '/') . '/' . $this->escape($reference);
+            $unresolved = $alt !== '' ? $alt : $fallbackAlt;
 
-            return '<img src="' . $src . '" alt="' . $this->escape($alt) . '" loading="lazy">';
+            return '<img src="' . $src . '" alt="' . $this->escape($unresolved) . '" loading="lazy">';
         }
 
         $urls = $item->urls($this->mediaBaseUrl);
         $srcset = $item->srcset($this->mediaBaseUrl);
-        $description = $alt !== '' ? $alt : $item->alt;
+        // The library's own description is the one written to describe this
+        // picture, so it wins over anything inferred from surrounding content.
+        $description = $alt !== '' ? $alt : ($item->alt !== '' ? $item->alt : $fallbackAlt);
 
         $tag = '<img src="' . $this->escape($urls['original']) . '"';
 
@@ -224,11 +249,13 @@ final class SectionRenderer
                     continue;
                 }
 
-                // Inside a repeater an image is the item's own picture, and any
-                // sibling title is its description.
+                // A sibling title is only a fallback description. Letting it win
+                // threw away the wording an editor wrote in the media library and
+                // made a screen reader announce the card's heading twice — once as
+                // the heading, once as the picture.
                 if ($sub->type === FieldType::Image && is_string($row[$sub->name])) {
-                    $alt = is_string($row['title'] ?? null) ? $row['title'] : '';
-                    $inner .= $this->imageTag($row[$sub->name], $alt);
+                    $fallback = is_string($row['title'] ?? null) ? $row['title'] : '';
+                    $inner .= $this->imageTag($row[$sub->name], '', $fallback);
                     continue;
                 }
 

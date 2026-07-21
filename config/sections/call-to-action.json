@@ -6,6 +6,6 @@
     { "name": "heading", "type": "text", "label": "Heading", "required": true },
     { "name": "body", "type": "textarea", "label": "Text" },
     { "name": "buttonLabel", "type": "text", "label": "Button label", "required": true },
-    { "name": "buttonUrl", "type": "url", "label": "Button link", "required": true }
+    { "name": "buttonUrl", "type": "url", "label": "Button link", "required": true, "labelField": "buttonLabel" }
   ]
 }
