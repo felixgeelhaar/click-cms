@@ -35,6 +35,13 @@ COPY admin-ui/package.json admin-ui/package-lock.json* ./
 RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
 COPY admin-ui/ ./
+
+# Tests before the build, so a component that misreads the API cannot reach an
+# image. Four such defects shipped before this ran: the page list and the
+# dashboard both reported a fully live site as having nothing published, and a
+# changed content key broke every address the list rendered and made Delete
+# remove the wrong language's document. Every one was found by reading code.
+RUN npm test
 RUN npm run build
 
 # ---------------------------------------------------------------------------
