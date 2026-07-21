@@ -103,49 +103,41 @@ The domain layer. `Content`, `ContentKey`, the schema types, `UploadPolicy` and
 a port with two implementations. Media generates variants and refuses what it
 cannot verify. This is the part that is right.
 
-### The main problem: `Core\Application`
+### `Core\Application`
 
-One class, roughly a thousand lines, with about fifty methods. It is currently
-all of:
-
-- the HTTP kernel and router
-- authentication, sessions, idle timeout and login lockout
-- configuration loading and validation
-- plugin installation endpoints
-- health checks
-- proxying the admin UI to a development server
-- rendering public pages
-- logging
-
-That is at least seven responsibilities in one file, and it is why the login bug
-went unnoticed: authentication is buried in a class nobody reads as an
-authentication class. Capabilities 5, 6, 7 and 9 above are all tangled here.
-
-It should become a thin kernel that wires collaborators together:
+Was one class of about a thousand lines doing everything. Sessions, login
+throttling and configuration now live on their own:
 
 ```
-Http\Kernel              request -> response, nothing else
-Http\Router              route tables and matching
-Http\SecurityHeaders
-Application\Auth\*       authentication, sessions, lockout
-Application\Config       loading and access
-Application\Health
+Application\Authentication\SessionStore     reading, expiry, idle timeout
+Application\Authentication\LoginThrottle    failure counting and lockout
+Application\Authentication\CsrfGuard        token generation and comparison
+Application\Config\CoreConfig               one name and one default per setting
+Domain\Identity\Role, Capability            who may do what
+Http\CoreApiRoutes                          the management API
+Application\Content\PageService             page management rules
 ```
 
-None of that changes behaviour. It makes each piece findable, testable, and
-small enough to review.
+Still to extract: the HTTP kernel itself, route matching and the health checks.
+Application remains larger than it should be, but each remaining responsibility
+is now visible rather than tangled with authentication.
 
 ### Gaps against the capability list
 
-- **Identity (5)** is the weakest. Roles are a bare string on a user document,
-  with no capability model, so "an administrator may use the builder but an
-  editor may not" cannot currently be expressed. There is no CSRF protection,
-  and sessions are a single shared file that concurrent logins will fight over.
-- **The installer creates `admin` with the password `admin` and never forces a
-  change.** This is the most dangerous item in the project.
-- **Management API (7)** is incomplete: page CRUD still lives in the `rest-api`
-  plugin, so disabling that plugin leaves the admin UI unable to manage pages.
-  Full CRUD belongs in core; read-only delivery stays in the plugin.
+Closed since this was written: the seeded password now has to be changed before
+anything else can be reached; CSRF tokens are required on state-changing
+requests; authentication is deny-by-default rather than an allowlist of
+protected prefixes; roles map to named capabilities; and page management moved
+into core, so the delivery plugins are genuinely optional.
+
+Still open:
+
+- **Sessions are a single file.** Two people signed in at once share one record
+  and will overwrite each other. Isolated in SessionStore, so replacing it
+  touches nothing else.
+- **Nothing enforces capabilities at the storage layer.** A handler that forgets
+  to ask is still able to act. Checks belong closer to the operation.
+- **No audit trail.** Who changed what, and when, is not recorded anywhere.
 - **Installing plugins has no CSRF protection.** This is the sharpest edge in
   the codebase. The endpoint is correctly restricted to administrators, but with
   no CSRF token an administrator who loads a hostile page while logged in can be
