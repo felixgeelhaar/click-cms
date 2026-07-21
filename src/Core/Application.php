@@ -331,25 +331,34 @@ class Application
     private function handlePreviewRequest(string $uri): array
     {
         $path = (string) parse_url($uri, PHP_URL_PATH);
-        $slug = rawurldecode(substr($path, strlen('/preview/')));
+        $rest = rawurldecode(substr($path, strlen('/preview/')));
+
+        // The same language prefix the public site uses, so `/preview/de/kontakt`
+        // previews the German page and `/preview/kontakt` the default one.
+        [$locale, $slug] = $this->splitLocaleFromPath($rest);
 
         // The slug reaches storage, so only the shape this application itself
         // generates is accepted. Anything else is refused before it is used to
         // build a key, rather than relying on a layer further down to notice.
         if (preg_match('/^[a-z0-9][a-z0-9-]*$/', $slug) !== 1) {
-            return $this->notFoundPage();
+            return $this->notFoundPage($locale);
         }
 
+        $key = ContentKey::page($slug, $locale);
         $token = $_GET['token'] ?? null;
-        $bySignature = $this->previewLinks()->accepts($slug, is_string($token) ? $token : null);
+        $bySignature = $this->previewLinks()->accepts($key, is_string($token) ? $token : null);
 
         if (!$bySignature && !$this->mayPreviewFromSession()) {
-            return $this->notFoundPage();
+            return $this->notFoundPage($locale);
         }
 
-        $page = $this->contentService?->page($slug);
+        // Deliberately not the fallback-resolving read the public site uses. A
+        // preview of a translation that does not exist yet must say so by being
+        // absent, not quietly show the English one and let it be approved as
+        // though it were the German page.
+        $page = $this->contentService?->get($key);
         if ($page === null) {
-            return $this->notFoundPage();
+            return $this->notFoundPage($locale);
         }
 
         // Unpublished content must not be kept by anything between here and the
@@ -362,7 +371,9 @@ class Application
         header('X-Robots-Tag: noindex, nofollow, noarchive');
         header('Content-Type: text/html');
 
-        echo $this->renderPageHtml($page, preview: true);
+        header('Content-Language: ' . $locale->code);
+
+        echo $this->renderPageHtml($page, $locale, preview: true);
 
         return ['raw' => true];
     }

@@ -9,6 +9,7 @@ use Click\Cms\Application\Preview\PreviewLinks;
 use Click\Cms\Core\Application;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Domain\ValueObjects\Locale;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -76,9 +77,10 @@ final class PreviewRouteTest extends TestCase
         return $output;
     }
 
-    private function tokenFor(string $slug): string
+    private function tokenFor(string $slug, ?Locale $locale = null): string
     {
-        return (new PreviewLinks($this->base . '/data/preview-secret'))->issue($slug)['token'];
+        return (new PreviewLinks($this->base . '/data/preview-secret'))
+            ->issue(ContentKey::page($slug, $locale))['token'];
     }
 
     /** Put a real session on disk and hand its identifier to the request. */
@@ -163,10 +165,30 @@ final class PreviewRouteTest extends TestCase
         $this->assertStringContainsString('Page not found', $output);
     }
 
+    /**
+     * A page exists once per language, so a link to the finished German version
+     * must not also unlock the English draft nobody has proofread. Signing the
+     * slug alone made both the same subject.
+     */
+    public function testATokenForOneLanguageDoesNotOpenAnother(): void
+    {
+        $this->app->getContentService()->save(Content::create(
+            ContentKey::page('secret-plans', Locale::fromString('de')),
+            ['title' => 'Geheim', 'status' => 'draft', 'content' => 'DIE UNVEROEFFENTLICHTE ZEILE']
+        ));
+
+        $_GET['token'] = $this->tokenFor('secret-plans', Locale::fromString('de'));
+
+        $output = $this->request('/preview/secret-plans?token=' . $_GET['token']);
+
+        $this->assertStringNotContainsString('THE UNPUBLISHED SENTENCE', $output);
+        $this->assertStringContainsString('Page not found', $output);
+    }
+
     public function testAnExpiredTokenGetsNothing(): void
     {
         $links = new PreviewLinks($this->base . '/data/preview-secret', 1);
-        $_GET['token'] = $links->issue('secret-plans')['token'];
+        $_GET['token'] = $links->issue(ContentKey::page('secret-plans'))['token'];
         sleep(2);
 
         $output = $this->request('/preview/secret-plans?token=' . $_GET['token']);

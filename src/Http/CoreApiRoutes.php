@@ -322,11 +322,22 @@ final class CoreApiRoutes
             return ['status' => 403, 'error' => 'You do not have permission to share a preview of this page.'];
         }
 
-        if ($this->pages()->find($slug) === null) {
+        $locale = $this->requestedLocale();
+        if ($locale['error'] !== null) {
+            return ['status' => 400, 'error' => $locale['error']];
+        }
+
+        $key = ContentKey::page($slug, $locale['locale']);
+
+        // Exactly this translation, with no fallback: a link minted for a German
+        // page that does not exist yet would otherwise verify and then show the
+        // English one, which is how a translation gets approved without anybody
+        // having read it.
+        if ($this->contentService()->get($key) === null) {
             return ['status' => 404, 'error' => 'Page not found'];
         }
 
-        $link = $this->previewLinks()->issue($slug);
+        $link = $this->previewLinks()->issue($key, $this->config?->defaultLocale());
 
         if ($link === null) {
             // Better to say so than to return a link that will not verify.

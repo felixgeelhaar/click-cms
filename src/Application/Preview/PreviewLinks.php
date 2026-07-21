@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Click\Cms\Application\Preview;
 
 use Click\Cms\Domain\Preview\PreviewToken;
+use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Domain\ValueObjects\Locale;
 
 /**
  * Issues and checks preview links.
@@ -34,17 +36,26 @@ final class PreviewLinks
      *         Null when no secret could be established, because a link that
      *         cannot be verified later must not be handed out now.
      */
-    public function issue(string $slug): ?array
+    public function issue(ContentKey $key, ?Locale $defaultLocale = null): ?array
     {
         $secret = $this->secret(create: true);
         if ($secret === '') {
             return null;
         }
 
-        $token = PreviewToken::issue($secret, $slug, $this->ttlSeconds);
+        // The document's full identity is signed, not just its slug, so a link
+        // to one translation cannot be pointed at another.
+        $token = PreviewToken::issue($secret, $key->toString(), $this->ttlSeconds);
+
+        // The default language is left out of the address, matching the public
+        // site, where `/home` is the default language and `/de/home` is German.
+        $isDefault = $key->locale->equals($defaultLocale ?? Locale::default());
+        $path = $isDefault
+            ? '/preview/' . rawurlencode($key->slug)
+            : '/preview/' . rawurlencode($key->locale->code) . '/' . rawurlencode($key->slug);
 
         return [
-            'path' => '/preview/' . rawurlencode($slug) . '?token=' . rawurlencode($token),
+            'path' => $path . '?token=' . rawurlencode($token),
             'token' => $token,
             'expiresAt' => (int) explode('.', $token, 2)[0],
         ];
@@ -58,9 +69,9 @@ final class PreviewLinks
      * best and, if the file were ever written between two requests, an
      * inconsistent answer.
      */
-    public function accepts(string $slug, ?string $token): bool
+    public function accepts(ContentKey $key, ?string $token): bool
     {
-        return PreviewToken::accepts($this->secret(create: false), $slug, $token);
+        return PreviewToken::accepts($this->secret(create: false), $key->toString(), $token);
     }
 
     /**

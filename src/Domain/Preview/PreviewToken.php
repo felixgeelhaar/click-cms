@@ -46,11 +46,17 @@ final class PreviewToken
     private function __construct() {}
 
     /**
-     * Mint a token permitting one page to be previewed until it expires.
+     * Mint a token permitting one document to be previewed until it expires.
+     *
+     * The subject is whatever string identifies the thing being previewed, and
+     * it is signed although it is not carried in the token. Callers pass a
+     * document's full identity rather than its slug: a page exists once per
+     * language, and a link to the finished German translation must not also
+     * unlock the English draft nobody has proofread yet.
      */
     public static function issue(
         string $secret,
-        string $slug,
+        string $subject,
         int $ttlSeconds = self::DEFAULT_TTL_SECONDS,
         ?int $now = null,
     ): string {
@@ -58,7 +64,7 @@ final class PreviewToken
         $ttl = max(1, min($ttlSeconds, self::MAX_TTL_SECONDS));
         $expiresAt = $now + $ttl;
 
-        return $expiresAt . '.' . self::sign($secret, $slug, $expiresAt);
+        return $expiresAt . '.' . self::sign($secret, $subject, $expiresAt);
     }
 
     /**
@@ -70,7 +76,7 @@ final class PreviewToken
      */
     public static function accepts(
         string $secret,
-        string $slug,
+        string $subject,
         ?string $token,
         ?int $now = null,
     ): bool {
@@ -93,7 +99,7 @@ final class PreviewToken
 
         // Constant time, so the signature cannot be recovered a byte at a time
         // by measuring how long a rejection takes.
-        return hash_equals(self::sign($secret, $slug, $expiresAt), $matches[2]);
+        return hash_equals(self::sign($secret, $subject, $expiresAt), $matches[2]);
     }
 
     /**
@@ -102,19 +108,19 @@ final class PreviewToken
      * Only for telling an editor how long their link lasts. It verifies the
      * signature first so an unsigned guess cannot produce a plausible answer.
      */
-    public static function expiresAt(string $secret, string $slug, ?string $token, ?int $now = null): ?int
+    public static function expiresAt(string $secret, string $subject, ?string $token, ?int $now = null): ?int
     {
-        if (!self::accepts($secret, $slug, $token, $now)) {
+        if (!self::accepts($secret, $subject, $token, $now)) {
             return null;
         }
 
         return (int) explode('.', (string) $token, 2)[0];
     }
 
-    private static function sign(string $secret, string $slug, int $expiresAt): string
+    private static function sign(string $secret, string $subject, int $expiresAt): string
     {
         // The separator is a character a slug cannot contain, so no pair of
         // different (slug, expiry) inputs can produce the same signed string.
-        return hash_hmac('sha256', $slug . "\0" . $expiresAt, $secret);
+        return hash_hmac('sha256', $subject . "\0" . $expiresAt, $secret);
     }
 }
