@@ -154,4 +154,69 @@ final class SectionTypeTest extends TestCase
         $this->assertSame(['heading', 'rows'], $restored->fieldNames());
         $this->assertSame('title', $restored->field('rows')?->fields[0]->name);
     }
+
+    public function testImageFieldMayDeclareTheWidthItIsDisplayedAt(): void
+    {
+        $type = SectionType::fromArray([
+            'id' => 'hero',
+            'fields' => [
+                ['name' => 'banner', 'type' => 'image', 'displayWidth' => 1440],
+            ],
+        ]);
+
+        $this->assertSame(1440, $type->field('banner')?->displayWidth);
+    }
+
+    public function testDisplayWidthSurvivesToArray(): void
+    {
+        $spec = [
+            'id' => 'hero',
+            'fields' => [['name' => 'banner', 'type' => 'image', 'displayWidth' => 1440]],
+        ];
+
+        $restored = SectionType::fromArray(SectionType::fromArray($spec)->toArray());
+
+        $this->assertSame(1440, $restored->field('banner')?->displayWidth);
+    }
+
+    /**
+     * A display width means nothing for a date, and accepting it there would
+     * suggest it did something.
+     */
+    public function testDisplayWidthIsIgnoredOnFieldsThatDoNotShowAnImage(): void
+    {
+        $type = SectionType::fromArray([
+            'id' => 'hero',
+            'fields' => [['name' => 'published', 'type' => 'date', 'displayWidth' => 1440]],
+        ]);
+
+        $this->assertNull($type->field('published')?->displayWidth);
+        $this->assertArrayNotHasKey('displayWidth', $type->field('published')?->toArray() ?? []);
+    }
+
+    public function testAnImageFieldWithoutADeclaredWidthHasNone(): void
+    {
+        $type = SectionType::fromArray([
+            'id' => 'hero',
+            'fields' => [['name' => 'banner', 'type' => 'image']],
+        ]);
+
+        $this->assertNull($type->field('banner')?->displayWidth);
+    }
+
+    public function testANonsenseDisplayWidthIsTreatedAsAbsent(): void
+    {
+        $type = SectionType::fromArray([
+            'id' => 'hero',
+            'fields' => [
+                ['name' => 'a', 'type' => 'image', 'displayWidth' => 0],
+                ['name' => 'b', 'type' => 'image', 'displayWidth' => -100],
+                ['name' => 'c', 'type' => 'image', 'displayWidth' => 'wide'],
+            ],
+        ]);
+
+        $this->assertNull($type->field('a')?->displayWidth);
+        $this->assertNull($type->field('b')?->displayWidth);
+        $this->assertNull($type->field('c')?->displayWidth);
+    }
 }
