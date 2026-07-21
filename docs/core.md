@@ -85,8 +85,9 @@ expensive the longer it waits.
 | 11 | **History** — a previous version of a document, and a way back to it | An editor who cannot undo is one mistake away from unrecoverable loss. It is a property of how documents are stored, so nothing above storage can supply it |
 | 12 | **Preview** — seeing an unpublished change rendered before it is public | An editor who cannot see their work before publishing is guessing. Rendering already exists; without this it is only reachable by publishing |
 
-Twelve, and the last three are gaps rather than implementations. They are listed
-as core because of where they have to live, not because they are written.
+Twelve, and the last three were listed as core because of where they have to
+live rather than because they were written. Preview is now written; languages
+and history remain gaps.
 
 ### Media quality is part of media
 
@@ -184,9 +185,15 @@ Still open:
   one of them is unreachable.
 - **Media reports nothing about quality.** See above. The ladder silently
   produces fewer variants for a small upload.
-- **No languages, history or preview.** Capabilities 10 to 12, none started.
+- **No languages or history.** Capabilities 10 and 11, neither started.
   `ContentKey` is `type/slug` with no locale dimension, which is the specific
   thing that has to change first.
+- **Preview shows the stored document, not an unsaved edit.** Capability 12 is
+  built: a signed, expiring link renders any page through the same
+  `SectionRenderer` the public site uses. What it cannot yet do is show a change
+  to an *already published* page without publishing it, because there is nowhere
+  to keep that change — a page has one stored version. History (capability 11)
+  is what supplies the second version; preview will read it when it exists.
 - **No audit trail.** Who changed what, and when, is not recorded anywhere.
 - **The two install paths are not equally trusted.** Registry installs verify a
   signed manifest with `openssl_verify` against a configured public key, which
@@ -219,8 +226,11 @@ What remains, in this order:
    versioning one and then migrating it.
 3. **Media quality reporting.** Independent of both, small, and the editor feels
    it immediately.
-4. **Preview.** Cheap once rendering and history exist — an unpublished version
-   rendered at a URL that does not require the viewer to be signed in.
+4. **Preview.** Done, in the form that does not depend on history: a page
+   rendered at a signed, expiring URL that does not require the viewer to be
+   signed in. What remains is to point it at a stored previous version once
+   history exists, so a change to a published page can be seen before it
+   replaces what is live.
 5. **Wire `SqliteStorage`,** or withdraw the claim that core has two storage
    backends.
 6. **Extract the kernel, router, config and health.** What remains of

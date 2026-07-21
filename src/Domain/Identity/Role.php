@@ -57,6 +57,7 @@ enum Role: string
                 Capability::EditOwnContent,
                 Capability::DeleteOwnContent,
                 Capability::PublishContent,
+                Capability::PreviewContent,
                 Capability::ViewMedia,
                 Capability::UploadMedia,
                 Capability::UseSectionEditor,
@@ -65,18 +66,27 @@ enum Role: string
             // Writes and maintains their own work only. Notably has neither
             // PublishContent nor the free-form builder: an author drafts, and
             // someone else decides it goes live.
+            //
+            // Preview is granted precisely because of that: showing the draft
+            // to whoever makes that decision is the author's job, and without
+            // it the only way to be reviewed is to be published first.
             self::Author => [
                 Capability::ViewContent,
                 Capability::CreateContent,
                 Capability::EditOwnContent,
                 Capability::DeleteOwnContent,
+                Capability::PreviewContent,
                 Capability::ViewMedia,
                 Capability::UploadMedia,
                 Capability::UseSectionEditor,
             ],
 
             // Read-only. Also the fallback for an unrecognised role, which is
-            // why it must be safe to land in by accident.
+            // why it must be safe to land in by accident — and why it does not
+            // get PreviewContent. A viewer may read unpublished work inside the
+            // CMS, but minting a link that shows it to somebody with no account
+            // is a decision to let it out of the building, and that must not be
+            // something an account lands in by having a role nobody recognises.
             self::Viewer => [
                 Capability::ViewContent,
                 Capability::ViewMedia,
