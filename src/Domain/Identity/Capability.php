@@ -28,6 +28,12 @@ enum Capability: string
     case DeleteAnyContent = 'content.delete.any';
     case DeleteOwnContent = 'content.delete.own';
     case PublishContent = 'content.publish';
+    /**
+     * Handing out a link that shows unpublished work to whoever holds it.
+     * Distinct from editing: it is the decision to let content out of the
+     * building before it is public, which is not the same act as writing it.
+     */
+    case PreviewContent = 'content.preview';
 
     /* Media */
     case ViewMedia = 'media.view';
@@ -54,6 +60,7 @@ enum Capability: string
             self::DeleteAnyContent => "Delete anyone's content",
             self::DeleteOwnContent => 'Delete own content',
             self::PublishContent => 'Publish content',
+            self::PreviewContent => 'Share a preview of unpublished content',
             self::ViewMedia => 'View media',
             self::UploadMedia => 'Upload media',
             self::DeleteAnyMedia => 'Delete any media',

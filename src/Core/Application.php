@@ -196,6 +196,15 @@ class Application
             return $this->handleAdminRequest($uri, $method);
         }
 
+        // Preview sits outside /api/ deliberately. Serving unpublished content
+        // from its own path means the API's public allowlist — which is
+        // deny-by-default and hard to reason about once it grows — does not
+        // have to be widened at all, and nothing that is already public gains
+        // a new way in.
+        if (str_starts_with($uri, '/preview/')) {
+            return $this->handlePreviewRequest($uri);
+        }
+
         return $this->handlePublicPage($uri);
     }
 
@@ -207,11 +216,13 @@ class Application
         }
 
         $page = $this->contentService?->page($slug);
-        if ($page === null) {
-            header('Content-Type: text/html');
-            http_response_code(404);
-            echo '<!doctype html><html><head><meta charset="utf-8"><title>Not Found</title></head><body><h1>Page not found</h1></body></html>';
-            return ['raw' => true];
+
+        // An unpublished page is not found, as far as the public site is
+        // concerned. This route previously rendered drafts to anybody who
+        // guessed the address, which meant "unpublished" described the editor's
+        // intent and nothing about who could read it.
+        if ($page === null || !$page->isPublished()) {
+            return $this->notFoundPage();
         }
 
         $rendered = $this->renderPageHtml($page);
@@ -221,13 +232,118 @@ class Application
         return ['raw' => true];
     }
 
-    private function renderPageHtml(Content $page): string
+    /**
+     * Render a page as it stands, published or not, to somebody entitled to see
+     * it early.
+     *
+     * Two ways to be entitled, and both are checked here rather than trusted
+     * from elsewhere:
+     *
+     * - a signed link, which is what lets a preview be sent to a client or a
+     *   proofreader who has no account at all; or
+     * - a session, so an editor clicking through from the admin UI is not made
+     *   to mint a link to look at their own work.
+     *
+     * A visitor with neither gets the same 404 the public site gives, so the
+     * existence of an unpublished page is not disclosed either.
+     *
+     * @return array<string, mixed>
+     */
+    private function handlePreviewRequest(string $uri): array
+    {
+        $path = (string) parse_url($uri, PHP_URL_PATH);
+        $slug = rawurldecode(substr($path, strlen('/preview/')));
+
+        // The slug reaches storage, so only the shape this application itself
+        // generates is accepted. Anything else is refused before it is used to
+        // build a key, rather than relying on a layer further down to notice.
+        if (preg_match('/^[a-z0-9][a-z0-9-]*$/', $slug) !== 1) {
+            return $this->notFoundPage();
+        }
+
+        $token = $_GET['token'] ?? null;
+        $bySignature = $this->previewLinks()->accepts($slug, is_string($token) ? $token : null);
+
+        if (!$bySignature && !$this->mayPreviewFromSession()) {
+            return $this->notFoundPage();
+        }
+
+        $page = $this->contentService?->page($slug);
+        if ($page === null) {
+            return $this->notFoundPage();
+        }
+
+        // Unpublished content must not be kept by anything between here and the
+        // browser, or a shared cache turns one signed link into a public page
+        // that outlives the token.
+        header('Cache-Control: no-store, private');
+        // Belt and braces against a preview link finding its way into a crawler:
+        // the token is in the query string, and query strings end up in
+        // referrers, bookmarks and pasted chat messages.
+        header('X-Robots-Tag: noindex, nofollow, noarchive');
+        header('Content-Type: text/html');
+
+        echo $this->renderPageHtml($page, preview: true);
+
+        return ['raw' => true];
+    }
+
+    /**
+     * Whether the signed-in account may see unpublished content.
+     *
+     * Asked as ViewContent rather than PreviewContent on purpose. PreviewContent
+     * is permission to *hand out* a link to somebody with no account, which is a
+     * decision to let unpublished work out of the building. Reading a draft
+     * while signed in is what the management API already allows every role, and
+     * the two should not be conflated.
+     */
+    private function mayPreviewFromSession(): bool
+    {
+        $user = $this->getSessionUser();
+
+        if ($user === null) {
+            return false;
+        }
+
+        // An account still on the seeded password may do nothing else anywhere,
+        // and preview is not an exception to that.
+        if ($user['mustChangePassword'] ?? false) {
+            return false;
+        }
+
+        return Role::fromName($user['role'] ?? null)->can(Capability::ViewContent);
+    }
+
+    private function previewLinks(): \Click\Cms\Application\Preview\PreviewLinks
+    {
+        return new \Click\Cms\Application\Preview\PreviewLinks(
+            $this->basePath . '/data/preview-secret'
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function notFoundPage(): array
+    {
+        header('Content-Type: text/html');
+        http_response_code(404);
+        echo '<!doctype html><html><head><meta charset="utf-8"><title>Not Found</title></head><body><h1>Page not found</h1></body></html>';
+
+        return ['raw' => true];
+    }
+
+    private function renderPageHtml(Content $page, bool $preview = false): string
     {
         // A plugin may take over rendering entirely — a theme, or the free-form
         // builder for a page built that way.
-        foreach ($this->pluginManager->executeHook('web.render', ['page' => $page]) as $result) {
+        foreach ($this->pluginManager->executeHook('web.render', ['page' => $page, 'preview' => $preview]) as $result) {
             if (is_string($result) && $result !== '') {
-                return $result;
+                // The mark is added here rather than left to the plugin. A theme
+                // that had never heard of preview would otherwise render an
+                // unpublished page indistinguishable from the live site, which
+                // is the exact mistake this is meant to prevent.
+                return $preview ? $this->markAsPreview($result, $page) : $result;
             }
         }
 
@@ -248,18 +364,63 @@ class Application
                 . '</div>';
         }
 
-        return '<!doctype html>
+        // Same renderer, same markup, same stylesheet as the public site. The
+        // point of a preview is that it is not a second rendering path: an
+        // approximation would be worse than nothing, because it would be
+        // believed.
+        $robots = $preview
+            ? '
+    <meta name="robots" content="noindex, nofollow, noarchive">'
+            : '';
+
+        $html = '<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>' . $title . '</title>
+    <title>' . ($preview ? 'Preview: ' : '') . $title . '</title>' . $robots . '
     <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
     <main>' . $body . '</main>
 </body>
 </html>';
+
+        return $preview ? $this->markAsPreview($html, $page) : $html;
+    }
+
+    /**
+     * Make it obvious, on the page itself, that this is not the live site.
+     *
+     * A status header or a differently-coloured URL is not enough: previews get
+     * screenshotted, forwarded and shown in meetings, and by then the address
+     * bar is gone. The banner has to survive into the picture.
+     *
+     * Styles are inline because a preview may be served by a theme whose
+     * stylesheet this code has never seen, and the one thing that must not fail
+     * is the warning.
+     */
+    private function markAsPreview(string $html, Content $page): string
+    {
+        // Which of the two things a preview can be, said plainly. Without it an
+        // editor cannot tell a draft nobody has seen from a live page they are
+        // looking at through the preview route by accident.
+        $status = $page->isPublished()
+            ? ' This page is already published.'
+            : ' This page is a draft and is not public.';
+
+        $banner = '<div role="status" style="position:sticky;top:0;z-index:2147483647;'
+            . 'background:#b45309;color:#fff;font:600 14px/1.4 system-ui,sans-serif;'
+            . 'padding:10px 16px;text-align:center;">'
+            . 'Preview — this is not the published site.' . $status
+            . '</div>';
+
+        // Placed immediately inside <body> so it is the first thing rendered,
+        // whatever the document around it looks like. A theme with no <body>
+        // tag still gets the banner, just at the very top.
+        $injected = preg_replace('/<body\b[^>]*>/i', '$0' . $banner, $html, 1, $count);
+
+        return ($count ?? 0) > 0 && is_string($injected) ? $injected : $banner . $html;
     }
 
     private function handleHealthLive(): array
