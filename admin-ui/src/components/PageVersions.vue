@@ -25,28 +25,21 @@
     </p>
 
     <!--
-      The history endpoints address a page by slug alone, with no locale, so they
-      answer for the default language whatever is being edited. Showing that list
-      under a translation would offer to restore German text from English
-      versions, so the panel says what it cannot do instead of guessing.
+      History is per translation: the endpoints take the same ?locale= the rest
+      of the page API does, so a German page shows German versions. This used to
+      answer for the default language whatever was edited, and the panel refused
+      to show anything else rather than offer to restore German text from an
+      English version. That constraint is gone.
     -->
-    <p v-if="!addressable" class="versions-note warn">
-      History is only reachable for {{ defaultLocale || 'the default language' }} at
-      the moment — the API addresses versions by page address alone, with no
-      language. Switch back to {{ defaultLocale || 'the default language' }} to see
-      and restore versions.
+    <p v-if="error" class="versions-error" role="alert">{{ error }}</p>
+
+    <p v-if="loading && !versions.length" class="versions-empty">Loading…</p>
+
+    <p v-else-if="!versions.length" class="versions-empty">
+      No versions recorded yet. Every save from here on leaves one behind.
     </p>
 
-    <template v-else>
-      <p v-if="error" class="versions-error" role="alert">{{ error }}</p>
-
-      <p v-if="loading && !versions.length" class="versions-empty">Loading…</p>
-
-      <p v-else-if="!versions.length" class="versions-empty">
-        No versions recorded yet. Every save from here on leaves one behind.
-      </p>
-
-      <ol v-else class="versions-list">
+    <ol v-else class="versions-list">
         <li v-for="(version, index) in versions" :key="version.id" class="version">
           <div class="version-body">
             <p class="version-when">
@@ -105,8 +98,7 @@
             </button>
           </div>
         </li>
-      </ol>
-    </template>
+    </ol>
   </section>
 </template>
 
@@ -122,9 +114,6 @@ defineProps({
   canRestore: { type: Boolean, default: false },
   /** The id currently being restored, or '' . */
   restoring: { type: String, default: '' },
-  /** False while editing a language the history endpoints cannot address. */
-  addressable: { type: Boolean, default: true },
-  defaultLocale: { type: String, default: '' },
 });
 
 defineEmits(['restore', 'reload']);
