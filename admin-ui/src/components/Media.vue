@@ -65,6 +65,17 @@
             <span v-else class="muted">no resized versions</span>
           </p>
 
+          <!-- The ladder never upscales, so a small upload quietly produces
+               fewer variants. Saying only "sm" told the uploader nothing; the
+               server words the consequence and this shows it. -->
+          <p
+            v-if="item.quality?.warning"
+            class="card-quality"
+            :class="item.quality.level"
+          >
+            {{ item.quality.message }}
+          </p>
+
           <label class="alt-label" :for="`alt-${item.id}`">Description</label>
           <input
             :id="`alt-${item.id}`"
@@ -212,6 +223,9 @@ onMounted(load);
 .card-body { padding: 0.75rem; }
 .card-name { margin: 0; font-size: 0.875rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-meta, .card-variants { margin: 0.2rem 0 0; font-size: 0.75rem; color: var(--app-text-muted); }
+.card-quality { margin: 0.35rem 0 0; font-size: 0.75rem; line-height: 1.35; }
+.card-quality.low { color: var(--color-danger-600, #dc2626); }
+.card-quality.adequate { color: var(--app-text-muted); }
 .muted { opacity: 0.7; }
 .alt-label { display: block; margin: 0.6rem 0 0.25rem; font-size: 0.75rem; font-weight: 500; }
 .alt-input { width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--app-border); border-radius: 6px; background: var(--app-surface); color: var(--app-text); font: inherit; font-size: 0.8125rem; }

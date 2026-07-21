@@ -21,6 +21,13 @@
           No description set — add one in the Media library so screen readers can
           describe it.
         </p>
+        <!-- When the field declares displayWidth the library is fetched judged
+             against that slot, so this is the server's verdict for this field
+             specifically: the same file can be fine in a card and wrong in a
+             header, and the wording says which. -->
+        <p v-if="selected.quality?.warning" class="selected-warning">
+          {{ selected.quality.message }}
+        </p>
       </div>
       <button type="button" class="btn-sm" @click="clear">Remove</button>
     </div>
@@ -92,7 +99,11 @@ const clear = () => emit('update:modelValue', '');
 
 onMounted(async () => {
   try {
-    const res = await fetch('/api/media');
+    // Ask for the library judged against this field's slot. The comparison and
+    // its wording stay in the domain; this only says which slot to judge for.
+    const width = Number(props.field.displayWidth) || 0;
+    const query = width > 0 ? `?displayWidth=${width}` : '';
+    const res = await fetch(`/api/media${query}`);
     items.value = (await res.json()).data ?? [];
   } catch {
     items.value = [];

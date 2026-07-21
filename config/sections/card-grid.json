@@ -11,7 +11,7 @@
       "fields": [
         { "name": "title", "type": "text", "label": "Title", "required": true },
         { "name": "body", "type": "textarea", "label": "Text" },
-        { "name": "image", "type": "image", "label": "Image" },
+        { "name": "image", "type": "image", "label": "Image", "displayWidth": 360 },
         { "name": "link", "type": "url", "label": "Link" }
       ]
     }

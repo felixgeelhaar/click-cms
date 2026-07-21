@@ -25,6 +25,15 @@ final class FieldDefinition
      *                                          renderer has no way to know they belong
      *                                          together and prints the raw address on
      *                                          the page next to a separate label.
+     * @param ?int                  $displayWidth For Image fields: the width in CSS
+     *                                          pixels the section shows the image at.
+     *                                          A card in a four-column grid and a
+     *                                          full-bleed header need very different
+     *                                          sources, and only the section type knows
+     *                                          which this is. Declared, it turns a vague
+     *                                          "this might be small" into arithmetic:
+     *                                          the same 1022-pixel file is fine in the
+     *                                          card and wrong in the header.
      */
     private function __construct(
         public readonly string $name,
@@ -38,6 +47,7 @@ final class FieldDefinition
         public readonly ?int $min,
         public readonly ?int $max,
         public readonly ?string $labelField,
+        public readonly ?int $displayWidth,
     ) {}
 
     /**
@@ -97,6 +107,13 @@ final class FieldDefinition
             labelField: $type === FieldType::Url && is_string($spec['labelField'] ?? null)
                 ? trim($spec['labelField'])
                 : null,
+            // Ignored on every other type: a display width means nothing for a
+            // number or a date, and silently accepting it there would suggest
+            // it does something.
+            displayWidth: $type === FieldType::Image && isset($spec['displayWidth'])
+                && (int) $spec['displayWidth'] > 0
+                ? (int) $spec['displayWidth']
+                : null,
         );
     }
 
@@ -135,6 +152,9 @@ final class FieldDefinition
         }
         if ($this->labelField !== null) {
             $out['labelField'] = $this->labelField;
+        }
+        if ($this->displayWidth !== null) {
+            $out['displayWidth'] = $this->displayWidth;
         }
 
         return $out;

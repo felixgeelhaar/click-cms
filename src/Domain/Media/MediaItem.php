@@ -161,6 +161,24 @@ final class MediaItem
         return implode(', ', $parts);
     }
 
+    /**
+     * How well this image will hold up, optionally for a slot of a known width.
+     *
+     * Null for anything without pixels to count — a non-image, or a file whose
+     * dimensions could not be read. Silence is better than a verdict derived
+     * from a width nobody measured.
+     */
+    public function quality(?int $displayWidth = null): ?ImageQuality
+    {
+        if (!$this->isImage() || $this->width === null || $this->width <= 0) {
+            return null;
+        }
+
+        return $displayWidth !== null && $displayWidth > 0
+            ? ImageQuality::forSlot($this->width, $displayWidth)
+            : ImageQuality::forUpload($this->width);
+    }
+
     public function withAlt(string $alt): self
     {
         return new self(
@@ -171,10 +189,16 @@ final class MediaItem
     }
 
     /**
+     * @param ?int $displayWidth The width a field displays this image at, when
+     *                           the caller knows it. Given one, `quality` is
+     *                           answered for that slot rather than in general.
+     *
      * @return array<string, mixed>
      */
-    public function toArray(): array
+    public function toArray(?int $displayWidth = null): array
     {
+        $quality = $this->quality($displayWidth);
+
         return [
             'id' => $this->id,
             'extension' => $this->extension,
@@ -188,6 +212,9 @@ final class MediaItem
             'uploadedAt' => $this->uploadedAt,
             'urls' => $this->urls(),
             'srcset' => $this->srcset(),
+            // Part of the payload rather than only the admin UI, so any client
+            // reading media can tell an editor what the ladder could not do.
+            'quality' => $quality?->toArray(),
         ];
     }
 }
