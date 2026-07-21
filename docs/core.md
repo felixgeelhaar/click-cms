@@ -65,19 +65,60 @@ as 200. Core should refuse or report, never quietly do less than asked.
 
 ## Core capabilities
 
-Nine, and nothing else.
+Twelve, and nothing else. The count grew once: languages, history and preview
+were argued in as core on the grounds that each is structural — none can be
+supplied by something layered on top, and each becomes dramatically more
+expensive the longer it waits.
 
 | # | Capability | Why it cannot be a plugin |
 |---|---|---|
 | 1 | **Content** — the aggregate, its key, and the service that reads and writes it | There is no CMS without content |
 | 2 | **Storage** — the port, plus flat-file and SQLite implementations | The application cannot boot without one |
 | 3 | **Schema** — field types, section types, validation | Content with no defined shape cannot be validated or rendered |
-| 4 | **Media** — upload policy, storage, responsive variants | Content references media; the reference must always resolve |
+| 4 | **Media** — upload policy, storage, responsive variants, and telling the editor when a file cannot fill them | Content references media; the reference must always resolve, and silently producing a soft image is the kind of quiet failure core exists to prevent |
 | 5 | **Identity** — accounts, authentication, sessions, roles | Security must not be removable |
 | 6 | **HTTP kernel** — request to response, route matching, security headers | It is the entry point |
 | 7 | **Management API** — the endpoints the admin UI depends on | The admin UI is how the product is used |
 | 8 | **Extension points** — plugin discovery, installation and lifecycle, events, hooks | The plugin system cannot itself be a plugin, and a plugin system with no way to install plugins is developer-only |
 | 9 | **Configuration and health** — loading settings, reporting readiness | Needed to run and to operate |
+| 10 | **Languages** — a locale dimension on content, from the key through storage, API and rendering | Cannot be added later without rewriting how every document is addressed. A bilingual site is not an edge case, and retrofitting this is the most expensive change available in this project |
+| 11 | **History** — a previous version of a document, and a way back to it | An editor who cannot undo is one mistake away from unrecoverable loss. It is a property of how documents are stored, so nothing above storage can supply it |
+| 12 | **Preview** — seeing an unpublished change rendered before it is public | An editor who cannot see their work before publishing is guessing. Rendering already exists; without this it is only reachable by publishing |
+
+Twelve, and the last three are gaps rather than implementations. They are listed
+as core because of where they have to live, not because they are written.
+
+### Media quality is part of media
+
+Core generates a variant ladder — 640, 1024, 1536 and 2048 pixels wide — and
+never scales an image up, because an upscaled image is a larger file that looks
+no better. The consequence is that an upload smaller than a rung simply produces
+fewer variants.
+
+Today that happens in silence. A real upload during testing was 1022 pixels
+wide; it produced one variant, the library displayed `sm`, and nothing said why
+or what it would cost. On a high-density display that image is stretched by the
+browser and looks soft. The person who uploaded it has no way to know, and the
+person who would notice is a visitor.
+
+That is precisely the failure mode listed under **Failure is visible**, so the
+remedy belongs in core alongside the ladder that causes it:
+
+- **At upload**, say what could be produced and what could not, in the editor's
+  terms rather than in pixels alone — that this picture will look soft on modern
+  phones and laptops, and roughly what size to supply instead.
+- **In the schema**, let an `image` field declare the width it is displayed at.
+  A card in a four-column grid and a full-bleed header have very different
+  needs, and only the section type knows which it is. With that declared, the
+  warning becomes specific: the same 1022-pixel file is fine in the card and
+  wrong in the header.
+- **Never refuse the upload.** A small image is often the only one that exists,
+  and a logo that must ship today beats a warning that blocks it. Core reports;
+  the editor decides.
+
+Deliberately out of scope: judging compression artefacts, sharpness or subject
+matter. Those need heuristics that are wrong often enough to erode trust in the
+warnings that are right.
 
 ### Explicitly not core
 
@@ -126,24 +167,27 @@ is now visible rather than tangled with authentication.
 
 Closed since this was written: the seeded password now has to be changed before
 anything else can be reached; CSRF tokens are required on state-changing
-requests; authentication is deny-by-default rather than an allowlist of
-protected prefixes; roles map to named capabilities; and page management moved
-into core, so the delivery plugins are genuinely optional.
+requests, plugin installation included; authentication is deny-by-default rather
+than an allowlist of protected prefixes; roles map to named capabilities; page
+management moved into core, so the delivery plugins are genuinely optional; and
+sessions are one file per session, keyed by a random identifier in an HttpOnly
+cookie, where they were previously a single shared record that authenticated any
+visitor as whoever had last signed in.
 
 Still open:
 
-- **Sessions are a single file.** Two people signed in at once share one record
-  and will overwrite each other. Isolated in SessionStore, so replacing it
-  touches nothing else.
 - **Nothing enforces capabilities at the storage layer.** A handler that forgets
   to ask is still able to act. Checks belong closer to the operation.
+- **`SqliteStorage` is written and never constructed.** `Application::boot()`
+  hardcodes `JsonStorage`, and `config/config.json` declares a
+  `storage.default` that nothing reads. Capability 2 claims two implementations;
+  one of them is unreachable.
+- **Media reports nothing about quality.** See above. The ladder silently
+  produces fewer variants for a small upload.
+- **No languages, history or preview.** Capabilities 10 to 12, none started.
+  `ContentKey` is `type/slug` with no locale dimension, which is the specific
+  thing that has to change first.
 - **No audit trail.** Who changed what, and when, is not recorded anywhere.
-- **Installing plugins has no CSRF protection.** This is the sharpest edge in
-  the codebase. The endpoint is correctly restricted to administrators, but with
-  no CSRF token an administrator who loads a hostile page while logged in can be
-  made to install a plugin without knowing. On an endpoint that installs
-  executable code, a cross-site request forgery becomes remote code execution.
-  CSRF is listed below as a general gap; this is the reason it is urgent.
 - **The two install paths are not equally trusted.** Registry installs verify a
   signed manifest with `openssl_verify` against a configured public key, which
   is sound. Uploading a ZIP verifies nothing. That asymmetry matches what
@@ -160,23 +204,30 @@ Still open:
 Correctness before tidiness, and nothing that changes behaviour mixed with
 anything that does not.
 
-The first two are security work and come before everything else.
+The security work listed here previously — forced password change, CSRF, page
+CRUD in core, extracting authentication, the capability model — is done.
 
-1. **Force a password change on first run.** The installer creates `admin` with
-   the password `admin`. Anyone who finds a deployment owns it, with no user
-   interaction required at all.
-2. **Add CSRF protection**, starting with plugin installation. An
-   administrator's session is otherwise one hostile page away from installing
-   executable code.
-3. **Move page CRUD into the management API.** Completes capability 7 and makes
-   the delivery plugins genuinely optional.
-4. **Extract authentication, sessions and lockout out of `Application`.** Pure
-   refactor, no behaviour change, and the precondition for taking identity
-   seriously.
-5. **Add a capability model.** Roles that mean something, so editing modes and
-   permissions can be expressed at all.
+What remains, in this order:
+
+1. **Languages.** First because it changes how every document is addressed, and
+   because every day it waits, more content exists to migrate. A locale belongs
+   in `ContentKey`, which means storage layout, the management API, the delivery
+   payload and the admin UI all move with it. Nothing else on this list should
+   start until the content model has settled.
+2. **History.** Second because it is also storage-shaped, and doing it after
+   languages means versioning a key that already has its final form rather than
+   versioning one and then migrating it.
+3. **Media quality reporting.** Independent of both, small, and the editor feels
+   it immediately.
+4. **Preview.** Cheap once rendering and history exist — an unpublished version
+   rendered at a URL that does not require the viewer to be signed in.
+5. **Wire `SqliteStorage`,** or withdraw the claim that core has two storage
+   backends.
 6. **Extract the kernel, router, config and health.** What remains of
    `Application` should fit on a screen.
+7. **Settings out of files.** Bootstrap stays on disk because storage
+   configuration cannot live in storage; everything else becomes a document,
+   edited in the admin UI.
 
 Only then go through the plugins one at a time. Each should have to justify
 itself against the test at the top of this document, and anything that fails it
