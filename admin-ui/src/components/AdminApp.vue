@@ -51,6 +51,7 @@ import Marketplace from './Marketplace.vue';
 import Analytics from './Analytics.vue';
 import Builder from './Builder.vue';
 import ChangePassword from './ChangePassword.vue';
+import { installCsrfFetch, setCsrfToken } from '../lib/api.js';
 
 const currentRoute = ref('/admin');
 const isLoggedIn = ref(false);
@@ -71,6 +72,9 @@ const checkAuth = async () => {
   try {
     const res = await fetch('/api/auth/check');
     const data = await res.json();
+    // Kept current on every check, so a re-login or a new session is picked up
+    // without any component having to think about it.
+    setCsrfToken(data.data?.csrfToken ?? null);
     isLoggedIn.value = data.data?.authenticated || false;
     currentUser.value = data.data?.user || null;
     if (isLoggedIn.value) { await loadInstalledPlugins(); }
@@ -129,6 +133,7 @@ const currentProps = computed(() => getRouteProps());
 const handleNavigate = (path) => { currentRoute.value = path; window.history.pushState({}, '', path); };
 
 onMounted(async () => {
+  installCsrfFetch();
   currentRoute.value = window.location.pathname + window.location.search;
   await checkAuth();
   window.addEventListener('popstate', () => { currentRoute.value = window.location.pathname + window.location.search; });
