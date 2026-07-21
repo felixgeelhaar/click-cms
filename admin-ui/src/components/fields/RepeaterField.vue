@@ -56,7 +56,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import FieldInput from './FieldInput.vue';
 
 const props = defineProps({
@@ -67,7 +67,29 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue']);
 
-const rows = computed(() => props.modelValue ?? []);
+/**
+ * Rows are held locally rather than derived straight from the prop.
+ *
+ * Deriving them meant every edit read whatever the prop held when it fired. Two
+ * changes in the same tick — fast typing across fields, a paste, anything
+ * programmatic — both read the same snapshot, so the second emission discarded
+ * the first and only the last write survived.
+ *
+ * Local state composes: each edit builds on the previous one, and the prop is
+ * only copied back in when the parent genuinely supplies something different.
+ */
+const rows = ref([...(props.modelValue ?? [])]);
+
+watch(
+  () => props.modelValue,
+  (next) => {
+    const incoming = next ?? [];
+    if (JSON.stringify(incoming) !== JSON.stringify(rows.value)) {
+      rows.value = [...incoming];
+    }
+  }
+);
+
 const atMax = computed(() => props.field.max != null && rows.value.length >= props.field.max);
 
 const singular = computed(() => {
@@ -75,9 +97,12 @@ const singular = computed(() => {
   return label.endsWith('s') ? label.slice(0, -1).toLowerCase() : label.toLowerCase();
 });
 
-// Every mutation emits a new array rather than mutating in place, so the parent
-// stays the single owner of the value and Vue reliably sees the change.
-const commit = (next) => emit('update:modelValue', next);
+// Apply locally first, then emit a copy — so the next edit builds on this one
+// even if the parent has not yet flowed the value back down.
+const commit = (next) => {
+  rows.value = next;
+  emit('update:modelValue', next.map((row) => ({ ...row })));
+};
 
 const add = () => {
   const blank = {};

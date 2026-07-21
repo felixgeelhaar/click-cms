@@ -1,7 +1,8 @@
 node_modules/
 admin-ui/node_modules/
-admin-ui/dist/
 admin-ui/.astro/
+# admin-ui/dist is rebuilt inside the image by the admin-ui stage.
+admin-ui/dist/
 vendor/
 .git/
 .gitignore
