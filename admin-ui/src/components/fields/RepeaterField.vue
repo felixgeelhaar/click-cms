@@ -38,7 +38,8 @@
           </div>
         </div>
 
-        <FieldInput
+        <component
+          :is="sub.type === 'image' ? ImageField : FieldInput"
           v-for="sub in field.fields || []"
           :key="sub.name"
           :field="sub"
@@ -58,6 +59,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import FieldInput from './FieldInput.vue';
+import ImageField from './ImageField.vue';
 
 const props = defineProps({
   field: { type: Object, required: true },

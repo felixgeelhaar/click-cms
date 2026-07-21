@@ -96,6 +96,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import FieldInput from './fields/FieldInput.vue';
 import RepeaterField from './fields/RepeaterField.vue';
+import ImageField from './fields/ImageField.vue';
 
 const props = defineProps({
   // [{ type: 'card-grid', values: { ... } }]
@@ -145,7 +146,11 @@ const commit = () => emit('update:modelValue', strip());
 const typeFor = (id) => types.value.find((t) => t.id === id) ?? null;
 const labelFor = (id) => typeFor(id)?.label ?? id;
 
-const fieldComponent = (field) => (field.type === 'repeater' ? RepeaterField : FieldInput);
+const fieldComponent = (field) => {
+  if (field.type === 'repeater') return RepeaterField;
+  if (field.type === 'image') return ImageField;
+  return FieldInput;
+};
 
 const pendingDescription = computed(() => typeFor(pendingType.value)?.description ?? '');
 
