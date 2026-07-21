@@ -1,28 +1,51 @@
-version: '3.8'
+# No `version:` key — obsolete since Compose v2 and warned about on every run.
 
 services:
   click-cms:
-    build: .
+    build:
+      context: .
+    image: click-cms:local
     container_name: click-cms
     ports:
-      - "8080:80"
+      # Override with CLICK_CMS_PORT when 8080 is taken on the host.
+      - "${CLICK_CMS_PORT:-8080}:80"
     volumes:
+      # Runtime state only. Application code lives in the image so that what
+      # runs is what was built.
       - ./content:/var/www/html/content
       - ./data:/var/www/html/data
-      - ./plugins:/var/www/html/plugins
-    environment:
-      - APACHE_DOCUMENT_ROOT=/var/www/html/public
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1/health.php') !== false ? 0 : 1);"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    # Modest ceilings so a runaway request cannot take the host down.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
 
-  # Optional: Admin UI development server
-  admin-ui-dev:
-    image: node:20-alpine
-    container_name: click-cms-admin-dev
+  # Development only: `docker compose --profile dev up`
+  admin-ui:
+    image: node:22-alpine
+    container_name: click-cms-admin-ui
     working_dir: /app
     volumes:
       - ./admin-ui:/app
+      # Keeps container-built node_modules out of the host bind mount, which
+      # otherwise breaks on native modules built for a different platform.
+      - admin-ui-node-modules:/app/node_modules
+    # Astro's dev server listens on 4321.
     ports:
-      - "3000:3000"
-    command: sh -c "npm install && npm run dev -- --host"
+      - "4321:4321"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - click-cms
     profiles:
       - dev
+
+volumes:
+  admin-ui-node-modules:
