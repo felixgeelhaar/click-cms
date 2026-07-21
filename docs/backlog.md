@@ -207,3 +207,46 @@ What is missing is a way to *supply* a theme:
 
 The current file exists to make a fresh install render something presentable. It
 is a default, not a theming system, and should not be mistaken for one.
+
+---
+
+## Plugin review (findings, not yet acted on)
+
+Deferred through the core work; opened by driving the running system. Each plugin
+is judged against core.md's test: would a reasonable site turn it off? All three
+pass that test — a self-rendering site needs none of them — so all three stay
+plugins. But each has a concrete defect found by exercising it.
+
+**Verified good:** the CMS boots and works with `plugins/` emptied — health,
+admin UI, login and the management API all function. "Boots with zero plugins"
+holds, which is what makes the without-plugins TurboScience case real.
+
+### rest-api (public delivery) — duplicates core, partly dead
+
+- It registers `GET /api/pages/:slug/versions` and `.../versions/:versionId`,
+  which **core also registers**. Core matches first, so the plugin's copies never
+  run — and the plugin's are the old locale-blind versions, so even if they did
+  they would now be wrong. Dead, shadowed routes that read as live.
+- Its page CRUD overlaps core's management API the same way. Core's `getPage`
+  already serves published content anonymously, which is why `/api/pages/home`
+  answers with the plugin's own page routes shadowed.
+- It fires a `content.status_changed` event on a `data['status']` field that was
+  removed with draft-and-publish, so that event can never fire for a page again.
+- The split to settle: the plugin should be *only* the public read surface that
+  core does not already provide, not a second copy of routes core owns.
+
+### graphql (alternative delivery) — cannot serve anonymous reads
+
+- `POST /api/graphql` returns 401: it is not in the public allowlist, so the one
+  thing a delivery API is for — a front end with no account reading published
+  content — does not work. REST delivery works anonymously; GraphQL does not.
+- Making it public is not as simple as adding a prefix: a POST with an arbitrary
+  query is a larger anonymous surface than a REST GET, and it needs its own
+  answer for depth-limiting and for serving published-only content. Until then it
+  is an authenticated-only API, which is not delivery.
+
+### visual-builder (free-form building) — a milestone, not a plugin task
+
+- One bootstrap hook; the server-side node-tree renderer exists. The editor —
+  canvas, selection, drag and drop, breakpoints, undo — does not. `backlog.md`
+  already scopes this as its own milestone. Nothing to review until that is built.
