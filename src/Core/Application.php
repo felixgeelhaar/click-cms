@@ -584,7 +584,10 @@ class Application
         // taking a parameter — `/api/media?displayWidth=360`, which asks for the
         // library judged against a field's slot — matched no route at all and
         // came back 404.
-        $path = ltrim(preg_replace('#^/api/#', '', strtok($uri, '?') ?: $uri), '/');
+        // The query string is already gone by here — run() strips it before any
+        // routing, so public pages get the same treatment. Stripping it a second
+        // time would only hide it if that ever stopped being true.
+        $path = ltrim(preg_replace('#^/api/#', '', $uri), '/');
 
         // Before anything else acts on the request. A forged POST that reaches
         // a handler has already done its damage, and on plugin installation
