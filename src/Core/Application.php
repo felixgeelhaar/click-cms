@@ -19,7 +19,7 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\SectionRenderer;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
-use Click\Cms\Infrastructure\Storage\JsonStorage;
+use Click\Cms\Infrastructure\Storage\StorageFactory;
 
 class Application
 {
@@ -95,8 +95,11 @@ class Application
         $this->eventBus = new EventBus($this->eventDispatcher);
         
         // Storage is constructed directly rather than resolved from a plugin:
-        // the application cannot boot without one, so it is not optional.
-        $storage = new JsonStorage($this->basePath . '/content');
+        // the application cannot boot without one, so it is not optional. Which
+        // backend, however, is configuration — and a backend that cannot be
+        // built throws rather than falling back, so a site never silently runs
+        // on a different store than it asked for.
+        $storage = StorageFactory::create($this->config, $this->basePath);
         $this->contentService = new ContentService($storage);
 
         $this->coreApiRoutes = new CoreApiRoutes($this->basePath, $this->contentService);

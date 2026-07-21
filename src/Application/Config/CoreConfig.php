@@ -81,6 +81,37 @@ final class CoreConfig
         return $this->stringList('core.delivery.allowedOrigins', []);
     }
 
+    /* ------------------------------------------------------------ storage -- */
+
+    /**
+     * Which storage backend holds content.
+     *
+     * Flat files by default, so a fresh install with no configuration at all
+     * boots without a database — that is a stated property of core, not a
+     * convenience. SQLite is opt-in for sites that have outgrown a directory
+     * full of files.
+     *
+     * Returned verbatim rather than normalised so that a misconfigured value can
+     * be quoted back to whoever wrote it. Matching is the factory's job.
+     */
+    public function storageBackend(): string
+    {
+        return trim($this->string('core.storage.backend', 'json'));
+    }
+
+    /**
+     * Where the SQLite database lives, relative to the installation root unless
+     * absolute.
+     *
+     * Under `data/` because that is the directory already expected to be
+     * writable and already kept out of the web root — a database served over
+     * HTTP would hand out every account record in it.
+     */
+    public function storageSqlitePath(): string
+    {
+        return trim($this->string('core.storage.sqlite.path', 'data/content.sqlite'));
+    }
+
     /* --------------------------------------------------------------- auth -- */
 
     public function authEnabled(): bool

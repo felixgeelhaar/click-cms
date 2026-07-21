@@ -18,6 +18,44 @@ final class CoreConfigTest extends TestCase
         $this->assertSame(28_800, $config->sessionTtlSeconds());
         $this->assertSame(5, $config->lockoutMaxAttempts());
         $this->assertSame(['admin-ui', 'authentication'], $config->excludedPluginIds());
+        $this->assertSame('json', $config->storageBackend());
+        $this->assertSame('data/content.sqlite', $config->storageSqlitePath());
+    }
+
+    /** Core must never require a database, whatever else the file says. */
+    public function testStorageDefaultsToFlatFilesWhenNothingIsConfigured(): void
+    {
+        $config = CoreConfig::fromArray(['core' => ['auth' => ['enabled' => false]]]);
+
+        $this->assertSame('json', $config->storageBackend());
+    }
+
+    public function testStorageBackendAndPathAreReadFromTheFile(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => [
+                'storage' => [
+                    'backend' => 'sqlite',
+                    'sqlite' => ['path' => '/var/lib/click/content.sqlite'],
+                ],
+            ],
+        ]);
+
+        $this->assertSame('sqlite', $config->storageBackend());
+        $this->assertSame('/var/lib/click/content.sqlite', $config->storageSqlitePath());
+    }
+
+    /**
+     * Returned verbatim apart from surrounding space, so that a value the
+     * factory cannot match can be quoted back to whoever typed it.
+     */
+    public function testAnUnknownBackendIsReturnedUnchangedForTheFactoryToReject(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['storage' => ['backend' => '  MongoDB  ']],
+        ]);
+
+        $this->assertSame('MongoDB', $config->storageBackend());
     }
 
     public function testAMissingFileIsNotAnError(): void

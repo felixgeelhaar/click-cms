@@ -7,7 +7,6 @@ namespace Click\Cms\Infrastructure\Storage;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Storage\StorageInterface;
 use Click\Cms\Domain\ValueObjects\ContentKey;
-use InvalidArgumentException;
 use RuntimeException;
 
 /**
@@ -24,9 +23,6 @@ use RuntimeException;
  */
 final class JsonStorage implements StorageInterface
 {
-    /** Slugs and types become path segments, so they must not be able to escape. */
-    private const SAFE_SEGMENT = '/^[A-Za-z0-9._-]+$/';
-
     public function __construct(private readonly string $contentDir) {}
 
     public function find(ContentKey $key): ?Content
@@ -34,7 +30,7 @@ final class JsonStorage implements StorageInterface
         // A key that cannot name a file is simply a miss. Reads are reached
         // straight from URLs, so throwing here would turn every request for
         // `/some/path` into a 500 instead of a 404.
-        if (!$this->isSafeKey($key)) {
+        if (!ContentKeyRules::isSafe($key)) {
             return null;
         }
 
@@ -62,7 +58,7 @@ final class JsonStorage implements StorageInterface
 
     public function findByType(string $type): array
     {
-        if (!$this->isSafeSegment($type)) {
+        if (!ContentKeyRules::isSafeSegment($type)) {
             return [];
         }
 
@@ -117,7 +113,7 @@ final class JsonStorage implements StorageInterface
 
     public function delete(ContentKey $key): bool
     {
-        if (!$this->isSafeKey($key)) {
+        if (!ContentKeyRules::isSafe($key)) {
             return false;
         }
 
@@ -128,47 +124,13 @@ final class JsonStorage implements StorageInterface
 
     public function exists(ContentKey $key): bool
     {
-        return $this->isSafeKey($key) && is_file($this->pathFor($key));
+        return ContentKeyRules::isSafe($key) && is_file($this->pathFor($key));
     }
 
     private function pathFor(ContentKey $key): string
     {
-        $this->assertSafeSegment($key->type, 'type');
-        $this->assertSafeSegment($key->slug, 'slug');
+        ContentKeyRules::assertSafe($key);
 
         return $this->contentDir . '/' . $key->type . '/' . $key->slug . '.json';
-    }
-
-    private function isSafeKey(ContentKey $key): bool
-    {
-        return $this->isSafeSegment($key->type) && $this->isSafeSegment($key->slug);
-    }
-
-    private function isSafeSegment(string $segment): bool
-    {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            return false;
-        }
-
-        return preg_match(self::SAFE_SEGMENT, $segment) === 1;
-    }
-
-    /**
-     * Reject anything that could traverse out of the content directory.
-     *
-     * Used on the write path only: storing under an impossible key is a bug or
-     * an attack and must be loud, whereas reading one is merely a miss.
-     */
-    private function assertSafeSegment(string $segment, string $label): void
-    {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            throw new InvalidArgumentException("Content {$label} is not a valid path segment.");
-        }
-
-        if (preg_match(self::SAFE_SEGMENT, $segment) !== 1) {
-            throw new InvalidArgumentException(
-                "Content {$label} may only contain letters, digits, dot, dash and underscore."
-            );
-        }
     }
 }

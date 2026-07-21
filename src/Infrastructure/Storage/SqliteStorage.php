@@ -21,6 +21,10 @@ use RuntimeException;
  *
  * Suitable when a site outgrows flat files but still has no database server —
  * SQLite needs only the pdo_sqlite extension.
+ *
+ * Key safety is enforced here exactly as the flat-file backend enforces it, even
+ * though no path is ever built from a key. See {@see ContentKeyRules} for why
+ * the legal key space must not depend on the backend in use.
  */
 final class SqliteStorage implements StorageInterface
 {
@@ -30,6 +34,10 @@ final class SqliteStorage implements StorageInterface
 
     public function find(ContentKey $key): ?Content
     {
+        if (!ContentKeyRules::isSafe($key)) {
+            return null;
+        }
+
         $stmt = $this->pdo()->prepare(
             'SELECT payload FROM content WHERE type = :type AND slug = :slug LIMIT 1'
         );
@@ -45,6 +53,10 @@ final class SqliteStorage implements StorageInterface
 
     public function findByType(string $type): array
     {
+        if (!ContentKeyRules::isSafeSegment($type)) {
+            return [];
+        }
+
         $stmt = $this->pdo()->prepare(
             'SELECT slug, payload FROM content WHERE type = :type ORDER BY slug ASC'
         );
@@ -66,6 +78,8 @@ final class SqliteStorage implements StorageInterface
 
     public function save(Content $content): void
     {
+        ContentKeyRules::assertSafe($content->key);
+
         $payload = json_encode(
             $content->toArray(),
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
@@ -89,6 +103,10 @@ final class SqliteStorage implements StorageInterface
 
     public function delete(ContentKey $key): bool
     {
+        if (!ContentKeyRules::isSafe($key)) {
+            return false;
+        }
+
         $stmt = $this->pdo()->prepare('DELETE FROM content WHERE type = :type AND slug = :slug');
         $stmt->execute(['type' => $key->type, 'slug' => $key->slug]);
 
@@ -97,6 +115,10 @@ final class SqliteStorage implements StorageInterface
 
     public function exists(ContentKey $key): bool
     {
+        if (!ContentKeyRules::isSafe($key)) {
+            return false;
+        }
+
         $stmt = $this->pdo()->prepare(
             'SELECT 1 FROM content WHERE type = :type AND slug = :slug LIMIT 1'
         );
