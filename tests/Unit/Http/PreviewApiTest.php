@@ -84,7 +84,7 @@ final class PreviewApiTest extends TestCase
         parse_str((string) parse_url($response['data']['url'], PHP_URL_QUERY), $query);
 
         $this->assertTrue(
-            (new PreviewLinks($this->base . '/data/preview-secret'))->accepts('secret-plans', $query['token'])
+            (new PreviewLinks($this->base . '/data/preview-secret'))->accepts(ContentKey::page('secret-plans'), $query['token'])
         );
     }
 

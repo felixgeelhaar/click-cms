@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Tests\Unit\Preview;
 
 use Click\Cms\Application\Preview\PreviewLinks;
+use Click\Cms\Domain\ValueObjects\ContentKey;
 use PHPUnit\Framework\TestCase;
 
 final class PreviewLinksTest extends TestCase
@@ -32,11 +33,11 @@ final class PreviewLinksTest extends TestCase
 
     public function testAnIssuedLinkVerifies(): void
     {
-        $link = $this->links()->issue('pricing');
+        $link = $this->links()->issue(ContentKey::page('pricing'));
 
         $this->assertNotNull($link);
         $this->assertStringStartsWith('/preview/pricing?token=', $link['path']);
-        $this->assertTrue($this->links()->accepts('pricing', $link['token']));
+        $this->assertTrue($this->links()->accepts(ContentKey::page('pricing'), $link['token']));
     }
 
     /**
@@ -45,26 +46,26 @@ final class PreviewLinksTest extends TestCase
      */
     public function testTheSecretPersistsAcrossInstances(): void
     {
-        $token = $this->links()->issue('pricing')['token'];
+        $token = $this->links()->issue(ContentKey::page('pricing'))['token'];
 
-        $this->assertTrue($this->links()->accepts('pricing', $token));
+        $this->assertTrue($this->links()->accepts(ContentKey::page('pricing'), $token));
     }
 
     public function testALinkForOnePageDoesNotOpenAnother(): void
     {
-        $token = $this->links()->issue('pricing')['token'];
+        $token = $this->links()->issue(ContentKey::page('pricing'))['token'];
 
-        $this->assertFalse($this->links()->accepts('unannounced-product', $token));
+        $this->assertFalse($this->links()->accepts(ContentKey::page('unannounced-product'), $token));
     }
 
     public function testAnExpiredLinkIsRefused(): void
     {
         // A one-second life, then waited out. Cheaper than sleeping longer, and
         // the boundary itself is covered by PreviewTokenTest with a fixed clock.
-        $token = $this->links(1)->issue('pricing')['token'];
+        $token = $this->links(1)->issue(ContentKey::page('pricing'))['token'];
         sleep(2);
 
-        $this->assertFalse($this->links()->accepts('pricing', $token));
+        $this->assertFalse($this->links()->accepts(ContentKey::page('pricing'), $token));
     }
 
     /**
@@ -74,7 +75,7 @@ final class PreviewLinksTest extends TestCase
      */
     public function testVerifyingNeverCreatesASecret(): void
     {
-        $this->assertFalse($this->links()->accepts('pricing', 'anything'));
+        $this->assertFalse($this->links()->accepts(ContentKey::page('pricing'), 'anything'));
         $this->assertFileDoesNotExist($this->dir . '/preview-secret');
     }
 
@@ -86,8 +87,8 @@ final class PreviewLinksTest extends TestCase
     {
         $links = $this->links();
 
-        $this->assertFalse($links->accepts('pricing', (time() + 600) . '.' . str_repeat('0', 64)));
-        $this->assertFalse($links->accepts('pricing', null));
+        $this->assertFalse($links->accepts(ContentKey::page('pricing'), (time() + 600) . '.' . str_repeat('0', 64)));
+        $this->assertFalse($links->accepts(ContentKey::page('pricing'), null));
     }
 
     /**
@@ -98,12 +99,12 @@ final class PreviewLinksTest extends TestCase
     {
         file_put_contents($this->dir . '/preview-secret', 'short');
 
-        $this->assertFalse($this->links()->accepts('pricing', (time() + 600) . '.' . str_repeat('0', 64)));
+        $this->assertFalse($this->links()->accepts(ContentKey::page('pricing'), (time() + 600) . '.' . str_repeat('0', 64)));
     }
 
     public function testTheSecretIsNotWorldReadable(): void
     {
-        $this->links()->issue('pricing');
+        $this->links()->issue(ContentKey::page('pricing'));
 
         $mode = fileperms($this->dir . '/preview-secret') & 0o777;
 
@@ -112,14 +113,14 @@ final class PreviewLinksTest extends TestCase
 
     public function testTheSecretIsLongEnoughToBeUnguessable(): void
     {
-        $this->links()->issue('pricing');
+        $this->links()->issue(ContentKey::page('pricing'));
 
         $this->assertGreaterThanOrEqual(64, strlen(trim(file_get_contents($this->dir . '/preview-secret'))));
     }
 
     public function testTheReportedExpiryMatchesTheToken(): void
     {
-        $link = $this->links(120)->issue('pricing');
+        $link = $this->links(120)->issue(ContentKey::page('pricing'));
 
         $this->assertGreaterThan(time(), $link['expiresAt']);
         $this->assertLessThanOrEqual(time() + 120, $link['expiresAt']);
@@ -131,9 +132,9 @@ final class PreviewLinksTest extends TestCase
      */
     public function testRemovingTheSecretInvalidatesEveryLink(): void
     {
-        $token = $this->links()->issue('pricing')['token'];
+        $token = $this->links()->issue(ContentKey::page('pricing'))['token'];
         unlink($this->dir . '/preview-secret');
 
-        $this->assertFalse($this->links()->accepts('pricing', $token));
+        $this->assertFalse($this->links()->accepts(ContentKey::page('pricing'), $token));
     }
 }
