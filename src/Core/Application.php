@@ -10,16 +10,20 @@ use Click\Cms\Application\Authentication\LoginThrottle;
 use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Event\EventBus;
+use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Event\EventDispatcher;
+use Click\Cms\Domain\History\RetentionPolicy;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\SectionRenderer;
+use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
+use Click\Cms\Infrastructure\Storage\VersioningStorage;
 
 class Application
 {
@@ -36,6 +40,7 @@ class Application
     private ?EventBus $eventBus = null;
     private array $apiRoutes = [];
     private ?CoreApiRoutes $coreApiRoutes = null;
+    private ?HistoryService $history = null;
     private ?SessionStore $sessions = null;
     private ?LoginThrottle $throttle = null;
     private array $coreConfig = [];
@@ -96,10 +101,29 @@ class Application
         
         // Storage is constructed directly rather than resolved from a plugin:
         // the application cannot boot without one, so it is not optional.
-        $storage = new JsonStorage($this->basePath . '/content');
-        $this->contentService = new ContentService($storage);
+        //
+        // It is wrapped in versioning here, at the one place the whole
+        // application gets its storage from, so that nothing can write content
+        // without leaving a way back to what it replaced. The author is read
+        // from the session lazily because the backend outlives any one request.
+        $versions = new JsonVersionStore(
+            $this->basePath . '/data/versions',
+            RetentionPolicy::keeping($this->config->historyRetainedVersions())
+        );
+        $storage = new VersioningStorage(
+            new JsonStorage($this->basePath . '/content'),
+            $versions,
+            fn (): ?string => $this->getSessionUser()['username'] ?? null,
+        );
 
-        $this->coreApiRoutes = new CoreApiRoutes($this->basePath, $this->contentService);
+        $this->contentService = new ContentService($storage);
+        $this->history = new HistoryService($storage, $versions);
+
+        $this->coreApiRoutes = new CoreApiRoutes(
+            $this->basePath,
+            $this->contentService,
+            $this->history
+        );
 
         // Sessions and login throttling are collaborators rather than methods on
         // this class, so each can be understood and tested on its own.
@@ -435,6 +459,14 @@ class Application
             return false;
         }
 
+        // History is management even though it hangs off a public path. The
+        // allowlist below would otherwise hand an anonymous reader every
+        // unpublished draft a page has ever been in, which is the exact
+        // opposite of what publishing means.
+        if (preg_match('#^pages/[^/]+/versions(/|$)#', $path) === 1) {
+            return false;
+        }
+
         // Published content, read by a front end that has no account.
         if ($path === 'pages' || str_starts_with($path, 'pages/')) {
             return true;
@@ -486,6 +518,14 @@ class Application
 
         if (str_starts_with($path, 'plugins') && $method !== 'GET' && !$role->can(Capability::ManagePlugins)) {
             return ['status' => 403, 'error' => 'You do not have permission to manage plugins.'];
+        }
+
+        // A first pass only. HistoryService asks the same question again
+        // against the document's owner, which is the check that actually
+        // governs — this one cannot see whose page it is, and exists so a role
+        // without the capability is turned away before any handler runs.
+        if (str_ends_with($path, '/restore') && !$role->can(Capability::RestoreContent)) {
+            return ['status' => 403, 'error' => 'You do not have permission to restore a previous version.'];
         }
 
         return null;

@@ -114,5 +114,32 @@ final class RoleTest extends TestCase
     {
         $this->assertContains('content.view', Role::Viewer->capabilityNames());
         $this->assertContains('plugins.install', Role::Admin->capabilityNames());
+        $this->assertContains('content.restore', Role::Editor->capabilityNames());
+    }
+
+    /**
+     * Restoring is safe to grant widely because it writes a new version rather
+     * than discarding one, so everyone who may edit gets it — but a reader
+     * does not.
+     */
+    public function testRestoringIsGrantedToEveryoneWhoMayEdit(): void
+    {
+        $this->assertTrue(Role::Admin->can(Capability::RestoreContent));
+        $this->assertTrue(Role::Editor->can(Capability::RestoreContent));
+        $this->assertTrue(Role::Author->can(Capability::RestoreContent));
+        $this->assertFalse(Role::Viewer->can(Capability::RestoreContent));
+    }
+
+    /**
+     * Both halves of the question, so a role cannot be granted history over
+     * content it has no business editing.
+     */
+    public function testRestoringNeedsTheReachToEditThatDocumentToo(): void
+    {
+        $this->assertTrue(Role::Editor->canRestoreContentOwnedBy('bob', 'ann'));
+        $this->assertTrue(Role::Author->canRestoreContentOwnedBy('ann', 'ann'));
+        $this->assertFalse(Role::Author->canRestoreContentOwnedBy('bob', 'ann'));
+        $this->assertFalse(Role::Viewer->canRestoreContentOwnedBy('ann', 'ann'));
+        $this->assertFalse(Role::Author->canRestoreContentOwnedBy(null, 'ann'));
     }
 }
