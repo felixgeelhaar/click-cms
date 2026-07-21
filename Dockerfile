@@ -42,16 +42,51 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 FROM php:8.3-apache AS runtime
 
-# libzip/libsqlite are needed to build the extensions; the -dev packages are
-# dropped again afterwards so they do not ship in the final layer.
+# gd is required to generate responsive image variants; without it the media
+# library can store an upload but not resize it.
+#
+# The -dev packages are build-time only, but the shared libraries they pull in
+# (libpng16, libzip, libjpeg, libwebp) are needed at run time. Purging the
+# headers with --auto-remove takes those runtime libraries with them and the
+# extensions then silently fail to load, so the runtime libraries are installed
+# explicitly first and only the headers are purged, by name.
 RUN set -eux; \
     apt-get update; \
+    # Runtime libraries, installed explicitly so they are never candidates for
+    # auto-removal when the build-time headers go.
+    apt-get install -y --no-install-recommends \
+        libpng16-16 \
+        libjpeg62-turbo \
+        libwebp7 \
+        libfreetype6 \
+        libzip5; \
+    # Build-time headers only.
     apt-get install -y --no-install-recommends \
         libsqlite3-dev \
-        libzip-dev; \
-    docker-php-ext-install -j"$(nproc)" pdo pdo_sqlite zip; \
-    apt-get purge -y --auto-remove libsqlite3-dev libzip-dev; \
-    rm -rf /var/lib/apt/lists/*
+        libzip-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
+        libwebp-dev; \
+    docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \
+    docker-php-ext-install -j"$(nproc)" pdo pdo_sqlite zip gd; \
+    # Purge the headers by name. Nothing is auto-removed, so the runtime
+    # libraries above survive.
+    apt-get purge -y \
+        libsqlite3-dev libzip-dev libpng-dev libjpeg62-turbo-dev \
+        libfreetype6-dev libwebp-dev; \
+    rm -rf /var/lib/apt/lists/*; \
+    # Fail the build rather than ship an image whose extensions cannot load.
+    php -r 'foreach (["gd","zip","pdo_sqlite"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR, "missing extension: $e\n"); exit(1); } }'
+
+# Uploads are limited here as well as in application code: a request larger than
+# this is rejected before PHP ever buffers it.
+RUN { \
+        echo 'upload_max_filesize=12M'; \
+        echo 'post_max_size=13M'; \
+        echo 'max_file_uploads=10'; \
+        echo 'memory_limit=256M'; \
+    } > "$PHP_INI_DIR/conf.d/zz-uploads.ini"
 
 RUN a2enmod rewrite headers
 

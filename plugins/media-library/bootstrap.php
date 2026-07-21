@@ -4,31 +4,25 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../src/Application/Plugin/BasePlugin.php';
 
+use Click\Cms\Application\Media\MediaService;
+use Click\Cms\Domain\Media\ImageSize;
+use Click\Cms\Domain\Media\UploadPolicy;
+use Click\Cms\Infrastructure\Media\GdImageProcessor;
+
+/**
+ * The media library.
+ *
+ * Uploads are stored outside the document root and streamed through this
+ * plugin, so nothing uploaded is directly reachable — and therefore never
+ * directly executable — whatever it turns out to contain.
+ *
+ * Every accepted image gets a ladder of responsive variants (-sm, -md, -lg,
+ * -xl) generated once at upload time, so a front end can emit a srcset without
+ * resizing on every request.
+ */
 class Plugin_media_library extends \Click\Cms\Application\Plugin\BasePlugin
 {
-    private string $mediaPath;
-    private string $uploadsPath;
-    private string $thumbnailsPath;
-
-    public function __construct($pluginManager)
-    {
-        parent::__construct($pluginManager);
-        $basePath = $this->pluginManager->getBasePath();
-        $this->mediaPath = $basePath . '/content/media';
-        $this->uploadsPath = $this->mediaPath . '/uploads';
-        $this->thumbnailsPath = $this->mediaPath . '/thumbnails';
-        
-        $this->ensureDirectoriesExist();
-    }
-
-    private function ensureDirectoriesExist(): void
-    {
-        foreach ([$this->mediaPath, $this->uploadsPath, $this->thumbnailsPath] as $dir) {
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
-            }
-        }
-    }
+    private ?MediaService $service = null;
 
     public function getPluginId(): string
     {
@@ -52,389 +46,167 @@ class Plugin_media_library extends \Click\Cms\Application\Plugin\BasePlugin
 
     public function deactivate(): bool
     {
+        $this->service = null;
+
         return true;
     }
 
+    public function uninstall(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<string, callable>
+     */
     public function hook_api_routes(array $params): array
     {
         return [
-            'GET /api/media-library' => [$this, 'listMedia'],
-            'POST /api/media-library/upload' => [$this, 'uploadMedia'],
-            'DELETE /api/media-library/:filename' => [$this, 'deleteMedia'],
-            'GET /media/uploads/:filename' => [$this, 'serveMedia'],
-            'GET /media/thumbnails/:filename' => [$this, 'serveThumbnail'],
+            'GET /api/media' => [$this, 'listMedia'],
+            'POST /api/media' => [$this, 'uploadMedia'],
+            'GET /api/media/capabilities' => [$this, 'capabilities'],
+            'GET /api/media/file/:filename' => [$this, 'serveFile'],
+            'GET /api/media/:id' => [$this, 'getMedia'],
+            'PUT /api/media/:id' => [$this, 'updateMedia'],
+            'DELETE /api/media/:id' => [$this, 'deleteMedia'],
         ];
     }
 
+    /**
+     * What the library accepts, so the UI can state its limits up front rather
+     * than only after an upload has been rejected.
+     *
+     * @return array<string, mixed>
+     */
+    public function capabilities(): array
+    {
+        return [
+            'data' => [
+                'acceptedMimeTypes' => UploadPolicy::acceptedMimeTypes(),
+                'maxBytes' => UploadPolicy::MAX_BYTES,
+                'resizingAvailable' => GdImageProcessor::isAvailable(),
+                'variants' => array_map(
+                    static fn (ImageSize $s): array => [
+                        'name' => $s->value,
+                        'label' => $s->label(),
+                        'width' => $s->width(),
+                    ],
+                    ImageSize::ladder()
+                ),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function listMedia(): array
     {
-        $files = [];
-        
-        if (!is_dir($this->uploadsPath)) {
-            return ['data' => []];
-        }
-
-        $items = scandir($this->uploadsPath);
-        if ($items === false) {
-            return ['data' => []];
-        }
-
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') continue;
-            
-            $filePath = $this->uploadsPath . '/' . $item;
-            if (!is_file($filePath)) continue;
-
-            $fileInfo = $this->getFileInfo($item, $filePath);
-            if ($fileInfo) {
-                $files[] = $fileInfo;
-            }
-        }
-
-        usort($files, fn($a, $b) => strcmp($b['created_at'], $a['created_at']));
-
-        return ['data' => $files];
+        return [
+            'data' => array_map(
+                static fn ($item): array => $item->toArray(),
+                $this->service()->all()
+            ),
+        ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function getMedia(string $id): array
+    {
+        $item = $this->service()->find($id);
+
+        return $item === null
+            ? ['status' => 404, 'error' => 'Media not found']
+            : ['data' => $item->toArray()];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function uploadMedia(): array
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            return ['error' => 'Method not allowed', 'status' => 405];
+        if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {
+            return ['status' => 400, 'error' => 'No file was uploaded.'];
         }
 
-        if (!isset($_FILES['file'])) {
-            return ['error' => 'No file uploaded', 'status' => 400];
+        $result = $this->service()->store($_FILES['file']);
+
+        if ($result['item'] === null) {
+            return ['status' => 422, 'error' => $result['error']];
         }
 
-        $file = $_FILES['file'];
-        
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            return ['error' => 'Upload error: ' . $file['error'], 'status' => 400];
-        }
-
-        $filename = $this->sanitizeFilename($file['name']);
-        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'pdf', 'mp4', 'webm', 'mp3', 'wav', 'zip'];
-        if (!in_array($ext, $allowedExtensions)) {
-            return ['error' => 'File type not allowed', 'status' => 400];
-        }
-
-        $filename = $this->ensureUniqueFilename($filename);
-        $destination = $this->uploadsPath . '/' . $filename;
-
-        if (!move_uploaded_file($file['tmp_name'], $destination)) {
-            return ['error' => 'Failed to save file', 'status' => 500];
-        }
-
-        $metadata = [
-            'original_name' => $file['name'],
-            'filename' => $filename,
-            'size' => filesize($destination),
-            'mime_type' => $this->getMimeType($destination),
-            'dimensions' => null,
-            'alt' => '',
-            'caption' => '',
-            'created_at' => date('c'),
-        ];
-
-        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-            $dimensions = $this->getImageDimensions($destination);
-            if ($dimensions) {
-                $metadata['dimensions'] = $dimensions;
-            }
-            
-            $this->createThumbnail($destination, $filename, $ext);
-        }
-
-        $metadataPath = $this->mediaPath . '/' . $filename . '.json';
-        file_put_contents($metadataPath, json_encode($metadata, JSON_PRETTY_PRINT));
-
-        return [
-            'data' => $metadata,
-            'status' => 201
-        ];
+        return ['status' => 201, 'data' => $result['item']->toArray()];
     }
 
-    public function deleteMedia(string $filename): array
+    /**
+     * @return array<string, mixed>
+     */
+    public function updateMedia(string $id): array
     {
-        $filename = $this->sanitizeFilename($filename);
-        
-        $filePath = $this->uploadsPath . '/' . $filename;
-        $thumbPath = $this->thumbnailsPath . '/' . $filename;
-        $metadataPath = $this->mediaPath . '/' . $filename . '.json';
+        $body = json_decode(file_get_contents('php://input') ?: '[]', true);
+        $alt = is_array($body) ? (string) ($body['alt'] ?? '') : '';
 
-        $deleted = false;
+        $item = $this->service()->updateAlt($id, $alt);
 
-        if (file_exists($filePath)) {
-            unlink($filePath);
-            $deleted = true;
-        }
-
-        if (file_exists($thumbPath)) {
-            unlink($thumbPath);
-        }
-
-        if (file_exists($metadataPath)) {
-            unlink($metadataPath);
-        }
-
-        if (!$deleted) {
-            return ['error' => 'File not found', 'status' => 404];
-        }
-
-        return ['data' => ['deleted' => true, 'filename' => $filename]];
+        return $item === null
+            ? ['status' => 404, 'error' => 'Media not found']
+            : ['data' => $item->toArray()];
     }
 
-    public function serveMedia(string $filename): array
+    /**
+     * @return array<string, mixed>
+     */
+    public function deleteMedia(string $id): array
     {
-        $filename = $this->sanitizeFilename($filename);
-        $filePath = $this->uploadsPath . '/' . $filename;
+        return $this->service()->delete($id)
+            ? ['data' => ['deleted' => true]]
+            : ['status' => 404, 'error' => 'Media not found'];
+    }
 
-        if (!file_exists($filePath)) {
-            return ['status' => 404, 'error' => 'Not found'];
+    /**
+     * Stream a stored file.
+     *
+     * Only names this library could itself have generated resolve to a path, so
+     * a crafted filename cannot reach anything outside the media directory.
+     *
+     * @return array<string, mixed>
+     */
+    public function serveFile(string $filename): array
+    {
+        $path = $this->service()->pathForFile($filename);
+
+        if ($path === null) {
+            return ['status' => 404, 'error' => 'File not found'];
         }
 
-        $mimeType = $this->getMimeType($filePath);
+        $info = @getimagesize($path);
+        $mimeType = is_array($info) ? ($info['mime'] ?? '') : '';
+
+        // Served only as a type the library itself accepts, and never sniffed
+        // into something else by the browser.
+        if (!UploadPolicy::isAccepted($mimeType)) {
+            return ['status' => 404, 'error' => 'File not found'];
+        }
+
         header('Content-Type: ' . $mimeType);
-        header('Cache-Control: public, max-age=31536000');
-        
-        readfile($filePath);
-        return ['raw' => true];
+        header('Content-Length: ' . (string) filesize($path));
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Disposition: inline');
+        // Stored names carry random bytes and content never changes under a
+        // given name, so this can be cached hard.
+        header('Cache-Control: public, max-age=31536000, immutable');
+
+        readfile($path);
+
+        return ['raw' => true, 'html' => ''];
     }
 
-    public function serveThumbnail(string $filename): array
+    private function service(): MediaService
     {
-        $filename = $this->sanitizeFilename($filename);
-        $thumbPath = $this->thumbnailsPath . '/' . $filename;
-        
-        $originalPath = $this->uploadsPath . '/' . $filename;
-        
-        if (!file_exists($thumbPath) && file_exists($originalPath)) {
-            $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-            if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-                $this->createThumbnail($originalPath, $filename, $ext);
-            }
-        }
-
-        if (!file_exists($thumbPath)) {
-            return ['status' => 404, 'error' => 'Not found'];
-        }
-
-        $mimeType = $this->getMimeType($thumbPath);
-        header('Content-Type: ' . $mimeType);
-        header('Cache-Control: public, max-age=31536000');
-        
-        readfile($thumbPath);
-        return ['raw' => true];
-    }
-
-    private function sanitizeFilename(string $filename): string
-    {
-        $filename = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
-        $filename = preg_replace('/_+/', '_', $filename);
-        return trim($filename, '_');
-    }
-
-    private function ensureUniqueFilename(string $filename): string
-    {
-        if (!file_exists($this->uploadsPath . '/' . $filename)) {
-            return $filename;
-        }
-
-        $baseName = pathinfo($filename, PATHINFO_FILENAME);
-        $ext = pathinfo($filename, PATHINFO_EXTENSION);
-        $counter = 1;
-
-        while (file_exists($this->uploadsPath . '/' . $filename)) {
-            $filename = $baseName . '_' . $counter . '.' . $ext;
-            $counter++;
-        }
-
-        return $filename;
-    }
-
-    private function getMimeType(string $filePath): string
-    {
-        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-        
-        $mimeTypes = [
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'webp' => 'image/webp',
-            'svg' => 'image/svg+xml',
-            'pdf' => 'application/pdf',
-            'mp4' => 'video/mp4',
-            'webm' => 'video/webm',
-            'mp3' => 'audio/mpeg',
-            'wav' => 'audio/wav',
-            'zip' => 'application/zip',
-        ];
-
-        return $mimeTypes[$ext] ?? 'application/octet-stream';
-    }
-
-    private function getImageDimensions(string $filePath): ?array
-    {
-        if (!function_exists('getimagesize')) {
-            return null;
-        }
-
-        $dimensions = @getimagesize($filePath);
-        
-        if ($dimensions === false) {
-            return null;
-        }
-
-        return [
-            'width' => $dimensions[0],
-            'height' => $dimensions[1],
-        ];
-    }
-
-    private function createThumbnail(string $sourcePath, string $filename, string $ext): bool
-    {
-        if (!function_exists('imagecreatetruecolor')) {
-            return false;
-        }
-
-        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-            return false;
-        }
-
-        $maxWidth = 400;
-        $maxHeight = 400;
-
-        switch ($ext) {
-            case 'jpg':
-            case 'jpeg':
-                $source = imagecreatefromjpeg($sourcePath);
-                break;
-            case 'png':
-                $source = imagecreatefrompng($sourcePath);
-                break;
-            case 'gif':
-                $source = imagecreatefromgif($sourcePath);
-                break;
-            case 'webp':
-                $source = imagecreatefromwebp($sourcePath);
-                break;
-            default:
-                return false;
-        }
-
-        if ($source === false) {
-            return false;
-        }
-
-        $srcWidth = imagesx($source);
-        $srcHeight = imagesy($source);
-
-        $ratio = min($maxWidth / $srcWidth, $maxHeight / $srcHeight);
-        
-        if ($ratio >= 1) {
-            $thumbWidth = $srcWidth;
-            $thumbHeight = $srcHeight;
-        } else {
-            $thumbWidth = (int) ($srcWidth * $ratio);
-            $thumbHeight = (int) ($srcHeight * $ratio);
-        }
-
-        $thumb = imagecreatetruecolor($thumbWidth, $thumbHeight);
-        
-        if ($ext === 'png' || $ext === 'gif') {
-            imagealphablending($thumb, false);
-            imagesavealpha($thumb, true);
-            $transparent = imagecolorallocatealpha($thumb, 0, 0, 0, 127);
-            imagefill($thumb, 0, 0, $transparent);
-        }
-
-        imagecopyresampled(
-            $thumb, $source,
-            0, 0, 0, 0,
-            $thumbWidth, $thumbHeight,
-            $srcWidth, $srcHeight
+        return $this->service ??= new MediaService(
+            $this->pluginManager->getBasePath() . '/content/media'
         );
-
-        $thumbPath = $this->thumbnailsPath . '/' . $filename;
-        
-        switch ($ext) {
-            case 'jpg':
-            case 'jpeg':
-                $result = imagejpeg($thumb, $thumbPath, 85);
-                break;
-            case 'png':
-                $result = imagepng($thumb, $thumbPath, 6);
-                break;
-            case 'gif':
-                $result = imagegif($thumb, $thumbPath);
-                break;
-            case 'webp':
-                $result = imagewebp($thumb, $thumbPath, 85);
-                break;
-            default:
-                $result = false;
-        }
-
-        imagedestroy($source);
-        imagedestroy($thumb);
-
-        return $result;
-    }
-
-    private function getFileInfo(string $filename, string $filePath): ?array
-    {
-        $metadataPath = $this->mediaPath . '/' . $filename . '.json';
-        
-        if (file_exists($metadataPath)) {
-            $metadata = json_decode(file_get_contents($metadataPath), true);
-            if (is_array($metadata)) {
-                $metadata['url'] = '/media/uploads/' . $filename;
-                $metadata['thumbnail_url'] = '/media/thumbnails/' . $filename;
-                return $metadata;
-            }
-        }
-
-        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        
-        return [
-            'filename' => $filename,
-            'original_name' => $filename,
-            'size' => filesize($filePath),
-            'mime_type' => $this->getMimeType($filePath),
-            'dimensions' => in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']) 
-                ? $this->getImageDimensions($filePath) 
-                : null,
-            'alt' => '',
-            'caption' => '',
-            'created_at' => date('c', filemtime($filePath)),
-            'url' => '/media/uploads/' . $filename,
-            'thumbnail_url' => '/media/thumbnails/' . $filename,
-        ];
-    }
-
-    public function updateMediaMetadata(string $filename, array $data): array
-    {
-        $filename = $this->sanitizeFilename($filename);
-        $metadataPath = $this->mediaPath . '/' . $filename . '.json';
-
-        if (!file_exists($metadataPath)) {
-            return ['error' => 'File not found', 'status' => 404];
-        }
-
-        $metadata = json_decode(file_get_contents($metadataPath), true);
-        
-        if (isset($data['alt'])) {
-            $metadata['alt'] = $data['alt'];
-        }
-        if (isset($data['caption'])) {
-            $metadata['caption'] = $data['caption'];
-        }
-
-        file_put_contents($metadataPath, json_encode($metadata, JSON_PRETTY_PRINT));
-
-        return ['data' => $metadata];
     }
 }
