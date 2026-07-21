@@ -8,6 +8,7 @@ use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\History\RetentionPolicy;
 use Click\Cms\Domain\History\Version;
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -50,6 +51,119 @@ final class JsonVersionStoreTest extends TestCase
     private function page(string $title): Content
     {
         return Content::create(ContentKey::page('home'), ['title' => $title, 'owner' => 'ada']);
+    }
+
+    /* ---------------------------------------------------------- retention -- */
+
+    /**
+     * The data-loss bug the exemption exists to close.
+     *
+     * Retention used to have no exemptions, which was harmless while a version
+     * was only ever a copy of something already safely in `content/`. Once the
+     * newest version became the working copy and a published version became the
+     * record of what the live site is serving, the twenty-first edit started
+     * discarding the state the public was actually reading: the site would go
+     * on serving it, and nothing could say what it was or put it back.
+     */
+    public function testRetentionNeverDiscardsThePublishedOrTheNewestVersion(): void
+    {
+        $store = new JsonVersionStore($this->dir, RetentionPolicy::keeping(3));
+        $key = ContentKey::page('home');
+
+        $store->record($this->page('Nothing special'));
+        $published = $store->record($this->page('What the public reads'), 'ada', Version::REASON_PUBLISH);
+
+        // Far more edits afterwards than the limit allows.
+        for ($i = 0; $i < 10; $i++) {
+            $store->record($this->page("Edit {$i}"));
+        }
+
+        $newest = $store->newest($key);
+
+        $this->assertNotNull($store->find($key, $published->id));
+        $this->assertSame('What the public reads', $store->lastPublished($key)?->content()->title());
+        $this->assertSame('Edit 9', $newest?->content()->title());
+        $this->assertNotNull($store->find($key, $newest->id));
+
+        // The limit still bites. The exemption changes *which* three survive,
+        // not how many — the published version keeps a place that would
+        // otherwise have gone to a more recent edit, rather than being an extra
+        // one on top. Overshooting the limit only happens when the exempt
+        // entries outnumber the room, which is covered in RetentionPolicyTest.
+        $this->assertCount(3, $store->all($key));
+    }
+
+    /**
+     * A publish of the newest version makes one entry both exempt for both
+     * reasons, and it must not be counted — or spared — twice.
+     */
+    public function testTheSameVersionBeingBothNewestAndPublishedIsNotDoubleCounted(): void
+    {
+        $store = new JsonVersionStore($this->dir, RetentionPolicy::keeping(2));
+        $key = ContentKey::page('home');
+
+        foreach (range(1, 5) as $n) {
+            $store->record($this->page("Edit {$n}"));
+        }
+        $store->record($this->page('Live'), 'ada', Version::REASON_PUBLISH);
+
+        $this->assertCount(2, $store->all($key));
+        $this->assertSame('Live', $store->newest($key)?->content()->title());
+    }
+
+    /* --------------------------------------------------------- publication -- */
+
+    public function testNewestIsTheMostRecentlyRecordedState(): void
+    {
+        $key = ContentKey::page('home');
+
+        $this->assertNull($this->store->newest($key));
+
+        $this->store->record($this->page('First'));
+        $this->store->record($this->page('Second'));
+
+        $this->assertSame('Second', $this->store->newest($key)?->content()->title());
+    }
+
+    public function testLastPublishedIgnoresOrdinarySaves(): void
+    {
+        $key = ContentKey::page('home');
+
+        $this->store->record($this->page('Draft'));
+        $this->assertNull($this->store->lastPublished($key));
+
+        $this->store->record($this->page('Live'), 'ada', Version::REASON_PUBLISH);
+        $this->store->record($this->page('Edited since'));
+
+        $this->assertSame('Live', $this->store->lastPublished($key)?->content()->title());
+    }
+
+    /**
+     * A management listing has to include documents that exist only as drafts,
+     * and `content/` is by definition where those are not.
+     */
+    public function testKeysOfTypeFindsDocumentsThatExistOnlyAsVersions(): void
+    {
+        $this->store->record(Content::create(ContentKey::page('alpha', 'en'), ['title' => 'A']));
+        $this->store->record(Content::create(ContentKey::page('beta', 'de'), ['title' => 'B']));
+        $this->store->record(Content::create(ContentKey::user('admin'), ['role' => 'admin']));
+
+        $all = array_map(
+            static fn (ContentKey $k): string => $k->toString(),
+            $this->store->keysOfType('page')
+        );
+        sort($all);
+
+        $this->assertSame(['page:de:beta', 'page:en:alpha'], $all);
+
+        // Per language, because a listing screen shows one.
+        $this->assertSame(
+            ['page:de:beta'],
+            array_map(
+                static fn (ContentKey $k): string => $k->toString(),
+                $this->store->keysOfType('page', Locale::fromString('de'))
+            )
+        );
     }
 
     public function testRecordThenFindRoundTrips(): void

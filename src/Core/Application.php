@@ -264,11 +264,16 @@ class Application
         $resolved = $this->contentService?->resolve(ContentKey::page($slug, $locale));
 
         // An unpublished page is not found, as far as the public site is
-        // concerned. This route previously rendered drafts to anybody who guessed
-        // the address, which meant "unpublished" described the editor's intent and
-        // nothing about who could read it. Seeing one early is what preview is
-        // for, and that requires a signed link or a session.
-        if ($resolved === null || !$resolved->content->isPublished()) {
+        // concerned — and that is now true by construction rather than by a
+        // check. `resolve()` reads `content/`, `content/` holds published
+        // documents only, so there is no unpublished document here to filter
+        // out and no way for a later edit to this method to forget to.
+        //
+        // The check it replaces tested a `status` field on the document, which
+        // could disagree with whether the file was there at all. Seeing a page
+        // early is what preview is for, and that requires a signed link or a
+        // session.
+        if ($resolved === null) {
             return $this->notFoundPage($locale);
         }
 
@@ -352,11 +357,18 @@ class Application
             return $this->notFoundPage($locale);
         }
 
+        // The working copy, which is the thing preview exists to show. Reading
+        // the stored document instead would render whatever is already live and
+        // silently omit the edit the link was minted for — the gap the core
+        // docs described as "preview shows the stored document, not an unsaved
+        // edit", and the reason draft-and-publish had to be decided before this
+        // capability was finished.
+        //
         // Deliberately not the fallback-resolving read the public site uses. A
         // preview of a translation that does not exist yet must say so by being
         // absent, not quietly show the English one and let it be approved as
         // though it were the German page.
-        $page = $this->contentService?->get($key);
+        $page = $this->contentService?->draft($key);
         if ($page === null) {
             return $this->notFoundPage($locale);
         }
@@ -522,12 +534,22 @@ class Application
      */
     private function markAsPreview(string $html, Content $page): string
     {
-        // Which of the two things a preview can be, said plainly. Without it an
-        // editor cannot tell a draft nobody has seen from a live page they are
-        // looking at through the preview route by accident.
-        $status = $page->isPublished()
-            ? ' This page is already published.'
-            : ' This page is a draft and is not public.';
+        // Which of the three things a preview can be, said plainly. Without it
+        // an editor cannot tell a draft nobody has seen from a live page they
+        // are looking at through the preview route by accident — and now that
+        // saving no longer publishes, there is a third case that matters more
+        // than either: a published page whose live version is not this one. An
+        // editor who cannot see that difference will send the link, hear "looks
+        // good", and never press Publish.
+        $state = $this->contentService?->publicationOf($page->key);
+
+        $status = match (true) {
+            $state === null => '',
+            $state->hasUnpublishedChanges && $state->published
+                => ' This page is published, but these changes are not — the public still sees the previous version.',
+            $state->published => ' This page is already published.',
+            default => ' This page is not published.',
+        };
 
         $banner = '<div role="status" style="position:sticky;top:0;z-index:2147483647;'
             . 'background:#b45309;color:#fff;font:600 14px/1.4 system-ui,sans-serif;'

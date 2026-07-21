@@ -42,8 +42,8 @@ final class PreviewRouteTest extends TestCase
         $this->app = new Application($this->base);
         $this->app->boot();
 
-        $this->savePage('secret-plans', 'Secret Plans', 'draft', 'THE UNPUBLISHED SENTENCE');
-        $this->savePage('about', 'About', 'published', 'A PUBLISHED SENTENCE');
+        $this->savePage('secret-plans', 'Secret Plans', false, 'THE UNPUBLISHED SENTENCE');
+        $this->savePage('about', 'About', true, 'A PUBLISHED SENTENCE');
     }
 
     protected function tearDown(): void
@@ -53,13 +53,22 @@ final class PreviewRouteTest extends TestCase
         $this->removeTree($this->base);
     }
 
-    private function savePage(string $slug, string $title, string $status, string $body): void
+    /**
+     * Rewritten for draft-and-publish. Unpublished used to mean a `status`
+     * field on a document that was in `content/` either way; it now means the
+     * document is not in `content/` at all, and publishing is the act that puts
+     * it there.
+     */
+    private function savePage(string $slug, string $title, bool $publish, string $body): void
     {
         $this->app->getContentService()->save(Content::create(ContentKey::page($slug), [
             'title' => $title,
-            'status' => $status,
             'content' => $body,
         ]));
+
+        if ($publish) {
+            $this->app->getContentService()->publish(ContentKey::page($slug));
+        }
     }
 
     /** Drive the kernel the way a request does, and collect what it wrote. */
@@ -121,6 +130,58 @@ final class PreviewRouteTest extends TestCase
         $this->assertStringContainsString('Page not found', $output);
     }
 
+    /**
+     * The rule stated at the level a visitor experiences it: an edit to a
+     * published page is not published by having been saved.
+     *
+     * Driven through the kernel rather than the storage decorator, because that
+     * is where somebody would have to remember to keep the two apart, and a
+     * later refactor of the render path is exactly what could quietly stop
+     * doing so.
+     */
+    public function testSavingAnEditToAPublishedPageDoesNotChangeThePublicPage(): void
+    {
+        $this->assertStringContainsString('A PUBLISHED SENTENCE', $this->request('/about'));
+
+        $this->savePage('about', 'About', false, 'AN UNPUBLISHED REWRITE');
+
+        $public = $this->request('/about');
+        $this->assertStringContainsString('A PUBLISHED SENTENCE', $public);
+        $this->assertStringNotContainsString('AN UNPUBLISHED REWRITE', $public);
+
+        // Publishing is what closes the gap, and nothing else does.
+        $this->app->getContentService()->publish(ContentKey::page('about'));
+
+        $this->assertStringContainsString('AN UNPUBLISHED REWRITE', $this->request('/about'));
+    }
+
+    /**
+     * Preview is the one place the pending edit must be visible, which is what
+     * it was built for and could not do while a page had one stored document.
+     */
+    public function testPreviewShowsThePendingEditRatherThanTheLivePage(): void
+    {
+        $this->savePage('about', 'About', false, 'AN UNPUBLISHED REWRITE');
+
+        $_GET['token'] = $this->tokenFor('about');
+        $preview = $this->request('/preview/about?token=' . $_GET['token']);
+
+        $this->assertStringContainsString('AN UNPUBLISHED REWRITE', $preview);
+        // And says so, because an editor who thinks this is live will never
+        // press Publish.
+        $this->assertStringContainsString('these changes are not', $preview);
+    }
+
+    public function testTakingAPageDownMakesItAFourOhFourAgain(): void
+    {
+        $this->app->getContentService()->unpublish(ContentKey::page('about'));
+
+        $output = $this->request('/about');
+
+        $this->assertStringNotContainsString('A PUBLISHED SENTENCE', $output);
+        $this->assertStringContainsString('Page not found', $output);
+    }
+
     public function testAPublishedPageIsStillServedPublicly(): void
     {
         $output = $this->request('/about');
@@ -155,7 +216,7 @@ final class PreviewRouteTest extends TestCase
      */
     public function testATokenForOnePageDoesNotOpenAnother(): void
     {
-        $this->savePage('other-secret', 'Other', 'draft', 'ANOTHER UNPUBLISHED SENTENCE');
+        $this->savePage('other-secret', 'Other', false, 'ANOTHER UNPUBLISHED SENTENCE');
 
         $_GET['token'] = $this->tokenFor('other-secret');
 
@@ -174,7 +235,7 @@ final class PreviewRouteTest extends TestCase
     {
         $this->app->getContentService()->save(Content::create(
             ContentKey::page('secret-plans', Locale::fromString('de')),
-            ['title' => 'Geheim', 'status' => 'draft', 'content' => 'DIE UNVEROEFFENTLICHTE ZEILE']
+            ['title' => 'Geheim', 'content' => 'DIE UNVEROEFFENTLICHTE ZEILE']
         ));
 
         $_GET['token'] = $this->tokenFor('secret-plans', Locale::fromString('de'));
@@ -241,7 +302,7 @@ final class PreviewRouteTest extends TestCase
         $output = $this->request('/preview/secret-plans?token=' . $_GET['token']);
 
         $this->assertStringContainsString('this is not the published site', $output);
-        $this->assertStringContainsString('draft and is not public', $output);
+        $this->assertStringContainsString('This page is not published', $output);
         $this->assertStringContainsString('noindex', $output);
     }
 
@@ -251,7 +312,7 @@ final class PreviewRouteTest extends TestCase
      */
     public function testPreviewRendersThroughTheSameRendererAsThePublicSite(): void
     {
-        $this->savePage('twin', 'Twin', 'published', 'IDENTICAL BODY');
+        $this->savePage('twin', 'Twin', true, 'IDENTICAL BODY');
 
         $public = $this->request('/twin');
 

@@ -57,6 +57,7 @@ enum Role: string
                 Capability::EditOwnContent,
                 Capability::DeleteOwnContent,
                 Capability::PublishContent,
+                Capability::UnpublishContent,
                 Capability::RestoreContent,
                 Capability::PreviewContent,
                 Capability::ViewMedia,
@@ -65,8 +66,14 @@ enum Role: string
             ],
 
             // Writes and maintains their own work only. Notably has neither
-            // PublishContent nor the free-form builder: an author drafts, and
-            // someone else decides it goes live.
+            // PublishContent, UnpublishContent nor the free-form builder: an
+            // author drafts, and someone else decides it goes live.
+            //
+            // That sentence has been in this file since the role model was
+            // written and was not true until draft-and-publish existed: saving
+            // was publishing, so an author pressing Save put their words in
+            // front of every visitor. Withholding these two is what finally
+            // makes it real.
             //
             // Preview is granted precisely because of that: showing the draft
             // to whoever makes that decision is the author's job, and without
@@ -134,6 +141,27 @@ enum Role: string
     public function canRestoreContentOwnedBy(?string $owner, ?string $username): bool
     {
         return $this->can(Capability::RestoreContent)
+            && $this->canEditContentOwnedBy($owner, $username);
+    }
+
+    /**
+     * Whether this role may put someone's content in front of the public.
+     *
+     * Both questions, like restoring: publishing is an act on a particular
+     * document, so the capability alone is not enough — a role able to publish
+     * anything it can reach must still only reach what it may edit. Without the
+     * second half, granting publishing would quietly grant the ability to push
+     * somebody else's half-written draft live.
+     */
+    public function canPublishContentOwnedBy(?string $owner, ?string $username): bool
+    {
+        return $this->can(Capability::PublishContent)
+            && $this->canEditContentOwnedBy($owner, $username);
+    }
+
+    public function canUnpublishContentOwnedBy(?string $owner, ?string $username): bool
+    {
+        return $this->can(Capability::UnpublishContent)
             && $this->canEditContentOwnedBy($owner, $username);
     }
 
