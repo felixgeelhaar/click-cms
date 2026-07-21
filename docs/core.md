@@ -120,6 +120,49 @@ Deliberately out of scope: judging compression artefacts, sharpness or subject
 matter. Those need heuristics that are wrong often enough to erode trust in the
 warnings that are right.
 
+### Choosing a storage backend
+
+Core ships two, and `config/core.json` decides which one runs:
+
+```json
+{
+  "core": {
+    "storage": {
+      "backend": "json",
+      "sqlite": { "path": "data/content.sqlite" }
+    }
+  }
+}
+```
+
+`backend` is `json` or `sqlite`. It defaults to `json`, and every setting under
+`storage` has a default, so an installation with no configuration file at all
+boots on flat files. That is the "no database required" property above, enforced
+rather than intended.
+
+`sqlite.path` is only read for the SQLite backend. A relative path resolves
+against the installation root rather than the working directory, which differs
+between the web server and the CLI and would otherwise give one install two
+databases. It defaults under `data/` because that directory is already expected
+to be writable and already outside the web root — a database served over HTTP
+hands out every account record in it.
+
+Anything else is refused at boot, loudly: an unrecognised backend name, or
+`sqlite` on a PHP build without the `pdo_sqlite` extension, throws with the value
+that was configured, the backends that exist, and what to change. Nothing falls
+back to JSON. A site that silently ran on a different store than it was
+configured for would look exactly like one that had lost every document it ever
+wrote, which is the quiet failure this document exists to forbid.
+
+Two caveats when moving content between backends:
+
+- **Migration is not automatic.** Switching `backend` points the CMS at an empty
+  store; it does not copy anything across. There is no migration command yet.
+- **Slugs that differ only in case are not portable.** SQLite tells `page:Home`
+  and `page:home` apart. The flat-file backend inherits whatever the host
+  filesystem does, and on macOS or Windows those are one document. A site
+  relying on the distinction loses content moving from SQLite to files.
+
 ### Explicitly not core
 
 - **Delivery APIs** (`rest-api`, `graphql`) — how an *external* front end reads
@@ -141,7 +184,9 @@ Honest assessment, not aspiration.
 
 The domain layer. `Content`, `ContentKey`, the schema types, `UploadPolicy` and
 `ImageSize` are small, dependency-free and covered by tests. Storage sits behind
-a port with two implementations. Media generates variants and refuses what it
+a port with two implementations, both selectable from configuration and both
+held to one shared contract test, so the choice of backend cannot change what a
+caller observes. Media generates variants and refuses what it
 cannot verify. This is the part that is right.
 
 ### `Core\Application`
@@ -172,16 +217,26 @@ than an allowlist of protected prefixes; roles map to named capabilities; page
 management moved into core, so the delivery plugins are genuinely optional; and
 sessions are one file per session, keyed by a random identifier in an HttpOnly
 cookie, where they were previously a single shared record that authenticated any
-visitor as whoever had last signed in.
+visitor as whoever had last signed in; and `SqliteStorage` is now reachable,
+chosen by `core.storage.backend` and executed by the same tests as the flat-file
+backend, which is what closed the gap between capability 2's claim and the code.
+
+`config/config.json` is gone. It declared a `storage.default` nothing read and an
+`admin.enabled: false` that was false while the admin UI worked, alongside three
+more sections no code consulted — a file describing a system that did not exist,
+sitting next to the one the application actually loads. The single real setting
+in it moved to `core.storage` in `config/core.json`; the rest was fiction and was
+deleted rather than implemented.
 
 Still open:
 
 - **Nothing enforces capabilities at the storage layer.** A handler that forgets
   to ask is still able to act. Checks belong closer to the operation.
-- **`SqliteStorage` is written and never constructed.** `Application::boot()`
-  hardcodes `JsonStorage`, and `config/config.json` declares a
-  `storage.default` that nothing reads. Capability 2 claims two implementations;
-  one of them is unreachable.
+- **No way to migrate content between storage backends.** Both are now
+  selectable and both are proven against one shared contract, but switching
+  `core.storage.backend` points the CMS at an empty store rather than moving
+  what is already there. Until there is a command for it, changing backend on a
+  site with content is a manual job.
 - **Media reports nothing about quality.** See above. The ladder silently
   produces fewer variants for a small upload.
 - **No languages, history or preview.** Capabilities 10 to 12, none started.
@@ -221,11 +276,9 @@ What remains, in this order:
    it immediately.
 4. **Preview.** Cheap once rendering and history exist — an unpublished version
    rendered at a URL that does not require the viewer to be signed in.
-5. **Wire `SqliteStorage`,** or withdraw the claim that core has two storage
-   backends.
-6. **Extract the kernel, router, config and health.** What remains of
+5. **Extract the kernel, router, config and health.** What remains of
    `Application` should fit on a screen.
-7. **Settings out of files.** Bootstrap stays on disk because storage
+6. **Settings out of files.** Bootstrap stays on disk because storage
    configuration cannot live in storage; everything else becomes a document,
    edited in the admin UI.
 
