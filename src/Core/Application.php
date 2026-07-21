@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Core;
 
 use Click\Cms\Application\Content\ContentService;
+use Click\Cms\Application\Authentication\CsrfGuard;
 use Click\Cms\Application\Event\EventBus;
 use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Domain\Content\Content;
@@ -280,6 +281,14 @@ class Application
     {
         $path = ltrim(preg_replace('#^/api/#', '', $uri), '/');
 
+        // Before anything else acts on the request. A forged POST that reaches
+        // a handler has already done its damage, and on plugin installation
+        // that damage is arbitrary code execution.
+        $csrf = $this->enforceCsrf($path, $method);
+        if ($csrf !== null) {
+            return $csrf;
+        }
+
         if ($this->isCoreAuthEnabled() && str_starts_with($path, 'auth/')) {
             return $this->handleAuthRequest($path, $method);
         }
@@ -352,6 +361,54 @@ class Application
         return ['status' => 404, 'error' => 'Endpoint not found'];
     }
 
+    /**
+     * Require authentication for API requests.
+     *
+     * Deny by default, with a short list of deliberate exceptions. The previous
+     * rule was the other way round — a list of protected prefixes — which fails
+     * open: every endpoint added to core was public until somebody remembered
+     * to list it, and the media endpoints were reachable with no session at all
+     * because of exactly that.
+     *
+     * Public by design:
+     *   auth/*            logging in must work before there is a session
+     *   GET pages*        a headless front end reads published content
+     *                     anonymously; that is the whole point of a delivery API
+     *   GET media/file/*  images referenced by a public page must load for
+     *                     visitors
+     *
+     * Everything else — including listing the media library and reading section
+     * definitions — is management and requires a session.
+     */
+    /**
+     * Whether a path may be reached without a session.
+     *
+     * @see enforceAuthForApi for why this is an allowlist of public paths
+     *      rather than a list of protected ones.
+     */
+    private function isPublicApiPath(string $path, string $method): bool
+    {
+        if (str_starts_with($path, 'auth/')) {
+            return true;
+        }
+
+        if (!CsrfGuard::isSafeMethod($method)) {
+            return false;
+        }
+
+        // Published content, read by a front end that has no account.
+        if ($path === 'pages' || str_starts_with($path, 'pages/')) {
+            return true;
+        }
+
+        // The bytes of an image a public page references.
+        if (str_starts_with($path, 'media/file/')) {
+            return true;
+        }
+
+        return false;
+    }
+
     private function enforceAuthForApi(string $path, string $method): ?array
     {
         // An account with an outstanding password change may do nothing else.
@@ -366,30 +423,7 @@ class Application
             ];
         }
 
-        $protectedPrefixes = [
-            'users',
-            'plugins',
-            'marketplace',
-        ];
-
-        $requiresAuth = false;
-
-        foreach ($protectedPrefixes as $prefix) {
-            if (str_starts_with($path, $prefix)) {
-                $requiresAuth = true;
-                break;
-            }
-        }
-
-        if (str_starts_with($path, 'pages') && $method !== 'GET') {
-            $requiresAuth = true;
-        }
-
-        if (str_starts_with($path, 'graphql')) {
-            $requiresAuth = true;
-        }
-
-        if (!$requiresAuth) {
+        if ($this->isPublicApiPath($path, $method)) {
             return null;
         }
 
@@ -531,6 +565,7 @@ class Application
             'remember' => $remember,
             'lastActivity' => time(),
             'sessionId' => bin2hex(random_bytes(16)),
+            'csrfToken' => CsrfGuard::generateToken(),
             'user' => [
                 'username' => $userData['username'] ?? $username,
                 'displayName' => $userData['displayName'] ?? $username,
@@ -659,6 +694,45 @@ class Application
         return ['data' => $user];
     }
 
+    /**
+     * Reject state-changing requests that do not carry the session's CSRF token.
+     *
+     * Only applies once there is a session to forge: an unauthenticated request
+     * can do nothing that needs protecting, and login itself must be reachable
+     * before any token exists.
+     *
+     * @return array<string, mixed>|null Null when the request may proceed.
+     */
+    private function enforceCsrf(string $path, string $method): ?array
+    {
+        if (CsrfGuard::isSafeMethod($method)) {
+            return null;
+        }
+
+        // Logging in and out must work without a token; there is no session to
+        // protect yet, and being unable to log out would be worse than the risk.
+        if (in_array($path, ['auth/login', 'auth/logout'], true)) {
+            return null;
+        }
+
+        $session = $this->getSessionData();
+        $expected = $session['csrfToken'] ?? null;
+
+        // No session means nothing to forge.
+        if (!is_string($expected) || $expected === '') {
+            return null;
+        }
+
+        if (!CsrfGuard::matches($expected, CsrfGuard::tokenFromRequest($_SERVER))) {
+            return [
+                'status' => 403,
+                'error' => 'Missing or invalid CSRF token.',
+            ];
+        }
+
+        return null;
+    }
+
     private function handleAuthCheck(): array
     {
         $session = $this->getSessionData();
@@ -670,7 +744,8 @@ class Application
             'expiresAt' => $session['expiresAt'] ?? null,
             'remember' => $session['remember'] ?? false,
             'lastActivity' => $session['lastActivity'] ?? null,
-            'sessionId' => $session['sessionId'] ?? null
+            'sessionId' => $session['sessionId'] ?? null,
+            'csrfToken' => $session['csrfToken'] ?? null
         ]];
     }
 
