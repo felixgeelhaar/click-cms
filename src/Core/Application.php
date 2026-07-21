@@ -17,6 +17,8 @@ use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\SectionRenderer;
+use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
 
 class Application
@@ -219,34 +221,43 @@ class Application
         return ['raw' => true];
     }
 
-    private function renderPageHtml(\Click\Cms\Domain\Content\Content $page): string
+    private function renderPageHtml(Content $page): string
     {
-        $hookResults = $this->pluginManager->executeHook('web.render', ['page' => $page]);
-
-        foreach ($hookResults as $result) {
+        // A plugin may take over rendering entirely — a theme, or the free-form
+        // builder for a page built that way.
+        foreach ($this->pluginManager->executeHook('web.render', ['page' => $page]) as $result) {
             if (is_string($result) && $result !== '') {
                 return $result;
             }
         }
-        
-        // Fallback: render basic HTML from page content
-        $title = htmlspecialchars($page->title() ?? 'Untitled', ENT_QUOTES, 'UTF-8');
-        $content = $page->content() ?? '';
-        
+
+        $title = htmlspecialchars($page->title(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+        // Sections are the CMS's own content model, so it renders them itself.
+        // Without this a site could store a page but not show it.
+        $renderer = new SectionRenderer(
+            new JsonSectionTypeRepository($this->basePath . '/config/sections'),
+            new \Click\Cms\Application\Media\MediaService($this->basePath . '/content/media')
+        );
+        $body = $renderer->render($page);
+
+        // Pages predating sections keep their plain content field.
+        if ($body === '' && $page->content() !== '') {
+            $body = '<div class="cms-content">'
+                . nl2br(htmlspecialchars($page->content(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'))
+                . '</div>';
+        }
+
         return '<!doctype html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>' . $title . '</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
-        h1 { color: #333; }
-    </style>
+    <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
-    <h1>' . $title . '</h1>
-    <div>' . nl2br(htmlspecialchars($content, ENT_QUOTES, 'UTF-8')) . '</div>
+    <main>' . $body . '</main>
 </body>
 </html>';
     }
@@ -304,6 +315,14 @@ class Application
         // Before anything else acts on the request. A forged POST that reaches
         // a handler has already done its damage, and on plugin installation
         // that damage is arbitrary code execution.
+        // Cross-origin reads for a separate front end. Applied before anything
+        // else so that a preflight is answered even for paths that would
+        // otherwise require a session.
+        $preflight = $this->applyDeliveryCors($path, $method);
+        if ($preflight !== null) {
+            return $preflight;
+        }
+
         $csrf = $this->enforceCsrf($path, $method);
         if ($csrf !== null) {
             return $csrf;
@@ -731,6 +750,50 @@ class Application
      *
      * @return array<string, mixed>|null Null when the request may proceed.
      */
+    /**
+     * Allow a named front end to read the delivery API from the browser.
+     *
+     * Only public paths are opened, and only to origins the site has listed.
+     * Credentials are never allowed: delivery is anonymous, so a cross-origin
+     * request must not be able to carry a session, which keeps this from
+     * becoming a way around the CSRF protection.
+     *
+     * @return array<string, mixed>|null A response for a preflight, else null.
+     */
+    private function applyDeliveryCors(string $path, string $method): ?array
+    {
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        if ($origin === '') {
+            return null;
+        }
+
+        $allowed = $this->config?->deliveryAllowedOrigins() ?? [];
+        if (!in_array($origin, $allowed, true)) {
+            return null;
+        }
+
+        // A preflight asks about the request that follows, so the answer has to
+        // consider that method rather than OPTIONS itself.
+        $intended = $method === 'OPTIONS'
+            ? strtoupper((string) ($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD'] ?? 'GET'))
+            : $method;
+
+        if (!$this->isPublicApiPath($path, $intended)) {
+            return null;
+        }
+
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Vary: Origin');
+        header('Access-Control-Allow-Methods: GET, HEAD, OPTIONS');
+        header('Access-Control-Max-Age: 600');
+
+        if ($method === 'OPTIONS') {
+            return ['status' => 204, 'raw' => true, 'html' => ''];
+        }
+
+        return null;
+    }
+
     private function enforceCsrf(string $path, string $method): ?array
     {
         if (CsrfGuard::isSafeMethod($method)) {

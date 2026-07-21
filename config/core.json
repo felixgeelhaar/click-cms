@@ -32,6 +32,9 @@
           "auth"
         ]
       }
+    },
+    "delivery": {
+      "allowedOrigins": []
     }
   }
 }

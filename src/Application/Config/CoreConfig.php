@@ -65,6 +65,22 @@ final class CoreConfig
         return $this->bool('core.graphql.enabled', true);
     }
 
+    /**
+     * Origins allowed to read the delivery API from a browser.
+     *
+     * Empty by default, which means same-origin only. A front end served from
+     * another origin — the usual arrangement when the CMS backs a separate
+     * site — must be named explicitly. A wildcard is deliberately not
+     * supported: the delivery API is anonymous, but a public read API that
+     * anybody's page can call is still a decision to make on purpose.
+     *
+     * @return list<string>
+     */
+    public function deliveryAllowedOrigins(): array
+    {
+        return $this->stringList('core.delivery.allowedOrigins', []);
+    }
+
     /* --------------------------------------------------------------- auth -- */
 
     public function authEnabled(): bool
