@@ -8,6 +8,7 @@ use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Authentication\CsrfGuard;
 use Click\Cms\Application\Authentication\LoginThrottle;
 use Click\Cms\Application\Authentication\SessionStore;
+use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Event\EventBus;
 use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Domain\Content\Content;
@@ -36,6 +37,7 @@ class Application
     private ?SessionStore $sessions = null;
     private ?LoginThrottle $throttle = null;
     private array $coreConfig = [];
+    private ?CoreConfig $config = null;
 
     private string $basePath;
 
@@ -84,6 +86,7 @@ class Application
         }
 
         $this->loadCoreConfig();
+        $this->config = CoreConfig::fromArray($this->coreConfig);
         $this->validateCoreConfig();
 
         $this->eventDispatcher = new EventDispatcher();
@@ -104,15 +107,13 @@ class Application
         );
         $this->throttle = new LoginThrottle(
             $this->basePath . '/data/lockouts.json',
-            (int) ($this->coreConfig['core']['auth']['lockoutMaxAttempts'] ?? 5),
-            (int) ($this->coreConfig['core']['auth']['lockoutWindowSeconds'] ?? 900),
-            (int) ($this->coreConfig['core']['auth']['lockoutDurationSeconds'] ?? 900)
+            $this->config->lockoutMaxAttempts(),
+            $this->config->lockoutWindowSeconds(),
+            $this->config->lockoutDurationSeconds()
         );
         
-        $pluginConfig = $this->coreConfig['core']['plugins'] ?? [];
-        $excludeConfig = $pluginConfig['exclude'] ?? [];
-        $excludedIds = $excludeConfig['ids'] ?? ['admin-ui', 'authentication'];
-        $excludedDirs = $excludeConfig['dirs'] ?? ['admin-ui', 'auth'];
+        $excludedIds = $this->config->excludedPluginIds();
+        $excludedDirs = $this->config->excludedPluginDirs();
 
         $this->pluginManager = new PluginManager(
             $this->basePath . '/plugins',
@@ -471,42 +472,51 @@ class Application
         return null;
     }
 
+    /**
+     * Serve the admin UI.
+     *
+     * In a built image the UI is static files under the document root, so
+     * Apache answers before PHP is reached and this never runs. It exists for
+     * development, where the UI is a Vite dev server on another port.
+     *
+     * The proxy only runs when CLICK_ADMIN_DEV_URL is set. Previously it always
+     * ran against a hardcoded localhost:4321, which meant a production
+     * deployment without the built assets silently tried to reach a developer's
+     * machine and served a blank page.
+     */
     private function serveAdminUi(string $uri): array
     {
-        $adminDevUrl = 'http://localhost:4321';
-        
-        error_reporting(E_ERROR);
-        
-        $ch = curl_init($adminDevUrl . $uri);
+        $devUrl = getenv('CLICK_ADMIN_DEV_URL') ?: '';
+
+        if ($devUrl === '') {
+            return [
+                'status' => 404,
+                'error' => 'The admin UI is not available. Build it into public/admin, '
+                    . 'or set CLICK_ADMIN_DEV_URL to proxy a development server.',
+            ];
+        }
+
+        $ch = curl_init(rtrim($devUrl, '/') . $uri);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Host: localhost:4321'
-        ]);
-        
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+
         $content = curl_exec($ch);
         $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        
-        if (is_resource($ch)) {
-            curl_close($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($content === false || $httpCode === 0) {
+            return ['status' => 502, 'error' => 'The admin development server is not reachable.'];
         }
-        
-        error_reporting(E_ALL);
-        
+
         if ($httpCode >= 400) {
             return ['status' => $httpCode, 'error' => 'Admin UI error'];
         }
-        
-        if ($contentType && strpos($contentType, 'text/html') !== false && $content) {
-            $content = str_replace('http://localhost:4321', 'http://localhost:8080', $content);
-            $content = str_replace('localhost:4321', 'localhost:8080', $content);
-            $contentType = 'text/html';
-        }
-        
+
         header('Content-Type: ' . ($contentType ?: 'text/html'));
-        echo $content;
-        return ['raw' => true];
+
+        return ['raw' => true, 'html' => (string) $content, 'status' => $httpCode];
     }
 
     private function handleAuthRequest(string $path, string $method): array
@@ -692,7 +702,7 @@ class Application
 
     private function getPasswordMinLength(): int
     {
-        return max(8, (int) ($this->coreConfig['core']['auth']['passwordMinLength'] ?? 8));
+        return $this->config?->passwordMinLength() ?? 8;
     }
 
     private function handleLogout(): array
@@ -782,24 +792,14 @@ class Application
         $this->sessions?->touch();
     }
 
-    private function getSessionTtlSeconds(bool $remember): int
+    private function getSessionTtlSeconds(bool $remember = false): int
     {
-        $authConfig = $this->coreConfig['core']['auth'] ?? [];
-        $defaultTtl = 8 * 60 * 60;
-        $rememberTtl = 30 * 24 * 60 * 60;
-
-        if ($remember) {
-            return (int) ($authConfig['rememberTtlSeconds'] ?? $rememberTtl);
-        }
-
-        return (int) ($authConfig['sessionTtlSeconds'] ?? $defaultTtl);
+        return $this->config?->sessionTtlSeconds($remember) ?? ($remember ? 2592000 : 28800);
     }
 
     private function getIdleTimeoutSeconds(): int
     {
-        $authConfig = $this->coreConfig['core']['auth'] ?? [];
-
-        return (int) ($authConfig['idleTimeoutSeconds'] ?? 0);
+        return $this->config?->idleTimeoutSeconds() ?? 1800;
     }
 
     private function getSessionFile(): string
@@ -886,22 +886,22 @@ class Application
 
     private function isCoreRestApiEnabled(): bool
     {
-        return (bool) ($this->coreConfig['core']['restApi']['enabled'] ?? true);
+        return $this->config?->restApiEnabled() ?? true;
     }
 
     private function isCoreAuthEnabled(): bool
     {
-        return (bool) ($this->coreConfig['core']['auth']['enabled'] ?? true);
+        return $this->config?->authEnabled() ?? true;
     }
 
     private function isMarketplaceEnabled(): bool
     {
-        return (bool) ($this->coreConfig['core']['marketplace']['enabled'] ?? true);
+        return $this->config?->marketplaceEnabled() ?? true;
     }
 
     private function isGraphqlEnabled(): bool
     {
-        return (bool) ($this->coreConfig['core']['graphql']['enabled'] ?? false);
+        return $this->config?->graphqlEnabled() ?? true;
     }
 
     private function shouldSkipPluginRoutes(string $pluginName): bool
@@ -931,8 +931,7 @@ class Application
             return;
         }
 
-        $legacyUser = $this->loadLegacyAdminUser();
-        $adminUser = $legacyUser ?? [
+        $adminUser = [
             'username' => 'admin',
             'displayName' => 'Administrator',
             'email' => 'admin@example.com',
@@ -949,22 +948,6 @@ class Application
         $this->contentService->save($content);
     }
 
-    private function loadLegacyAdminUser(): ?array
-    {
-        $legacyPath = $this->basePath . '/content/users/admin.json';
-        if (!file_exists($legacyPath)) {
-            return null;
-        }
-
-        $data = json_decode(file_get_contents($legacyPath), true);
-        if (!is_array($data)) {
-            return null;
-        }
-
-        $data['password'] = $data['password'] ?? password_hash('admin', PASSWORD_DEFAULT);
-
-        return $data;
-    }
 
     private function handleMarketplaceRequest(string $path, string $method): array
     {

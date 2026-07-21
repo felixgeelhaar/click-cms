@@ -1,0 +1,194 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Click\Cms\Application\Config;
+
+/**
+ * Typed access to `config/core.json`.
+ *
+ * Settings were previously read with `$this->coreConfig['core']['auth'][...] ??
+ * default` wherever they were needed, which meant every default was repeated at
+ * each call site and could disagree between them. Here each has one name and
+ * one default.
+ *
+ * A missing or unreadable file is not an error: every setting has a default, so
+ * a fresh install with no configuration runs.
+ */
+final class CoreConfig
+{
+    /** @var array<string, mixed> */
+    private array $values;
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function __construct(array $values)
+    {
+        $this->values = $values;
+    }
+
+    public static function load(string $path): self
+    {
+        if (!is_file($path)) {
+            return new self([]);
+        }
+
+        $decoded = json_decode((string) @file_get_contents($path), true);
+
+        return new self(is_array($decoded) ? $decoded : []);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    public static function fromArray(array $values): self
+    {
+        return new self($values);
+    }
+
+    /* ------------------------------------------------------------ content -- */
+
+    /**
+     * Whether the REST delivery API answers.
+     *
+     * Delivery is optional by design: a site that renders its own pages needs
+     * no API for a front end to read. Management endpoints are unaffected.
+     */
+    public function restApiEnabled(): bool
+    {
+        return $this->bool('core.restApi.enabled', true);
+    }
+
+    public function graphqlEnabled(): bool
+    {
+        return $this->bool('core.graphql.enabled', true);
+    }
+
+    /* --------------------------------------------------------------- auth -- */
+
+    public function authEnabled(): bool
+    {
+        return $this->bool('core.auth.enabled', true);
+    }
+
+    public function sessionTtlSeconds(bool $remembered = false): int
+    {
+        return $remembered
+            ? $this->int('core.auth.rememberTtlSeconds', 2_592_000)
+            : $this->int('core.auth.sessionTtlSeconds', 28_800);
+    }
+
+    public function idleTimeoutSeconds(): int
+    {
+        return $this->int('core.auth.idleTimeoutSeconds', 1_800);
+    }
+
+    public function lockoutMaxAttempts(): int
+    {
+        return $this->int('core.auth.lockoutMaxAttempts', 5);
+    }
+
+    public function lockoutWindowSeconds(): int
+    {
+        return $this->int('core.auth.lockoutWindowSeconds', 900);
+    }
+
+    public function lockoutDurationSeconds(): int
+    {
+        return $this->int('core.auth.lockoutDurationSeconds', 900);
+    }
+
+    /** Never below eight, whatever the file says. */
+    public function passwordMinLength(): int
+    {
+        return max(8, $this->int('core.auth.passwordMinLength', 8));
+    }
+
+    /* -------------------------------------------------------- marketplace -- */
+
+    public function marketplaceEnabled(): bool
+    {
+        return $this->bool('core.marketplace.enabled', true);
+    }
+
+    public function marketplaceRegistryUrl(): string
+    {
+        return $this->string('core.marketplace.registryUrl', '');
+    }
+
+    public function marketplacePublicKey(): string
+    {
+        return $this->string('core.marketplace.publicKey', '');
+    }
+
+    /* ------------------------------------------------------------ plugins -- */
+
+    /**
+     * @return list<string>
+     */
+    public function excludedPluginIds(): array
+    {
+        return $this->stringList('core.plugins.exclude.ids', ['admin-ui', 'authentication']);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function excludedPluginDirs(): array
+    {
+        return $this->stringList('core.plugins.exclude.dirs', ['admin-ui', 'auth']);
+    }
+
+    /* -------------------------------------------------------------- lookup -- */
+
+    private function get(string $path): mixed
+    {
+        $value = $this->values;
+
+        foreach (explode('.', $path) as $segment) {
+            if (!is_array($value) || !array_key_exists($segment, $value)) {
+                return null;
+            }
+            $value = $value[$segment];
+        }
+
+        return $value;
+    }
+
+    private function bool(string $path, bool $default): bool
+    {
+        $value = $this->get($path);
+
+        return $value === null ? $default : (bool) $value;
+    }
+
+    private function int(string $path, int $default): int
+    {
+        $value = $this->get($path);
+
+        return is_numeric($value) ? (int) $value : $default;
+    }
+
+    private function string(string $path, string $default): string
+    {
+        $value = $this->get($path);
+
+        return is_string($value) ? $value : $default;
+    }
+
+    /**
+     * @param list<string> $default
+     * @return list<string>
+     */
+    private function stringList(string $path, array $default): array
+    {
+        $value = $this->get($path);
+
+        if (!is_array($value)) {
+            return $default;
+        }
+
+        return array_values(array_filter($value, 'is_string'));
+    }
+}
