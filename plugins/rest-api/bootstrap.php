@@ -1099,13 +1099,9 @@ class Plugin_rest_api extends \Click\Cms\Application\Plugin\BasePlugin
 
     private function sanitizeUser(array $user): array
     {
-        if (isset($user['data']['password'])) {
-            $user['data']['password'] = null;
-        }
-
-        if (isset($user['password'])) {
-            $user['password'] = null;
-        }
+        // Removed rather than nulled. A "password": null in a response reads
+        // like an account without one, which is alarming and untrue.
+        unset($user['data']['password'], $user['password']);
 
         return $user;
     }

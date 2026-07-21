@@ -39,7 +39,6 @@ const navItems = computed(() => {
     items.push({ href: '/admin/plugins', icon: 'plugins', label: 'Plugins' });
     items.push({ href: '/admin/marketplace', icon: 'marketplace', label: 'Marketplace' });
     items.push({ href: '/admin/users', icon: 'users', label: 'Users' });
-    items.push({ href: '/admin/analytics', icon: 'analytics', label: 'Analytics' });
   }
   items.push({ href: '/admin/profile', icon: 'profile', label: 'Profile' });
   return items;

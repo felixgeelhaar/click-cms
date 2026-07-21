@@ -48,7 +48,6 @@ import Profile from './Profile.vue';
 import Plugins from './Plugins.vue';
 import PluginDetail from './PluginDetail.vue';
 import Marketplace from './Marketplace.vue';
-import Analytics from './Analytics.vue';
 import Builder from './Builder.vue';
 import ChangePassword from './ChangePassword.vue';
 import { installCsrfFetch, setCsrfToken } from '../lib/api.js';
@@ -116,7 +115,6 @@ const getRouteComponent = () => {
   if (path === '/admin/plugins') return Plugins;
   if (path === '/admin/marketplace') return can('plugins.install') ? Marketplace : Dashboard;
   if (path === '/admin/builder') return hasBuilder.value ? Builder : Dashboard;
-  if (path === '/admin/analytics') return Analytics;
   if (path.startsWith('/admin/pages/edit/')) return PageEdit;
   if (path === '/admin/pages/new') return PageEdit;
   if (path.startsWith('/admin/plugins/')) return PluginDetail;
@@ -127,7 +125,7 @@ const getRouteProps = () => {
   const path = currentRoute.value.split('?')[0];
   if (path.startsWith('/admin/pages/edit/')) return { slug: path.replace('/admin/pages/edit/', '') };
   if (path.startsWith('/admin/plugins/') && path !== '/admin/plugins') return { id: path.replace('/admin/plugins/', '') };
-  if (path === '/admin/users') return { userRole: currentUser.value?.role };
+  if (path === '/admin/users') return { userRole: currentUser.value?.role, currentUsername: currentUser.value?.username };
   if (path === '/admin/plugins') return { userRole: currentUser.value?.role };
   if (path === '/admin/profile' && currentUser.value) return { user: currentUser.value };
   return {};
