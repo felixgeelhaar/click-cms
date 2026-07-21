@@ -29,6 +29,13 @@ enum Capability: string
     case DeleteOwnContent = 'content.delete.own';
     case PublishContent = 'content.publish';
 
+    // Putting an earlier version of a document back. Separate from editing
+    // because it is the one action whose whole purpose is to undo somebody
+    // else's, and a site may reasonably want that held to a higher bar than
+    // ordinary edits — while still being safe to grant widely, since a restore
+    // writes a new version rather than discarding one.
+    case RestoreContent = 'content.restore';
+
     /* Media */
     case ViewMedia = 'media.view';
     case UploadMedia = 'media.upload';
@@ -54,6 +61,7 @@ enum Capability: string
             self::DeleteAnyContent => "Delete anyone's content",
             self::DeleteOwnContent => 'Delete own content',
             self::PublishContent => 'Publish content',
+            self::RestoreContent => 'Restore a previous version',
             self::ViewMedia => 'View media',
             self::UploadMedia => 'Upload media',
             self::DeleteAnyMedia => 'Delete any media',
