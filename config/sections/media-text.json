@@ -1,0 +1,14 @@
+{
+  "label": "Media and text",
+  "description": "An image beside a block of text.",
+  "icon": "image",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading" },
+    { "name": "body", "type": "richtext", "label": "Body" },
+    { "name": "image", "type": "image", "label": "Image", "required": true },
+    { "name": "alt", "type": "text", "label": "Image description",
+      "help": "Describes the image for screen readers and when it fails to load." },
+    { "name": "imagePosition", "type": "select", "label": "Image position",
+      "options": ["left", "right"], "default": "left" }
+  ]
+}

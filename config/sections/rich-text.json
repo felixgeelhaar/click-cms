@@ -1,0 +1,11 @@
+{
+  "label": "Rich text",
+  "description": "A heading and a block of formatted text.",
+  "icon": "text",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading" },
+    { "name": "body", "type": "richtext", "label": "Body", "required": true },
+    { "name": "width", "type": "select", "label": "Width",
+      "options": ["narrow", "wide", "full"], "default": "narrow" }
+  ]
+}
