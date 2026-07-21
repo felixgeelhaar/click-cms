@@ -419,22 +419,14 @@ class Plugin_rest_api extends \Click\Cms\Application\Plugin\BasePlugin
 
     private function getSessionUser(): ?array
     {
-        $sessionFile = $this->pluginManager->getBasePath() . '/data/session.json';
-        if (!file_exists($sessionFile)) {
-            return null;
-        }
+        // Through the store, so this is the caller's own session rather than
+        // whichever happens to be on disk. Reading the file directly is what
+        // let an anonymous request act as whoever was signed in.
+        $store = new \Click\Cms\Application\Authentication\SessionStore(
+            $this->pluginManager->getBasePath() . '/data/sessions'
+        );
 
-        $session = json_decode(file_get_contents($sessionFile), true);
-        if (!is_array($session)) {
-            return null;
-        }
-
-        $expiresAt = $session['expiresAt'] ?? null;
-        if ($expiresAt !== null && time() > (int) $expiresAt) {
-            return null;
-        }
-
-        return $session['user'] ?? null;
+        return $store->user();
     }
 
     private function canModifyPage(array $pageData, array $user): bool|string

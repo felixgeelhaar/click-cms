@@ -102,7 +102,7 @@ class Application
         // Sessions and login throttling are collaborators rather than methods on
         // this class, so each can be understood and tested on its own.
         $this->sessions = new SessionStore(
-            $this->getSessionFile(),
+            $this->basePath . '/data/sessions',
             $this->getIdleTimeoutSeconds()
         );
         $this->throttle = new LoginThrottle(
@@ -614,7 +614,7 @@ class Application
             ]
         ];
 
-        $this->sessions->write($session);
+        $this->sessions->start($session, $remember);
         $this->clearFailedLogin($username);
 
         return ['data' => ['success' => true, 'user' => $session['user']]];
@@ -802,10 +802,6 @@ class Application
         return $this->config?->idleTimeoutSeconds() ?? 1800;
     }
 
-    private function getSessionFile(): string
-    {
-        return $this->basePath . '/data/session.json';
-    }
 
     private function loadCoreConfig(): void
     {

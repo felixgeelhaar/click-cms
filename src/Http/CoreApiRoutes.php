@@ -164,15 +164,14 @@ final class CoreApiRoutes
     private function currentUser(): array
     {
         // Authentication has already run by the time a handler is reached; this
-        // only needs the identity for ownership checks.
-        $sessionFile = $this->basePath . '/data/session.json';
-        if (!is_file($sessionFile)) {
-            return [];
-        }
+        // only needs the identity for ownership checks. Read through the store
+        // so it is the caller's own session, not whichever happens to be on
+        // disk.
+        $store = new \Click\Cms\Application\Authentication\SessionStore(
+            $this->basePath . '/data/sessions'
+        );
 
-        $session = json_decode((string) file_get_contents($sessionFile), true);
-
-        return is_array($session) && is_array($session['user'] ?? null) ? $session['user'] : [];
+        return $store->user() ?? [];
     }
 
     /* ------------------------------------------------------------ schema -- */
