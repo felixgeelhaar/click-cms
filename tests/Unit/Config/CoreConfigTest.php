@@ -97,6 +97,35 @@ final class CoreConfigTest extends TestCase
         $this->assertSame(['good', 'also-good'], $config->excludedPluginIds());
     }
 
+    public function testHistoryRetentionDefaultsToTwenty(): void
+    {
+        $this->assertSame(20, CoreConfig::fromArray([])->historyRetainedVersions());
+    }
+
+    public function testHistoryRetentionIsConfigurable(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['history' => ['retainVersions' => 5]],
+        ]);
+
+        $this->assertSame(5, $config->historyRetainedVersions());
+    }
+
+    /**
+     * Zero would leave history looking enabled while keeping nothing, which an
+     * editor would only discover on the day they needed it.
+     */
+    public function testHistoryRetentionIsNeverBelowOne(): void
+    {
+        foreach ([0, -1] as $configured) {
+            $config = CoreConfig::fromArray([
+                'core' => ['history' => ['retainVersions' => $configured]],
+            ]);
+
+            $this->assertSame(1, $config->historyRetainedVersions());
+        }
+    }
+
     public function testBothDeliveryApisCanBeDisabled(): void
     {
         $config = CoreConfig::fromArray([

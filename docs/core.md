@@ -184,9 +184,20 @@ Still open:
   one of them is unreachable.
 - **Media reports nothing about quality.** See above. The ladder silently
   produces fewer variants for a small upload.
-- **No languages, history or preview.** Capabilities 10 to 12, none started.
+- **No languages or preview.** Capabilities 10 and 12, neither started.
   `ContentKey` is `type/slug` with no locale dimension, which is the specific
   thing that has to change first.
+- **History is in.** Capability 11. Storage is wrapped in a decorator, so every
+  write leaves a snapshot behind whichever backend is underneath, and deleting a
+  page retains the state it removed rather than being the one operation with no
+  way back. Versions live under `data/versions`, outside the content directory,
+  because they hold unpublished drafts and must not be reachable as content;
+  their layout is derived from the key's own string form, so a key that gains a
+  dimension gains a directory level rather than a migration. Restoring writes
+  forward — the restored state becomes the newest version — so a restore of the
+  wrong version is itself undoable. Retention keeps the newest
+  `core.history.retainVersions` (twenty by default) per document, oldest
+  discarded first, with no exemptions.
 - **No audit trail.** Who changed what, and when, is not recorded anywhere.
 - **The two install paths are not equally trusted.** Registry installs verify a
   signed manifest with `openssl_verify` against a configured public key, which
