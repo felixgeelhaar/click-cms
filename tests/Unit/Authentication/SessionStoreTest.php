@@ -17,20 +17,40 @@ final class SessionStoreTest extends TestCase
     {
         $this->dir = sys_get_temp_dir() . '/click-cms-session-' . bin2hex(random_bytes(6));
         mkdir($this->dir, 0o775, true);
-        $this->path = $this->dir . '/session.json';
+        $this->path = $this->dir . '/sessions';
+        $_COOKIE = [];
     }
 
     protected function tearDown(): void
     {
-        foreach (glob($this->dir . '/*') ?: [] as $f) {
+        foreach (glob($this->dir . '/*/*') ?: [] as $f) {
             @unlink($f);
         }
+        foreach (glob($this->dir . '/*') ?: [] as $d) {
+            is_dir($d) ? @rmdir($d) : @unlink($d);
+        }
         @rmdir($this->dir);
+        $_COOKIE = [];
     }
 
     private function store(int $idleTimeout = 1800): SessionStore
     {
         return new SessionStore($this->path, $idleTimeout);
+    }
+
+    /**
+     * Simulate a browser presenting the identifier it was given.
+     *
+     * start() issues a cookie, but setcookie() does not populate $_COOKIE
+     * within the same request, so a test has to carry it across explicitly —
+     * which is exactly what a browser does between requests.
+     */
+    private function asClientOf(SessionStore $store): void
+    {
+        $files = glob($this->path . '/*.json') ?: [];
+        if ($files !== []) {
+            $_COOKIE[SessionStore::COOKIE] = basename(end($files), '.json');
+        }
     }
 
     public function testAnAbsentSessionReadsAsEmpty(): void
@@ -39,18 +59,65 @@ final class SessionStoreTest extends TestCase
         $this->assertNull($this->store()->user());
     }
 
-    public function testWriteThenReadRoundTrips(): void
+    public function testStartThenReadRoundTrips(): void
     {
         $store = $this->store();
-        $store->write(['user' => ['username' => 'ann'], 'lastActivity' => time()]);
+        $store->start(['user' => ['username' => 'ann'], 'lastActivity' => time()]);
 
         $this->assertSame('ann', $store->user()['username']);
+    }
+
+    /**
+     * The defect this class exists to prevent: a stored session must be
+     * unreachable by a client that does not present its identifier. Previously
+     * one file was read by everyone, so any visitor was treated as whoever had
+     * signed in.
+     */
+    public function testAnotherClientCannotSeeTheSession(): void
+    {
+        $signedIn = $this->store();
+        $signedIn->start(['user' => ['username' => 'ann'], 'lastActivity' => time()]);
+
+        // A different visitor: same server, same files, no cookie.
+        $_COOKIE = [];
+        $stranger = $this->store();
+
+        $this->assertNull($stranger->user());
+        $this->assertSame([], $stranger->read());
+    }
+
+    public function testAForgedIdentifierIsIgnored(): void
+    {
+        $store = $this->store();
+        $store->start(['user' => ['username' => 'ann'], 'lastActivity' => time()]);
+
+        foreach (['../../etc/passwd', 'not-hex', str_repeat('a', 63), ''] as $forged) {
+            $_COOKIE[SessionStore::COOKIE] = $forged;
+            $this->assertNull($this->store()->user(), $forged);
+        }
+    }
+
+    public function testTwoAccountsGetSeparateSessions(): void
+    {
+        $this->store()->start(['user' => ['username' => 'ann'], 'lastActivity' => time()]);
+        $this->asClientOf($this->store());
+        $annCookie = $_COOKIE[SessionStore::COOKIE];
+
+        $_COOKIE = [];
+        $this->store()->start(['user' => ['username' => 'bob'], 'lastActivity' => time()]);
+
+        // Two files, not one: Bob signing in does not overwrite Ann's session,
+        // which is what the single shared file used to do.
+        $this->assertCount(2, glob($this->path . '/*.json') ?: []);
+
+        $_COOKIE[SessionStore::COOKIE] = $annCookie;
+        $this->assertSame('ann', $this->store()->user()['username']);
     }
 
     public function testClearRemovesIt(): void
     {
         $store = $this->store();
-        $store->write(['user' => ['username' => 'ann'], 'lastActivity' => time()]);
+        $store->start(['user' => ['username' => 'ann'], 'lastActivity' => time()]);
         $store->clear();
 
         $this->assertSame([], $store->read());
@@ -58,24 +125,27 @@ final class SessionStoreTest extends TestCase
 
     public function testCorruptFileReadsAsEmptyRatherThanThrowing(): void
     {
-        file_put_contents($this->path, '{ not json');
+        $store = $this->store();
+        $store->start(['user' => ['username' => 'ann'], 'lastActivity' => time()]);
 
-        $this->assertSame([], $this->store()->read());
+        $files = glob($this->path . '/*.json') ?: [];
+        file_put_contents($files[0], '{ not json');
+
+        $this->assertSame([], $store->read());
     }
 
     public function testExpiredSessionIsDiscarded(): void
     {
         $store = $this->store();
-        $store->write(['user' => ['username' => 'ann'], 'expiresAt' => time() - 10]);
+        $store->start(['user' => ['username' => 'ann'], 'expiresAt' => time() - 10]);
 
         $this->assertSame([], $store->read());
-        $this->assertFileDoesNotExist($this->path);
     }
 
     public function testIdleSessionIsDiscarded(): void
     {
         $store = $this->store(60);
-        $store->write(['user' => ['username' => 'ann'], 'lastActivity' => time() - 3600]);
+        $store->start(['user' => ['username' => 'ann'], 'lastActivity' => time() - 3600]);
 
         $this->assertSame([], $store->read());
     }
@@ -87,11 +157,11 @@ final class SessionStoreTest extends TestCase
     public function testRememberedSessionSurvivesIdleness(): void
     {
         $store = $this->store(60);
-        $store->write([
+        $store->start([
             'user' => ['username' => 'ann'],
             'lastActivity' => time() - 3600,
             'remember' => true,
-        ]);
+        ], true);
 
         $this->assertSame('ann', $store->user()['username']);
     }
@@ -99,7 +169,7 @@ final class SessionStoreTest extends TestCase
     public function testTouchExtendsAnActiveSession(): void
     {
         $store = $this->store(60);
-        $store->write(['user' => ['username' => 'ann'], 'lastActivity' => time() - 30]);
+        $store->start(['user' => ['username' => 'ann'], 'lastActivity' => time() - 30]);
 
         $store->touch();
 
@@ -109,7 +179,7 @@ final class SessionStoreTest extends TestCase
     public function testTouchDoesNotResurrectAnExpiredSession(): void
     {
         $store = $this->store(60);
-        $store->write(['user' => ['username' => 'ann'], 'lastActivity' => time() - 3600]);
+        $store->start(['user' => ['username' => 'ann'], 'lastActivity' => time() - 3600]);
 
         $store->touch();
 
@@ -119,7 +189,7 @@ final class SessionStoreTest extends TestCase
     public function testMergeLeavesUnrelatedValuesAlone(): void
     {
         $store = $this->store();
-        $store->write([
+        $store->start([
             'user' => ['username' => 'ann', 'role' => 'admin'],
             'csrfToken' => 'keep-me',
             'lastActivity' => time(),
