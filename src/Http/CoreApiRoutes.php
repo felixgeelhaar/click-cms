@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Click\Cms\Http;
 
+use Click\Cms\Application\Content\ContentService;
+use Click\Cms\Application\Content\PageService;
 use Click\Cms\Application\Media\MediaService;
 use Click\Cms\Domain\Media\ImageSize;
 use Click\Cms\Domain\Media\UploadPolicy;
@@ -29,8 +31,12 @@ final class CoreApiRoutes
 {
     private ?JsonSectionTypeRepository $sectionTypes = null;
     private ?MediaService $media = null;
+    private ?PageService $pages = null;
 
-    public function __construct(private readonly string $basePath) {}
+    public function __construct(
+        private readonly string $basePath,
+        private readonly ?ContentService $content = null,
+    ) {}
 
     /**
      * @return array<string, callable>
@@ -38,6 +44,15 @@ final class CoreApiRoutes
     public function routes(): array
     {
         return [
+            // Managing pages. Reading published content for a front end is the
+            // delivery API's job and stays in a plugin; editing is management
+            // and cannot be something a site is able to uninstall.
+            'GET /api/pages' => [$this, 'listPages'],
+            'GET /api/pages/:slug' => [$this, 'getPage'],
+            'POST /api/pages' => [$this, 'createPage'],
+            'PUT /api/pages/:slug' => [$this, 'updatePage'],
+            'DELETE /api/pages/:slug' => [$this, 'deletePage'],
+
             'GET /api/section-types' => [$this, 'listSectionTypes'],
             'GET /api/section-types/:id' => [$this, 'getSectionType'],
 
@@ -49,6 +64,115 @@ final class CoreApiRoutes
             'PUT /api/media/:id' => [$this, 'updateMedia'],
             'DELETE /api/media/:id' => [$this, 'deleteMedia'],
         ];
+    }
+
+    /* ------------------------------------------------------------- pages -- */
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function listPages(): array
+    {
+        return [
+            'data' => array_map(
+                static fn ($page): array => $page->toArray(),
+                $this->pages()->all()
+            ),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPage(string $slug): array
+    {
+        $page = $this->pages()->find($slug);
+
+        return $page === null
+            ? ['status' => 404, 'error' => 'Page not found']
+            : ['data' => $page->toArray()];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function createPage(): array
+    {
+        return $this->pageResponse(
+            $this->pages()->create($this->jsonBody(), $this->currentUser())
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function updatePage(string $slug): array
+    {
+        return $this->pageResponse(
+            $this->pages()->update($slug, $this->jsonBody(), $this->currentUser())
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function deletePage(string $slug): array
+    {
+        $result = $this->pages()->delete($slug, $this->currentUser());
+
+        if ($result['error'] !== null) {
+            return ['status' => $result['status'], 'error' => $result['error']];
+        }
+
+        return ['data' => ['deleted' => true, 'slug' => $slug]];
+    }
+
+    /**
+     * @param array{page: mixed, error: ?string, status: int, errors: array<string, string>} $result
+     * @return array<string, mixed>
+     */
+    private function pageResponse(array $result): array
+    {
+        if ($result['error'] !== null) {
+            $response = ['status' => $result['status'], 'error' => $result['error']];
+
+            // Field-level messages are keyed "<sectionIndex>.<fieldName>" so the
+            // editor can put each one against the input that caused it.
+            if ($result['errors'] !== []) {
+                $response['errors'] = $result['errors'];
+            }
+
+            return $response;
+        }
+
+        return ['status' => $result['status'], 'data' => $result['page']->toArray()];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function jsonBody(): array
+    {
+        $decoded = json_decode(file_get_contents('php://input') ?: '[]', true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function currentUser(): array
+    {
+        // Authentication has already run by the time a handler is reached; this
+        // only needs the identity for ownership checks.
+        $sessionFile = $this->basePath . '/data/session.json';
+        if (!is_file($sessionFile)) {
+            return [];
+        }
+
+        $session = json_decode((string) file_get_contents($sessionFile), true);
+
+        return is_array($session) && is_array($session['user'] ?? null) ? $session['user'] : [];
     }
 
     /* ------------------------------------------------------------ schema -- */
@@ -250,6 +374,16 @@ final class CoreApiRoutes
     {
         return $this->sectionTypes ??= new JsonSectionTypeRepository(
             $this->basePath . '/config/sections'
+        );
+    }
+
+    private function pages(): PageService
+    {
+        return $this->pages ??= new PageService(
+            $this->content ?? new ContentService(
+                new \Click\Cms\Infrastructure\Storage\JsonStorage($this->basePath . '/content')
+            ),
+            $this->sectionTypes()
         );
     }
 
