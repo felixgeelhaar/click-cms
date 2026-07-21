@@ -86,16 +86,28 @@ final class ContentTest extends TestCase
         $this->assertArrayNotHasKey('createdAt', $content->data);
     }
 
-    public function testStatusDefaultsToPublishedAndOnlyDraftOverrides(): void
+    /**
+     * The aggregate has no opinion about publication any more.
+     *
+     * This test used to pin down how a `status` field was interpreted — draft
+     * hides, anything else shows. That field was one of two answers to the same
+     * question, the other being whether the document is in `content/` at all,
+     * and the two could disagree with nothing able to say which was right.
+     * Publication moved out to {@see PublicationState}, which derives it from
+     * facts that cannot contradict each other. What is pinned down here now is
+     * that nothing brought it back: a payload carrying `status` is carried as
+     * ordinary data and confers nothing.
+     */
+    public function testPublicationIsNotAPropertyOfTheDocument(): void
     {
-        $this->assertTrue(Content::create(ContentKey::page('a'))->isPublished());
-        $this->assertFalse(
-            Content::create(ContentKey::page('a'), ['status' => 'draft'])->isPublished()
-        );
-        // An unrecognised status must not accidentally hide a page.
-        $this->assertTrue(
-            Content::create(ContentKey::page('a'), ['status' => 'nonsense'])->isPublished()
-        );
+        $this->assertFalse(method_exists(Content::class, 'isPublished'));
+        $this->assertFalse(method_exists(Content::class, 'status'));
+
+        $content = Content::create(ContentKey::page('a'), ['status' => 'published']);
+
+        // Kept, because the payload is open and a plugin may own that key —
+        // but it is data, not a claim about visibility.
+        $this->assertSame('published', $content->data['status']);
     }
 
     public function testRoundTripsThroughToArrayAndFromArray(): void

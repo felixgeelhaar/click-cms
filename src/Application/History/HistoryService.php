@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Application\History;
 
 use Click\Cms\Domain\History\Version;
-use Click\Cms\Domain\History\VersionedStorage;
+use Click\Cms\Domain\Publishing\PublishingStorage;
 use Click\Cms\Domain\History\VersionStoreInterface;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
@@ -22,7 +22,7 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
 final class HistoryService
 {
     public function __construct(
-        private readonly VersionedStorage $storage,
+        private readonly PublishingStorage $storage,
         private readonly VersionStoreInterface $versions,
     ) {}
 
@@ -90,7 +90,12 @@ final class HistoryService
             return ['version' => null, 'error' => 'Version not found.', 'status' => 404];
         }
 
-        $current = $this->storage->find($key);
+        // The working copy, not the live page. A restore replaces what the
+        // editor is working on and leaves publication alone — putting an
+        // earlier version straight in front of the public would make undo the
+        // one editing action with no review step, which is the reverse of what
+        // a safety net should be.
+        $current = $this->storage->draft($key);
 
         // Ownership comes from the document as it stands, falling back to the
         // version's own record of it. The fallback is what lets a deleted page
@@ -108,10 +113,24 @@ final class HistoryService
 
         // Belt and braces against a state that never passed through versioning
         // — content seeded directly onto disk, or written by a backend that was
-        // swapped in without the decorator. Without this, restoring over such a
-        // document would be the one way this feature could still lose work.
-        if ($current !== null && !$this->isRetained($key, $current->toArray())) {
-            $this->versions->record($current, $this->usernameOf($user), Version::REASON_SAVE);
+        // swapped in without the decorator.
+        //
+        // The danger this guards against changed shape with draft-and-publish
+        // and is worth restating rather than leaving the old reasoning here. A
+        // restore no longer writes over the live document, so it cannot destroy
+        // it directly. What it does is make the restored state the working copy,
+        // and the next publish overwrites the live document with it — at which
+        // point a live state that appears nowhere in history is gone with no way
+        // back. Recording it first is the difference between an undo and a
+        // delayed loss.
+        //
+        // Both copies are checked, because either can be the unretained one: the
+        // working copy when nothing was ever versioned, the live document when
+        // something wrote past the decorator.
+        foreach ([$current, $this->storage->find($key)] as $atRisk) {
+            if ($atRisk !== null && !$this->isRetained($key, $atRisk->toArray())) {
+                $this->versions->record($atRisk, $this->usernameOf($user), Version::REASON_SAVE);
+            }
         }
 
         $restored = $version->content();
@@ -133,13 +152,21 @@ final class HistoryService
      */
     private function isRetained(ContentKey $key, array $document): bool
     {
-        $newest = $this->versions->all($key)[0] ?? null;
+        // The whole chain rather than only its newest entry. Publishing records
+        // a version that duplicates the working copy, so the live document is
+        // routinely retained one or two entries back rather than at the front,
+        // and checking only the front would record a redundant copy on every
+        // restore of a published page.
+        foreach ($this->versions->all($key) as $version) {
+            // Timestamps differ on every write, so they are excluded: what
+            // matters is whether the editor's work is recoverable, not whether
+            // the two records were written at the same instant.
+            if (($version->document['data'] ?? null) === ($document['data'] ?? null)) {
+                return true;
+            }
+        }
 
-        // Timestamps differ on every write, so they are excluded: what matters
-        // is whether the editor's work is recoverable, not whether the two
-        // records were written at the same instant.
-        return $newest !== null
-            && ($newest->document['data'] ?? null) === ($document['data'] ?? null);
+        return false;
     }
 
     /**
