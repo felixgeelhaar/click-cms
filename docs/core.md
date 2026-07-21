@@ -85,9 +85,10 @@ expensive the longer it waits.
 | 11 | **History** — a previous version of a document, and a way back to it | An editor who cannot undo is one mistake away from unrecoverable loss. It is a property of how documents are stored, so nothing above storage can supply it |
 | 12 | **Preview** — seeing an unpublished change rendered before it is public | An editor who cannot see their work before publishing is guessing. Rendering already exists; without this it is only reachable by publishing |
 
-Twelve, and the last three were listed as core because of where they have to
-live rather than because they were written. Preview is now written; languages
-and history remain gaps.
+The last three were argued in as core because of where they have to live, not
+because they existed. All three are now written, along with media quality
+reporting and a second storage backend that can finally be selected. What is
+still missing is the admin UI for them — see the order of work below.
 
 ### Media quality is part of media
 
@@ -96,26 +97,26 @@ never scales an image up, because an upscaled image is a larger file that looks
 no better. The consequence is that an upload smaller than a rung simply produces
 fewer variants.
 
-Today that happens in silence. A real upload during testing was 1022 pixels
+That used to happen in silence. A real upload during testing was 1022 pixels
 wide; it produced one variant, the library displayed `sm`, and nothing said why
 or what it would cost. On a high-density display that image is stretched by the
-browser and looks soft. The person who uploaded it has no way to know, and the
-person who would notice is a visitor.
+browser and looks soft — and the person who would notice is a visitor, not the
+person who uploaded it.
 
 That is precisely the failure mode listed under **Failure is visible**, so the
-remedy belongs in core alongside the ladder that causes it:
+remedy lives in core alongside the ladder that causes it:
 
-- **At upload**, say what could be produced and what could not, in the editor's
-  terms rather than in pixels alone — that this picture will look soft on modern
-  phones and laptops, and roughly what size to supply instead.
-- **In the schema**, let an `image` field declare the width it is displayed at.
+- **At upload**, it says what could be produced and what could not, in the
+  editor's terms rather than in pixels alone — that this picture will look soft
+  on modern phones and laptops, and roughly what size to supply instead.
+- **In the schema**, an `image` field may declare the width it is displayed at.
   A card in a four-column grid and a full-bleed header have very different
   needs, and only the section type knows which it is. With that declared, the
   warning becomes specific: the same 1022-pixel file is fine in the card and
   wrong in the header.
-- **Never refuse the upload.** A small image is often the only one that exists,
-  and a logo that must ship today beats a warning that blocks it. Core reports;
-  the editor decides.
+- **The upload is never refused.** A small image is often the only one that
+  exists, and a logo that must ship today beats a warning that blocks it. Core
+  reports; the editor decides.
 
 Deliberately out of scope: judging compression artefacts, sharpness or subject
 matter. Those need heuristics that are wrong often enough to erode trust in the
@@ -263,10 +264,22 @@ Still open:
   discarded first, with no exemptions.
 - **Preview shows the stored document, not an unsaved edit.** Capability 12 is
   built: a signed, expiring link renders any page through the same
-  `SectionRenderer` the public site uses. What it cannot yet do is show a change
-  to an *already published* page without publishing it, because there is nowhere
-  to keep that change — a page has one stored version. History (capability 11)
-  is what supplies the second version; preview will read it when it exists.
+  `SectionRenderer` the public site uses, per language — the token signs the
+  document's full identity, so a link to one translation cannot open another,
+  and a preview of a translation that does not exist is a 404 rather than a
+  quiet fallback to the language that does.
+
+  What it cannot yet do is show a change to an *already published* page without
+  publishing it, because there is nowhere to keep that change: a page has one
+  stored document, and saving it is publishing it. History supplies versions of
+  what *was*, not a draft of what is next, so it does not close this on its own.
+
+  Closing it needs a decision rather than more code. Either a published page
+  gains a separate working copy that preview reads and publishing promotes — the
+  WordPress model, and a second state for every consumer of a page to reason
+  about — or editing a published page is understood to be immediate, and preview
+  serves drafts and new pages only. The second is honest and much smaller; it
+  should be chosen deliberately rather than remaining true by accident.
 - **No audit trail.** Who changed what, and when, is not recorded anywhere.
 - **The two install paths are not equally trusted.** Registry installs verify a
   signed manifest with `openssl_verify` against a configured public key, which
@@ -287,33 +300,35 @@ anything that does not.
 The security work listed here previously — forced password change, CSRF, page
 CRUD in core, extracting authentication, the capability model — is done.
 
-What remains, in this order:
+Four of the twelve capabilities landed together and are done in core:
+**languages**, **history**, **preview** and **media quality reporting**, with the
+second storage backend finally reachable. What remains:
 
-1. **Languages.** Done in core; the admin UI has not caught up. The API can
-   list, create and edit a document in any configured language, and a rendered
-   page declares the language it actually served, but nothing in the editor
-   offers a language picker yet, so a second language is reachable only through
-   the API.
-2. **History.** Second because it is also storage-shaped, and doing it after
-   languages means versioning a key that already has its final form rather than
-   versioning one and then migrating it.
-3. **Media quality reporting.** Independent of both, small, and the editor feels
-   it immediately.
-4. **Preview.** Cheap once rendering and history exist — an unpublished version
-   rendered at a URL that does not require the viewer to be signed in.
+1. **The admin UI has not caught up with languages.** The API can list, create
+   and edit a document in any configured language, and a rendered page declares
+   the language it actually served, but the editor offers no language picker. A
+   second language is reachable only through the API, which for a product whose
+   point is that a non-developer can edit it means the capability is not really
+   delivered yet.
+2. **History has no admin UI either, and only pages have endpoints.** Media and
+   user documents are versioned at the storage layer but there is no way to
+   reach those versions.
+3. **Decide what preview means for a published page.** See the gap above: either
+   a working copy, or an explicit decision that editing a published page is
+   immediate.
+4. **Restore does not re-validate against the current schema.** Restoring a
+   version whose section type has since been removed puts back content the
+   schema no longer declares. Verbatim recovery is the right default for a
+   safety net, but it contradicts the rule that stored content only ever holds a
+   shape the templates were written for, and that tension should be resolved on
+   purpose.
 5. **Extract the kernel, router, config and health.** What remains of
-4. **Preview.** Done, in the form that does not depend on history: a page
-   rendered at a signed, expiring URL that does not require the viewer to be
-   signed in. What remains is to point it at a stored previous version once
-   history exists, so a change to a published page can be seen before it
-   replaces what is live.
-5. **Wire `SqliteStorage`,** or withdraw the claim that core has two storage
-   backends.
-6. **Extract the kernel, router, config and health.** What remains of
-   `Application` should fit on a screen.
+   `Application` should fit on a screen. It is still the largest thing here.
 6. **Settings out of files.** Bootstrap stays on disk because storage
    configuration cannot live in storage; everything else becomes a document,
    edited in the admin UI.
+7. **No audit trail**, which matters more now that a restore can replace live
+   content and a preview link can be handed to somebody with no account.
 
 Only then go through the plugins one at a time. Each should have to justify
 itself against the test at the top of this document, and anything that fails it
