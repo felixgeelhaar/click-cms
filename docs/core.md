@@ -338,36 +338,40 @@ anything that does not.
 The security work listed here previously — forced password change, CSRF, page
 CRUD in core, extracting authentication, the capability model — is done.
 
-Four of the twelve capabilities landed together and are done in core:
-**languages**, **history**, **preview** and **media quality reporting**, with the
-second storage backend finally reachable. What remains:
+Five of the twelve capabilities are now built and reachable by an editor:
+**languages**, **history**, **preview**, **media quality reporting** and
+**draft-and-publish**, with the second storage backend selectable. The page
+editor and page list expose publication state, language switching, version
+history and restore; the capability model refuses an author the publish control
+rather than letting the server's 403 be the interface.
 
-1. **The admin UI has not caught up with languages.** The API can list, create
-   and edit a document in any configured language, and a rendered page declares
-   the language it actually served, but the editor offers no language picker. A
-   second language is reachable only through the API, which for a product whose
-   point is that a non-developer can edit it means the capability is not really
-   delivered yet.
-2. **History has no admin UI either, and only pages have endpoints.** Media and
-   user documents are versioned at the storage layer but there is no way to
-   reach those versions.
-3. **The admin UI has no publish control.** The API exposes publication state
-   and both endpoints, and the capability model refuses an author, but the
-   editor offers no button — so publishing is reachable only through the API,
-   which is the same gap languages and history have.
-4. **Restore does not re-validate against the current schema.** Restoring a
-   version whose section type has since been removed puts back content the
-   schema no longer declares. Verbatim recovery is the right default for a
-   safety net, but it contradicts the rule that stored content only ever holds a
-   shape the templates were written for, and that tension should be resolved on
-   purpose.
-5. **Extract the kernel, router, config and health.** What remains of
+What remains:
+
+1. **There is no frontend test framework, and it has cost real bugs.** Every
+   capability verified through the API had a matching UI defect nobody saw:
+   removing the `status` field left the page list and the dashboard reporting a
+   site that was entirely live as "0 published"; adding a language segment to the
+   key broke every slug the list rendered and made Delete remove the wrong
+   language's document. Each was found by reading code, not by a failing test.
+   This is the largest hole in the project's safety net.
+2. **Restore does not re-validate against the current schema.** Restoring a
+   version whose section type has since been removed puts back content the schema
+   no longer declares. Verbatim recovery is the right default for a safety net,
+   but it contradicts the rule that stored content only ever holds a shape the
+   templates were written for, and that tension should be resolved on purpose.
+3. **History covers pages only.** Media and user documents are versioned at the
+   storage layer, but nothing exposes those versions.
+4. **Extract the kernel, router, config and health.** What remains of
    `Application` should fit on a screen. It is still the largest thing here.
-6. **Settings out of files.** Bootstrap stays on disk because storage
+5. **Settings out of files.** Bootstrap stays on disk because storage
    configuration cannot live in storage; everything else becomes a document,
    edited in the admin UI.
-7. **No audit trail**, which matters more now that a restore can replace live
-   content and a preview link can be handed to somebody with no account.
+6. **No audit trail**, which matters more now that a restore can replace a
+   working copy, a publish changes what the public sees, and a preview link can
+   be handed to somebody with no account.
+7. **Concurrent editors are unmodelled.** Two people editing one page produce two
+   draft chains with no rule for which wins. Draft-and-publish makes this
+   visible where immediate saves hid it. See `collaboration.md`.
 
 Only then go through the plugins one at a time. Each should have to justify
 itself against the test at the top of this document, and anything that fails it

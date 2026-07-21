@@ -113,7 +113,18 @@ final class ContentService
     {
         $out = [];
 
-        foreach ($this->storage->findByType($type) as $content) {
+        // Working copies, not published documents. A translation that exists but
+        // has never been published is exactly the one an editor needs told about
+        // — reading only what is live reported "this page has no German version"
+        // while a German draft sat in the version store, and an editor acting on
+        // that would start the translation a second time.
+        // Every language, so `null` must reach storage as "unfiltered" rather
+        // than being resolved to the default one on the way past.
+        $everywhere = $this->storage instanceof PublishingStorage
+            ? $this->storage->workingCopies($type, null)
+            : $this->storage->findByType($type);
+
+        foreach ($everywhere as $content) {
             if ($content->slug() === $slug) {
                 $out[] = $content->locale();
             }

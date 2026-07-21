@@ -4,8 +4,14 @@ services:
   click-cms:
     build:
       context: .
-    image: click-cms:local
-    container_name: click-cms
+    # Both the tag and the container name are overridable, and for the same
+    # reason: two people — or two agents — building this repo at once otherwise
+    # write the same tag and steal the same name from each other, so one ends up
+    # testing the other's code without noticing. That has happened repeatedly and
+    # is very hard to see from the inside. Set CLICK_CMS_TAG and CLICK_CMS_NAME
+    # alongside CLICK_CMS_PORT to get an isolated stack.
+    image: click-cms:${CLICK_CMS_TAG:-local}
+    container_name: ${CLICK_CMS_NAME:-click-cms}
     ports:
       # Override with CLICK_CMS_PORT when 8080 is taken on the host.
       - "${CLICK_CMS_PORT:-8080}:80"
