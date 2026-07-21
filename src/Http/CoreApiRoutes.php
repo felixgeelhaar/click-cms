@@ -10,6 +10,9 @@ use Click\Cms\Application\Content\PageService;
 use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Application\Media\MediaService;
 use Click\Cms\Domain\History\RetentionPolicy;
+use Click\Cms\Application\Preview\PreviewLinks;
+use Click\Cms\Domain\Identity\Capability;
+use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\Media\ImageSize;
 use Click\Cms\Domain\Media\UploadPolicy;
 use Click\Cms\Domain\Schema\SectionType;
@@ -42,6 +45,7 @@ final class CoreApiRoutes
     private ?ContentService $contentService = null;
     private ?VersioningStorage $storage = null;
     private ?JsonVersionStore $versions = null;
+    private ?PreviewLinks $previewLinks = null;
 
     public function __construct(
         private readonly string $basePath,
@@ -72,6 +76,12 @@ final class CoreApiRoutes
             'GET /api/pages/:slug/versions/:id' => [$this, 'getPageVersion'],
             'POST /api/pages/:slug/versions/:id/restore' => [$this, 'restorePageVersion'],
 
+            // Minting a preview link. A POST rather than a GET because it hands
+            // back a credential: it is a thing that happens, not a thing that
+            // is read, and being unsafe means it carries the CSRF token and can
+            // never be triggered by another site embedding a URL.
+            'POST /api/pages/:slug/preview' => [$this, 'createPreviewLink'],
+
             'GET /api/section-types' => [$this, 'listSectionTypes'],
             'GET /api/section-types/:id' => [$this, 'getSectionType'],
 
@@ -97,10 +107,26 @@ final class CoreApiRoutes
             return ['status' => 400, 'error' => $locale['error']];
         }
 
+        $pages = $this->pages()->all($locale['locale']);
+
+        // Anonymous callers see published pages only.
+        //
+        // This endpoint is deliberately public — a headless front end reads it
+        // with no account — but it was returning drafts to anyone who asked,
+        // which made every unpublished page world-readable and would have made
+        // signed preview links pointless. Editing is unaffected: the admin UI
+        // has a session and still sees everything.
+        if ($this->currentUser() === []) {
+            $pages = array_values(array_filter(
+                $pages,
+                static fn ($page): bool => $page->isPublished()
+            ));
+        }
+
         return [
             'data' => array_map(
                 static fn ($page): array => $page->toArray(),
-                $this->pages()->all($locale['locale'])
+                $pages
             ),
             // Echoed so a client can tell which language it is looking at
             // without having to remember what it asked for, and so the admin UI
@@ -136,6 +162,14 @@ final class CoreApiRoutes
         }
 
         $page = $resolved->content;
+
+        // Not found rather than forbidden: telling an anonymous caller that a
+        // page exists but is unpublished leaks the thing being protected —
+        // which slugs are being worked on — even while withholding the content.
+        if (!$page->isPublished() && $this->currentUser() === []) {
+            return ['status' => 404, 'error' => 'Page not found'];
+        }
+
         $response = ['data' => $page->toArray()] + $resolved->toArray();
 
         // Which other languages this page exists in, so an editor sees at a
@@ -261,6 +295,49 @@ final class CoreApiRoutes
     private function requestedLocale(): array
     {
         return $this->pages()->parseLocale($this->localeParam());
+    }
+
+    /**
+     * Hand back a signed, expiring link that shows this page as it stands.
+     *
+     * The capability is checked here rather than in the kernel's path rules on
+     * purpose. Those rules match on prefixes, and a check that lives next to
+     * the operation cannot be missed by a route added later — which is the
+     * failure the core docs single out as still open.
+     *
+     * @return array<string, mixed>
+     */
+    public function createPreviewLink(string $slug): array
+    {
+        $user = $this->currentUser();
+
+        // Authentication has already run, but this endpoint is reached through
+        // the `pages` prefix, which is otherwise readable without a session.
+        // Not re-asserting it here would depend on a rule stated somewhere else.
+        if ($user === []) {
+            return ['status' => 401, 'error' => 'Not authenticated'];
+        }
+
+        if (!Role::fromName($user['role'] ?? null)->can(Capability::PreviewContent)) {
+            return ['status' => 403, 'error' => 'You do not have permission to share a preview of this page.'];
+        }
+
+        if ($this->pages()->find($slug) === null) {
+            return ['status' => 404, 'error' => 'Page not found'];
+        }
+
+        $link = $this->previewLinks()->issue($slug);
+
+        if ($link === null) {
+            // Better to say so than to return a link that will not verify.
+            return ['status' => 500, 'error' => 'A preview link could not be signed. Check that data/ is writable.'];
+        }
+
+        return ['data' => [
+            'url' => $link['path'],
+            'expiresAt' => $link['expiresAt'],
+            'expiresInSeconds' => max(0, $link['expiresAt'] - time()),
+        ]];
     }
 
     /**
@@ -621,6 +698,15 @@ final class CoreApiRoutes
             RetentionPolicy::keeping(
                 CoreConfig::load($this->basePath . '/config/core.json')->historyRetainedVersions()
             ),
+        );
+    }
+
+    private function previewLinks(): PreviewLinks
+    {
+        // Outside the document root, alongside sessions: holding this key means
+        // being able to mint a link to any unpublished page.
+        return $this->previewLinks ??= new PreviewLinks(
+            $this->basePath . '/data/preview-secret'
         );
     }
 
