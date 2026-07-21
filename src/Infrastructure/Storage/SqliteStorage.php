@@ -42,6 +42,13 @@ final class SqliteStorage implements StorageInterface
 
     public function find(ContentKey $key): ?Content
     {
+        // SQLite would happily store `page:../../etc/passwd`; the flat-file
+        // backend would not. Applying the stricter rule here too keeps the legal
+        // key space the same on both, so content stays portable between them.
+        if (!ContentKeyRules::isSafe($key)) {
+            return null;
+        }
+
         $stmt = $this->pdo()->prepare(
             'SELECT payload FROM content WHERE type = :type AND locale = :locale AND slug = :slug LIMIT 1'
         );
@@ -61,6 +68,10 @@ final class SqliteStorage implements StorageInterface
 
     public function findByType(string $type, ?Locale $locale = null): array
     {
+        if (!ContentKeyRules::isSafeSegment($type)) {
+            return [];
+        }
+
         $sql = 'SELECT locale, slug, payload FROM content WHERE type = :type';
         $params = ['type' => $type];
 
@@ -88,6 +99,10 @@ final class SqliteStorage implements StorageInterface
 
     public function save(Content $content): void
     {
+        // Loud on the write path: storing under a key the other backend could
+        // never represent is a bug or an attack, not a miss.
+        ContentKeyRules::assertSafe($content->key);
+
         $payload = json_encode(
             $content->toArray(),
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
@@ -112,6 +127,10 @@ final class SqliteStorage implements StorageInterface
 
     public function delete(ContentKey $key): bool
     {
+        if (!ContentKeyRules::isSafe($key)) {
+            return false;
+        }
+
         $stmt = $this->pdo()->prepare(
             'DELETE FROM content WHERE type = :type AND locale = :locale AND slug = :slug'
         );
@@ -126,6 +145,10 @@ final class SqliteStorage implements StorageInterface
 
     public function exists(ContentKey $key): bool
     {
+        if (!ContentKeyRules::isSafe($key)) {
+            return false;
+        }
+
         $stmt = $this->pdo()->prepare(
             'SELECT 1 FROM content WHERE type = :type AND locale = :locale AND slug = :slug LIMIT 1'
         );

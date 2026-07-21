@@ -8,7 +8,6 @@ use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Storage\StorageInterface;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
-use InvalidArgumentException;
 use RuntimeException;
 
 /**
@@ -35,9 +34,6 @@ use RuntimeException;
  */
 final class JsonStorage implements StorageInterface
 {
-    /** Slugs and types become path segments, so they must not be able to escape. */
-    private const SAFE_SEGMENT = '/^[A-Za-z0-9._-]+$/';
-
     private readonly Locale $defaultLocale;
 
     /**
@@ -72,7 +68,7 @@ final class JsonStorage implements StorageInterface
 
     public function findByType(string $type, ?Locale $locale = null): array
     {
-        if (!$this->isSafeSegment($type)) {
+        if (!ContentKeyRules::isSafeSegment($type)) {
             return [];
         }
 
@@ -236,8 +232,9 @@ final class JsonStorage implements StorageInterface
 
     private function pathFor(ContentKey $key): string
     {
-        $this->assertSafeSegment($key->type, 'type');
-        $this->assertSafeSegment($key->slug, 'slug');
+        // The locale needs no check — Locale rejects anything that is not a
+        // language tag at construction, so one cannot reach this point.
+        ContentKeyRules::assertSafe($key);
 
         return $this->contentDir . '/' . $key->type . '/' . $key->locale->code . '/' . $key->slug . '.json';
     }
@@ -304,37 +301,6 @@ final class JsonStorage implements StorageInterface
 
     private function isSafeKey(ContentKey $key): bool
     {
-        return $this->isSafeSegment($key->type) && $this->isSafeSegment($key->slug);
-    }
-
-    private function isSafeSegment(string $segment): bool
-    {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            return false;
-        }
-
-        return preg_match(self::SAFE_SEGMENT, $segment) === 1;
-    }
-
-    /**
-     * Reject anything that could traverse out of the content directory.
-     *
-     * Used on the write path only: storing under an impossible key is a bug or
-     * an attack and must be loud, whereas reading one is merely a miss.
-     *
-     * The locale needs no check here — {@see Locale} rejects anything that is
-     * not a language tag at construction, so one cannot reach this point.
-     */
-    private function assertSafeSegment(string $segment, string $label): void
-    {
-        if ($segment === '' || $segment === '.' || $segment === '..') {
-            throw new InvalidArgumentException("Content {$label} is not a valid path segment.");
-        }
-
-        if (preg_match(self::SAFE_SEGMENT, $segment) !== 1) {
-            throw new InvalidArgumentException(
-                "Content {$label} may only contain letters, digits, dot, dash and underscore."
-            );
-        }
+        return ContentKeyRules::isSafe($key);
     }
 }
