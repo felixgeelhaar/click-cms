@@ -57,6 +57,7 @@ enum Role: string
                 Capability::EditOwnContent,
                 Capability::DeleteOwnContent,
                 Capability::PublishContent,
+                Capability::RestoreContent,
                 Capability::ViewMedia,
                 Capability::UploadMedia,
                 Capability::UseSectionEditor,
@@ -70,6 +71,11 @@ enum Role: string
                 Capability::CreateContent,
                 Capability::EditOwnContent,
                 Capability::DeleteOwnContent,
+                // Granted even though publishing is not: an author who can edit
+                // their own page can already reach any state a restore could
+                // put it in, so withholding this would only make recovering
+                // from their own mistake harder than making it.
+                Capability::RestoreContent,
                 Capability::ViewMedia,
                 Capability::UploadMedia,
                 Capability::UseSectionEditor,
@@ -105,6 +111,20 @@ enum Role: string
             && $owner !== null
             && $username !== null
             && $owner === $username;
+    }
+
+    /**
+     * Whether this role may put an earlier version of someone's content back.
+     *
+     * Both questions, not either: restoring is an edit, so it needs the reach
+     * to edit this particular document as well as the capability itself. That
+     * stops a role being granted history without also being granted the content
+     * it would be history for.
+     */
+    public function canRestoreContentOwnedBy(?string $owner, ?string $username): bool
+    {
+        return $this->can(Capability::RestoreContent)
+            && $this->canEditContentOwnedBy($owner, $username);
     }
 
     public function canDeleteContentOwnedBy(?string $owner, ?string $username): bool

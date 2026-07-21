@@ -7,13 +7,19 @@ namespace Click\Cms\Http;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Content\PageService;
+use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Application\Media\MediaService;
+use Click\Cms\Domain\History\RetentionPolicy;
 use Click\Cms\Domain\Media\ImageSize;
 use Click\Cms\Domain\Media\UploadPolicy;
 use Click\Cms\Domain\Schema\SectionType;
 use Click\Cms\Domain\Schema\SectionValidator;
+use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Media\GdImageProcessor;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
+use Click\Cms\Infrastructure\Storage\JsonStorage;
+use Click\Cms\Infrastructure\Storage\VersioningStorage;
 
 /**
  * API endpoints the CMS cannot function without.
@@ -34,10 +40,13 @@ final class CoreApiRoutes
     private ?MediaService $media = null;
     private ?PageService $pages = null;
     private ?ContentService $contentService = null;
+    private ?VersioningStorage $storage = null;
+    private ?JsonVersionStore $versions = null;
 
     public function __construct(
         private readonly string $basePath,
         private readonly ?ContentService $content = null,
+        private ?HistoryService $history = null,
         private readonly ?CoreConfig $config = null,
     ) {}
 
@@ -55,6 +64,13 @@ final class CoreApiRoutes
             'POST /api/pages' => [$this, 'createPage'],
             'PUT /api/pages/:slug' => [$this, 'updatePage'],
             'DELETE /api/pages/:slug' => [$this, 'deletePage'],
+
+            // History. Nested under the page rather than a top-level
+            // /api/versions, because a version has no meaning apart from the
+            // document it is a version of, and the address should say so.
+            'GET /api/pages/:slug/versions' => [$this, 'listPageVersions'],
+            'GET /api/pages/:slug/versions/:id' => [$this, 'getPageVersion'],
+            'POST /api/pages/:slug/versions/:id/restore' => [$this, 'restorePageVersion'],
 
             'GET /api/section-types' => [$this, 'listSectionTypes'],
             'GET /api/section-types/:id' => [$this, 'getSectionType'],
@@ -266,6 +282,61 @@ final class CoreApiRoutes
         }
 
         return ['status' => $result['status'], 'data' => $result['page']->toArray()];
+    }
+
+    /* ----------------------------------------------------------- history -- */
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function listPageVersions(string $slug): array
+    {
+        $result = $this->history()->all(ContentKey::page($slug), $this->currentUser());
+
+        if ($result['error'] !== null) {
+            return ['status' => $result['status'], 'error' => $result['error']];
+        }
+
+        return ['data' => $result['versions']];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPageVersion(string $slug, string $id): array
+    {
+        $result = $this->history()->get(ContentKey::page($slug), $id, $this->currentUser());
+
+        if ($result['error'] !== null) {
+            return ['status' => $result['status'], 'error' => $result['error']];
+        }
+
+        return ['data' => $result['version']->toArray()];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function restorePageVersion(string $slug, string $id): array
+    {
+        $result = $this->history()->restore(ContentKey::page($slug), $id, $this->currentUser());
+
+        if ($result['error'] !== null) {
+            return ['status' => $result['status'], 'error' => $result['error']];
+        }
+
+        // The page as it now stands, so the editor sees the result of the
+        // restore rather than the version they asked for — those differ in
+        // their timestamps, and showing the old one invites the reader to think
+        // nothing happened.
+        $page = $this->pages()->find($slug);
+
+        return [
+            'data' => [
+                'restoredFrom' => $result['version']->summary(),
+                'page' => $page?->toArray(),
+            ],
+        ];
     }
 
     /**
@@ -506,14 +577,50 @@ final class CoreApiRoutes
         );
     }
 
+    /**
+     * The content service used when nothing was injected.
+     *
+     * Built on the versioned storage rather than a bare backend, so a write that
+     * reaches this fallback still leaves history behind — an undo that depends on
+     * which of two construction paths ran is not an undo. It is told the default
+     * locale for the same reason the boot path is: documents written before
+     * languages carry no language of their own.
+     */
     private function contentService(): ContentService
     {
         return $this->contentService ??= $this->content ?? new ContentService(
-            new \Click\Cms\Infrastructure\Storage\JsonStorage(
-                $this->basePath . '/content',
-                $this->config?->defaultLocale()
-            ),
+            $this->storage(),
             $this->config?->defaultLocale()
+        );
+    }
+
+    private function history(): HistoryService
+    {
+        return $this->history ??= new HistoryService($this->storage(), $this->versions());
+    }
+
+    /**
+     * The storage used when nothing was injected.
+     *
+     * Versioning is applied here and not only in {@see \Click\Cms\Core\Application}
+     * so that a write reaching this fallback still leaves history behind. An
+     * undo that depends on which of two construction paths ran is not an undo.
+     */
+    private function storage(): VersioningStorage
+    {
+        return $this->storage ??= new VersioningStorage(
+            new JsonStorage($this->basePath . '/content', $this->config?->defaultLocale()),
+            $this->versions(),
+        );
+    }
+
+    private function versions(): JsonVersionStore
+    {
+        return $this->versions ??= new JsonVersionStore(
+            $this->basePath . '/data/versions',
+            RetentionPolicy::keeping(
+                CoreConfig::load($this->basePath . '/config/core.json')->historyRetainedVersions()
+            ),
         );
     }
 

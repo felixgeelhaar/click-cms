@@ -6,6 +6,8 @@ namespace Click\Cms\Application\Config;
 
 use Click\Cms\Domain\ValueObjects\Locale;
 
+use Click\Cms\Domain\History\RetentionPolicy;
+
 /**
  * Typed access to `config/core.json`.
  *
@@ -167,6 +169,22 @@ final class CoreConfig
     public function storageSqlitePath(): string
     {
         return trim($this->string('core.storage.sqlite.path', 'data/content.sqlite'));
+    }
+
+    /* ------------------------------------------------------------ history -- */
+
+    /**
+     * How many versions of a document are kept.
+     *
+     * Never below one, whatever the file says: zero would leave history looking
+     * enabled while retaining nothing, and an editor discovering that on the
+     * day they need it is the failure the feature exists to prevent. A site
+     * that genuinely wants no history should say so by not asking for a
+     * restore, not by configuring a limit that quietly does nothing.
+     */
+    public function historyRetainedVersions(): int
+    {
+        return max(1, $this->int('core.history.retainVersions', RetentionPolicy::DEFAULT_LIMIT));
     }
 
     /* --------------------------------------------------------------- auth -- */
