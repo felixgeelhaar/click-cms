@@ -122,8 +122,18 @@ const getRouteComponent = () => {
 };
 
 const getRouteProps = () => {
-  const path = currentRoute.value.split('?')[0];
-  if (path.startsWith('/admin/pages/edit/')) return { slug: path.replace('/admin/pages/edit/', '') };
+  const [path, query] = currentRoute.value.split('?');
+  if (path.startsWith('/admin/pages/edit/')) {
+    // The language is carried in the query so a link to a translation — from the
+    // page list's language chips, or a bookmark — opens that translation rather
+    // than always the default one.
+    const locale = new URLSearchParams(query || '').get('locale') || '';
+    return { slug: path.replace('/admin/pages/edit/', ''), initialLocale: locale };
+  }
+  if (path === '/admin/pages/new') {
+    const locale = new URLSearchParams((currentRoute.value.split('?')[1]) || '').get('locale') || '';
+    return { initialLocale: locale };
+  }
   if (path.startsWith('/admin/plugins/') && path !== '/admin/plugins') return { id: path.replace('/admin/plugins/', '') };
   if (path === '/admin/users') return { userRole: currentUser.value?.role, currentUsername: currentUser.value?.username };
   if (path === '/admin/plugins') return { userRole: currentUser.value?.role };

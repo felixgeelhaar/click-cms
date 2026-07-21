@@ -117,8 +117,6 @@
         :error="versionsError"
         :can-restore="can('content.restore')"
         :restoring="restoringId"
-        :addressable="locale === defaultLocale"
-        :default-locale="languageName(defaultLocale)"
         @restore="restoreVersion"
         @reload="loadVersions"
       />
@@ -133,7 +131,7 @@ import PagePublication from './PagePublication.vue';
 import PageLanguages from './PageLanguages.vue';
 import PageVersions from './PageVersions.vue';
 
-const props = defineProps({ slug: String });
+const props = defineProps({ slug: String, initialLocale: { type: String, default: '' } });
 const emit = defineEmits(['saved', 'cancel']);
 
 // The address this page lives at once it exists. Tracked separately from the
@@ -170,7 +168,9 @@ const can = (capability) => capabilities.value.includes(capability);
 const siteLocales = ref([]);
 // CoreConfig lists the default language first, so this needs no second request.
 const defaultLocale = computed(() => siteLocales.value[0] ?? '');
-const locale = ref('');
+// Seeded from the URL so a deep link to a translation opens in that language.
+// loadSiteLocales only fills this in when it is still empty, so the seed wins.
+const locale = ref(props.initialLocale || '');
 const translations = ref({});
 const translationMissing = ref(false);
 const fallbackSource = ref(null);
@@ -344,7 +344,7 @@ const loadTranslations = async () => {
 };
 
 const loadVersions = async () => {
-  if (!storedSlug.value || locale.value !== defaultLocale.value) {
+  if (!storedSlug.value) {
     versions.value = [];
     return;
   }
@@ -353,7 +353,13 @@ const loadVersions = async () => {
   versionsError.value = '';
 
   try {
-    const res = await fetch(`/api/pages/${storedSlug.value}/versions`);
+    // History is per translation, addressed by the same ?locale= the rest of
+    // the page API takes. It used to answer for the default language whatever
+    // was asked, so the panel refused to show anything but the default; that is
+    // fixed on the server now, and a German page shows German history.
+    const res = await fetch(
+      `/api/pages/${storedSlug.value}/versions?locale=${encodeURIComponent(locale.value)}`
+    );
     const body = await res.json().catch(() => ({}));
 
     if (!res.ok) {
@@ -515,8 +521,10 @@ const restoreVersion = async (version) => {
   notice.value = '';
 
   try {
+    // The language being edited, so a German restore rewinds the German working
+    // copy and not the English one — the endpoint keys on locale now.
     const res = await fetch(
-      `/api/pages/${storedSlug.value}/versions/${version.id}/restore`,
+      `/api/pages/${storedSlug.value}/versions/${version.id}/restore?locale=${encodeURIComponent(locale.value)}`,
       { method: 'POST' }
     );
     const body = await res.json().catch(() => ({}));
