@@ -10,6 +10,7 @@ use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Event\EventDispatcher;
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
 
 class Application
@@ -20,6 +21,7 @@ class Application
     private ?EventDispatcher $eventDispatcher = null;
     private ?EventBus $eventBus = null;
     private array $apiRoutes = [];
+    private ?CoreApiRoutes $coreApiRoutes = null;
     private array $coreConfig = [];
 
     private string $basePath;
@@ -74,8 +76,12 @@ class Application
         $this->eventDispatcher = new EventDispatcher();
         $this->eventBus = new EventBus($this->eventDispatcher);
         
+        // Storage is constructed directly rather than resolved from a plugin:
+        // the application cannot boot without one, so it is not optional.
         $storage = new JsonStorage($this->basePath . '/content');
         $this->contentService = new ContentService($storage);
+
+        $this->coreApiRoutes = new CoreApiRoutes($this->basePath);
         
         $pluginConfig = $this->coreConfig['core']['plugins'] ?? [];
         $excludeConfig = $pluginConfig['exclude'] ?? [];
@@ -287,12 +293,17 @@ class Application
             return $this->handleMarketplaceRequest($path, $method);
         }
 
-        if (!$this->isCoreRestApiEnabled() && $this->isGraphqlEnabled() === false) {
-            return ['status' => 500, 'error' => 'No content API enabled'];
+        // Core routes first. These are the management endpoints the admin UI
+        // cannot work without, so they answer whether or not any delivery API
+        // plugin is enabled — a site rendering its own pages still needs to be
+        // editable.
+        $coreMatch = $this->matchRouteTable($this->coreApiRoutes->routes(), $path, $method);
+        if ($coreMatch !== null) {
+            return $this->executeHandler($coreMatch['handler'], $coreMatch['params']);
         }
-        
+
         $routes = $this->pluginManager->executeHook('api.routes', []);
-        
+
         foreach ($routes as $pluginName => $pluginRoutes) {
             if (!is_array($pluginRoutes)) continue;
 
@@ -740,14 +751,18 @@ class Application
         file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT));
     }
 
+    /**
+     * The delivery APIs are deliberately not required.
+     *
+     * REST and GraphQL exist to serve an external front end. A site that uses
+     * the CMS's own page rendering needs neither, and refusing to boot without
+     * one would make that perfectly reasonable setup impossible. Content
+     * management does not depend on them: those endpoints are core.
+     */
     private function validateCoreConfig(): void
     {
-        $restEnabled = $this->isCoreRestApiEnabled();
-        $graphqlEnabled = $this->isGraphqlEnabled();
-
-        if (!$restEnabled && !$graphqlEnabled) {
-            throw new \RuntimeException('At least one content API must be enabled (REST or GraphQL).');
-        }
+        // Nothing to enforce today. Kept as the place where genuinely fatal
+        // misconfiguration should be caught.
     }
 
     private function isCoreRestApiEnabled(): bool
@@ -954,6 +969,55 @@ class Application
         }
 
         return ['params' => $params];
+    }
+
+    /**
+     * Match a request against a whole route table.
+     *
+     * Distinct from matchRoute(), which tests a single route: this walks a table
+     * and returns the handler as well as the parameters.
+     *
+     * @param array<string, callable> $routes
+     * @return array{handler: callable, params: array<string, string>}|null
+     */
+    private function matchRouteTable(array $routes, string $path, string $method): ?array
+    {
+        foreach ($routes as $route => $handler) {
+            $parts = explode(' ', $route, 2);
+            if (count($parts) !== 2) {
+                continue;
+            }
+
+            [$routeMethod, $routePath] = $parts;
+            if ($routeMethod !== $method) {
+                continue;
+            }
+
+            $routeParts = explode('/', ltrim(preg_replace('#^/api/#', '', $routePath), '/'));
+            $pathParts = explode('/', $path);
+
+            if (count($routeParts) !== count($pathParts)) {
+                continue;
+            }
+
+            $params = [];
+            $matched = true;
+
+            for ($i = 0; $i < count($routeParts); $i++) {
+                if (str_starts_with($routeParts[$i], ':')) {
+                    $params[substr($routeParts[$i], 1)] = $pathParts[$i];
+                } elseif ($routeParts[$i] !== $pathParts[$i]) {
+                    $matched = false;
+                    break;
+                }
+            }
+
+            if ($matched) {
+                return ['handler' => $handler, 'params' => $params];
+            }
+        }
+
+        return null;
     }
 
     private function executeHandler(array $handler, array $params): array
