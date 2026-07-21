@@ -42,8 +42,14 @@ class Application
         $response = $this->handleRequest($uri, $method);
         
         if (isset($response['raw']) && $response['raw']) {
-            // Raw HTML response
-            http_response_code($response['status'] ?? 200);
+            // Raw HTML response.
+            //
+            // Only set the code when the handler supplied one. Defaulting to 200
+            // here would overwrite a status the handler already set on its own —
+            // which is how the 404 page came to be served with "200 OK".
+            if (isset($response['status'])) {
+                http_response_code($response['status']);
+            }
             echo $response['html'] ?? '';
         } elseif (isset($response['redirect'])) {
             // Redirect response
