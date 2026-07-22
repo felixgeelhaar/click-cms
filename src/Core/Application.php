@@ -11,6 +11,7 @@ use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Config\Settings;
 use Click\Cms\Application\Event\EventBus;
+use Click\Cms\Application\Audit\AuditService;
 use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Domain\Content\Content;
@@ -23,6 +24,8 @@ use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\HealthCheck;
 use Click\Cms\Http\SectionRenderer;
+use Click\Cms\Infrastructure\Audit\AuditingStorage;
+use Click\Cms\Infrastructure\Audit\JsonAuditLog;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 use Click\Cms\Infrastructure\Storage\StorageFactory;
@@ -44,6 +47,7 @@ class Application
     private array $apiRoutes = [];
     private ?CoreApiRoutes $coreApiRoutes = null;
     private ?HistoryService $history = null;
+    private ?\Click\Cms\Application\Audit\AuditService $auditService = null;
     private ?SessionStore $sessions = null;
     private ?LoginThrottle $throttle = null;
     private array $coreConfig = [];
@@ -136,14 +140,28 @@ class Application
                 $this->basePath . '/data/versions',
                 RetentionPolicy::keeping($this->config->historyRetainedVersions())
             );
-            $storage = new VersioningStorage(
-                StorageFactory::create($this->config, $this->basePath),
-                $versions,
-                fn (): ?string => $this->getSessionUser()['username'] ?? null,
+            // Who is acting, read lazily on each write because the storage stack
+            // outlives any one request. Shared by versioning and the audit trail.
+            $author = fn (): ?string => $this->getSessionUser()['username'] ?? null;
+
+            // Audit wraps versioning as the outermost decorator, so every write —
+            // save, delete, publish, unpublish and a history restore — leaves a
+            // record of who did it, on top of the record of what changed. Both
+            // still satisfy the storage port, so nothing downstream changes.
+            $auditLog = new JsonAuditLog($this->basePath . '/data/audit');
+            $storage = new AuditingStorage(
+                new VersioningStorage(
+                    StorageFactory::create($this->config, $this->basePath),
+                    $versions,
+                    $author,
+                ),
+                $auditLog,
+                $author,
             );
             $this->contentService = new ContentService($storage, $this->config->defaultLocale());
 
         $this->history = new HistoryService($storage, $versions);
+        $this->auditService = new AuditService($auditLog);
 
         $this->coreApiRoutes = new CoreApiRoutes(
             $this->basePath,
@@ -698,6 +716,20 @@ class Application
         // action. CSRF and authentication have already been enforced above.
         if ($path === 'settings') {
             return $this->handleSettingsRequest($method);
+        }
+
+        // The audit trail — who did what, across the whole site. An operator
+        // accountability tool, so the service gates it to administrators; the
+        // handler only needs to have a session (enforced above) and hand the
+        // user to the service, which decides.
+        if ($path === 'audit') {
+            $user = $this->getSessionUser() ?? [];
+            $result = $this->auditService?->recent($user, 100)
+                ?? ['entries' => null, 'error' => 'Audit is unavailable.', 'status' => 500];
+
+            return $result['error'] !== null
+                ? ['status' => $result['status'], 'error' => $result['error']]
+                : ['data' => $result['entries']];
         }
 
         // Core routes first. These are the management endpoints the admin UI
