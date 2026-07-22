@@ -23,6 +23,7 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\MarketplaceController;
+use Click\Cms\Http\RedirectsController;
 use Click\Cms\Http\PluginsController;
 use Click\Cms\Http\UsersController;
 use Click\Cms\Http\ApiGuard;
@@ -55,6 +56,7 @@ class Application
     private ?UsersController $usersController = null;
     private ?PluginsController $pluginsController = null;
     private ?MarketplaceController $marketplaceController = null;
+    private ?RedirectsController $redirectsController = null;
     private ?HistoryService $history = null;
     private ?\Click\Cms\Application\Audit\AuditService $auditService = null;
     private ?SessionStore $sessions = null;
@@ -105,7 +107,10 @@ class Application
             }
             echo $response['html'] ?? '';
         } elseif (isset($response['redirect'])) {
-            // Redirect response
+            // A redirect names the destination and the code — 301 for a
+            // permanent move so browsers cache it, 302 otherwise. Without the
+            // code a Location header rides on a 200, which no browser follows.
+            http_response_code($response['status'] ?? 302);
             header('Location: ' . $response['redirect']);
         } else {
             // JSON response
@@ -189,6 +194,10 @@ class Application
             $this->config,
             fn (string $event, array $payload): mixed => $this->pluginManager?->executeHook($event, $payload),
         );
+
+        // Redirect rules are read on the way to a 404 and managed through the
+        // admin, both from one place so the two never disagree.
+        $this->redirectsController = new RedirectsController($this->contentService);
 
         // Sessions and login throttling are collaborators rather than methods on
         // this class, so each can be understood and tested on its own.
@@ -379,6 +388,14 @@ class Application
         // early is what preview is for, and that requires a signed link or a
         // session.
         if ($resolved === null) {
+            // Before giving up on a path, see if it was moved. A redirect rule
+            // sends an old address to a new one, so a bookmark or an inbound
+            // link that predates a slug change still lands somewhere.
+            $redirect = $this->redirectsController->rules()->match($path);
+            if ($redirect !== null) {
+                return ['redirect' => $redirect->to, 'status' => $redirect->statusCode()];
+            }
+
             return $this->notFoundPage($locale);
         }
 
@@ -784,6 +801,7 @@ class Application
             $this->coreApiRoutes->routes(),
             $this->usersController->routes(),
             $this->pluginsController->routes(),
+            $this->redirectsController->routes(),
         ];
         foreach ($coreTables as $table) {
             $match = $this->matchRouteTable($table, $path, $method);
