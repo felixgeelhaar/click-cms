@@ -5,13 +5,25 @@
       <span v-if="field.required" class="required" aria-hidden="true">*</span>
     </label>
 
-    <!-- Long-form prose. Kept as a plain textarea for now; a rich editor can be
-         swapped in here without any other component knowing. -->
+    <!-- Rich text is HTML by design: a small contenteditable editor with a
+         formatting toolbar. Its value is sanitised on the server before it is
+         ever rendered into a page, so the editor's own cleanup is convenience,
+         not the security boundary. -->
+    <RichTextField
+      v-if="field.type === 'richtext'"
+      :model-value="modelValue ?? ''"
+      :describedby="describedBy"
+      :invalid="!!error"
+      @update:model-value="emitValue($event)"
+    />
+
+    <!-- Plain long-form prose stays a textarea; it is escaped, not rendered as
+         markup, so it needs no editor. -->
     <textarea
-      v-if="field.type === 'richtext' || field.type === 'textarea'"
+      v-else-if="field.type === 'textarea'"
       :id="inputId"
       :value="modelValue ?? ''"
-      :rows="field.type === 'richtext' ? 8 : 4"
+      :rows="4"
       :aria-describedby="describedBy"
       :aria-invalid="error ? 'true' : undefined"
       @input="emitValue($event.target.value)"
@@ -61,6 +73,7 @@
 
 <script setup>
 import { computed, useId } from 'vue';
+import RichTextField from './RichTextField.vue';
 
 const props = defineProps({
   field: { type: Object, required: true },

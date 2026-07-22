@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Http;
 
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Content\RichTextSanitizer;
 use Click\Cms\Application\Media\MediaService;
 use Click\Cms\Domain\Schema\FieldDefinition;
 use Click\Cms\Domain\Schema\FieldType;
@@ -23,17 +24,28 @@ use Click\Cms\Domain\Schema\SectionTypeRepository;
  * fighting anything, and a site that wants full control uses the delivery API
  * and its own front end instead.
  *
- * Every value is escaped. Content is written by trusted editors, but "trusted"
+ * Plain values are escaped. Content is written by trusted editors, but "trusted"
  * is a statement about intent rather than a guarantee about what a paste from
- * elsewhere contains.
+ * elsewhere contains. Rich-text values are the one exception: they are HTML by
+ * design, so escaping them would print their tags instead of applying them.
+ * They are run through {@see RichTextSanitizer} instead, which reduces them to a
+ * safe allowlist — because a value emitted as markup is an XSS surface, and the
+ * admin editor's own sanitising is bypassable by anyone posting to the API.
  */
 final class SectionRenderer
 {
+    private readonly RichTextSanitizer $sanitizer;
+
     public function __construct(
         private readonly SectionTypeRepository $sectionTypes,
         private readonly ?MediaService $media = null,
         private readonly string $mediaBaseUrl = '/api/media/file',
-    ) {}
+        ?RichTextSanitizer $sanitizer = null,
+    ) {
+        // Defaulted rather than required so existing callers are unaffected: the
+        // sanitiser is pure domain logic with no dependencies of its own.
+        $this->sanitizer = $sanitizer ?? new RichTextSanitizer();
+    }
 
     /**
      * Render every section of a page, in order.
@@ -123,7 +135,8 @@ final class SectionRenderer
         return match ($field->type) {
             FieldType::Repeater => $this->renderRepeater($field, $value),
             FieldType::Image => $this->renderImage($field, $value),
-            FieldType::RichText, FieldType::Textarea => $this->renderProse($field, $value),
+            FieldType::RichText => $this->renderRichText($field, $value),
+            FieldType::Textarea => $this->renderProse($field, $value),
             FieldType::Boolean => '',
             default => $this->renderScalar($field, $value, $linkText),
         };
@@ -159,15 +172,38 @@ final class SectionRenderer
         return '<p class="' . $class . '">' . $text . '</p>';
     }
 
+    /**
+     * A rich-text value is HTML the editor authored, so it is emitted as markup
+     * rather than escaped — its whole point is that the bold, links and lists
+     * apply. That makes it an XSS surface, since a value stored through a direct
+     * API call never passed the admin editor's own sanitising. The sanitiser is
+     * the boundary that holds: it reduces the value to a safe allowlist before a
+     * single byte reaches the page. An empty result renders nothing, so a value
+     * that was entirely stripped does not leave a bare, classed div behind.
+     */
+    private function renderRichText(FieldDefinition $field, mixed $value): string
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return '';
+        }
+
+        $safe = $this->sanitizer->sanitize($value);
+        if (trim($safe) === '') {
+            return '';
+        }
+
+        return '<div class="' . $this->fieldClass($field) . '">' . $safe . '</div>';
+    }
+
     private function renderProse(FieldDefinition $field, mixed $value): string
     {
         if (!is_string($value) || trim($value) === '') {
             return '';
         }
 
-        // Paragraph breaks are preserved; everything else is escaped. A rich
-        // text editor storing HTML would need sanitising here, which is why the
-        // field is still plain text today.
+        // A textarea is plain prose, not markup: paragraph breaks are preserved
+        // and everything else is escaped. Rich text takes the separate path
+        // above, where its HTML is sanitised rather than printed as text.
         $paragraphs = preg_split('/\n{2,}/', trim($value)) ?: [];
         $html = '';
 
