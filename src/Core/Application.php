@@ -22,6 +22,7 @@ use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\MarketplaceController;
 use Click\Cms\Http\PluginsController;
 use Click\Cms\Http\UsersController;
 use Click\Cms\Http\ApiGuard;
@@ -53,6 +54,7 @@ class Application
     private ?CoreApiRoutes $coreApiRoutes = null;
     private ?UsersController $usersController = null;
     private ?PluginsController $pluginsController = null;
+    private ?MarketplaceController $marketplaceController = null;
     private ?HistoryService $history = null;
     private ?\Click\Cms\Application\Audit\AuditService $auditService = null;
     private ?SessionStore $sessions = null;
@@ -230,6 +232,7 @@ class Application
         // Plugin management is core — the admin UI's Plugins page depends on it —
         // so it is wired here rather than in a plugin that could be disabled.
         $this->pluginsController = new PluginsController($this->pluginManager);
+        $this->marketplaceController = new MarketplaceController($this->pluginManager, $this->config, $this->basePath);
 
         // Identity — login, logout, password changes, the default admin — is its
         // own controller, given the same session store the rest of a request
@@ -748,7 +751,7 @@ class Application
                 return ['status' => 404, 'error' => 'Marketplace disabled'];
             }
 
-            return $this->handleMarketplaceRequest($path, $method);
+            return $this->marketplaceController->handle($path, $method);
         }
 
         // Runtime settings. Reading is available to any signed-in user so the
@@ -1054,64 +1057,6 @@ class Application
     }
 
 
-    private function handleMarketplaceRequest(string $path, string $method): array
-    {
-        $action = ltrim(preg_replace('#^marketplace#', '', $path), '/');
-
-        $marketplace = new \Click\Cms\Application\Plugin\PluginMarketplace(
-            $this->pluginManager,
-            $this->basePath
-        );
-
-        $marketplaceConfig = $this->coreConfig['core']['marketplace'] ?? [];
-        $registryUrl = $marketplaceConfig['registryUrl'] ?? '';
-        $publicKey = $marketplaceConfig['publicKey'] ?? '';
-
-        if ($method === 'POST' && $action === 'install') {
-            $data = $this->getJsonBody();
-            $pluginId = $data['id'] ?? null;
-            $version = $data['version'] ?? null;
-
-            if ($pluginId === null) {
-                return ['status' => 400, 'error' => 'Plugin id is required'];
-            }
-
-            $result = $marketplace->installFromRegistry($registryUrl, $publicKey, $pluginId, $version);
-
-            if (!($result['success'] ?? false)) {
-                return ['status' => 400, 'error' => $result['error'] ?? 'Install failed'];
-            }
-
-            return ['data' => $result['plugin'] ?? $result];
-        }
-
-        if ($method !== 'GET') {
-            return ['status' => 405, 'error' => 'Method not allowed'];
-        }
-
-        $plugins = array_map(
-            fn($p) => [
-                'id' => $p->id->value,
-                'name' => $p->name,
-                'description' => $p->description,
-                'version' => $p->version->value,
-                'state' => $p->state->value,
-            ],
-            $this->pluginManager->all()
-        );
-
-        $catalog = $marketplace->getRegistryCatalog($registryUrl, $publicKey);
-
-        return [
-            'data' => [
-                'available' => $catalog['available'] ?? [],
-                'errors' => $catalog['errors'] ?? [],
-                'installed' => $plugins,
-                'message' => $catalog['available'] ? 'Registry loaded' : 'Marketplace catalog not configured'
-            ]
-        ];
-    }
-
     private function getJsonBody(): array
     {
         $input = file_get_contents('php://input');
@@ -1123,62 +1068,6 @@ class Application
         $data = json_decode($input, true);
 
         return $data ?? [];
-    }
-
-    private function matchRouteRaw(string $routePath, string $path): array|false
-    {
-        $routeParts = explode('/', $routePath);
-        $pathParts = explode('/', $path);
-        
-        if (count($routeParts) !== count($pathParts)) {
-            return false;
-        }
-
-        $params = [];
-        
-        for ($i = 0; $i < count($routeParts); $i++) {
-            if (str_starts_with($routeParts[$i], ':')) {
-                $params[substr($routeParts[$i], 1)] = $pathParts[$i];
-            } elseif ($routeParts[$i] !== $pathParts[$i]) {
-                return false;
-            }
-        }
-
-        return ['params' => $params];
-    }
-
-    private function matchRoute(string $route, string $path, string $method): array|false
-    {
-        $routeParts = explode(' ', $route, 2);
-        
-        if (count($routeParts) !== 2) {
-            return false;
-        }
-        
-        [$routeMethod, $routePath] = $routeParts;
-        
-        if ($routeMethod !== $method) {
-            return false;
-        }
-
-        $routeParts = explode('/', $routePath);
-        $pathParts = explode('/', $path);
-        
-        if (count($routeParts) !== count($pathParts)) {
-            return false;
-        }
-
-        $params = [];
-        
-        for ($i = 0; $i < count($routeParts); $i++) {
-            if (str_starts_with($routeParts[$i], ':')) {
-                $params[substr($routeParts[$i], 1)] = $pathParts[$i];
-            } elseif ($routeParts[$i] !== $pathParts[$i]) {
-                return false;
-            }
-        }
-
-        return ['params' => $params];
     }
 
     /**
