@@ -77,9 +77,15 @@
 
         <div class="card-body">
           <p class="card-name" :title="item.originalName">{{ item.originalName }}</p>
-          <p class="card-meta">{{ item.width }}×{{ item.height }} · {{ formatBytes(item.bytes) }}</p>
+          <!-- An SVG has no raster dimensions — it scales to any size — so the
+               pixel readout would be an empty "×". Say what it is instead. -->
+          <p class="card-meta">
+            <span v-if="isVector(item)">Scalable vector · {{ formatBytes(item.bytes) }}</span>
+            <span v-else>{{ item.width }}×{{ item.height }} · {{ formatBytes(item.bytes) }}</span>
+          </p>
           <p class="card-variants">
-            <span v-if="item.variants.length">{{ item.variants.join(', ') }}</span>
+            <span v-if="isVector(item)" class="muted">scales to any size</span>
+            <span v-else-if="item.variants.length">{{ item.variants.join(', ') }}</span>
             <span v-else class="muted">no resized versions</span>
           </p>
 
@@ -135,6 +141,10 @@ const subtitle = computed(() => {
   const sizes = capabilities.value.variants.map((v) => v.name).join(', ');
   return sizes ? `${count} ${noun}. Each upload is resized to: ${sizes}.` : `${count} ${noun}.`;
 });
+
+// An SVG is resolution-independent: no width, no variant ladder, no focal crop.
+// The card reads its metadata differently because a pixel size would be blank.
+const isVector = (item) => item.mimeType === 'image/svg+xml' || item.extension === 'svg';
 
 const formatBytes = (bytes) => {
   if (!bytes) return '0 B';
