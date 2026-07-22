@@ -37,6 +37,7 @@ const iconPaths = {
   marketplace: ['M12 2L2 7l10 5 10-5-10-5z', 'M2 17l10 5 10-5', 'M2 12l10 5 10-5'],
   users: ['M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0z', 'M4 20a8 8 0 0 1 16 0'],
   profile: ['M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2', 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z'],
+  settings: ['M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'],
   analytics: ['M18 20V10', 'M12 20V4', 'M6 20v-6']
 };
 
@@ -51,6 +52,7 @@ const navItems = computed(() => {
     items.push({ href: '/admin/plugins', icon: 'plugins', label: 'Plugins' });
     items.push({ href: '/admin/marketplace', icon: 'marketplace', label: 'Marketplace' });
     items.push({ href: '/admin/users', icon: 'users', label: 'Users' });
+    items.push({ href: '/admin/settings', icon: 'settings', label: 'Settings' });
   }
   items.push({ href: '/admin/profile', icon: 'profile', label: 'Profile' });
   return items;

@@ -9,6 +9,7 @@ use Click\Cms\Application\Authentication\CsrfGuard;
 use Click\Cms\Application\Authentication\LoginThrottle;
 use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Application\Config\CoreConfig;
+use Click\Cms\Application\Config\Settings;
 use Click\Cms\Application\Event\EventBus;
 use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Application\Plugin\PluginManager;
@@ -46,6 +47,7 @@ class Application
     private ?LoginThrottle $throttle = null;
     private array $coreConfig = [];
     private ?CoreConfig $config = null;
+    private ?Settings $settings = null;
 
     private string $basePath;
 
@@ -105,6 +107,10 @@ class Application
         $this->loadCoreConfig();
         $this->config = CoreConfig::fromArray($this->coreConfig);
         $this->validateCoreConfig();
+
+        // Runtime settings live under data/, not in the image, so an operator can
+        // flip them from the admin and have them survive a redeploy.
+        $this->settings = Settings::load($this->basePath . '/data/settings.json');
 
         $this->eventDispatcher = new EventDispatcher();
         $this->eventBus = new EventBus($this->eventDispatcher);
@@ -249,7 +255,44 @@ class Application
             return $this->handlePreviewRequest($uri);
         }
 
+        // In headless mode this instance serves no rendered site of its own —
+        // the public front end is someone else's, reading the delivery API. The
+        // admin UI and the API above are untouched; only the public pages go
+        // away, which is the whole point of the switch.
+        if ($this->settings?->headless()) {
+            return $this->headlessPlaceholder($uri);
+        }
+
         return $this->handlePublicPage($uri);
+    }
+
+    /**
+     * What a visitor gets at a content URL when the site is headless.
+     *
+     * A 404, because there genuinely is no page here to serve — the content
+     * lives behind the API. The root path gets a one-line pointer to the API
+     * rather than a bare error, so someone who lands on the origin by hand is
+     * told what this is rather than left guessing.
+     *
+     * @return array<string, mixed>
+     */
+    private function headlessPlaceholder(string $uri): array
+    {
+        $path = trim((string) parse_url($uri, PHP_URL_PATH), '/');
+
+        http_response_code($path === '' ? 200 : 404);
+        header('Content-Type: text/html; charset=utf-8');
+        header('X-Robots-Tag: noindex');
+
+        $body = $path === ''
+            ? '<p>This is a headless Click CMS instance. Content is served from '
+                . '<code>/api/pages</code>, not rendered here.</p>'
+            : '<h1>Not found</h1>';
+
+        echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            . '<title>Headless</title></head><body>' . $body . '</body></html>';
+
+        return ['raw' => true];
     }
 
     private function handlePublicPage(string $uri): array
@@ -657,6 +700,13 @@ class Application
             return $this->handleMarketplaceRequest($path, $method);
         }
 
+        // Runtime settings. Reading is available to any signed-in user so the
+        // admin UI can show the current mode; changing one is an administrator
+        // action. CSRF and authentication have already been enforced above.
+        if ($path === 'settings') {
+            return $this->handleSettingsRequest($method);
+        }
+
         // Core routes first. These are the management endpoints the admin UI
         // cannot work without, so they answer whether or not any delivery API
         // plugin is enabled — a site rendering its own pages still needs to be
@@ -983,6 +1033,48 @@ class Application
      *
      * @return array<string, mixed>
      */
+    /**
+     * Read or change the runtime settings.
+     *
+     * Reading is allowed to any signed-in user, so the admin UI can show the
+     * current mode to everyone who can see the admin. Changing one needs the
+     * settings capability, which only an administrator has — turning a site
+     * headless takes its public pages away, and that is not an editor's call.
+     *
+     * @return array<string, mixed>
+     */
+    private function handleSettingsRequest(string $method): array
+    {
+        $user = $this->getSessionUser();
+        if ($user === null) {
+            return ['status' => 401, 'error' => 'Not authenticated'];
+        }
+
+        if ($method === 'GET') {
+            return ['data' => ($this->settings ?? Settings::load($this->basePath . '/data/settings.json'))->toArray()];
+        }
+
+        if ($method !== 'PUT') {
+            return ['status' => 405, 'error' => 'Method not allowed'];
+        }
+
+        if (!Role::fromName($user['role'] ?? null)->can(Capability::ManageSettings)) {
+            return ['status' => 403, 'error' => 'You do not have permission to change settings.'];
+        }
+
+        $data = $this->getJsonBody();
+        $settings = $this->settings ?? Settings::load($this->basePath . '/data/settings.json');
+
+        // Only the keys we understand are acted on; an unknown key is ignored
+        // rather than stored, so the settings file cannot accrete arbitrary
+        // content a client decides to post.
+        if (array_key_exists('headless', $data)) {
+            $settings->setHeadless((bool) $data['headless']);
+        }
+
+        return ['data' => $settings->toArray()];
+    }
+
     private function handleChangePassword(): array
     {
         $session = $this->getSessionUser();
