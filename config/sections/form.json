@@ -1,0 +1,15 @@
+{
+  "label": "Contact form",
+  "description": "A form a visitor can fill in. Submissions are stored and read under Form submissions.",
+  "icon": "mail",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading", "required": true },
+    { "name": "intro", "type": "textarea", "label": "Intro text", "help": "Shown above the form." },
+    { "name": "nameLabel", "type": "text", "label": "Name field label", "default": "Your name", "required": true },
+    { "name": "emailLabel", "type": "text", "label": "Email field label", "default": "Email address", "required": true },
+    { "name": "messageLabel", "type": "text", "label": "Message field label", "default": "Message", "required": true },
+    { "name": "submitLabel", "type": "text", "label": "Submit button label", "default": "Send message", "required": true },
+    { "name": "confirmation", "type": "textarea", "label": "Confirmation message", "help": "Shown to the visitor after a successful submission." },
+    { "name": "destinationNote", "type": "text", "label": "Destination note", "help": "A private note for editors on where these submissions go. Not shown to visitors." }
+  ]
+}
