@@ -60,6 +60,139 @@ final class MediaServiceTest extends TestCase
         ];
     }
 
+    /** @return array{name: string, type: string, tmp_name: string, error: int, size: int} */
+    private function uploadSvg(string $name, string $svg): array
+    {
+        $tmp = $this->root . '/upload-' . bin2hex(random_bytes(4)) . '.svg';
+        file_put_contents($tmp, $svg);
+
+        return [
+            'name' => $name,
+            'type' => 'image/svg+xml',
+            'tmp_name' => $tmp,
+            'error' => UPLOAD_ERR_OK,
+            'size' => filesize($tmp),
+        ];
+    }
+
+    /**
+     * A logo is usually an SVG, and an SVG is an XML document a browser executes.
+     * It is accepted only after sanitisation, and what lands on disk is the
+     * sanitised bytes — never the raw upload with its script still in it.
+     */
+    public function testStoresASanitisedSvgWithoutItsScript(): void
+    {
+        $dirty = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" onload="alert(1)">'
+            . '<script>steal(document.cookie)</script>'
+            . '<rect width="10" height="10" fill="#09f"/></svg>';
+
+        $result = $this->service->store($this->uploadSvg('company-logo.svg', $dirty));
+
+        $this->assertNull($result['error']);
+        $item = $result['item'];
+        $this->assertNotNull($item);
+        $this->assertSame('svg', $item->extension);
+        $this->assertSame('image/svg+xml', $item->mimeType);
+        // Resolution-independent: no raster dimensions, no ladder, no crop.
+        $this->assertNull($item->width);
+        $this->assertNull($item->height);
+        $this->assertSame([], $item->variants);
+        $this->assertNull($item->squareCrop);
+
+        // The airtight part: the stored file itself carries no script.
+        $stored = (string) file_get_contents($this->mediaDir . '/' . $item->filename());
+        $this->assertStringNotContainsStringIgnoringCase('<script', $stored);
+        $this->assertStringNotContainsStringIgnoringCase('onload', $stored);
+        $this->assertStringNotContainsString('steal', $stored);
+        // The drawing survives the clean.
+        $this->assertStringContainsString('<rect', $stored);
+    }
+
+    /** The quality logic counts pixels; an SVG has none and must not choke it. */
+    public function testAStoredSvgHasNoQualityVerdict(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="4"/></svg>';
+
+        $item = $this->service->store($this->uploadSvg('mark.svg', $svg))['item'];
+
+        $this->assertNotNull($item);
+        $this->assertNull($item->quality());
+        $this->assertNull($item->toArray(1200)['quality']);
+    }
+
+    /**
+     * An SVG that cannot be parsed into a safe drawing is refused, not stored
+     * raw — the whole reason SVG was refused outright before there was a
+     * sanitiser to lean on.
+     */
+    public function testRefusesAnSvgThatCannotBeMadeSafe(): void
+    {
+        $malformed = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10"';
+
+        $result = $this->service->store($this->uploadSvg('broken.svg', $malformed));
+
+        $this->assertNull($result['item']);
+        $this->assertNotNull($result['error']);
+        $this->assertStringContainsStringIgnoringCase('safe', $result['error']);
+        // Nothing was written.
+        $this->assertSame([], glob($this->mediaDir . '/*.svg') ?: []);
+    }
+
+    public function testAStoredSvgIsServableAndFindable(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>';
+        $item = $this->service->store($this->uploadSvg('logo.svg', $svg))['item'];
+
+        $this->assertNotNull($this->service->find($item->id));
+        $this->assertNotNull($this->service->pathForFile($item->filename()));
+    }
+
+    /**
+     * A focal-point-centred square crop rides alongside the ladder for a raster
+     * upload, so a fixed-box layout gets a real cropped file.
+     */
+    public function testGeneratesASquareCropForARasterUpload(): void
+    {
+        $item = $this->service->store($this->upload('crane.jpg', 2400, 1600))['item'];
+
+        $this->assertNotNull($item);
+        $this->assertNotNull($item->squareCrop);
+        $this->assertFileExists($this->mediaDir . '/' . $item->id . '-square.jpg');
+        // The crop is a genuine square file.
+        $info = getimagesize($this->mediaDir . '/' . $item->id . '-square.jpg');
+        $this->assertSame($info[0], $info[1]);
+    }
+
+    /**
+     * Moving the focal point re-cuts the square around the new subject, so the
+     * crop always reflects the point the editor last marked.
+     */
+    public function testMovingTheFocalPointRegeneratesTheSquareCrop(): void
+    {
+        $stored = $this->service->store($this->upload('crane.jpg', 2400, 1600))['item'];
+        $before = (string) file_get_contents($this->mediaDir . '/' . $stored->id . '-square.jpg');
+
+        $updated = $this->service->updateFocalPoint($stored->id, 0.95, 0.5);
+
+        $this->assertNotNull($updated);
+        $this->assertNotNull($updated->squareCrop);
+        $after = (string) file_get_contents($this->mediaDir . '/' . $stored->id . '-square.jpg');
+        // A far-right focal point keeps a different band, so the bytes change.
+        $this->assertNotSame($before, $after);
+        // And the persisted record still points at a crop.
+        $this->assertNotNull($this->service->find($stored->id)?->squareCrop);
+    }
+
+    public function testDeletingRemovesTheSquareCropToo(): void
+    {
+        $stored = $this->service->store($this->upload('crane.jpg', 2400, 1600))['item'];
+        $this->assertFileExists($this->mediaDir . '/' . $stored->id . '-square.jpg');
+
+        $this->service->delete($stored->id);
+
+        $this->assertFileDoesNotExist($this->mediaDir . '/' . $stored->id . '-square.jpg');
+    }
+
     public function testStoresAnImageAndGeneratesVariants(): void
     {
         $result = $this->service->store($this->upload('Harbour Crane.JPG'));

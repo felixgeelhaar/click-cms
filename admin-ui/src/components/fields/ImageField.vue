@@ -17,9 +17,14 @@
       />
       <div class="selected-meta">
         <p class="selected-name">{{ selected.originalName }}</p>
+        <!-- An SVG scales to any size and has no raster dimensions, so it reads
+             as a vector rather than as an empty "×". -->
         <p class="selected-detail">
-          {{ selected.width }}×{{ selected.height }}
-          <span v-if="selected.variants?.length"> · {{ selected.variants.join(', ') }}</span>
+          <span v-if="isVector(selected)">Scalable vector (SVG)</span>
+          <template v-else>
+            {{ selected.width }}×{{ selected.height }}
+            <span v-if="selected.variants?.length"> · {{ selected.variants.join(', ') }}</span>
+          </template>
         </p>
         <p v-if="!selected.alt" class="selected-warning">
           No description set — add one in the Media library so screen readers can
@@ -93,6 +98,9 @@ const loading = ref(true);
 const open = ref(false);
 
 const selected = computed(() => items.value.find((i) => i.id === props.modelValue) ?? null);
+
+// An SVG has no raster dimensions to show; it reads as a vector instead.
+const isVector = (item) => item?.mimeType === 'image/svg+xml' || item?.extension === 'svg';
 
 const choose = (item) => {
   emit('update:modelValue', item.id);
