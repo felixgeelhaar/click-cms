@@ -115,25 +115,21 @@ together. That is exactly the fake-optionality core.md warns about: a site that
 disables the "delivery API" to render its own pages would lose account
 management.
 
-The fix is to move users and plugins management into core (`CoreApiRoutes`),
-where everything the admin UI depends on belongs, and then `rest-api` can be
-deleted outright rather than kept as a shell. This is security-sensitive — it
-moves password handling and plugin activation — so it wants its own focused pass
-with full verification, not a rushed one.
+**Done.** User management moved to `UsersController`, plugin management to
+`PluginsController`, both core and both gated by `ApiGuard`; the `rest-api`
+plugin was deleted. The response never carries a password hash and the floor
+comes from config.
 
 ### Also found
 
-- **Plugin deactivation does not persist. Root cause found.**
-  `Application::boot()` calls `pluginManager->activate()` on **every** discovered
-  plugin in a blanket loop, overriding the saved state that `discover()` already
-  computes from `plugin-state.json`. So a deactivation is written but ignored on
-  the next boot. The fix is two coordinated changes: `discover()` should default
-  a plugin with no saved state to activated (so new plugins still auto-load) and
-  DISCOVERED only when the saved state says `activated: false`; and `boot()` must
-  activate only the plugins `discover()` marked activated, not all of them. This
-  is security-relevant — activation runs plugin code — so it wants a test that a
-  deactivated plugin stays inactive across a boot, and one that a brand-new
-  plugin still activates by default.
+- ~~Plugin deactivation does not persist.~~ Done. `discover()` no longer
+  pre-marks state; `boot()` activates each plugin that is not persisted as
+  deactivated (`isDeactivated`), and a new plugin still activates by default.
+  It was deeper than first thought: `discover()`'s pre-marking also made
+  `activate()` short-circuit and skip loading the bootstrap, so on any boot after
+  the first an active plugin's routes would have vanished — masked only because
+  every container test began with an empty `data/`. Verified across a real
+  restart.
 
 ---
 
@@ -180,9 +176,11 @@ once at upload time.
 
 Outstanding:
 
-- SVG is refused because it can carry script. Logos are usually SVG, so this is
-  a real cost. Supporting it safely needs a sanitiser; a half-sanitised SVG is
-  worse than none.
+- ~~SVG is refused.~~ Done: SVG uploads are accepted only after a strict
+  allowlist sanitiser (ext-dom, no dependency) strips script, event handlers,
+  `foreignObject`, external references and XXE vectors; the stored file is the
+  sanitised output, never the raw upload; and it is served as `image/svg+xml`
+  under a `default-src 'none'; sandbox` CSP as defence in depth.
 - ~~No focal point.~~ Done: an image carries a focal point (a 0..1 coordinate,
   centre by default), set by clicking or arrow-nudging a preview in the media
   library. It rides through `MediaItem::toArray` into the delivery API and is
