@@ -123,10 +123,17 @@ with full verification, not a rushed one.
 
 ### Also found
 
-- **Plugin deactivation does not persist.** Deactivating `rest-api` through the
-  API returned 200, but after a restart it was `activated` again. Either the
-  state is not written, or discovery re-activates everything on boot. Until this
-  works, the enable/disable a plugin story is not real.
+- **Plugin deactivation does not persist. Root cause found.**
+  `Application::boot()` calls `pluginManager->activate()` on **every** discovered
+  plugin in a blanket loop, overriding the saved state that `discover()` already
+  computes from `plugin-state.json`. So a deactivation is written but ignored on
+  the next boot. The fix is two coordinated changes: `discover()` should default
+  a plugin with no saved state to activated (so new plugins still auto-load) and
+  DISCOVERED only when the saved state says `activated: false`; and `boot()` must
+  activate only the plugins `discover()` marked activated, not all of them. This
+  is security-relevant — activation runs plugin code — so it wants a test that a
+  deactivated plugin stays inactive across a boot, and one that a brand-new
+  plugin still activates by default.
 
 ---
 
