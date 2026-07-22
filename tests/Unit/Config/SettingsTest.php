@@ -105,16 +105,16 @@ final class SettingsTest extends TestCase
 
     public function testSettingTheSiteNamePersistsAndTrims(): void
     {
-        Settings::load($this->path)->setSiteName('  TurboScience  ');
+        Settings::load($this->path)->setSiteName('  Acme Studio  ');
 
         // Trimmed on the way in, so the stored brand has no stray whitespace, and
         // it reached disk rather than one object's memory.
-        $this->assertSame('TurboScience', Settings::load($this->path)->siteName());
+        $this->assertSame('Acme Studio', Settings::load($this->path)->siteName());
     }
 
     public function testClearingTheSiteNamePersists(): void
     {
-        Settings::load($this->path)->setSiteName('TurboScience');
+        Settings::load($this->path)->setSiteName('Acme Studio');
         Settings::load($this->path)->setSiteName('');
 
         $this->assertSame('', Settings::load($this->path)->siteName());

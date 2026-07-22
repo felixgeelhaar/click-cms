@@ -20,7 +20,7 @@
               v-model="siteName"
               type="text"
               class="text-input"
-              placeholder="e.g. TurboScience"
+              placeholder="e.g. Acme Studio"
               :disabled="loading || savingName"
             />
             <button type="submit" class="btn-primary" :disabled="loading || savingName">

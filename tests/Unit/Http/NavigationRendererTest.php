@@ -39,10 +39,10 @@ final class NavigationRendererTest extends TestCase
 
     public function testBrandAloneRendersAHeaderWithNoNav(): void
     {
-        $html = $this->renderer->render([], '/home', 'TurboScience');
+        $html = $this->renderer->render([], '/home', 'Acme Studio');
 
         $this->assertStringContainsString('<header class="cms-header">', $html);
-        $this->assertStringContainsString('<a class="cms-brand" href="/">TurboScience</a>', $html);
+        $this->assertStringContainsString('<a class="cms-brand" href="/">Acme Studio</a>', $html);
         // No menu, so no nav and no enhancement script.
         $this->assertStringNotContainsString('<nav', $html);
         $this->assertStringNotContainsString('<script>', $html);

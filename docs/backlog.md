@@ -260,7 +260,8 @@ plugins. But each has a concrete defect found by exercising it.
 
 **Verified good:** the CMS boots and works with `plugins/` emptied — health,
 admin UI, login and the management API all function. "Boots with zero plugins"
-holds, which is what makes the without-plugins TurboScience case real.
+holds, which is what makes the without-plugins case — a plain self-rendering
+site that installs nothing extra — real.
 
 ### rest-api (public delivery) — DONE, but see "Management API and delivery API"
 
