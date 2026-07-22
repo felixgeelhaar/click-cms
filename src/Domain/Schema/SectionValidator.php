@@ -67,7 +67,7 @@ final class SectionValidator
             FieldType::Number => $this->coerceNumber($field, $raw),
             FieldType::Boolean => ['value' => (bool) $raw, 'error' => null],
             FieldType::Select => $this->coerceSelect($field, $raw),
-            FieldType::Url => $this->coerceFiltered($field, $raw, FILTER_VALIDATE_URL, 'a valid URL'),
+            FieldType::Url => $this->coerceUrl($field, $raw),
             FieldType::Email => $this->coerceFiltered($field, $raw, FILTER_VALIDATE_EMAIL, 'a valid email address'),
             FieldType::Date => $this->coerceDate($field, $raw),
             FieldType::Image, FieldType::File => $this->coerceString($field, $raw),
@@ -131,6 +131,37 @@ final class SectionValidator
         }
 
         return ['value' => $value, 'error' => null];
+    }
+
+    /**
+     * A link the editor points a button at. Two shapes are allowed, and nothing
+     * else: a full http(s) URL for an off-site link, or an on-site absolute path
+     * beginning with a single slash for one of their own pages — the common case,
+     * which a bare FILTER_VALIDATE_URL would reject.
+     *
+     * The path branch is deliberately narrow because this value becomes an href.
+     * A protocol-relative `//host` (an off-site jump wearing a path's clothes), a
+     * `javascript:`/`data:` scheme, or a backslash used to fake a path are all
+     * refused. It mirrors the same allow-a-path-or-an-http-URL rule the redirect
+     * value object already enforces, so a link and a redirect cannot disagree
+     * about what is safe.
+     *
+     * @return array{value: mixed, error: ?string}
+     */
+    private function coerceUrl(FieldDefinition $field, mixed $raw): array
+    {
+        if (is_string($raw) && str_starts_with($raw, '/') && !str_starts_with($raw, '//')
+            && !str_contains($raw, '\\')) {
+            return ['value' => $raw, 'error' => null];
+        }
+
+        if (is_string($raw)
+            && (str_starts_with($raw, 'http://') || str_starts_with($raw, 'https://'))
+            && filter_var($raw, FILTER_VALIDATE_URL) !== false) {
+            return ['value' => $raw, 'error' => null];
+        }
+
+        return ['value' => null, 'error' => "{$field->label} must be a valid URL or an on-site path like /contact."];
     }
 
     /**

@@ -24,6 +24,22 @@ body {
 
 main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
 
+/*
+ * The main navigation. Rendered into <body> before <main>, so it styles itself
+ * as a full-width bar rather than inheriting the article measure.
+ */
+.cms-nav { border-bottom: 1px solid var(--rule); }
+.cms-nav-list {
+  max-width: var(--measure); margin: 0 auto; padding: 1rem 1.5rem;
+  list-style: none; display: flex; flex-wrap: wrap; gap: 1.75rem;
+}
+.cms-nav-item { margin: 0; }
+.cms-nav a {
+  color: var(--ink); text-decoration: none; font-weight: 500;
+  padding-bottom: 2px; border-bottom: 2px solid transparent;
+}
+.cms-nav a:hover { border-bottom-color: var(--accent); color: var(--accent); }
+
 .cms-section { padding: 3.5rem 0; border-bottom: 1px solid var(--rule); }
 .cms-section:last-child { border-bottom: 0; }
 .cms-section h2 { margin: 0 0 1rem; font-size: 1.75rem; letter-spacing: -0.01em; }
@@ -52,6 +68,32 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
   display: inline-block; padding: 0.7rem 1.5rem; border-radius: 6px;
   background: var(--accent); color: #fff; text-decoration: none;
 }
+
+/*
+ * The contact form. Labels stack above their fields, inputs fill the column,
+ * so a form is legible without the editor touching CSS. The honeypot keeps
+ * whatever inline positioning the renderer gave it — it must stay off-screen.
+ */
+.cms-form { max-width: 32rem; }
+.cms-form-field { display: flex; flex-direction: column; gap: 0.35rem; margin: 0 0 1.25rem; }
+.cms-form-field label { color: var(--ink); font-weight: 500; }
+.cms-form input,
+.cms-form textarea {
+  font: inherit; color: var(--ink); width: 100%;
+  padding: 0.6rem 0.75rem; border: 1px solid var(--rule); border-radius: 6px;
+  background: #fff;
+}
+.cms-form input:focus,
+.cms-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.cms-form textarea { min-height: 8rem; resize: vertical; }
+.cms-form button[type="submit"] {
+  font: inherit; font-weight: 500; cursor: pointer;
+  padding: 0.7rem 1.5rem; border: 0; border-radius: 6px;
+  background: var(--accent); color: #fff;
+}
+.cms-form button[type="submit"]:disabled { opacity: 0.6; cursor: default; }
+.cms-form-status:not(:empty) { margin-top: 0.75rem; color: var(--muted); }
+.cms-form-thanks { color: var(--ink); font-weight: 500; }
 
 @media (max-width: 48rem) {
   .cms-items { grid-template-columns: 1fr !important; }
