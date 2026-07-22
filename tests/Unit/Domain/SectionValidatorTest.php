@@ -172,6 +172,27 @@ final class SectionValidatorTest extends TestCase
         );
     }
 
+    /**
+     * A link field is where an editor points a button, and the button almost
+     * always points at one of their own pages. An on-site absolute path is the
+     * natural way to write that, so it is accepted alongside a full http(s) URL —
+     * but only a real path: a protocol-relative `//host`, a `javascript:` or
+     * `data:` scheme, or a bare word are all refused, because a link value ends
+     * up in an href and must not be able to smuggle a script or an off-site jump.
+     */
+    public function testUrlFieldAcceptsAnOnSitePathButNotAScriptOrProtocolRelative(): void
+    {
+        $type = $this->type([['name' => 'link', 'type' => 'url']]);
+
+        $this->assertTrue($this->validator->validate($type, ['link' => '/contact'])->isValid());
+        $this->assertTrue($this->validator->validate($type, ['link' => '/de/kontakt'])->isValid());
+        $this->assertTrue($this->validator->validate($type, ['link' => '/'])->isValid());
+
+        $this->assertFalse($this->validator->validate($type, ['link' => '//evil.example'])->isValid());
+        $this->assertFalse($this->validator->validate($type, ['link' => 'javascript:alert(1)'])->isValid());
+        $this->assertFalse($this->validator->validate($type, ['link' => 'contact'])->isValid());
+    }
+
     public function testDateMustBeRealAndCorrectlyFormatted(): void
     {
         $type = $this->type([['name' => 'd', 'type' => 'date']]);
