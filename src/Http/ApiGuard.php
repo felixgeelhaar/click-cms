@@ -170,7 +170,14 @@ final class ApiGuard
         // nothing, so a forged request achieves nothing a plain fetch could not,
         // and requiring a token would stop an anonymous front end — the intended
         // caller — from using it at all.
-        if (in_array($path, ['auth/login', 'auth/logout', 'graphql'], true)) {
+        //
+        // A contact-form submission is the same shape of thing: a public POST an
+        // anonymous visitor makes, which only appends a form-submission document
+        // and can read nothing. Requiring a token here would break the form for
+        // any visitor who also holds a session — an editor previewing their own
+        // site — while adding no protection, since the endpoint needs no account
+        // and a forger gains nothing the plain form does not already allow.
+        if (in_array($path, ['auth/login', 'auth/logout', 'graphql', 'forms/submit'], true)) {
             return null;
         }
 

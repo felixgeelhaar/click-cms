@@ -154,4 +154,16 @@ final class ApiGuardTest extends TestCase
         $this->assertNull($this->guard->enforceCsrf('auth/login', 'POST', []));
         $this->assertNull($this->guard->enforceCsrf('graphql', 'POST', []));
     }
+
+    /**
+     * A public contact form is submitted by anyone, with no token — the same
+     * anonymous POST graphql accepts. It must keep working even when the caller
+     * happens to hold a session (an editor previewing their own site), so it is
+     * exempt from CSRF like the other public writes.
+     */
+    public function testFormSubmitIsExemptFromCsrf(): void
+    {
+        $this->signIn('admin');
+        $this->assertNull($this->guard->enforceCsrf('forms/submit', 'POST', []));
+    }
 }
