@@ -8,6 +8,8 @@ use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\History\RetentionPolicy;
 use Click\Cms\Domain\History\Version;
+use Click\Cms\Domain\Schema\SectionType;
+use Click\Cms\Domain\Schema\SectionTypeRepository;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
@@ -362,6 +364,162 @@ final class HistoryServiceTest extends TestCase
         );
     }
 
+    /* ------------------------------------------------ schema re-validation -- */
+
+    /**
+     * A section type declaring exactly the fields the fixtures use, so a saved
+     * page fits the schema until a test removes the type or a field from it.
+     */
+    private function heroType(string ...$fields): SectionType
+    {
+        $fields = $fields === [] ? ['heading', 'body'] : $fields;
+
+        return SectionType::fromArray([
+            'id' => 'hero',
+            'label' => 'Hero',
+            'fields' => array_map(
+                static fn (string $name): array => ['name' => $name, 'type' => 'text', 'label' => $name],
+                $fields
+            ),
+        ]);
+    }
+
+    /**
+     * A HistoryService wired to a specific current schema, sharing this test's
+     * storage and version store so a page written in setUp can be restored
+     * against a schema that has since changed.
+     *
+     * @param list<SectionType> $types
+     */
+    private function historyWithSchema(array $types): HistoryService
+    {
+        return new HistoryService($this->storage, $this->versions, new InMemorySectionTypes($types));
+    }
+
+    /**
+     * Save a page carrying one hero section, then a second edit, and return the
+     * version identifier of the first — the state a test will restore.
+     *
+     * @param array<string, mixed> $heroValues
+     */
+    private function saveHeroThenEdit(array $heroValues): string
+    {
+        $page = Content::create($this->key(), [
+            'title' => 'Original',
+            'owner' => 'ada',
+            'sections' => [['type' => 'hero', 'values' => $heroValues]],
+        ]);
+        $this->storage->save($page);
+        $original = $this->versions->all($this->key())[0]->id;
+
+        $page->update(['title' => 'Later edit', 'sections' => []]);
+        $this->storage->save($page);
+
+        return $original;
+    }
+
+    /**
+     * The reassuring case: the design the restored content uses still exists and
+     * uses the same fields, so verbatim recovery reintroduces nothing the schema
+     * cannot account for and there is nothing to warn about.
+     */
+    public function testRestoringContentThatStillFitsTheSchemaWarnsAboutNothing(): void
+    {
+        $original = $this->saveHeroThenEdit(['heading' => 'Hi', 'body' => 'There']);
+        $history = $this->historyWithSchema([$this->heroType()]);
+
+        $result = $history->restore($this->key(), $original, $this->admin());
+
+        $this->assertNull($result['error']);
+        $this->assertSame(200, $result['status']);
+        $this->assertTrue($result['warnings']->fits());
+
+        // Restored verbatim regardless.
+        $this->assertSame(
+            [['type' => 'hero', 'values' => ['heading' => 'Hi', 'body' => 'There']]],
+            $this->storage->draft($this->key())?->data['sections']
+        );
+    }
+
+    /**
+     * The case the rule exists for. Every normal write goes through
+     * SectionValidator, which rejects a section type the schema does not
+     * declare, so stored content can only ever hold a shape the templates were
+     * written for. A restore is exempt from that — verbatim recovery is the
+     * right default — so it puts the removed-type section back, and the warning
+     * is what tells the editor it will not render before they publish it.
+     */
+    public function testRestoringASectionWhoseTypeWasRemovedReportsItButStillRestores(): void
+    {
+        $original = $this->saveHeroThenEdit(['heading' => 'Hi', 'body' => 'There']);
+
+        // The site no longer offers the hero design at all.
+        $history = $this->historyWithSchema([]);
+
+        $result = $history->restore($this->key(), $original, $this->admin());
+
+        $this->assertNull($result['error']);
+        $this->assertSame(200, $result['status']);
+        $this->assertFalse($result['warnings']->fits());
+        $this->assertSame(
+            [['index' => 0, 'type' => 'hero']],
+            $result['warnings']->removedSectionTypes
+        );
+
+        // The restore still happened and the content is verbatim.
+        $this->assertSame(
+            [['type' => 'hero', 'values' => ['heading' => 'Hi', 'body' => 'There']]],
+            $this->storage->draft($this->key())?->data['sections']
+        );
+    }
+
+    /**
+     * A field the section type no longer declares is exactly what a normal save
+     * would strip. The restore keeps it verbatim; the warning tells the editor
+     * it would vanish on the next edit, so they lose it on purpose rather than
+     * by surprise.
+     */
+    public function testRestoringAFieldTheSchemaNoLongerDeclaresReportsItButStillRestores(): void
+    {
+        $original = $this->saveHeroThenEdit(['heading' => 'Hi', 'subtitle' => 'Legacy']);
+
+        // The hero design survives, but its "subtitle" field is gone.
+        $history = $this->historyWithSchema([$this->heroType('heading', 'body')]);
+
+        $result = $history->restore($this->key(), $original, $this->admin());
+
+        $this->assertNull($result['error']);
+        $this->assertSame(200, $result['status']);
+        $this->assertFalse($result['warnings']->fits());
+        $this->assertSame(
+            [['index' => 0, 'type' => 'hero', 'field' => 'subtitle']],
+            $result['warnings']->strippedFields
+        );
+
+        // Verbatim: the field the schema would strip is still there after the
+        // restore, which is the whole point of a verbatim safety net.
+        $this->assertSame(
+            ['heading' => 'Hi', 'subtitle' => 'Legacy'],
+            $this->storage->draft($this->key())?->data['sections'][0]['values']
+        );
+    }
+
+    /**
+     * With no schema wired in — the state before the HTTP layer is taught to
+     * supply one — restore behaves exactly as it did before, warning about
+     * nothing, so adding the parameter cannot regress an existing caller.
+     */
+    public function testWithNoSchemaConfiguredRestoreReportsNoWarnings(): void
+    {
+        $original = $this->saveHeroThenEdit(['heading' => 'Hi', 'body' => 'There']);
+
+        $result = $this->history->restore($this->key(), $original, $this->admin());
+
+        $this->assertNull($result['error']);
+        $this->assertTrue($result['warnings']->fits());
+        $this->assertSame('Original', $this->storage->draft($this->key())?->title());
+    }
+
     /* ---------------------------------------------------------- retention -- */
 
     public function testRestoringIsSubjectToTheSameRetentionAsAnyOtherWrite(): void
@@ -384,5 +542,44 @@ final class HistoryServiceTest extends TestCase
         $history->restore($this->key(), $oldest->id, $this->admin());
 
         $this->assertCount(2, $versions->all($this->key()));
+    }
+}
+
+/**
+ * A section-type source held in memory, so a test can hand a restore whatever
+ * schema it needs to exercise — including one a type or a field has been removed
+ * from — without writing definition files to disk.
+ */
+final class InMemorySectionTypes implements SectionTypeRepository
+{
+    /** @var array<string, SectionType> */
+    private array $byId = [];
+
+    /** @param list<SectionType> $types */
+    public function __construct(array $types)
+    {
+        foreach ($types as $type) {
+            $this->byId[$type->id] = $type;
+        }
+    }
+
+    public function all(): array
+    {
+        return array_values($this->byId);
+    }
+
+    public function find(string $id): ?SectionType
+    {
+        return $this->byId[$id] ?? null;
+    }
+
+    public function has(string $id): bool
+    {
+        return isset($this->byId[$id]);
+    }
+
+    public function errors(): array
+    {
+        return [];
     }
 }
