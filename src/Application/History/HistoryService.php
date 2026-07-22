@@ -9,6 +9,9 @@ use Click\Cms\Domain\Publishing\PublishingStorage;
 use Click\Cms\Domain\History\VersionStoreInterface;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
+use Click\Cms\Domain\Schema\SchemaCompatibility;
+use Click\Cms\Domain\Schema\SchemaCompatibilityReport;
+use Click\Cms\Domain\Schema\SectionTypeRepository;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 
 /**
@@ -21,9 +24,17 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
  */
 final class HistoryService
 {
+    /**
+     * @param ?SectionTypeRepository $sectionTypes The schema a restored version
+     *        is measured against. Optional so a caller that has not wired one in
+     *        keeps today's behaviour — a restore with no schema to check warns
+     *        about nothing — rather than being forced to supply one before this
+     *        can be constructed at all.
+     */
     public function __construct(
         private readonly PublishingStorage $storage,
         private readonly VersionStoreInterface $versions,
+        private readonly ?SectionTypeRepository $sectionTypes = null,
     ) {}
 
     /**
@@ -80,14 +91,24 @@ final class HistoryService
      * itself undoable — the property that makes this safe to offer to an editor
      * who is already having a bad afternoon.
      *
+     * The restore is verbatim, and stays that way: `warnings` reports what the
+     * current schema no longer accounts for without changing a byte of what is
+     * restored. Every ordinary write goes through {@see SectionValidator}, so
+     * stored content only ever holds a shape the templates were written for; a
+     * restore is deliberately exempt from that, because a safety net that
+     * silently strips content during a recovery is worse than one that warns. So
+     * the recovery succeeds verbatim and the warnings tell the editor which
+     * sections will not render and which fields the next save would drop — so
+     * they can fix it before publishing rather than discover it live.
+     *
      * @param array<string, mixed> $user
-     * @return array{version: ?Version, error: ?string, status: int}
+     * @return array{version: ?Version, warnings: ?SchemaCompatibilityReport, error: ?string, status: int}
      */
     public function restore(ContentKey $key, string $versionId, array $user): array
     {
         $version = $this->versions->find($key, $versionId);
         if ($version === null) {
-            return ['version' => null, 'error' => 'Version not found.', 'status' => 404];
+            return ['version' => null, 'warnings' => null, 'error' => 'Version not found.', 'status' => 404];
         }
 
         // The working copy, not the live page. A restore replaces what the
@@ -106,6 +127,7 @@ final class HistoryService
         if (!$role->canRestoreContentOwnedBy($owner, $this->usernameOf($user))) {
             return [
                 'version' => null,
+                'warnings' => null,
                 'error' => 'You do not have permission to restore this page.',
                 'status' => 403,
             ];
@@ -135,6 +157,12 @@ final class HistoryService
 
         $restored = $version->content();
 
+        // Measured before the restore writes, but the restore is unconditional
+        // either way: this only reports what no longer fits, it never decides
+        // whether to proceed. The content that goes back and the content that is
+        // checked are the same verbatim state.
+        $warnings = $this->schemaWarningsFor($restored->data);
+
         // An empty update, purely for its effect on the timestamp: the document
         // was changed now, even though its content is old, and a listing sorted
         // by "last edited" would otherwise bury it.
@@ -142,7 +170,27 @@ final class HistoryService
 
         $this->storage->saveWithReason($restored, Version::REASON_RESTORE);
 
-        return ['version' => $version, 'error' => null, 'status' => 200];
+        return ['version' => $version, 'warnings' => $warnings, 'error' => null, 'status' => 200];
+    }
+
+    /**
+     * What the current schema no longer accounts for in a restored document.
+     *
+     * The decision is pure domain logic — schema plus content — so this method
+     * does only the I/O the domain may not: loading the section types the site
+     * declares now. With no repository wired in there is no schema to measure
+     * against, and an empty report says "nothing to warn about", which is the
+     * behaviour a caller that predates this had.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function schemaWarningsFor(array $data): SchemaCompatibilityReport
+    {
+        if ($this->sectionTypes === null) {
+            return SchemaCompatibilityReport::empty();
+        }
+
+        return (new SchemaCompatibility($this->sectionTypes->all()))->check($data);
     }
 
     /**
