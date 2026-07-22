@@ -9,6 +9,31 @@
     <section class="panel">
       <div class="setting">
         <div class="setting-copy">
+          <h2 class="setting-title">Site name</h2>
+          <p class="setting-desc">
+            Shown as the brand in your site's header. Leave it empty for no brand.
+          </p>
+          <form class="inline-form" @submit.prevent="saveSiteName">
+            <label class="visually-hidden" for="site-name">Site name</label>
+            <input
+              id="site-name"
+              v-model="siteName"
+              type="text"
+              class="text-input"
+              placeholder="e.g. TurboScience"
+              :disabled="loading || savingName"
+            />
+            <button type="submit" class="btn-primary" :disabled="loading || savingName">
+              {{ savingName ? 'Saving…' : 'Save' }}
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="setting">
+        <div class="setting-copy">
           <h2 class="setting-title">Headless mode</h2>
           <p class="setting-desc">
             Off, this instance renders your website for visitors. On, it renders no
@@ -48,8 +73,10 @@
 import { onMounted, ref } from 'vue';
 
 const headless = ref(false);
+const siteName = ref('');
 const loading = ref(true);
 const saving = ref(false);
+const savingName = ref(false);
 const error = ref('');
 const notice = ref('');
 
@@ -61,10 +88,38 @@ const load = async () => {
     if (!res.ok) throw new Error(`Request failed (${res.status})`);
     const body = await res.json();
     headless.value = Boolean(body.data?.headless);
+    siteName.value = body.data?.siteName ?? '';
   } catch (e) {
     error.value = `Could not read the settings: ${e.message}`;
   } finally {
     loading.value = false;
+  }
+};
+
+const saveSiteName = async () => {
+  savingName.value = true;
+  error.value = '';
+  notice.value = '';
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteName: siteName.value }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      error.value = body.error || `Could not save (${res.status}).`;
+      return;
+    }
+    // Re-read what the server kept, so the field shows the trimmed, stored value.
+    siteName.value = body.data?.siteName ?? '';
+    notice.value = siteName.value
+      ? `Site name saved. Your header now shows “${siteName.value}”.`
+      : 'Site name cleared. Your header shows no brand.';
+  } catch (e) {
+    error.value = `Could not save: ${e.message}`;
+  } finally {
+    savingName.value = false;
   }
 };
 
@@ -122,6 +177,12 @@ onMounted(load);
 .setting-desc { margin: 0 0 0.6rem; font-size: 0.875rem; line-height: 1.5; color: var(--app-text-muted); }
 .setting-state { margin: 0; font-size: 0.8125rem; color: var(--app-text-muted); }
 .setting-state.warn { color: var(--color-warning-500, #b45309); }
+.inline-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; max-width: 26rem; }
+.text-input { flex: 1; min-width: 0; padding: 0.55rem 0.7rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.text-input:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; border-color: var(--color-primary-600); }
+.btn-primary { padding: 0.55rem 1.1rem; border: 0; border-radius: 8px; background: var(--color-primary-600); color: #fff; font-weight: 500; cursor: pointer; }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .switch { display: inline-flex; flex-direction: column; align-items: center; gap: 0.35rem; cursor: pointer; }
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 .switch-track { position: relative; width: 46px; height: 26px; border-radius: 999px; background: var(--app-surface-strong); border: 1px solid var(--app-border); transition: background 0.15s; }
