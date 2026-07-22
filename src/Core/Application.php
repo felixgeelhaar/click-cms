@@ -25,6 +25,7 @@ use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\PluginsController;
 use Click\Cms\Http\UsersController;
 use Click\Cms\Http\ApiGuard;
+use Click\Cms\Http\DeliveryCors;
 use Click\Cms\Http\AuthController;
 use Click\Cms\Http\HealthCheck;
 use Click\Cms\Http\SectionRenderer;
@@ -56,6 +57,7 @@ class Application
     private ?\Click\Cms\Application\Audit\AuditService $auditService = null;
     private ?SessionStore $sessions = null;
     private ?ApiGuard $apiGuard = null;
+    private ?DeliveryCors $deliveryCors = null;
     private ?AuthController $authController = null;
     private ?LoginThrottle $throttle = null;
     private array $coreConfig = [];
@@ -193,6 +195,7 @@ class Application
             $this->getIdleTimeoutSeconds()
         );
         $this->apiGuard = new ApiGuard($this->sessions);
+        $this->deliveryCors = new DeliveryCors($this->config->deliveryAllowedOrigins(), $this->apiGuard);
         $this->throttle = new LoginThrottle(
             $this->basePath . '/data/lockouts.json',
             $this->config->lockoutMaxAttempts(),
@@ -931,36 +934,16 @@ class Application
      */
     private function applyDeliveryCors(string $path, string $method): ?array
     {
-        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-        if ($origin === '') {
+        $decision = $this->deliveryCors->evaluate($path, $method, $_SERVER);
+        if ($decision === null) {
             return null;
         }
 
-        $allowed = $this->config?->deliveryAllowedOrigins() ?? [];
-        if (!in_array($origin, $allowed, true)) {
-            return null;
+        foreach ($decision['headers'] as $name => $value) {
+            header($name . ': ' . $value);
         }
 
-        // A preflight asks about the request that follows, so the answer has to
-        // consider that method rather than OPTIONS itself.
-        $intended = $method === 'OPTIONS'
-            ? strtoupper((string) ($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD'] ?? 'GET'))
-            : $method;
-
-        if (!$this->apiGuard->isPublic($path, $intended)) {
-            return null;
-        }
-
-        header('Access-Control-Allow-Origin: ' . $origin);
-        header('Vary: Origin');
-        header('Access-Control-Allow-Methods: GET, HEAD, OPTIONS');
-        header('Access-Control-Max-Age: 600');
-
-        if ($method === 'OPTIONS') {
-            return ['status' => 204, 'raw' => true, 'html' => ''];
-        }
-
-        return null;
+        return $decision['preflight'];
     }
 
     private function getSessionUser(): ?array
