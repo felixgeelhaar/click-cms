@@ -37,6 +37,7 @@ use Click\Cms\Infrastructure\Audit\AuditingStorage;
 use Click\Cms\Infrastructure\Audit\JsonAuditLog;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
+use Click\Cms\Infrastructure\Storage\AuthorizingStorage;
 use Click\Cms\Infrastructure\Storage\StorageFactory;
 use Click\Cms\Infrastructure\Storage\VersioningStorage;
 
@@ -179,6 +180,35 @@ class Application
                 $auditLog,
                 $author,
             );
+
+            // Defense in depth at the storage boundary, complementing — not
+            // duplicating — the request guard. Anonymous access to a state-
+            // changing path is already denied by default before a handler runs,
+            // and the writes that legitimately carry no session (a public form
+            // submission, the first-boot admin seed, a CLI task) must not be
+            // blocked here. The gap the request guard cannot close is an
+            // *authenticated* caller whose role should not be writing reaching a
+            // handler that forgot its capability check: a signed-in viewer, or
+            // any future read-only role. That is what this refuses.
+            //
+            // The specific capability a write needs — create vs edit, own vs any,
+            // a user account vs a page — stays with the handler that alone knows
+            // the ownership and intent; the storage layer only asks the weaker,
+            // type-blind question of whether this account may mutate content at
+            // all, throwing rather than silently dropping when the answer is no.
+            $authorizer = function (string $op, ContentKey $key): bool {
+                $user = $this->getSessionUser();
+                if ($user === null || $user === []) {
+                    return true;
+                }
+
+                $role = Role::fromName($user['role'] ?? null);
+                return $role->can(Capability::CreateContent)
+                    || $role->can(Capability::EditOwnContent)
+                    || $role->can(Capability::EditAnyContent);
+            };
+
+            $storage = new AuthorizingStorage($storage, $authorizer);
             $this->contentService = new ContentService($storage, $this->config->defaultLocale());
 
         $this->history = new HistoryService($storage, $versions);
