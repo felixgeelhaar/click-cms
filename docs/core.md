@@ -347,18 +347,18 @@ rather than letting the server's 403 be the interface.
 
 What remains:
 
-1. **There is no frontend test framework, and it has cost real bugs.** Every
-   capability verified through the API had a matching UI defect nobody saw:
-   removing the `status` field left the page list and the dashboard reporting a
-   site that was entirely live as "0 published"; adding a language segment to the
-   key broke every slug the list rendered and made Delete remove the wrong
-   language's document. Each was found by reading code, not by a failing test.
-   This is the largest hole in the project's safety net.
-2. **Restore does not re-validate against the current schema.** Restoring a
-   version whose section type has since been removed puts back content the schema
-   no longer declares. Verbatim recovery is the right default for a safety net,
-   but it contradicts the rule that stored content only ever holds a shape the
-   templates were written for, and that tension should be resolved on purpose.
+1. **Move users and plugins management into core.** After the delivery-plugin
+   cleanup, `rest-api` holds no delivery surface — only user CRUD, plugin
+   management and `/api/info`, all of which the admin UI depends on. A plugin
+   named "delivery API" holding account management together is the fake
+   optionality this document exists to prevent. Move it to core and delete the
+   plugin. Security-sensitive (passwords, plugin activation); wants its own
+   verified pass. Related: plugin deactivation does not persist across a restart.
+2. **Extract identity out of `Application`.** The kernel is ~1,560 lines, of
+   which some 39 methods are authentication, sessions, throttling, CSRF and
+   password changes — an entire bounded context living inside the HTTP entry
+   point, and the largest DDD violation in the codebase. This is the pure-refactor
+   centrepiece and should be done test-first.
 3. **History covers pages only.** Media and user documents are versioned at the
    storage layer, but nothing exposes those versions.
 4. **Extract the kernel, router, config and health.** What remains of
