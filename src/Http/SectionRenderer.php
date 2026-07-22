@@ -72,10 +72,67 @@ final class SectionRenderer
             }
 
             $values = is_array($section['values'] ?? null) ? $section['values'] : [];
-            $html .= $this->renderSection($type, $values);
+
+            // A form section is not display content — its fields configure an
+            // actual form. It is rendered as a working <form> that posts to the
+            // forms plugin, rather than through the generic field renderer that
+            // would just print the labels as text.
+            $html .= $section['type'] === 'form'
+                ? $this->renderForm($values, $page)
+                : $this->renderSection($type, $values);
         }
 
         return $html;
+    }
+
+    /**
+     * A contact form section, rendered as a working POST form.
+     *
+     * The input names are fixed because the forms plugin's submit endpoint reads
+     * them by name; only the labels are the editor's. The page and locale ride
+     * along hidden so a submission records where it came from. The honeypot is
+     * hidden from people but not from bots — one filled in is dropped silently by
+     * the endpoint. Every configured label is escaped, since it is editor text
+     * going into HTML.
+     *
+     * @param array<string, mixed> $values
+     */
+    private function renderForm(array $values, Content $page): string
+    {
+        $label = fn (string $key, string $default): string => $this->escape(
+            is_scalar($values[$key] ?? null) && (string) $values[$key] !== ''
+                ? (string) $values[$key]
+                : $default
+        );
+
+        $heading = isset($values['heading']) && is_scalar($values['heading'])
+            ? '<h2 class="cms-field cms-field--heading">' . $this->escape((string) $values['heading']) . '</h2>'
+            : '';
+        $intro = isset($values['intro']) && is_scalar($values['intro']) && (string) $values['intro'] !== ''
+            ? '<p class="cms-field cms-field--intro">' . $this->escape((string) $values['intro']) . '</p>'
+            : '';
+
+        $slug = $this->escape($page->slug());
+        $locale = $this->escape($page->locale()->code);
+
+        return '<section class="cms-section cms-section--form">'
+            . $heading . $intro
+            . '<form class="cms-form" method="POST" action="/api/forms/submit">'
+            . '<input type="hidden" name="page" value="' . $slug . '">'
+            . '<input type="hidden" name="locale" value="' . $locale . '">'
+            // The honeypot: positioned off-screen and hidden from assistive tech,
+            // so a person never sees it and a bot that fills every field does.
+            . '<div class="cms-form-hp" aria-hidden="true" style="position:absolute;left:-9999px" >'
+            . '<label>Leave this empty<input type="text" name="website" tabindex="-1" autocomplete="off"></label>'
+            . '</div>'
+            . '<p class="cms-form-field"><label for="cf-name">' . $label('nameLabel', 'Your name') . '</label>'
+            . '<input id="cf-name" type="text" name="name" required></p>'
+            . '<p class="cms-form-field"><label for="cf-email">' . $label('emailLabel', 'Email address') . '</label>'
+            . '<input id="cf-email" type="email" name="email" required></p>'
+            . '<p class="cms-form-field"><label for="cf-message">' . $label('messageLabel', 'Message') . '</label>'
+            . '<textarea id="cf-message" name="message" required></textarea></p>'
+            . '<button type="submit">' . $label('submitLabel', 'Send message') . '</button>'
+            . '</form></section>';
     }
 
     /**

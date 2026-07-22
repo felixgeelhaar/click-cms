@@ -69,6 +69,7 @@ final class ApiGuardTest extends TestCase
         $this->assertTrue($this->guard->isPublic('media/file/x.jpg', 'GET'));
         $this->assertTrue($this->guard->isPublic('graphql', 'POST'));
         $this->assertTrue($this->guard->isPublic('search', 'GET'));
+        $this->assertTrue($this->guard->isPublic('forms/submit', 'POST'));
         $this->assertTrue($this->guard->isPublic('auth/login', 'POST'));
     }
 

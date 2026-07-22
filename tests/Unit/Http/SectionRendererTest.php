@@ -285,6 +285,31 @@ final class SectionRendererTest extends TestCase
         $this->assertStringContainsString('alt="Balancing"', $html);
     }
 
+    /**
+     * A form section renders as a working POST form to the forms endpoint, with
+     * the fixed input names the plugin reads and the page carried hidden. The
+     * configured labels are the editor's; a script in one must not become markup.
+     */
+    public function testAFormSectionRendersAsAWorkingForm(): void
+    {
+        $html = $this->renderer->render($this->page([
+            ['type' => 'form', 'values' => [
+                'heading' => 'Contact us',
+                'submitLabel' => '<b>Go</b>',
+            ]],
+        ]));
+
+        $this->assertStringContainsString('<form class="cms-form" method="POST" action="/api/forms/submit">', $html);
+        $this->assertStringContainsString('name="name"', $html);
+        $this->assertStringContainsString('name="email"', $html);
+        $this->assertStringContainsString('name="message"', $html);
+        $this->assertStringContainsString('name="website"', $html); // honeypot
+        $this->assertStringContainsString('name="page" value="home"', $html);
+        // The label is escaped, not rendered as a tag.
+        $this->assertStringNotContainsString('<b>Go</b>', $html);
+        $this->assertStringContainsString('&lt;b&gt;Go&lt;/b&gt;', $html);
+    }
+
     public function testMalformedSectionsAreIgnoredRatherThanFatal(): void
     {
         $page = Content::create(ContentKey::page('home'), ['sections' => [

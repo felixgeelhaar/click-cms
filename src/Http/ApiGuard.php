@@ -51,6 +51,15 @@ final class ApiGuard
             return true;
         }
 
+        // A visitor with no account submits a contact form, so this one POST is
+        // public. It only writes a form-submission document and cannot read
+        // anything; the plugin validates and honeypots it. Nothing an anonymous
+        // caller does through it is a request the site's own pages could not
+        // already make, so there is nothing to forge.
+        if ($path === 'forms/submit') {
+            return true;
+        }
+
         if (!CsrfGuard::isSafeMethod($method)) {
             return false;
         }
