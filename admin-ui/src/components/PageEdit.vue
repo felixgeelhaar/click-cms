@@ -1,6 +1,16 @@
 <template>
   <div class="page-edit">
-    <h1 class="page-title">{{ isNew ? 'New Page' : 'Edit Page' }}</h1>
+    <div class="edit-heading">
+      <h1 class="page-title">{{ isNew ? 'New Page' : 'Edit Page' }}</h1>
+      <!-- Who else is on this page right now. Only meaningful once the page
+           exists (a new, unsaved page has no address to share). -->
+      <PresenceBar
+        v-if="!isNew && storedSlug"
+        :page="storedSlug"
+        :locale="locale"
+        :current-user="currentUsername"
+      />
+    </div>
 
     <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
     <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
@@ -188,6 +198,9 @@
         @restore="restoreVersion"
         @reload="loadVersions"
       />
+
+      <!-- Review notes for this page. Comments live once the page does. -->
+      <CommentsPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" />
     </div>
   </div>
 </template>
@@ -195,6 +208,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import SectionEditor from './SectionEditor.vue';
+import PresenceBar from './collaboration/PresenceBar.vue';
+import CommentsPanel from './collaboration/CommentsPanel.vue';
 import PagePublication from './PagePublication.vue';
 import PageLanguages from './PageLanguages.vue';
 import PageVersions from './PageVersions.vue';
@@ -264,6 +279,9 @@ const sectionErrors = ref({});
 // teaches them the product is broken.
 const capabilities = ref([]);
 const can = (capability) => capabilities.value.includes(capability);
+// The signed-in username, so the presence bar can show who *else* is on the page
+// rather than counting the reader among the crowd.
+const currentUsername = ref('');
 
 /* ------------------------------------------------------ languages -- */
 
@@ -351,6 +369,7 @@ const loadCapabilities = async () => {
     const res = await fetch('/api/auth/check');
     const body = await res.json();
     capabilities.value = body.data?.user?.capabilities ?? [];
+    currentUsername.value = body.data?.user?.username ?? '';
   } catch {
     // An empty set hides every privileged control rather than showing one that
     // cannot work. Failing closed is the only safe direction here.
@@ -758,6 +777,8 @@ onMounted(async () => {
 
 <style scoped>
 .page-edit { max-width: 860px; }
+.edit-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
+.edit-heading .page-title { margin-bottom: 0; }
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin-bottom: 2rem; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
 .banner.error { color: var(--color-danger-600, #dc2626); }
