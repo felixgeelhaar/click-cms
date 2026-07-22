@@ -90,6 +90,33 @@ final class SettingsTest extends TestCase
         $settings = Settings::load($this->path);
         $settings->setHeadless(true);
 
-        $this->assertSame(['headless' => true], Settings::load($this->path)->toArray());
+        $this->assertSame(
+            ['headless' => true, 'siteName' => ''],
+            Settings::load($this->path)->toArray()
+        );
+    }
+
+    public function testSiteNameIsEmptyByDefault(): void
+    {
+        // A fresh install has no brand until an operator names the site; the
+        // header simply shows no brand rather than inventing one.
+        $this->assertSame('', Settings::load($this->path)->siteName());
+    }
+
+    public function testSettingTheSiteNamePersistsAndTrims(): void
+    {
+        Settings::load($this->path)->setSiteName('  TurboScience  ');
+
+        // Trimmed on the way in, so the stored brand has no stray whitespace, and
+        // it reached disk rather than one object's memory.
+        $this->assertSame('TurboScience', Settings::load($this->path)->siteName());
+    }
+
+    public function testClearingTheSiteNamePersists(): void
+    {
+        Settings::load($this->path)->setSiteName('TurboScience');
+        Settings::load($this->path)->setSiteName('');
+
+        $this->assertSame('', Settings::load($this->path)->siteName());
     }
 }
