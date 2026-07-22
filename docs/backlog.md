@@ -158,8 +158,11 @@ editor, and the media library.
 
 Known gaps:
 
-- Rich text is a plain textarea. The seam exists to drop an editor in without
-  touching anything else.
+- ~~Rich text is a plain textarea.~~ Done: `richtext` fields now use a
+  dependency-free contenteditable editor (bold, italic, links, lists, H2/H3),
+  and the renderer sanitises the stored HTML to a fixed tag/attribute allowlist
+  server-side — the admin editor's sanitising is a courtesy, the renderer's is
+  the security boundary, since anyone can POST directly to the API.
 - ~~Sidebar navigation uses `<a>` elements with no `href`.~~ Fixed: the links
   carry their destination and mark the current page, so they are keyboard
   reachable, announced as links, and open in a new tab on Cmd/Ctrl-click.
@@ -180,9 +183,12 @@ Outstanding:
 - SVG is refused because it can carry script. Logos are usually SVG, so this is
   a real cost. Supporting it safely needs a sanitiser; a half-sanitised SVG is
   worse than none.
-- No cropping or focal point. Variants preserve the source aspect ratio, because
-  cropping to a fixed box is an editorial decision the CMS should not make
-  silently.
+- ~~No focal point.~~ Done: an image carries a focal point (a 0..1 coordinate,
+  centre by default), set by clicking or arrow-nudging a preview in the media
+  library. It rides through `MediaItem::toArray` into the delivery API and is
+  expressible as CSS `object-position`, so a front end honours it for free. Still
+  open: actual server-side cropping to fixed boxes (deliberately deferred — a
+  crop is an editorial decision, and object-position covers the common case).
 - No bulk operations, folders, or search. Fine for tens of images, painful at
   hundreds.
 

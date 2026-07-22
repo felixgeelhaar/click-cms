@@ -366,9 +366,9 @@ What remains:
 5. **Settings out of files.** Bootstrap stays on disk because storage
    configuration cannot live in storage; everything else becomes a document,
    edited in the admin UI.
-6. **No audit trail**, which matters more now that a restore can replace a
-   working copy, a publish changes what the public sees, and a preview link can
-   be handed to somebody with no account.
+6. ~~No audit trail.~~ Done: an append-only trail records who did what
+   (created, updated, deleted, published, unpublished, restored), as a storage
+   decorator wrapping versioning, readable by an administrator at `GET /api/audit`.
 7. **Concurrent editors are unmodelled.** Two people editing one page produce two
    draft chains with no rule for which wins. Draft-and-publish makes this
    visible where immediate saves hid it. See `collaboration.md`.
