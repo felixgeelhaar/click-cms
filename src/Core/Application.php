@@ -22,6 +22,8 @@ use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\PluginsController;
+use Click\Cms\Http\UsersController;
 use Click\Cms\Http\ApiGuard;
 use Click\Cms\Http\AuthController;
 use Click\Cms\Http\HealthCheck;
@@ -48,6 +50,8 @@ class Application
     private ?EventBus $eventBus = null;
     private array $apiRoutes = [];
     private ?CoreApiRoutes $coreApiRoutes = null;
+    private ?UsersController $usersController = null;
+    private ?PluginsController $pluginsController = null;
     private ?HistoryService $history = null;
     private ?\Click\Cms\Application\Audit\AuditService $auditService = null;
     private ?SessionStore $sessions = null;
@@ -174,6 +178,14 @@ class Application
             $this->config
         );
 
+        // User management is core (the admin UI depends on it); it fires the same
+        // account hooks the plugin it moved out of did, so any listener still runs.
+        $this->usersController = new UsersController(
+            $this->contentService,
+            $this->config,
+            fn (string $event, array $payload): mixed => $this->pluginManager?->executeHook($event, $payload),
+        );
+
         // Sessions and login throttling are collaborators rather than methods on
         // this class, so each can be understood and tested on its own.
         $this->sessions = new SessionStore(
@@ -201,10 +213,20 @@ class Application
         $this->pluginManager->setContentService($this->contentService);
         
         $plugins = $this->pluginManager->discover();
-        
+
+        // Activate each plugin that has not been explicitly turned off. A
+        // deactivation is persisted, so it survives here — the previous blanket
+        // loop activated everything unconditionally, which is why turning a
+        // plugin off never lasted past a restart.
         foreach ($plugins as $plugin) {
-            $this->pluginManager->activate($plugin->id);
+            if (!$this->pluginManager->isDeactivated($plugin->id)) {
+                $this->pluginManager->activate($plugin->id);
+            }
         }
+
+        // Plugin management is core — the admin UI's Plugins page depends on it —
+        // so it is wired here rather than in a plugin that could be disabled.
+        $this->pluginsController = new PluginsController($this->pluginManager);
 
         // Identity — login, logout, password changes, the default admin — is its
         // own controller, given the same session store the rest of a request
@@ -750,10 +772,18 @@ class Application
         // Core routes first. These are the management endpoints the admin UI
         // cannot work without, so they answer whether or not any delivery API
         // plugin is enabled — a site rendering its own pages still needs to be
-        // editable.
-        $coreMatch = $this->matchRouteTable($this->coreApiRoutes->routes(), $path, $method);
-        if ($coreMatch !== null) {
-            return $this->executeHandler($coreMatch['handler'], $coreMatch['params']);
+        // editable. Users and plugins management were once in the rest-api
+        // plugin; they are core now, for exactly this reason.
+        $coreTables = [
+            $this->coreApiRoutes->routes(),
+            $this->usersController->routes(),
+            $this->pluginsController->routes(),
+        ];
+        foreach ($coreTables as $table) {
+            $match = $this->matchRouteTable($table, $path, $method);
+            if ($match !== null) {
+                return $this->executeHandler($match['handler'], $match['params']);
+            }
         }
 
         $routes = $this->pluginManager->executeHook('api.routes', []);
@@ -1026,10 +1056,9 @@ class Application
 
     private function shouldSkipPluginRoutes(string $pluginName): bool
     {
-        if ($pluginName === 'REST API' && !$this->isCoreRestApiEnabled()) {
-            return true;
-        }
-
+        // The REST API plugin was deleted — its user and plugin management moved
+        // into core, and its page/media routes had long been dead duplicates of
+        // core's. Nothing to skip for it any more.
         if ($pluginName === 'GraphQL API' && !$this->isGraphqlEnabled()) {
             return true;
         }
