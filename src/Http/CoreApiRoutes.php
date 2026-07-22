@@ -737,13 +737,40 @@ final class CoreApiRoutes
     public function updateMedia(string $id): array
     {
         $body = json_decode(file_get_contents('php://input') ?: '[]', true);
-        $alt = is_array($body) ? (string) ($body['alt'] ?? '') : '';
+        $body = is_array($body) ? $body : [];
 
-        $item = $this->media()->updateAlt($id, $alt);
+        if ($this->media()->find($id) === null) {
+            return ['status' => 404, 'error' => 'Media not found'];
+        }
 
-        return $item === null
-            ? ['status' => 404, 'error' => 'Media not found']
-            : ['data' => $item->toArray()];
+        // Each field is applied only when it is present, so a request that sets
+        // just the focal point does not blank the alt text it did not mention,
+        // and the reverse. Updating one thing must not erase another.
+        $item = null;
+        if (array_key_exists('alt', $body)) {
+            $item = $this->media()->updateAlt($id, (string) $body['alt']);
+        }
+
+        if (isset($body['focalPoint']) && is_array($body['focalPoint'])) {
+            $point = $body['focalPoint'];
+            try {
+                $item = $this->media()->updateFocalPoint(
+                    $id,
+                    (float) ($point['x'] ?? 0.5),
+                    (float) ($point['y'] ?? 0.5)
+                );
+            } catch (\InvalidArgumentException $e) {
+                // A focal point outside the image is a client bug, not a server
+                // one — say what was wrong rather than storing nonsense.
+                return ['status' => 422, 'error' => $e->getMessage()];
+            }
+        }
+
+        // Nothing recognised to change: return the item as it stands rather than
+        // treating an empty update as an error.
+        $item ??= $this->media()->find($id);
+
+        return ['data' => $item?->toArray()];
     }
 
     /**
