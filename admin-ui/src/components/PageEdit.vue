@@ -74,6 +74,74 @@
       <SectionEditor v-model="page.sections" :errors="sectionErrors" />
 
       <!--
+        Page-level SEO. Collapsed by default because most edits are to the body,
+        not the metadata, and an always-open block would push the sections down
+        the page. The values live under a single `seo` key so they ride along in
+        the ordinary page save — PageService leaves top-level keys it does not
+        recognise untouched, so no new endpoint is needed.
+      -->
+      <details class="seo-group">
+        <summary class="seo-summary">Search &amp; social (SEO)</summary>
+
+        <div class="form-group">
+          <label for="seo-meta-title">Meta title</label>
+          <input
+            id="seo-meta-title"
+            v-model="page.seo.metaTitle"
+            type="text"
+            placeholder="Falls back to the page title"
+          />
+          <p class="field-help">
+            Shown in the browser tab and search results. Left empty, the page
+            title is used.
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label for="seo-description">Meta description</label>
+          <textarea
+            id="seo-description"
+            v-model="page.seo.description"
+            rows="2"
+            placeholder="A sentence or two summarising the page"
+          ></textarea>
+          <p class="field-help">
+            The snippet search engines and social cards show under the title.
+          </p>
+        </div>
+
+        <!--
+          The same picker section image fields use, so the Open Graph image is
+          chosen from the media library rather than pasted as a URL. Reusing it
+          means one place resolves references, warns about low-resolution files
+          and keeps the reference stable if the file is renamed.
+        -->
+        <ImageField
+          :field="ogImageField"
+          v-model="page.seo.ogImage"
+        />
+
+        <div class="form-group">
+          <label for="seo-canonical">Canonical URL</label>
+          <input
+            id="seo-canonical"
+            v-model="page.seo.canonicalUrl"
+            type="url"
+            placeholder="https://example.com/this-page"
+          />
+          <p class="field-help">
+            The preferred address for this page, when the same content is
+            reachable at more than one URL. Leave empty unless you need it.
+          </p>
+        </div>
+
+        <div class="form-group form-check">
+          <input id="seo-noindex" v-model="page.seo.noindex" type="checkbox" />
+          <label for="seo-noindex">Hide this page from search engines (noindex)</label>
+        </div>
+      </details>
+
+      <!--
         The link is shown rather than opened for the editor automatically. It is
         meant to be sent to somebody — a client, a proofreader — who has no
         account, so having it selectable is the point, and a popup blocker
@@ -130,6 +198,7 @@ import SectionEditor from './SectionEditor.vue';
 import PagePublication from './PagePublication.vue';
 import PageLanguages from './PageLanguages.vue';
 import PageVersions from './PageVersions.vue';
+import ImageField from './fields/ImageField.vue';
 
 const props = defineProps({ slug: String, initialLocale: { type: String, default: '' } });
 const emit = defineEmits(['saved', 'cancel']);
@@ -140,7 +209,40 @@ const emit = defineEmits(['saved', 'cancel']);
 const storedSlug = ref(props.slug || '');
 const isNew = computed(() => !storedSlug.value);
 
-const page = ref({ title: '', slug: '', sections: [] });
+// The SEO block's stable shape. Kept as one factory so every place that resets
+// the page — a fresh page, a load, an untranslated language — starts SEO from
+// the same keys, and the save payload is predictable regardless of how the
+// editor arrived here.
+const emptySeo = () => ({ metaTitle: '', description: '', ogImage: '', canonicalUrl: '', noindex: false });
+
+// A minimal field descriptor so the media picker section image fields use can
+// be reused verbatim for the Open Graph image. displayWidth is 1200 because
+// that is the width social cards render at, so the picker's quality warning is
+// judged against the slot this image actually fills.
+const ogImageField = {
+  label: 'Open Graph image',
+  help: 'The image shown when this page is shared on social media.',
+  displayWidth: 1200,
+};
+
+// Fill the SEO shape from whatever the API returned, ignoring anything that is
+// not the expected type. A stored payload can carry an array where a string is
+// expected; binding that to a text input would throw, so the empty default
+// wins over a value of the wrong shape.
+const seoFrom = (raw) => {
+  const base = emptySeo();
+  if (!raw || typeof raw !== 'object') return base;
+
+  return {
+    metaTitle: typeof raw.metaTitle === 'string' ? raw.metaTitle : base.metaTitle,
+    description: typeof raw.description === 'string' ? raw.description : base.description,
+    ogImage: typeof raw.ogImage === 'string' ? raw.ogImage : base.ogImage,
+    canonicalUrl: typeof raw.canonicalUrl === 'string' ? raw.canonicalUrl : base.canonicalUrl,
+    noindex: raw.noindex === true,
+  };
+};
+
+const page = ref({ title: '', slug: '', sections: [], seo: emptySeo() });
 const loading = ref(false);
 const saving = ref(false);
 const previewing = ref(false);
@@ -281,7 +383,7 @@ const loadPage = async () => {
     // this is a translation waiting to be written rather than a broken link.
     translationMissing.value = true;
     publication.value = null;
-    page.value = { title: '', slug: storedSlug.value, sections: [] };
+    page.value = { title: '', slug: storedSlug.value, sections: [], seo: emptySeo() };
     savedSnapshot.value = snapshot();
     return;
   }
@@ -300,7 +402,7 @@ const loadPage = async () => {
       sections: Array.isArray(data.sections) ? data.sections : [],
     };
     fallbackSourceLocale.value = body.locale ?? defaultLocale.value;
-    page.value = { title: '', slug: storedSlug.value, sections: [] };
+    page.value = { title: '', slug: storedSlug.value, sections: [], seo: emptySeo() };
     savedSnapshot.value = snapshot();
     return;
   }
@@ -312,6 +414,7 @@ const loadPage = async () => {
     title: data.title ?? '',
     slug: storedSlug.value,
     sections: Array.isArray(data.sections) ? data.sections : [],
+    seo: seoFrom(data.seo),
   };
   savedSnapshot.value = snapshot();
 };
@@ -416,6 +519,10 @@ const persist = async () => {
         title: page.value.title,
         slug: creating ? (page.value.slug || storedSlug.value) : page.value.slug,
         sections: page.value.sections,
+        // Rides along in the ordinary page write. PageService leaves top-level
+        // keys it does not recognise untouched, so `seo` is stored and returned
+        // as-is without any new endpoint or validator change.
+        seo: page.value.seo,
       }),
     }
   );
@@ -571,6 +678,9 @@ const copyFallbackSource = () => {
     // Deep-copied so editing the new translation cannot reach back into the
     // source document's sections through a shared reference.
     sections: JSON.parse(JSON.stringify(fallbackSource.value.sections)),
+    // SEO is per language and starts blank: a canonical URL or description
+    // copied from another translation is almost always wrong for this one.
+    seo: emptySeo(),
   };
 };
 
@@ -655,8 +765,15 @@ onMounted(async () => {
 .edit-form { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: 2rem; }
 .form-group { margin-bottom: 1.5rem; }
 .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
-.form-group input, .form-group select { width: 100%; padding: 0.75rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.form-group textarea { resize: vertical; min-height: 3rem; }
 .form-group input:disabled { opacity: 0.7; cursor: not-allowed; }
+.form-check { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0; }
+.form-check input { width: auto; }
+.form-check label { margin-bottom: 0; font-weight: 400; }
+.seo-group { margin-top: 1.5rem; border: 1px solid var(--app-border); border-radius: 8px; padding: 0 1rem; }
+.seo-group[open] { padding: 0 1rem 0.5rem; }
+.seo-summary { cursor: pointer; padding: 1rem 0; font-weight: 600; color: var(--app-text); }
 .field-help { margin: 0.35rem 0 0; font-size: 0.8125rem; color: var(--app-text-muted); }
 .inline-button { background: none; border: none; padding: 0; font: inherit; color: var(--color-primary-600); text-decoration: underline; cursor: pointer; }
 .actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem; }
