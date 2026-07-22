@@ -32,6 +32,7 @@ final class MediaItem
         public readonly array $variants,
         public readonly string $alt,
         public readonly string $uploadedAt,
+        public readonly FocalPoint $focalPoint,
     ) {}
 
     /**
@@ -48,6 +49,7 @@ final class MediaItem
         array $variants = [],
         string $alt = '',
         ?string $uploadedAt = null,
+        ?FocalPoint $focalPoint = null,
     ): self {
         if (preg_match('/^[a-z0-9][a-z0-9-]*$/', $id) !== 1) {
             throw new InvalidArgumentException(
@@ -76,6 +78,7 @@ final class MediaItem
             variants: $variants,
             alt: $alt,
             uploadedAt: $uploadedAt ?? gmdate('c'),
+            focalPoint: $focalPoint ?? FocalPoint::center(),
         );
     }
 
@@ -103,6 +106,9 @@ final class MediaItem
             variants: $variants,
             alt: (string) ($row['alt'] ?? ''),
             uploadedAt: isset($row['uploadedAt']) ? (string) $row['uploadedAt'] : null,
+            focalPoint: FocalPoint::fromArray(
+                is_array($row['focalPoint'] ?? null) ? $row['focalPoint'] : []
+            ),
         );
     }
 
@@ -184,7 +190,16 @@ final class MediaItem
         return new self(
             $this->id, $this->extension, $this->mimeType, $this->originalName,
             $this->bytes, $this->width, $this->height, $this->variants,
-            $alt, $this->uploadedAt,
+            $alt, $this->uploadedAt, $this->focalPoint,
+        );
+    }
+
+    public function withFocalPoint(FocalPoint $focalPoint): self
+    {
+        return new self(
+            $this->id, $this->extension, $this->mimeType, $this->originalName,
+            $this->bytes, $this->width, $this->height, $this->variants,
+            $this->alt, $this->uploadedAt, $focalPoint,
         );
     }
 
@@ -212,6 +227,12 @@ final class MediaItem
             'uploadedAt' => $this->uploadedAt,
             'urls' => $this->urls(),
             'srcset' => $this->srcset(),
+            // The mark itself, plus a ready-made CSS value so a front end that
+            // crops with object-fit keeps the subject visible without knowing
+            // the fraction convention. Both ride along in the existing payload,
+            // so the renderer and delivery API carry it for free.
+            'focalPoint' => $this->focalPoint->toArray(),
+            'objectPosition' => $this->focalPoint->toCss(),
             // Part of the payload rather than only the admin UI, so any client
             // reading media can tell an editor what the ladder could not do.
             'quality' => $quality?->toArray(),

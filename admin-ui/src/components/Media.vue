@@ -47,15 +47,33 @@
 
     <ul v-else class="grid">
       <li v-for="item in items" :key="item.id" class="card">
-        <div class="thumb">
+        <!-- The ladder keeps the source aspect ratio, so a layout that crops an
+             image can lose the subject. Marking the point that must stay visible
+             fixes it: a click places it, the arrow keys nudge it without a mouse,
+             and the thumbnail's object-position previews the crop. -->
+        <button
+          type="button"
+          class="thumb focal-target"
+          data-test="focal-target"
+          :aria-label="focalLabel(item)"
+          @click="setFocalFromClick(item, $event)"
+          @keydown="nudgeFocal(item, $event)"
+        >
           <img
             :src="thumbFor(item)"
             :srcset="item.srcset || undefined"
             sizes="240px"
             :alt="item.alt || item.originalName"
+            :style="{ objectPosition: objectPositionFor(item) }"
             loading="lazy"
           />
-        </div>
+          <span
+            class="focal-marker"
+            data-test="focal-marker"
+            :style="markerStyle(item)"
+            aria-hidden="true"
+          ></span>
+        </button>
 
         <div class="card-body">
           <p class="card-name" :title="item.originalName">{{ item.originalName }}</p>
@@ -185,6 +203,74 @@ const saveAlt = async (item, alt) => {
   item.alt = alt;
 };
 
+// Fractions of the image, so the mark holds for the original and every variant
+// at once. The keyboard nudge step is deliberately coarse — the point of a
+// focal point is "roughly here", not pixel placement.
+const FOCAL_STEP = 0.05;
+const clampFraction = (n) => Math.min(1, Math.max(0, n));
+// Three decimals is finer than any crop needs and keeps the stored value tidy.
+const roundFraction = (n) => Math.round(n * 1000) / 1000;
+
+const focalOf = (item) => item.focalPoint ?? { x: 0.5, y: 0.5 };
+const objectPositionFor = (item) => item.objectPosition ?? '50% 50%';
+
+const markerStyle = (item) => {
+  const { x, y } = focalOf(item);
+  return { left: `${x * 100}%`, top: `${y * 100}%` };
+};
+
+const focalLabel = (item) => {
+  const { x, y } = focalOf(item);
+  return (
+    `Focal point for ${item.originalName}: ${Math.round(x * 100)}% across, ` +
+    `${Math.round(y * 100)}% down. Click the image or use the arrow keys to move ` +
+    `the point that stays visible when the image is cropped.`
+  );
+};
+
+// Metadata only: the stored files are never re-cropped. A front end honours the
+// point with CSS object-position. Persisted the same way alt text is, so it
+// rides along in the media item's stored record.
+const applyFocal = async (item, x, y) => {
+  const point = { x: roundFraction(clampFraction(x)), y: roundFraction(clampFraction(y)) };
+  item.focalPoint = point;
+  item.objectPosition = `${roundFraction(point.x * 100)}% ${roundFraction(point.y * 100)}%`;
+
+  await fetch(`/api/media/${item.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ focalPoint: point }),
+  });
+};
+
+const setFocalFromClick = (item, event) => {
+  const rect = event.currentTarget.getBoundingClientRect();
+  // Without a laid-out box there is nothing to measure the click against.
+  if (!rect.width || !rect.height) return;
+
+  applyFocal(
+    item,
+    (event.clientX - rect.left) / rect.width,
+    (event.clientY - rect.top) / rect.height,
+  );
+};
+
+const nudgeFocal = (item, event) => {
+  const { x, y } = focalOf(item);
+  const moved = {
+    ArrowLeft: [x - FOCAL_STEP, y],
+    ArrowRight: [x + FOCAL_STEP, y],
+    ArrowUp: [x, y - FOCAL_STEP],
+    ArrowDown: [x, y + FOCAL_STEP],
+  }[event.key];
+
+  if (!moved) return;
+
+  // Keep arrow keys on the marker instead of scrolling the library.
+  event.preventDefault();
+  applyFocal(item, moved[0], moved[1]);
+};
+
 const remove = async (item) => {
   const res = await fetch(`/api/media/${item.id}`, { method: 'DELETE' });
   if (res.ok) items.value = items.value.filter((i) => i.id !== item.id);
@@ -220,6 +306,20 @@ onMounted(load);
 .card { border: 1px solid var(--app-border); border-radius: 10px; overflow: hidden; background: var(--card-bg); }
 .thumb { aspect-ratio: 4 / 3; background: var(--app-surface-strong); }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* The thumbnail doubles as the focal-point editor: a real button so it is
+   focusable and keyboard-operable, reset to look like the plain frame it was. */
+.focal-target { position: relative; width: 100%; padding: 0; border: 0; margin: 0; cursor: crosshair; }
+.focal-target:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.focal-marker {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
 .card-body { padding: 0.75rem; }
 .card-name { margin: 0; font-size: 0.875rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-meta, .card-variants { margin: 0.2rem 0 0; font-size: 0.75rem; color: var(--app-text-muted); }
