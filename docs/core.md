@@ -361,8 +361,12 @@ What remains:
    centrepiece and should be done test-first.
 3. **History covers pages only.** Media and user documents are versioned at the
    storage layer, but nothing exposes those versions.
-4. **Extract the kernel, router, config and health.** What remains of
-   `Application` should fit on a screen. It is still the largest thing here.
+4. **Extracting the kernel is largely done.** Health, the security gate
+   (`ApiGuard`), authentication (`AuthController`), user and plugin management,
+   delivery CORS and the marketplace are each their own tested unit now, and
+   `Application` has gone from ~1660 lines to ~1170. What remains in it is the
+   kernel's real job — routing, boot composition and page rendering — plus
+   config loading, which the settings-out-of-files work will revisit.
 5. **Settings out of files.** Bootstrap stays on disk because storage
    configuration cannot live in storage; everything else becomes a document,
    edited in the admin UI.
