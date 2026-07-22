@@ -24,6 +24,7 @@ use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\MarketplaceController;
 use Click\Cms\Http\MenusController;
+use Click\Cms\Http\NavigationRenderer;
 use Click\Cms\Http\RedirectsController;
 use Click\Cms\Http\PluginsController;
 use Click\Cms\Http\UsersController;
@@ -59,6 +60,7 @@ class Application
     private ?MarketplaceController $marketplaceController = null;
     private ?RedirectsController $redirectsController = null;
     private ?MenusController $menusController = null;
+    private ?NavigationRenderer $navigationRenderer = null;
     private ?HistoryService $history = null;
     private ?\Click\Cms\Application\Audit\AuditService $auditService = null;
     private ?SessionStore $sessions = null;
@@ -204,6 +206,7 @@ class Application
         // Navigation menus: managed through the admin and rendered into the site's
         // header, both reading the same stored menu.
         $this->menusController = new MenusController($this->contentService);
+        $this->navigationRenderer = new NavigationRenderer();
 
         // Sessions and login throttling are collaborators rather than methods on
         // this class, so each can be understood and tested on its own.
@@ -648,11 +651,12 @@ class Application
             );
         }
 
-        // The site's main navigation, rendered from the "main" menu if the site
-        // has built one. It reads the same stored menu the admin edits, resolves
-        // each item to a safe href, and is empty markup when there is no menu —
-        // so a site that never made one simply has no nav, not a broken one.
-        $nav = $this->renderMainNav($locale ?? $page->locale());
+        // The site's header: the brand, and the main navigation from the "main"
+        // menu if the site has built one. It reads the same stored menu the admin
+        // edits, resolves each item to a safe href, marks the current page, and is
+        // empty markup when there is neither menu nor site name — so a site that
+        // built neither simply has no header, not a broken one.
+        $nav = $this->renderSiteHeader($page, $locale ?? $page->locale());
 
         $html = '<!doctype html>
 <html lang="' . $lang . '">
@@ -671,44 +675,31 @@ class Application
     }
 
     /**
-     * The site header nav, from the "main" menu, or empty markup if there is
-     * none. Every label and href is escaped: the target was validated to a slug
-     * or an http(s) URL when saved, but the label is free editor text, and both
-     * land in HTML here.
+     * The site header — brand plus the "main" menu — for the page being rendered.
+     *
+     * The menu items and the site name are gathered here (a kernel concern:
+     * reading storage and settings), and the actual markup is left to
+     * {@see NavigationRenderer}. The current page's href is computed the same way
+     * the menu builds its own hrefs — no locale prefix for the default locale,
+     * `/locale/slug` otherwise — so the item pointing at this page matches and is
+     * marked current.
      */
-    private function renderMainNav(Locale $locale): string
+    private function renderSiteHeader(Content $page, Locale $locale): string
     {
         $items = $this->menusController?->resolvedItems('main', $locale->code) ?? [];
-        if ($items === []) {
-            return '';
-        }
 
-        $render = function (array $item) use (&$render): string {
-            $label = htmlspecialchars((string) $item['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            $href = htmlspecialchars((string) $item['href'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            // An external link opens in a new tab and is told not to hand the
-            // opener window to the destination.
-            $rel = ($item['external'] ?? false) ? ' rel="noopener noreferrer" target="_blank"' : '';
+        $defaultLocale = $this->contentService?->defaultLocale()->code ?? $locale->code;
+        $currentHref = $locale->code === $defaultLocale
+            ? '/' . $page->slug()
+            : '/' . $locale->code . '/' . $page->slug();
 
-            $li = '<li class="cms-nav-item"><a href="' . $href . '"' . $rel . '>' . $label . '</a>';
+        $brand = ($this->settings ?? Settings::load($this->basePath . '/data/settings.json'))->siteName();
 
-            if (!empty($item['children']) && is_array($item['children'])) {
-                $li .= '<ul class="cms-nav-children">';
-                foreach ($item['children'] as $child) {
-                    $li .= $render($child);
-                }
-                $li .= '</ul>';
-            }
+        // Stateless, so a render path that never ran boot() (a direct-render test)
+        // gets one on demand rather than a half-built kernel.
+        $renderer = $this->navigationRenderer ??= new NavigationRenderer();
 
-            return $li . '</li>';
-        };
-
-        $list = '';
-        foreach ($items as $item) {
-            $list .= $render($item);
-        }
-
-        return '<nav class="cms-nav" aria-label="Main"><ul class="cms-nav-list">' . $list . '</ul></nav>' . "\n    ";
+        return $renderer->render($items, $currentHref, $brand);
     }
 
     /**
@@ -992,6 +983,9 @@ class Application
         // content a client decides to post.
         if (array_key_exists('headless', $data)) {
             $settings->setHeadless((bool) $data['headless']);
+        }
+        if (array_key_exists('siteName', $data) && is_string($data['siteName'])) {
+            $settings->setSiteName($data['siteName']);
         }
 
         return ['data' => $settings->toArray()];

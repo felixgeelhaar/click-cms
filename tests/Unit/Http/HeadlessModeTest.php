@@ -147,7 +147,7 @@ final class HeadlessModeTest extends TestCase
 
         $read = (new \ReflectionMethod($this->app, 'handleSettingsRequest'))->invoke($this->app, 'GET');
 
-        $this->assertSame(['headless' => false], $read['data'] ?? null);
+        $this->assertSame(['headless' => false, 'siteName' => ''], $read['data'] ?? null);
     }
 
     public function testAnAnonymousRequestCannotReadSettings(): void

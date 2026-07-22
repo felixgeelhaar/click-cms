@@ -67,11 +67,27 @@ final class Settings
     }
 
     /**
-     * @return array{headless: bool}
+     * The site name, shown as the brand in the public header. Empty by default:
+     * a site with no name simply shows no brand. Trimmed so a stored name never
+     * carries stray whitespace into the markup.
+     */
+    public function siteName(): string
+    {
+        return trim((string) ($this->values['siteName'] ?? ''));
+    }
+
+    public function setSiteName(string $name): void
+    {
+        $this->values['siteName'] = trim($name);
+        $this->persist();
+    }
+
+    /**
+     * @return array{headless: bool, siteName: string}
      */
     public function toArray(): array
     {
-        return ['headless' => $this->headless()];
+        return ['headless' => $this->headless(), 'siteName' => $this->siteName()];
     }
 
     /**
