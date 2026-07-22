@@ -29,6 +29,14 @@ final class GdImageProcessor
         'image/webp' => 'webp',
     ];
 
+    /**
+     * The largest side a square crop is written at. Never upscales past the
+     * source's shorter edge — this is only a ceiling, so a crop is never bigger
+     * than it usefully needs to be. A fixed box in a card or an avatar is well
+     * served at 1024, which is 512 CSS pixels at the 2x density most screens draw.
+     */
+    private const SQUARE_MAX = 1024;
+
     public function __construct(private readonly int $jpegQuality = 82) {}
 
     public static function isAvailable(): bool
@@ -123,7 +131,98 @@ final class GdImageProcessor
     }
 
     /**
-     * Remove every variant of a base name.
+     * Write a square crop centred on a focal point.
+     *
+     * The variant ladder deliberately preserves the source aspect ratio, which
+     * leaves a layout that needs a fixed box to crop with CSS and lose whatever
+     * the browser's centre-crop cuts off. This produces an actual cropped file
+     * instead, centred on the point the editor marked, so the subject survives.
+     * It is additional to the ladder, never a replacement for it.
+     *
+     * The crop takes the largest square the source allows — its shorter edge —
+     * and slides that square along the longer axis so the focal point sits at its
+     * centre, clamped to stay within the image. The result is written at that
+     * square's size or SQUARE_MAX, whichever is smaller, so it is only ever
+     * scaled down: a crop of a small source is smaller, never invented.
+     *
+     * @param float $focalX Focal point across, 0..1.
+     * @param float $focalY Focal point down, 0..1.
+     * @return int|null The side length written, or null when nothing could be.
+     */
+    public function generateSquareCrop(
+        string $sourcePath,
+        string $targetDir,
+        string $basename,
+        string $extension,
+        float $focalX,
+        float $focalY
+    ): ?int {
+        if (!self::isAvailable()) {
+            return null;
+        }
+
+        $info = $this->inspect($sourcePath);
+        if ($info === null || !self::supports($info['mimeType'])) {
+            return null;
+        }
+
+        $source = $this->load($sourcePath, $info['mimeType']);
+        if ($source === null) {
+            return null;
+        }
+
+        // The largest square the source can yield is its shorter edge.
+        $region = min($info['width'], $info['height']);
+
+        // Centre the square on the focal point, then clamp so it never runs off
+        // the image — a focal point at the very edge pins the square to that edge
+        // rather than sampling pixels that do not exist.
+        $srcX = $this->clampOffset((int) round($focalX * $info['width'] - $region / 2), $info['width'], $region);
+        $srcY = $this->clampOffset((int) round($focalY * $info['height'] - $region / 2), $info['height'], $region);
+
+        // Never upscale: the output is the region's size, capped at SQUARE_MAX.
+        $side = min($region, self::SQUARE_MAX);
+
+        $target = imagecreatetruecolor($side, $side);
+        if (!$target instanceof GdImage) {
+            return null;
+        }
+
+        if ($info['mimeType'] !== 'image/jpeg') {
+            imagealphablending($target, false);
+            imagesavealpha($target, true);
+            $transparent = imagecolorallocatealpha($target, 0, 0, 0, 127);
+            imagefilledrectangle($target, 0, 0, $side, $side, $transparent);
+        }
+
+        $ok = imagecopyresampled(
+            $target, $source,
+            0, 0, $srcX, $srcY,
+            $side, $side,
+            $region, $region
+        );
+
+        if (!$ok) {
+            return null;
+        }
+
+        $path = $targetDir . '/' . $basename . '-square.' . $extension;
+
+        return $this->write($target, $path, $info['mimeType']) ? $side : null;
+    }
+
+    /**
+     * Keep a crop window of $window pixels inside an axis of $length pixels: the
+     * offset is pinned into [0, length - window] so the square never samples off
+     * the edge.
+     */
+    private function clampOffset(int $offset, int $length, int $window): int
+    {
+        return max(0, min($offset, $length - $window));
+    }
+
+    /**
+     * Remove every variant of a base name, the square crop included.
      *
      * @return int How many files were removed.
      */
@@ -136,6 +235,11 @@ final class GdImageProcessor
             if (is_file($path) && @unlink($path)) {
                 $removed++;
             }
+        }
+
+        $square = $dir . '/' . $basename . '-square.' . $extension;
+        if (is_file($square) && @unlink($square)) {
+            $removed++;
         }
 
         return $removed;
