@@ -89,14 +89,44 @@ Two different things that were previously one.
 
 **Management** — pages, media, schemas, authentication — is core. The admin UI
 cannot function without it, so it must not be something a site can uninstall.
+Page and media CRUD, publication, history and preview now live in core's
+`CoreApiRoutes`.
 
-**Delivery** — how an external front end reads content — is a plugin, currently
-`rest-api` and `graphql`. A site that uses the CMS's own page rendering needs
-neither. Both can be disabled and the CMS stays fully manageable.
+**Delivery** — how an external front end reads content — should be a plugin, and
+a site that renders its own pages needs none of it.
 
-Outstanding: page CRUD still lives in the `rest-api` plugin, so disabling it
-leaves the admin UI unable to manage pages. Split it — full CRUD to core as
-management, read-only public delivery stays in the plugin.
+### Resolved
+
+- Page CRUD moved to core; the `rest-api` plugin's copies were removed (they were
+  dead-shadowed, since core matches first).
+- Core's anonymous `GET /api/pages` / `GET /api/pages/:slug` **is** the REST
+  delivery surface now — published content, no account needed.
+- The `graphql` plugin is a real, safe delivery API: read-only, published-only,
+  no account access, reachable anonymously.
+
+### Outstanding — the sharp one
+
+After the `rest-api` cleanup, that plugin provides **no delivery surface at
+all**. What survives in it is `GET/POST/PUT/DELETE /api/users*`, the
+`/api/plugins*` management routes, and `/api/info` — all **management**, all
+depended on by the admin UI's Users, Plugins and Dashboard pages. So a plugin
+named "REST API / delivery" is the thing holding user and plugin management
+together. That is exactly the fake-optionality core.md warns about: a site that
+disables the "delivery API" to render its own pages would lose account
+management.
+
+The fix is to move users and plugins management into core (`CoreApiRoutes`),
+where everything the admin UI depends on belongs, and then `rest-api` can be
+deleted outright rather than kept as a shell. This is security-sensitive — it
+moves password handling and plugin activation — so it wants its own focused pass
+with full verification, not a rushed one.
+
+### Also found
+
+- **Plugin deactivation does not persist.** Deactivating `rest-api` through the
+  API returned 200, but after a restart it was `activated` again. Either the
+  state is not written, or discovery re-activates everything on boot. Until this
+  works, the enable/disable a plugin story is not real.
 
 ---
 
@@ -221,9 +251,13 @@ plugins. But each has a concrete defect found by exercising it.
 admin UI, login and the management API all function. "Boots with zero plugins"
 holds, which is what makes the without-plugins TurboScience case real.
 
-### rest-api (public delivery) — duplicates core, partly dead
+### rest-api (public delivery) — DONE, but see "Management API and delivery API"
 
-- It registers `GET /api/pages/:slug/versions` and `.../versions/:versionId`,
+Cleaned: the dead-shadowed page/version/media routes and their handlers are
+removed. What remains is management stranded in a delivery plugin — moving it to
+core is tracked above. Original findings, for the record:
+
+- It registered `GET /api/pages/:slug/versions` and `.../versions/:versionId`,
   which **core also registers**. Core matches first, so the plugin's copies never
   run — and the plugin's are the old locale-blind versions, so even if they did
   they would now be wrong. Dead, shadowed routes that read as live.
@@ -235,9 +269,14 @@ holds, which is what makes the without-plugins TurboScience case real.
 - The split to settle: the plugin should be *only* the public read surface that
   core does not already provide, not a second copy of routes core owns.
 
-### graphql (alternative delivery) — cannot serve anonymous reads
+### graphql (alternative delivery) — DONE
 
-- `POST /api/graphql` returns 401: it is not in the public allowlist, so the one
+Rewritten to a safe read-only, published-only delivery API with no account
+access and no mutations, reachable anonymously. It previously also leaked
+password hashes to any authenticated caller and could write unvalidated content;
+both are gone. Original findings, for the record:
+
+- `POST /api/graphql` returned 401: it is not in the public allowlist, so the one
   thing a delivery API is for — a front end with no account reading published
   content — does not work. REST delivery works anonymously; GraphQL does not.
 - Making it public is not as simple as adding a prefix: a POST with an arbitrary
