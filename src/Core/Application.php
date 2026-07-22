@@ -22,6 +22,7 @@ use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\ApiGuard;
 use Click\Cms\Http\HealthCheck;
 use Click\Cms\Http\SectionRenderer;
 use Click\Cms\Infrastructure\Audit\AuditingStorage;
@@ -49,6 +50,7 @@ class Application
     private ?HistoryService $history = null;
     private ?\Click\Cms\Application\Audit\AuditService $auditService = null;
     private ?SessionStore $sessions = null;
+    private ?ApiGuard $apiGuard = null;
     private ?LoginThrottle $throttle = null;
     private array $coreConfig = [];
     private ?CoreConfig $config = null;
@@ -176,6 +178,7 @@ class Application
             $this->basePath . '/data/sessions',
             $this->getIdleTimeoutSeconds()
         );
+        $this->apiGuard = new ApiGuard($this->sessions);
         $this->throttle = new LoginThrottle(
             $this->basePath . '/data/lockouts.json',
             $this->config->lockoutMaxAttempts(),
@@ -687,7 +690,7 @@ class Application
             return $preflight;
         }
 
-        $csrf = $this->enforceCsrf($path, $method);
+        $csrf = $this->apiGuard->enforceCsrf($path, $method, $_SERVER);
         if ($csrf !== null) {
             return $csrf;
         }
@@ -697,7 +700,7 @@ class Application
         }
 
         if ($this->isCoreAuthEnabled()) {
-            $authResult = $this->enforceAuthForApi($path, $method);
+            $authResult = $this->apiGuard->enforceAuth($path, $method);
             if ($authResult !== null) {
                 return $authResult;
             }
@@ -783,122 +786,6 @@ class Application
         }
 
         return ['status' => 404, 'error' => 'Endpoint not found'];
-    }
-
-    /**
-     * Require authentication for API requests.
-     *
-     * Deny by default, with a short list of deliberate exceptions. The previous
-     * rule was the other way round — a list of protected prefixes — which fails
-     * open: every endpoint added to core was public until somebody remembered
-     * to list it, and the media endpoints were reachable with no session at all
-     * because of exactly that.
-     *
-     * Public by design:
-     *   auth/*            logging in must work before there is a session
-     *   GET pages*        a headless front end reads published content
-     *                     anonymously; that is the whole point of a delivery API
-     *   GET media/file/*  images referenced by a public page must load for
-     *                     visitors
-     *
-     * Everything else — including listing the media library and reading section
-     * definitions — is management and requires a session.
-     */
-    /**
-     * Whether a path may be reached without a session.
-     *
-     * @see enforceAuthForApi for why this is an allowlist of public paths
-     *      rather than a list of protected ones.
-     */
-    private function isPublicApiPath(string $path, string $method): bool
-    {
-        if (str_starts_with($path, 'auth/')) {
-            return true;
-        }
-
-        // The GraphQL delivery endpoint is public regardless of verb. GraphQL
-        // clients send their query in a POST body, but it is still a read — no
-        // accounts, no writes, published content only, all enforced in the
-        // plugin — so it is checked before the guard below that would otherwise
-        // reject every POST out of hand.
-        if ($path === 'graphql') {
-            return true;
-        }
-
-        if (!CsrfGuard::isSafeMethod($method)) {
-            return false;
-        }
-
-        // History is management even though it hangs off a public path. The
-        // allowlist below would otherwise hand an anonymous reader every
-        // unpublished draft a page has ever been in, which is the exact
-        // opposite of what publishing means.
-        if (preg_match('#^pages/[^/]+/versions(/|$)#', $path) === 1) {
-            return false;
-        }
-
-        // Published content, read by a front end that has no account.
-        if ($path === 'pages' || str_starts_with($path, 'pages/')) {
-            return true;
-        }
-
-        // The bytes of an image a public page references.
-        if (str_starts_with($path, 'media/file/')) {
-            return true;
-        }
-
-        return false;
-    }
-
-    private function enforceAuthForApi(string $path, string $method): ?array
-    {
-        // An account with an outstanding password change may do nothing else.
-        // Checked before the per-path rules so that no endpoint, present or
-        // future, can be reached while the seeded password is still in place.
-        $session = $this->getSessionUser();
-        if ($session !== null && ($session['mustChangePassword'] ?? false)) {
-            return [
-                'status' => 403,
-                'error' => 'Set a new password before continuing.',
-                'mustChangePassword' => true,
-            ];
-        }
-
-        if ($this->isPublicApiPath($path, $method)) {
-            return null;
-        }
-
-        $user = $this->getSessionUser();
-        if ($user === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
-        }
-
-        // Asked as capability questions rather than role comparisons, so the
-        // rules live in one place and can be changed without hunting for every
-        // `=== 'admin'` in the codebase.
-        $role = Role::fromName($user['role'] ?? null);
-
-        if (str_starts_with($path, 'users') && !$role->can(Capability::ManageUsers)) {
-            return ['status' => 403, 'error' => 'You do not have permission to manage users.'];
-        }
-
-        if (str_starts_with($path, 'marketplace') && !$role->can(Capability::InstallPlugins)) {
-            return ['status' => 403, 'error' => 'You do not have permission to install plugins.'];
-        }
-
-        if (str_starts_with($path, 'plugins') && $method !== 'GET' && !$role->can(Capability::ManagePlugins)) {
-            return ['status' => 403, 'error' => 'You do not have permission to manage plugins.'];
-        }
-
-        // A first pass only. HistoryService asks the same question again
-        // against the document's owner, which is the check that actually
-        // governs — this one cannot see whose page it is, and exists so a role
-        // without the capability is turned away before any handler runs.
-        if (str_ends_with($path, '/restore') && !$role->can(Capability::RestoreContent)) {
-            return ['status' => 403, 'error' => 'You do not have permission to restore a previous version.'];
-        }
-
-        return null;
     }
 
     /**
@@ -1230,7 +1117,7 @@ class Application
             ? strtoupper((string) ($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD'] ?? 'GET'))
             : $method;
 
-        if (!$this->isPublicApiPath($path, $intended)) {
+        if (!$this->apiGuard->isPublic($path, $intended)) {
             return null;
         }
 
@@ -1241,41 +1128,6 @@ class Application
 
         if ($method === 'OPTIONS') {
             return ['status' => 204, 'raw' => true, 'html' => ''];
-        }
-
-        return null;
-    }
-
-    private function enforceCsrf(string $path, string $method): ?array
-    {
-        if (CsrfGuard::isSafeMethod($method)) {
-            return null;
-        }
-
-        // Logging in and out must work without a token; there is no session to
-        // protect yet, and being unable to log out would be worse than the risk.
-        //
-        // GraphQL delivery is POSTed but reads only published content and changes
-        // nothing, so a forged request achieves nothing a plain fetch could not,
-        // and requiring a token would stop an anonymous front end — the intended
-        // caller — from using it at all.
-        if (in_array($path, ['auth/login', 'auth/logout', 'graphql'], true)) {
-            return null;
-        }
-
-        $session = $this->getSessionData();
-        $expected = $session['csrfToken'] ?? null;
-
-        // No session means nothing to forge.
-        if (!is_string($expected) || $expected === '') {
-            return null;
-        }
-
-        if (!CsrfGuard::matches($expected, CsrfGuard::tokenFromRequest($_SERVER))) {
-            return [
-                'status' => 403,
-                'error' => 'Missing or invalid CSRF token.',
-            ];
         }
 
         return null;

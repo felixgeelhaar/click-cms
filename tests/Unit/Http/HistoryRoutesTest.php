@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Click\Cms\Tests\Unit\Http;
 
-use Click\Cms\Core\Application;
+use Click\Cms\Application\Authentication\SessionStore;
+use Click\Cms\Http\ApiGuard;
 use Click\Cms\Http\CoreApiRoutes;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
@@ -55,25 +56,22 @@ final class HistoryRoutesTest extends TestCase
      * point of a public read API. History hangs off the same prefix and must
      * not inherit that: it holds every unpublished draft the page has been in.
      *
-     * Reached through reflection deliberately. The rule is a security boundary
-     * and is private for good reason, but a regression here is silent — an
-     * anonymous request would simply start succeeding.
+     * The rule now lives in {@see ApiGuard} and is tested directly there and
+     * here — a regression is silent, an anonymous request would simply start
+     * succeeding, so it is worth pinning from more than one angle.
      */
     public function testHistoryIsNotReachableWithoutASession(): void
     {
-        $isPublic = new ReflectionMethod(Application::class, 'isPublicApiPath');
-        $app = new Application(sys_get_temp_dir() . '/click-cms-no-such-base');
+        $guard = new ApiGuard(new SessionStore(sys_get_temp_dir() . '/click-cms-no-such-sessions', 1800));
 
         // The public delivery paths this is carved out of.
-        $this->assertTrue($isPublic->invoke($app, 'pages', 'GET'));
-        $this->assertTrue($isPublic->invoke($app, 'pages/home', 'GET'));
+        $this->assertTrue($guard->isPublic('pages', 'GET'));
+        $this->assertTrue($guard->isPublic('pages/home', 'GET'));
 
-        $this->assertFalse($isPublic->invoke($app, 'pages/home/versions', 'GET'));
+        $this->assertFalse($guard->isPublic('pages/home/versions', 'GET'));
+        $this->assertFalse($guard->isPublic('pages/home/versions/20260721T104512.123456Z-a3f9', 'GET'));
         $this->assertFalse(
-            $isPublic->invoke($app, 'pages/home/versions/20260721T104512.123456Z-a3f9', 'GET')
-        );
-        $this->assertFalse(
-            $isPublic->invoke($app, 'pages/home/versions/20260721T104512.123456Z-a3f9/restore', 'POST')
+            $guard->isPublic('pages/home/versions/20260721T104512.123456Z-a3f9/restore', 'POST')
         );
     }
 }
