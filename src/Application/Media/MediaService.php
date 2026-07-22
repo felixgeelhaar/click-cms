@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Application\Media;
 
+use Click\Cms\Domain\Media\FocalPoint;
 use Click\Cms\Domain\Media\MediaItem;
 use Click\Cms\Domain\Media\UploadPolicy;
 use Click\Cms\Infrastructure\Media\GdImageProcessor;
@@ -139,6 +140,27 @@ final class MediaService
         }
 
         $updated = $item->withAlt($alt);
+        $this->writeMetadata($updated);
+
+        return $updated;
+    }
+
+    /**
+     * Mark the point of the image that must stay visible when it is cropped.
+     *
+     * Metadata only, exactly like alt text: the stored files are never re-cropped
+     * — a front end honours the point with CSS. Coordinates are fractions 0..1;
+     * validation lives in FocalPoint, so an out-of-range value throws rather than
+     * being quietly moved.
+     */
+    public function updateFocalPoint(string $id, float $x, float $y): ?MediaItem
+    {
+        $item = $this->find($id);
+        if ($item === null) {
+            return null;
+        }
+
+        $updated = $item->withFocalPoint(FocalPoint::at($x, $y));
         $this->writeMetadata($updated);
 
         return $updated;
