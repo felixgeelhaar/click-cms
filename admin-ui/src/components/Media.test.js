@@ -121,6 +121,132 @@ describe('focal point', () => {
 });
 
 /**
+ * Search, folder grouping and bulk delete.
+ *
+ * Filtering is done on the server (GET /api/media?q=&folder=), so these mount the
+ * component against a stub that filters like the server would, and assert that
+ * the rendered grid reflects the response — the component's job is to send the
+ * right query and render what comes back. Bulk delete asserts the outgoing
+ * request carries exactly the ticked ids.
+ */
+describe('search, folders and bulk delete', () => {
+  const library = () => [
+    item({ id: 'harbour-crane-a1', originalName: 'products/Harbour Crane.jpg' }),
+    item({ id: 'city-skyline-b2', originalName: 'products/City Skyline.jpg' }),
+    item({ id: 'logo-c3', originalName: 'logo.jpg' }),
+  ];
+
+  /**
+   * Answer /api/media the way the server does: parse q and folder from the URL,
+   * filter the library, and always return the full folder set. Records every
+   * request so a test can assert what was sent.
+   */
+  const serveLibrary = (all) => {
+    const calls = [];
+    global.fetch = vi.fn(async (url, options) => {
+      const u = String(url);
+      calls.push({ url: u, options });
+
+      if (u.includes('/api/media/capabilities')) {
+        return { ok: true, status: 200, json: async () => ({ data: { acceptedMimeTypes: [], maxBytes: 0, resizingAvailable: true, variants: [] } }) };
+      }
+      if (u.includes('/api/media/bulk-delete')) {
+        const ids = JSON.parse(options.body).ids;
+        return { ok: true, status: 200, json: async () => ({ data: { requested: ids.length, deleted: ids.length, results: ids.map((id) => ({ id, deleted: true })) } }) };
+      }
+      // GET /api/media[?q=&folder=]
+      const params = new URL(u, 'http://x').searchParams;
+      const q = (params.get('q') ?? '').toLowerCase();
+      const folder = params.get('folder');
+      const folderOf = (name) => (name.includes('/') ? name.slice(0, name.lastIndexOf('/')) : '');
+      const data = all.filter((it) => {
+        if (q && !it.originalName.toLowerCase().includes(q)) return false;
+        if (folder !== null && folderOf(it.originalName) !== folder) return false;
+        return true;
+      });
+      return { ok: true, status: 200, json: async () => ({ data, folders: ['', 'products'] }) };
+    });
+    return calls;
+  };
+
+  const mountLibrary = async (all) => {
+    const calls = serveLibrary(all);
+    const wrapper = mount(Media);
+    await flushPromises();
+    return { wrapper, calls };
+  };
+
+  it('filters the rendered list by the search box', async () => {
+    vi.useFakeTimers();
+    try {
+      serveLibrary(library());
+      const wrapper = mount(Media);
+      // Settle the mounted load. advanceTimersByTimeAsync flushes the microtasks
+      // and the setImmediate flushPromises relies on, which are faked here.
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Three items to start.
+      expect(wrapper.findAll('.card')).toHaveLength(3);
+
+      await wrapper.get('[data-test="media-search"]').setValue('skyline');
+      // The search is debounced (250ms); advancing past it fires the reload.
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(wrapper.findAll('.card')).toHaveLength(1);
+      expect(wrapper.text()).toContain('City Skyline.jpg');
+      expect(wrapper.text()).not.toContain('Harbour Crane.jpg');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends the chosen folder as a query parameter', async () => {
+    const { wrapper, calls } = await mountLibrary(library());
+
+    await wrapper.get('[data-test="media-folder"]').setValue('products');
+    await flushPromises();
+
+    const last = calls.filter((c) => c.url.includes('/api/media?')).pop();
+    expect(last.url).toContain('folder=products');
+    // The two products items remain; the root logo is filtered out.
+    expect(wrapper.findAll('.card')).toHaveLength(2);
+  });
+
+  it('triggers bulk-delete with exactly the selected ids once confirmed', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { wrapper, calls } = await mountLibrary(library());
+
+    // Tick the first two cards.
+    const boxes = wrapper.findAll('[data-test="select-item"]');
+    await boxes[0].setValue(true);
+    await boxes[1].setValue(true);
+
+    // The bulk bar appears and reports the count.
+    expect(wrapper.get('[data-test="bulk-bar"]').text()).toContain('2 selected');
+
+    await wrapper.get('[data-test="bulk-delete"]').trigger('click');
+    await flushPromises();
+
+    expect(confirm).toHaveBeenCalled();
+    const del = calls.find((c) => c.url.includes('/api/media/bulk-delete'));
+    expect(del).toBeTruthy();
+    expect(del.options.method).toBe('POST');
+    expect(JSON.parse(del.options.body).ids).toEqual(['harbour-crane-a1', 'city-skyline-b2']);
+  });
+
+  it('does not send a request when the confirm is dismissed', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { wrapper, calls } = await mountLibrary(library());
+
+    await wrapper.findAll('[data-test="select-item"]')[0].setValue(true);
+    await wrapper.get('[data-test="bulk-delete"]').trigger('click');
+    await flushPromises();
+
+    expect(calls.some((c) => c.url.includes('/api/media/bulk-delete'))).toBe(false);
+  });
+});
+
+/**
  * An SVG is resolution-independent: the server stores it with no width and no
  * variant ladder. The card must read that as a vector rather than rendering an
  * empty "×" where a pixel size would be.

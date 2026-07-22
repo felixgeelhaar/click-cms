@@ -41,6 +41,7 @@ final class CoreApiRoutes
 {
     private ?JsonSectionTypeRepository $sectionTypes = null;
     private ?MediaService $media = null;
+    private ?MediaLibrary $mediaLibrary = null;
     private ?PageService $pages = null;
     private ?ContentService $contentService = null;
     private ?VersioningStorage $storage = null;
@@ -94,6 +95,7 @@ final class CoreApiRoutes
 
             'GET /api/media' => [$this, 'listMedia'],
             'POST /api/media' => [$this, 'uploadMedia'],
+            'POST /api/media/bulk-delete' => [$this, 'bulkDeleteMedia'],
             'GET /api/media/capabilities' => [$this, 'mediaCapabilities'],
             'GET /api/media/file/:filename' => [$this, 'serveMediaFile'],
             'GET /api/media/:id' => [$this, 'getMedia'],
@@ -668,18 +670,33 @@ final class CoreApiRoutes
      */
     public function listMedia(): array
     {
-        // An image field that declares the width it displays at asks for the
-        // library through this parameter, so the "too small for this slot"
-        // verdict and its wording come from the domain rather than being
-        // recomputed — and worded differently — in every client.
-        $displayWidth = $this->requestedDisplayWidth();
+        // Search, virtual-folder filtering, and the display-width verdict (an
+        // image field declares the width it displays at, so the "too small for
+        // this slot" wording comes from the domain rather than each client) all
+        // live in MediaLibrary now, so the query string is handed straight to it.
+        return $this->mediaLibrary()->list($_GET);
+    }
 
-        return [
-            'data' => array_map(
-                static fn ($item): array => $item->toArray($displayWidth),
-                $this->media()->all()
-            ),
-        ];
+    /**
+     * Delete several media items at once. A management action — MediaLibrary
+     * enforces the capability itself against the caller's role and reports every
+     * requested id, so an already-gone id is a no-op rather than an error.
+     */
+    public function bulkDeleteMedia(): array
+    {
+        $ids = $this->jsonBody()['ids'] ?? [];
+
+        return $this->mediaLibrary()->bulkDelete(is_array($ids) ? $ids : []);
+    }
+
+    private function mediaLibrary(): MediaLibrary
+    {
+        // The role is resolved per request rather than captured, so a handler
+        // that runs after a session change still sees the current caller.
+        return $this->mediaLibrary ??= new MediaLibrary(
+            $this->media(),
+            fn (): Role => Role::fromName($this->currentUser()['role'] ?? null),
+        );
     }
 
     /**
