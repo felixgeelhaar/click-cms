@@ -23,6 +23,7 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\ApiGuard;
+use Click\Cms\Http\AuthController;
 use Click\Cms\Http\HealthCheck;
 use Click\Cms\Http\SectionRenderer;
 use Click\Cms\Infrastructure\Audit\AuditingStorage;
@@ -51,6 +52,7 @@ class Application
     private ?\Click\Cms\Application\Audit\AuditService $auditService = null;
     private ?SessionStore $sessions = null;
     private ?ApiGuard $apiGuard = null;
+    private ?AuthController $authController = null;
     private ?LoginThrottle $throttle = null;
     private array $coreConfig = [];
     private ?CoreConfig $config = null;
@@ -204,7 +206,17 @@ class Application
             $this->pluginManager->activate($plugin->id);
         }
 
-        $this->ensureDefaultAdminUser();
+        // Identity — login, logout, password changes, the default admin — is its
+        // own controller, given the same session store the rest of a request
+        // reads so a login is visible immediately.
+        $this->authController = new AuthController(
+            $this->sessions,
+            $this->throttle,
+            $this->contentService,
+            $this->config,
+            self::INITIAL_PASSWORD,
+        );
+        $this->authController->ensureDefaultAdminUser();
         $this->registerApiRoutes();
         
         $this->booted = true;
@@ -696,7 +708,7 @@ class Application
         }
 
         if ($this->isCoreAuthEnabled() && str_starts_with($path, 'auth/')) {
-            return $this->handleAuthRequest($path, $method);
+            return $this->authController->handle($path, $method);
         }
 
         if ($this->isCoreAuthEnabled()) {
@@ -835,116 +847,6 @@ class Application
         return ['raw' => true, 'html' => (string) $content, 'status' => $httpCode];
     }
 
-    private function handleAuthRequest(string $path, string $method): array
-    {
-        $action = ltrim(preg_replace('#^auth/#', '', $path), '/');
-
-        if ($method === 'POST' && $action === 'login') {
-            return $this->handleLogin();
-        }
-
-        if ($method === 'POST' && $action === 'password') {
-            return $this->handleChangePassword();
-        }
-
-        if ($method === 'POST' && $action === 'logout') {
-            return $this->handleLogout();
-        }
-
-        if ($method === 'GET' && $action === 'me') {
-            return $this->handleMe();
-        }
-
-        if ($method === 'GET' && $action === 'check') {
-            return $this->handleAuthCheck();
-        }
-
-        return ['status' => 404, 'error' => 'Auth endpoint not found'];
-    }
-
-    private function handleLogin(): array
-    {
-        $data = $this->getJsonBody();
-        $username = $data['username'] ?? '';
-        $password = $data['password'] ?? '';
-        $remember = (bool) ($data['remember'] ?? false);
-
-        if ($username === '' || $password === '') {
-            return ['status' => 400, 'error' => 'Username and password required'];
-        }
-
-        $lockout = $this->checkLockout($username);
-        if ($lockout !== null) {
-            return $lockout;
-        }
-
-        // Read through the content service rather than guessing at a path. This
-        // previously looked in content/users/ (plural) while users are stored
-        // under content/user/, so no account was ever found and every login
-        // failed — including the default admin the installer creates.
-        $account = $this->contentService?->user($username);
-        if ($account === null) {
-            $this->recordFailedLogin($username);
-            return ['status' => 401, 'error' => 'Invalid credentials'];
-        }
-
-        // Content nests its payload under `data`; the password lives there, not
-        // at the top level of the stored document.
-        $userData = $account->data;
-
-        $hash = $userData['password'] ?? null;
-        if (!is_string($hash) || $hash === '') {
-            // No usable hash means the account cannot be authenticated. There is
-            // deliberately no fallback: a hardcoded admin/admin escape hatch here
-            // would let anyone in whenever a user document lost its password.
-            $this->recordFailedLogin($username);
-            return ['status' => 401, 'error' => 'Invalid credentials'];
-        }
-
-        $validPassword = password_verify($password, $hash);
-
-        if (!$validPassword) {
-            $this->recordFailedLogin($username);
-            return ['status' => 401, 'error' => 'Invalid credentials'];
-        }
-
-        if (($userData['status'] ?? 'active') !== 'active') {
-            return ['status' => 403, 'error' => 'Account is not active'];
-        }
-
-        $session = [
-            'username' => $username,
-            'loginTime' => time(),
-            'expiresAt' => time() + $this->getSessionTtlSeconds($remember),
-            'remember' => $remember,
-            'lastActivity' => time(),
-            'sessionId' => bin2hex(random_bytes(16)),
-            'csrfToken' => CsrfGuard::generateToken(),
-            'user' => [
-                'username' => $userData['username'] ?? $username,
-                'displayName' => $userData['displayName'] ?? $username,
-                'email' => $userData['email'] ?? '',
-                'role' => $userData['role'] ?? 'editor',
-                'capabilities' => Role::fromName($userData['role'] ?? null)->capabilityNames(),
-                'mustChangePassword' => (bool) ($userData['mustChangePassword'] ?? false)
-            ]
-        ];
-
-        $this->sessions->start($session, $remember);
-        $this->clearFailedLogin($username);
-
-        return ['data' => ['success' => true, 'user' => $session['user']]];
-    }
-
-    /**
-     * Change the signed-in account's password.
-     *
-     * Requires the current password even though the session is already
-     * authenticated: it is what stops a borrowed or hijacked session from
-     * locking the real owner out of their own account.
-     *
-     * @return array<string, mixed>
-     */
     /**
      * Read or change the runtime settings.
      *
@@ -987,108 +889,6 @@ class Application
         return ['data' => $settings->toArray()];
     }
 
-    private function handleChangePassword(): array
-    {
-        $session = $this->getSessionUser();
-        if ($session === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
-        }
-
-        $data = $this->getJsonBody();
-        $current = (string) ($data['currentPassword'] ?? '');
-        $new = (string) ($data['newPassword'] ?? '');
-
-        if ($current === '' || $new === '') {
-            return ['status' => 400, 'error' => 'Both the current and the new password are required.'];
-        }
-
-        $username = (string) ($session['username'] ?? '');
-        $account = $this->contentService?->user($username);
-        if ($account === null) {
-            return ['status' => 404, 'error' => 'Account not found'];
-        }
-
-        $hash = $account->data['password'] ?? null;
-        if (!is_string($hash) || !password_verify($current, $hash)) {
-            $this->recordFailedLogin($username);
-            return ['status' => 403, 'error' => 'The current password is not correct.'];
-        }
-
-        $minimum = $this->getPasswordMinLength();
-        if (mb_strlen($new) < $minimum) {
-            return ['status' => 422, 'error' => "The new password must be at least {$minimum} characters."];
-        }
-
-        if ($new === $current) {
-            return ['status' => 422, 'error' => 'The new password must differ from the current one.'];
-        }
-
-        // The seeded password is published, so it can never be the answer even
-        // if it satisfies the length rule.
-        if ($new === self::INITIAL_PASSWORD) {
-            return ['status' => 422, 'error' => 'That password cannot be used.'];
-        }
-
-        $account->update([
-            'password' => password_hash($new, PASSWORD_DEFAULT),
-            'mustChangePassword' => null,
-            'passwordChangedAt' => gmdate('c'),
-        ]);
-        $this->contentService->save($account);
-
-        $this->clearFailedLogin($username);
-        $this->refreshSessionUser($username);
-
-        return ['data' => ['success' => true]];
-    }
-
-    /**
-     * Re-read the account into the session after it changes, so a stale flag
-     * cannot keep an account locked out of the rest of the API.
-     */
-    private function refreshSessionUser(string $username): void
-    {
-        $account = $this->contentService?->user($username);
-        if ($account === null) {
-            return;
-        }
-
-        $this->sessions?->merge([
-            'user' => ['mustChangePassword' => (bool) ($account->data['mustChangePassword'] ?? false)],
-        ]);
-    }
-
-    private function getPasswordMinLength(): int
-    {
-        return $this->config?->passwordMinLength() ?? 8;
-    }
-
-    private function handleLogout(): array
-    {
-        $this->sessions?->clear();
-
-        return ['data' => ['success' => true]];
-    }
-
-    private function handleMe(): array
-    {
-        $user = $this->getSessionUser();
-        if ($user === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
-        }
-
-        return ['data' => $user];
-    }
-
-    /**
-     * Reject state-changing requests that do not carry the session's CSRF token.
-     *
-     * Only applies once there is a session to forge: an unauthenticated request
-     * can do nothing that needs protecting, and login itself must be reachable
-     * before any token exists.
-     *
-     * @return array<string, mixed>|null Null when the request may proceed.
-     */
     /**
      * Allow a named front end to read the delivery API from the browser.
      *
@@ -1133,22 +933,6 @@ class Application
         return null;
     }
 
-    private function handleAuthCheck(): array
-    {
-        $session = $this->getSessionData();
-        $user = $session['user'] ?? null;
-
-        return ['data' => [
-            'authenticated' => $user !== null,
-            'user' => $user,
-            'expiresAt' => $session['expiresAt'] ?? null,
-            'remember' => $session['remember'] ?? false,
-            'lastActivity' => $session['lastActivity'] ?? null,
-            'sessionId' => $session['sessionId'] ?? null,
-            'csrfToken' => $session['csrfToken'] ?? null
-        ]];
-    }
-
     private function getSessionUser(): ?array
     {
         return $this->sessions?->user();
@@ -1162,11 +946,6 @@ class Application
     private function touchSession(): void
     {
         $this->sessions?->touch();
-    }
-
-    private function getSessionTtlSeconds(bool $remember = false): int
-    {
-        return $this->config?->sessionTtlSeconds($remember) ?? ($remember ? 2592000 : 28800);
     }
 
     private function getIdleTimeoutSeconds(): int
@@ -1205,33 +984,6 @@ class Application
                 'graphql' => ['enabled' => false],
             ],
         ];
-    }
-
-    private function checkLockout(string $username): ?array
-    {
-        $remaining = $this->throttle?->secondsRemaining($username);
-
-        if ($remaining === null) {
-            return null;
-        }
-
-        $minutes = (int) ceil($remaining / 60);
-
-        return [
-            'status' => 429,
-            'error' => "Too many failed attempts. Try again in {$minutes} minute(s).",
-            'retryAfter' => $remaining,
-        ];
-    }
-
-    private function recordFailedLogin(string $username): void
-    {
-        $this->throttle?->recordFailure($username);
-    }
-
-    private function clearFailedLogin(string $username): void
-    {
-        $this->throttle?->clear($username);
     }
 
 
@@ -1287,33 +1039,6 @@ class Application
         }
 
         return false;
-    }
-
-    private function ensureDefaultAdminUser(): void
-    {
-        if ($this->contentService === null) {
-            return;
-        }
-
-        if ($this->contentService->user('admin')) {
-            return;
-        }
-
-        $adminUser = [
-            'username' => 'admin',
-            'displayName' => 'Administrator',
-            'email' => 'admin@example.com',
-            'role' => 'admin',
-            'status' => 'active',
-            'password' => password_hash(self::INITIAL_PASSWORD, PASSWORD_DEFAULT),
-            // The seeded account has a published, guessable password. It can log
-            // in and do exactly one thing: choose a real one.
-            'mustChangePassword' => true,
-            'createdAt' => gmdate('c'),
-        ];
-
-        $content = Content::create(ContentKey::user('admin'), $adminUser);
-        $this->contentService->save($content);
     }
 
 
