@@ -25,9 +25,24 @@
     </div>
 
     <ol v-if="sections.length" class="section-list">
-      <li v-for="(section, index) in sections" :key="section._uid" class="section-item">
+      <li
+        v-for="(section, index) in sections"
+        :key="section._uid"
+        class="section-item"
+        :class="{ dragging: dragIndex === index, 'drag-over': overIndex === index }"
+        :aria-grabbed="dragIndex === index ? 'true' : 'false'"
+        @dragover="onDragOver(index, $event)"
+        @drop="onDrop(index)"
+      >
         <header class="section-head">
           <div class="section-identity">
+            <span
+              class="drag-handle"
+              draggable="true"
+              :aria-label="`Reorder section ${index + 1} — drag to move, or use the arrow buttons`"
+              @dragstart="onDragStart(index)"
+              @dragend="onDragEnd"
+            >⠿</span>
             <span class="section-index">{{ index + 1 }}</span>
             <div>
               <p class="section-type">{{ labelFor(section.type) }}</p>
@@ -97,6 +112,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import FieldInput from './fields/FieldInput.vue';
 import RepeaterField from './fields/RepeaterField.vue';
 import ImageField from './fields/ImageField.vue';
+import { moveItem, useDragReorder } from '../lib/dragReorder.js';
 
 const props = defineProps({
   // [{ type: 'card-grid', values: { ... } }]
@@ -184,11 +200,25 @@ const remove = (index) => {
 const move = (index, delta) => {
   const target = index + delta;
   if (target < 0 || target >= sections.value.length) return;
-
-  const [moved] = sections.value.splice(index, 1);
-  sections.value.splice(target, 0, moved);
+  sections.value = moveItem(sections.value, index, target);
   commit();
 };
+
+// Drag-and-drop performs the same reorder as the arrow buttons, by pointer. The
+// UI-only keys (_uid, _collapsed) ride along with each item and strip() drops
+// them, so the emitted payload keeps its { type, values } shape, just reordered.
+const reorder = (from, to) => {
+  sections.value = moveItem(sections.value, from, to);
+  commit();
+};
+const {
+  dragIndex,
+  overIndex,
+  start: onDragStart,
+  over: onDragOver,
+  drop: onDrop,
+  end: onDragEnd,
+} = useDragReorder(reorder);
 
 const toggle = (index) => {
   sections.value[index]._collapsed = !sections.value[index]._collapsed;
@@ -220,8 +250,12 @@ onMounted(async () => {
 .banner.warning ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
 .section-list { list-style: none; margin: 0 0 1.5rem; padding: 0; display: grid; gap: 1rem; }
 .section-item { border: 1px solid var(--app-border); border-radius: 10px; background: var(--card-bg); }
+.section-item.dragging { opacity: 0.5; }
+.section-item.drag-over { border-color: var(--color-primary-600); }
 .section-head { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid var(--app-border); }
 .section-identity { display: flex; align-items: center; gap: 0.75rem; }
+.drag-handle { cursor: grab; user-select: none; color: var(--app-text-muted); line-height: 1; }
+.drag-handle:active { cursor: grabbing; }
 .section-index { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; background: var(--app-surface-strong); font-size: 0.75rem; font-weight: 600; }
 .section-type { margin: 0; font-weight: 600; font-size: 0.9375rem; }
 .section-missing { margin: 0.15rem 0 0; font-size: 0.8125rem; color: var(--color-danger-600, #dc2626); }
