@@ -514,11 +514,16 @@ class Application
 
         $title = htmlspecialchars($page->title(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
+        // One media service, shared by the renderer (which resolves in-page
+        // images) and the SEO head (which resolves the Open Graph image), so all
+        // media I/O stays here and SeoMeta stays pure.
+        $media = new \Click\Cms\Application\Media\MediaService($this->basePath . '/content/media');
+
         // Sections are the CMS's own content model, so it renders them itself.
         // Without this a site could store a page but not show it.
         $renderer = new SectionRenderer(
             new JsonSectionTypeRepository($this->basePath . '/config/sections'),
-            new \Click\Cms\Application\Media\MediaService($this->basePath . '/content/media')
+            $media
         );
         $body = $renderer->render($page);
 
@@ -540,21 +545,31 @@ class Application
             'UTF-8'
         );
 
-        // Same renderer, same markup, same stylesheet as the public site. The
-        // point of a preview is that it is not a second rendering path: an
-        // approximation would be worse than nothing, because it would be
-        // believed.
-        $robots = $preview
-            ? '
-    <meta name="robots" content="noindex, nofollow, noarchive">'
-            : '';
+        // The head differs by audience. A preview is for an editor, so it keeps a
+        // plain, unmistakably-marked title and is told never to be indexed — SEO
+        // metadata is a public-page concern and would only mislead here. The
+        // public page gets the full SEO head: title with its own fallback,
+        // description, Open Graph tags, canonical and the editor's own noindex.
+        if ($preview) {
+            $head = '<title>Preview: ' . $title . '</title>
+    <meta name="robots" content="noindex, nofollow, noarchive">';
+        } else {
+            $head = \Click\Cms\Http\SeoMeta::forPage(
+                $page->toArray()['data'] ?? [],
+                $page->title(),
+                static function (string $ref) use ($media): string {
+                    $item = $media->find($ref);
+                    return $item?->urls('/api/media/file')['original'] ?? '';
+                }
+            );
+        }
 
         $html = '<!doctype html>
 <html lang="' . $lang . '">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>' . ($preview ? 'Preview: ' : '') . $title . '</title>' . $robots . '
+    ' . $head . '
     <link rel="stylesheet" href="/theme.css">
 </head>
 <body>

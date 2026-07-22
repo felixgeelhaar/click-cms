@@ -308,22 +308,32 @@ final class PreviewRouteTest extends TestCase
 
     /**
      * Preview must not be a second renderer, or what an editor approves is not
-     * what visitors get. Same markup, from the same code path.
+     * what visitors get. The rendered body — the sections themselves — has to be
+     * identical between the two.
+     *
+     * The <head> is allowed to differ, and now does: the public page carries SEO
+     * metadata that would only mislead in a preview, and the preview carries its
+     * own marking and a noindex. What must match is the content, so this compares
+     * the <main> block rather than the whole document.
      */
-    public function testPreviewRendersThroughTheSameRendererAsThePublicSite(): void
+    public function testPreviewRendersTheSameBodyAsThePublicSite(): void
     {
         $this->savePage('twin', 'Twin', true, 'IDENTICAL BODY');
 
-        $public = $this->request('/twin');
+        $main = static function (string $html): string {
+            preg_match('#<main>.*</main>#s', $html, $m);
+            return $m[0] ?? '';
+        };
+
+        $public = $main($this->request('/twin'));
 
         $_GET['token'] = $this->tokenFor('twin');
-        $preview = $this->request('/preview/twin?token=' . $_GET['token']);
+        $previewHtml = $this->request('/preview/twin?token=' . $_GET['token']);
+        // The preview banner sits inside <main>; strip it before comparing.
+        $preview = $main(preg_replace('#<div role="status".*?</div>#s', '', $previewHtml) ?? '');
 
-        // Strip the banner the preview adds and the two documents are the same.
-        $withoutBanner = preg_replace('#<div role="status".*?</div>#s', '', $preview);
-        $withoutBanner = str_replace(['<title>Preview: ', "\n    <meta name=\"robots\" content=\"noindex, nofollow, noarchive\">"], ['<title>', ''], (string) $withoutBanner);
-
-        $this->assertSame($public, $withoutBanner);
+        $this->assertNotSame('', $public, 'the public page should have a body');
+        $this->assertSame($public, $preview);
     }
 
     /* ------------------------------------------------------- path safety -- */
