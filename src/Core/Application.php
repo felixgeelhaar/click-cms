@@ -741,6 +741,15 @@ class Application
             return true;
         }
 
+        // The GraphQL delivery endpoint is public regardless of verb. GraphQL
+        // clients send their query in a POST body, but it is still a read — no
+        // accounts, no writes, published content only, all enforced in the
+        // plugin — so it is checked before the guard below that would otherwise
+        // reject every POST out of hand.
+        if ($path === 'graphql') {
+            return true;
+        }
+
         if (!CsrfGuard::isSafeMethod($method)) {
             return false;
         }
@@ -1128,7 +1137,12 @@ class Application
 
         // Logging in and out must work without a token; there is no session to
         // protect yet, and being unable to log out would be worse than the risk.
-        if (in_array($path, ['auth/login', 'auth/logout'], true)) {
+        //
+        // GraphQL delivery is POSTed but reads only published content and changes
+        // nothing, so a forged request achieves nothing a plain fetch could not,
+        // and requiring a token would stop an anonymous front end — the intended
+        // caller — from using it at all.
+        if (in_array($path, ['auth/login', 'auth/logout', 'graphql'], true)) {
             return null;
         }
 
