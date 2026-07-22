@@ -64,24 +64,94 @@ final class SectionRendererTest extends TestCase
     }
 
     /**
-     * Content is written by trusted editors, but "trusted" describes intent,
-     * not what a paste from elsewhere contains.
+     * A plain text field is written by trusted editors, but "trusted" describes
+     * intent, not what a paste from elsewhere contains, so it is escaped whole.
+     * A rich-text field is HTML on purpose, so it is sanitised to an allowlist
+     * rather than escaped — but the outcome for an injected script or handler is
+     * the same: nothing hostile becomes live markup.
      */
-    public function testEveryValueIsEscaped(): void
+    public function testEveryValueIsEscapedOrSanitised(): void
     {
         $html = $this->renderer->render($this->page([
             ['type' => 'rich-text', 'values' => [
+                // A plain text field: escaped, so the characters survive as text.
                 'heading' => '<script>alert(1)</script>',
+                // A rich-text field: sanitised, so the disallowed <img> and its
+                // handler are stripped out entirely.
                 'body' => '<img src=x onerror=alert(1)>',
             ]],
         ]));
 
-        // What matters is that neither becomes markup. The characters may
-        // still appear, escaped, as the text the editor actually typed.
         $this->assertStringNotContainsString('<script', $html);
         $this->assertStringNotContainsString('<img', $html);
-        $this->assertStringContainsString('&lt;script&gt;', $html);
-        $this->assertStringContainsString('&lt;img', $html);
+        // The rich-text handler stripped the disallowed image outright.
+        $this->assertStringNotContainsString('onerror', $html);
+        // The escaped heading text still shows the characters the editor typed.
+        // "alert(1)" surviving here is inert text inside &lt;script&gt;, not a
+        // live tag — which is exactly the escaping this asserts.
+        $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
+    }
+
+    /**
+     * Rich text is HTML by design: an editor's bold, links and lists must reach
+     * the page as markup, not as escaped angle brackets a reader would see.
+     */
+    public function testRichTextRendersAllowedFormattingAsHtml(): void
+    {
+        $html = $this->renderer->render($this->page([
+            ['type' => 'rich-text', 'values' => [
+                'body' => '<p>Hello <strong>world</strong> — <a href="https://example.com">link</a>.</p>',
+            ]],
+        ]));
+
+        $this->assertStringContainsString('<strong>world</strong>', $html);
+        $this->assertStringContainsString(
+            '<a href="https://example.com" rel="noopener noreferrer">link</a>',
+            $html
+        );
+        // Emphatically not escaped into visible tags.
+        $this->assertStringNotContainsString('&lt;strong&gt;', $html);
+    }
+
+    /**
+     * The same value is an XSS surface, because it is emitted as markup. A
+     * script, a handler or a javascript: link in it must not survive, while the
+     * surrounding safe prose does.
+     */
+    public function testRichTextIsSanitisedNotTrusted(): void
+    {
+        $html = $this->renderer->render($this->page([
+            ['type' => 'rich-text', 'values' => [
+                'body' => '<p>ok</p><script>alert(1)</script>'
+                    . '<p onclick="steal()">two</p>'
+                    . '<a href="javascript:alert(1)">x</a>',
+            ]],
+        ]));
+
+        $this->assertStringNotContainsString('<script', $html);
+        $this->assertStringNotContainsString('alert(1)', $html);
+        $this->assertStringNotContainsString('onclick', $html);
+        $this->assertStringNotContainsString('javascript:', $html);
+        $this->assertStringContainsString('<p>ok</p>', $html);
+        $this->assertStringContainsString('<p>two</p>', $html);
+    }
+
+    /**
+     * A textarea is not rich text: it stays plain prose, escaped exactly as
+     * before, so the sanitiser must not have loosened it into an HTML field.
+     */
+    public function testTextareaRemainsEscapedPlainProse(): void
+    {
+        $html = $this->renderer->render($this->page([
+            ['type' => 'call-to-action', 'values' => [
+                'body' => '<strong>not bold</strong>',
+                'buttonLabel' => 'Go',
+                'buttonUrl' => 'https://example.com',
+            ]],
+        ]));
+
+        $this->assertStringNotContainsString('<strong>not bold</strong>', $html);
+        $this->assertStringContainsString('&lt;strong&gt;not bold&lt;/strong&gt;', $html);
     }
 
     /**
