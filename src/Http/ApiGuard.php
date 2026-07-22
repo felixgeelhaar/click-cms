@@ -73,6 +73,13 @@ final class ApiGuard
             return true;
         }
 
+        // Full-text search over published pages, for a front end with no account.
+        // The search plugin reads only published documents, so this is a read of
+        // public content, safe to answer anonymously like /api/pages.
+        if ($path === 'search') {
+            return true;
+        }
+
         return false;
     }
 
