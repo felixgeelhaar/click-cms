@@ -187,6 +187,120 @@ final class MediaItemTest extends TestCase
         $this->assertSame('photo-sm.jpg', ImageSize::Small->filenameFor('photo', 'jpg'));
         $this->assertSame('photo-xl.webp', ImageSize::ExtraLarge->filenameFor('photo', 'webp'));
     }
+
+    /**
+     * An SVG has no raster dimensions and no variant ladder — it is
+     * resolution-independent. It must still round-trip and describe itself
+     * without the quality logic (which counts pixels) choking on the absence of
+     * a width.
+     */
+    private function svg(): MediaItem
+    {
+        return MediaItem::create(
+            id: 'company-logo-a1b2c3',
+            extension: 'svg',
+            mimeType: 'image/svg+xml',
+            originalName: 'logo.svg',
+            bytes: 512,
+            width: null,
+            height: null,
+            variants: [],
+        );
+    }
+
+    public function testSvgIsAnImageButHasNoQualityVerdict(): void
+    {
+        $svg = $this->svg();
+
+        // It is served as an image…
+        $this->assertTrue($svg->isImage());
+        // …but has no pixels to count, so the ladder's quality warning stays
+        // silent rather than reporting a nonsensical "too small".
+        $this->assertNull($svg->quality());
+        $this->assertNull($svg->quality(1200));
+        $this->assertNull($svg->toArray()['quality']);
+        $this->assertNull($svg->toArray(1200)['quality']);
+    }
+
+    public function testSvgServesItselfWithNoVariantsOrSrcset(): void
+    {
+        $svg = $this->svg();
+
+        $this->assertSame('/api/media/file/company-logo-a1b2c3.svg', $svg->urls()['original']);
+        $this->assertSame([], $svg->urls()['variants']);
+        $this->assertSame('', $svg->srcset());
+        $this->assertSame([], $svg->toArray()['variants']);
+    }
+
+    public function testSvgRoundTripsThroughArray(): void
+    {
+        $restored = MediaItem::fromArray($this->svg()->toArray());
+
+        $this->assertSame('company-logo-a1b2c3', $restored->id);
+        $this->assertSame('svg', $restored->extension);
+        $this->assertSame('image/svg+xml', $restored->mimeType);
+        $this->assertNull($restored->width);
+        $this->assertSame([], $restored->variants);
+    }
+
+    /**
+     * The square crop is an additional, focal-point-centred file for layouts
+     * that need a fixed box. It rides alongside the ladder — it does not replace
+     * it — so the payload exposes its own URL without disturbing `variants`.
+     */
+    public function testSquareCropSurfacesAsItsOwnUrlAndSize(): void
+    {
+        $cropped = MediaItem::create(
+            id: 'harbour-crane-a1b2c3',
+            extension: 'jpg',
+            mimeType: 'image/jpeg',
+            originalName: 'crane.jpg',
+            bytes: 200_000,
+            width: 2400,
+            height: 1600,
+            variants: [ImageSize::Small, ImageSize::Medium],
+            squareCrop: 1024,
+        );
+
+        $urls = $cropped->urls();
+        $this->assertSame('/api/media/file/harbour-crane-a1b2c3-square.jpg', $urls['square']['url']);
+        $this->assertSame(1024, $urls['square']['width']);
+        $this->assertSame(1024, $urls['square']['height']);
+
+        $array = $cropped->toArray();
+        $this->assertSame(1024, $array['squareCrop']);
+        // The uncropped ladder is untouched.
+        $this->assertSame(['sm', 'md'], $array['variants']);
+    }
+
+    public function testNoSquareCropKeyWhenThereIsNoCrop(): void
+    {
+        $urls = $this->item()->urls();
+
+        $this->assertArrayNotHasKey('square', $urls);
+        $this->assertNull($this->item()->toArray()['squareCrop']);
+    }
+
+    public function testSquareCropRoundTripsThroughArray(): void
+    {
+        $restored = MediaItem::fromArray(
+            $this->item()->withSquareCrop(768)->toArray()
+        );
+
+        $this->assertSame(768, $restored->squareCrop);
+    }
+
+    public function testSquareCropIsReplacedWithoutMutating(): void
+    {
+        $original = $this->item();
+        $cropped = $original->withSquareCrop(512);
+
+        $this->assertNull($original->squareCrop);
+        $this->assertSame(512, $cropped->squareCrop);
+        $this->assertSame($original->id, $cropped->id);
+        // Clearing it back to none is expressible too.
+        $this->assertNull($cropped->withSquareCrop(null)->squareCrop);
+    }
 }
 
 final class UploadPolicyTest extends TestCase
@@ -199,13 +313,23 @@ final class UploadPolicyTest extends TestCase
     }
 
     /**
-     * SVG is an XML document that can carry script, so serving one inline is a
-     * cross-site scripting hole.
+     * SVG is now an accepted *type* — but only because MediaService sanitises the
+     * bytes before storing them. The type gate opening is what lets the sanitised
+     * result be stored and served at all; the raw bytes are never trusted, and an
+     * SVG that will not sanitise is still refused (covered in MediaServiceTest).
      */
-    public function testRefusesSvgWithAnExplanation(): void
+    public function testSvgIsAnAcceptedTypeSoSanitisedLogosCanBeStored(): void
     {
-        $this->assertFalse(UploadPolicy::isAccepted('image/svg+xml'));
-        $this->assertStringContainsString('script', UploadPolicy::refusalReason('image/svg+xml'));
+        $this->assertTrue(UploadPolicy::isAccepted('image/svg+xml'));
+        $this->assertSame('svg', UploadPolicy::extensionFor('image/svg+xml'));
+        $this->assertContains('svg', UploadPolicy::acceptedExtensions());
+        $this->assertContains('image/svg+xml', UploadPolicy::acceptedMimeTypes());
+    }
+
+    /** The message shown when an SVG's bytes cannot be made safe still names why. */
+    public function testSvgRefusalNamesTheScriptRisk(): void
+    {
+        $this->assertStringContainsStringIgnoringCase('script', UploadPolicy::svgRefusalReason());
     }
 
     public function testRefusesExecutableAndMarkupTypes(): void

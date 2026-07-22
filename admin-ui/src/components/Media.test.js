@@ -119,3 +119,33 @@ describe('focal point', () => {
     expect(body.focalPoint.y).toBe(0);
   });
 });
+
+/**
+ * An SVG is resolution-independent: the server stores it with no width and no
+ * variant ladder. The card must read that as a vector rather than rendering an
+ * empty "×" where a pixel size would be.
+ */
+describe('svg items', () => {
+  const svgItem = () => item({
+    id: 'company-logo-a1b2c3',
+    extension: 'svg',
+    mimeType: 'image/svg+xml',
+    originalName: 'logo.svg',
+    width: null,
+    height: null,
+    variants: [],
+    urls: { original: '/api/media/file/company-logo-a1b2c3.svg', variants: {} },
+  });
+
+  it('describes a vector instead of blank dimensions', async () => {
+    const wrapper = await mountMedia([svgItem()]);
+
+    const text = wrapper.text();
+    expect(text).toContain('Scalable vector');
+    expect(text).toContain('scales to any size');
+    // No stray "null" leaking a missing pixel size, and it is not mislabelled as
+    // a raster that simply failed to produce variants.
+    expect(text).not.toContain('null');
+    expect(text).not.toContain('no resized versions');
+  });
+});

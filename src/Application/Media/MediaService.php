@@ -6,6 +6,7 @@ namespace Click\Cms\Application\Media;
 
 use Click\Cms\Domain\Media\FocalPoint;
 use Click\Cms\Domain\Media\MediaItem;
+use Click\Cms\Domain\Media\SvgSanitizer;
 use Click\Cms\Domain\Media\UploadPolicy;
 use Click\Cms\Infrastructure\Media\GdImageProcessor;
 use RuntimeException;
@@ -22,6 +23,7 @@ final class MediaService
     public function __construct(
         private readonly string $mediaDir,
         private readonly GdImageProcessor $processor = new GdImageProcessor(),
+        private readonly SvgSanitizer $svgSanitizer = new SvgSanitizer(),
     ) {}
 
     /**
@@ -48,6 +50,15 @@ final class MediaService
         if ($bytes > UploadPolicy::MAX_BYTES) {
             $limit = (int) (UploadPolicy::MAX_BYTES / 1024 / 1024);
             return ['item' => null, 'error' => "Files must be smaller than {$limit} MB."];
+        }
+
+        // SVG is handled before the raster path because getimagesize() cannot
+        // read one, and because it is the one upload that can carry executable
+        // script — it is accepted only through the sanitiser, and what is stored
+        // is the sanitiser's output, never the raw upload.
+        $raw = @file_get_contents($tmp);
+        if ($raw !== false && SvgSanitizer::looksLikeSvg($raw)) {
+            return $this->storeSvg($raw, (string) ($file['name'] ?? ''));
         }
 
         // Type comes from the file's content. The browser-supplied type and the
@@ -83,6 +94,14 @@ final class MediaService
 
         $variants = $this->processor->generateVariants($target, $this->mediaDir, $id, $extension);
 
+        // A focal-point-centred square crop rides alongside the ladder for a
+        // layout that needs a fixed box. Generated with the default centre focal
+        // point at upload; recut when the editor moves the point. Additional to
+        // the ladder, never a replacement — the ladder above is untouched.
+        $squareCrop = $this->processor->generateSquareCrop(
+            $target, $this->mediaDir, $id, $extension, 0.5, 0.5
+        );
+
         $item = MediaItem::create(
             id: $id,
             extension: $extension,
@@ -92,6 +111,56 @@ final class MediaService
             width: $info['width'],
             height: $info['height'],
             variants: $variants,
+            squareCrop: $squareCrop,
+        );
+
+        $this->writeMetadata($item);
+
+        return ['item' => $item, 'error' => null];
+    }
+
+    /**
+     * Store an SVG, but only its sanitised form.
+     *
+     * The bytes are run through the sanitiser first; an SVG that cannot be made
+     * safe is refused rather than stored, exactly as a raster that fails
+     * inspection is. What reaches disk is the cleaned markup, so even the served
+     * original carries no script. An SVG is resolution-independent, so there is
+     * no dimension to read, no variant ladder to build and no crop to cut — it
+     * serves as-is.
+     *
+     * @return array{item: ?MediaItem, error: ?string}
+     */
+    private function storeSvg(string $raw, string $originalName): array
+    {
+        $clean = $this->svgSanitizer->sanitize($raw);
+        if ($clean === null) {
+            return ['item' => null, 'error' => UploadPolicy::svgRefusalReason()];
+        }
+
+        $id = UploadPolicy::slugFor($originalName) . '-' . bin2hex(random_bytes(4));
+
+        $this->ensureDir();
+        $target = $this->mediaDir . '/' . $id . '.svg';
+
+        if (@file_put_contents($target, $clean, LOCK_EX) === false) {
+            return ['item' => null, 'error' => 'The file could not be saved.'];
+        }
+
+        // Data, never a program — the same posture every stored upload gets.
+        @chmod($target, 0o644);
+
+        $item = MediaItem::create(
+            id: $id,
+            extension: 'svg',
+            mimeType: 'image/svg+xml',
+            originalName: $originalName,
+            bytes: strlen($clean),
+            // No raster dimensions: an SVG scales without them, and leaving them
+            // null is what keeps the pixel-counting quality warning silent.
+            width: null,
+            height: null,
+            variants: [],
         );
 
         $this->writeMetadata($item);
@@ -148,10 +217,13 @@ final class MediaService
     /**
      * Mark the point of the image that must stay visible when it is cropped.
      *
-     * Metadata only, exactly like alt text: the stored files are never re-cropped
-     * — a front end honours the point with CSS. Coordinates are fractions 0..1;
+     * The focal point drives two things now. It is still metadata a front end
+     * honours with CSS `object-position` on the uncropped ladder — that is why
      * validation lives in FocalPoint, so an out-of-range value throws rather than
-     * being quietly moved.
+     * being quietly moved. It also re-cuts the server-side square crop around the
+     * new subject, so the fixed-box file always matches the point last marked. A
+     * resolution-independent SVG has no crop to recut, so the processor simply
+     * reports none for it.
      */
     public function updateFocalPoint(string $id, float $x, float $y): ?MediaItem
     {
@@ -161,6 +233,20 @@ final class MediaService
         }
 
         $updated = $item->withFocalPoint(FocalPoint::at($x, $y));
+
+        // Recut the square crop from the stored original around the new point.
+        // Returns null for an SVG or when GD is unavailable, which correctly
+        // clears the crop rather than leaving a stale one.
+        $squareCrop = $this->processor->generateSquareCrop(
+            $this->mediaDir . '/' . $item->filename(),
+            $this->mediaDir,
+            $item->id,
+            $item->extension,
+            $x,
+            $y
+        );
+        $updated = $updated->withSquareCrop($squareCrop);
+
         $this->writeMetadata($updated);
 
         return $updated;
@@ -188,7 +274,7 @@ final class MediaService
      */
     public function pathForFile(string $filename): ?string
     {
-        $pattern = '/^(?<id>[a-z0-9][a-z0-9-]*?)(?:-(?:sm|md|lg|xl))?\.(?<ext>[a-z0-9]{1,5})$/';
+        $pattern = '/^(?<id>[a-z0-9][a-z0-9-]*?)(?:-(?:sm|md|lg|xl|square))?\.(?<ext>[a-z0-9]{1,5})$/';
 
         if (preg_match($pattern, $filename, $m) !== 1) {
             return null;

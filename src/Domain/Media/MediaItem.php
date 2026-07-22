@@ -33,6 +33,10 @@ final class MediaItem
         public readonly string $alt,
         public readonly string $uploadedAt,
         public readonly FocalPoint $focalPoint,
+        // Side length in pixels of the focal-point-centred square crop, or null
+        // when none exists — a resolution-independent SVG never has one, and a
+        // raster only gains one once the processor could produce it.
+        public readonly ?int $squareCrop,
     ) {}
 
     /**
@@ -50,6 +54,7 @@ final class MediaItem
         string $alt = '',
         ?string $uploadedAt = null,
         ?FocalPoint $focalPoint = null,
+        ?int $squareCrop = null,
     ): self {
         if (preg_match('/^[a-z0-9][a-z0-9-]*$/', $id) !== 1) {
             throw new InvalidArgumentException(
@@ -79,6 +84,7 @@ final class MediaItem
             alt: $alt,
             uploadedAt: $uploadedAt ?? gmdate('c'),
             focalPoint: $focalPoint ?? FocalPoint::center(),
+            squareCrop: $squareCrop !== null && $squareCrop > 0 ? $squareCrop : null,
         );
     }
 
@@ -109,12 +115,25 @@ final class MediaItem
             focalPoint: FocalPoint::fromArray(
                 is_array($row['focalPoint'] ?? null) ? $row['focalPoint'] : []
             ),
+            squareCrop: isset($row['squareCrop']) ? (int) $row['squareCrop'] : null,
         );
     }
 
     public function filename(): string
     {
         return $this->id . '.' . $this->extension;
+    }
+
+    /**
+     * The stored name of the square crop, or null when there is none. Named off
+     * the same id as every other file so the serving path resolves it with the
+     * one rule it already uses.
+     */
+    public function squareCropFilename(): ?string
+    {
+        return $this->squareCrop === null
+            ? null
+            : $this->id . '-square.' . $this->extension;
     }
 
     public function isImage(): bool
@@ -128,7 +147,10 @@ final class MediaItem
      * Returned as data rather than built in a template so a front end can put
      * the variants straight into a srcset without knowing the naming rule.
      *
-     * @return array{original: string, variants: array<string, array{url: string, width: int}>}
+     * The `square` key is present only when a focal-point crop exists, so a
+     * caller can test for it rather than for a zero.
+     *
+     * @return array{original: string, variants: array<string, array{url: string, width: int}>, square?: array{url: string, width: int, height: int}}
      */
     public function urls(string $baseUrl = '/api/media/file'): array
     {
@@ -142,10 +164,22 @@ final class MediaItem
             ];
         }
 
-        return [
+        $urls = [
             'original' => $base . '/' . $this->filename(),
             'variants' => $variants,
         ];
+
+        $square = $this->squareCropFilename();
+        if ($square !== null) {
+            // A square is as wide as it is tall, so both are the stored side.
+            $urls['square'] = [
+                'url' => $base . '/' . $square,
+                'width' => $this->squareCrop,
+                'height' => $this->squareCrop,
+            ];
+        }
+
+        return $urls;
     }
 
     /**
@@ -190,7 +224,7 @@ final class MediaItem
         return new self(
             $this->id, $this->extension, $this->mimeType, $this->originalName,
             $this->bytes, $this->width, $this->height, $this->variants,
-            $alt, $this->uploadedAt, $this->focalPoint,
+            $alt, $this->uploadedAt, $this->focalPoint, $this->squareCrop,
         );
     }
 
@@ -199,7 +233,25 @@ final class MediaItem
         return new self(
             $this->id, $this->extension, $this->mimeType, $this->originalName,
             $this->bytes, $this->width, $this->height, $this->variants,
-            $this->alt, $this->uploadedAt, $focalPoint,
+            $this->alt, $this->uploadedAt, $focalPoint, $this->squareCrop,
+        );
+    }
+
+    /**
+     * Record (or clear) the side length of the focal-point square crop.
+     *
+     * A crop is regenerated whenever the focal point moves, so this is set right
+     * after `withFocalPoint`; passing null when the processor could not produce
+     * one keeps the payload honest rather than pointing at a file that is not
+     * there.
+     */
+    public function withSquareCrop(?int $squareCrop): self
+    {
+        return new self(
+            $this->id, $this->extension, $this->mimeType, $this->originalName,
+            $this->bytes, $this->width, $this->height, $this->variants,
+            $this->alt, $this->uploadedAt, $this->focalPoint,
+            $squareCrop !== null && $squareCrop > 0 ? $squareCrop : null,
         );
     }
 
@@ -225,6 +277,10 @@ final class MediaItem
             'variants' => array_map(static fn (ImageSize $s): string => $s->value, $this->variants),
             'alt' => $this->alt,
             'uploadedAt' => $this->uploadedAt,
+            // Side of the focal-point square crop, null when there is none. A
+            // front end needing a fixed box reads urls.square; this is the plain
+            // number beside it.
+            'squareCrop' => $this->squareCrop,
             'urls' => $this->urls(),
             'srcset' => $this->srcset(),
             // The mark itself, plus a ready-made CSS value so a front end that
