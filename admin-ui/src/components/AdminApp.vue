@@ -47,6 +47,7 @@ import Users from './Users.vue';
 import Profile from './Profile.vue';
 import Settings from './Settings.vue';
 import Redirects from './Redirects.vue';
+import Menus from './Menus.vue';
 import Plugins from './Plugins.vue';
 import PluginDetail from './PluginDetail.vue';
 import Marketplace from './Marketplace.vue';
@@ -118,6 +119,7 @@ const getRouteComponent = () => {
   if (path === '/admin/marketplace') return can('plugins.install') ? Marketplace : Dashboard;
   if (path === '/admin/settings') return can('settings.manage') ? Settings : Dashboard;
   if (path === '/admin/redirects') return Redirects;
+  if (path === '/admin/menus') return Menus;
   if (path === '/admin/builder') return hasBuilder.value ? Builder : Dashboard;
   if (path.startsWith('/admin/pages/edit/')) return PageEdit;
   if (path === '/admin/pages/new') return PageEdit;
