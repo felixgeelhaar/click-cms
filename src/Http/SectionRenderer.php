@@ -115,9 +115,18 @@ final class SectionRenderer
         $slug = $this->escape($page->slug());
         $locale = $this->escape($page->locale()->code);
 
+        $confirmation = isset($values['confirmation']) && is_scalar($values['confirmation'])
+            && (string) $values['confirmation'] !== ''
+            ? (string) $values['confirmation']
+            : 'Thank you. Your message has been received.';
+
         return '<section class="cms-section cms-section--form">'
             . $heading . $intro
-            . '<form class="cms-form" method="POST" action="/api/forms/submit">'
+            // The confirmation the visitor sees after submitting, carried on the
+            // form so the enhancement script below can show it without a second
+            // round trip. Escaped: it is editor text landing in an attribute.
+            . '<form class="cms-form" method="POST" action="/api/forms/submit"'
+            . ' data-confirmation="' . $this->escape($confirmation) . '">'
             . '<input type="hidden" name="page" value="' . $slug . '">'
             . '<input type="hidden" name="locale" value="' . $locale . '">'
             // The honeypot: positioned off-screen and hidden from assistive tech,
@@ -132,8 +141,52 @@ final class SectionRenderer
             . '<p class="cms-form-field"><label for="cf-message">' . $label('messageLabel', 'Message') . '</label>'
             . '<textarea id="cf-message" name="message" required></textarea></p>'
             . '<button type="submit">' . $label('submitLabel', 'Send message') . '</button>'
-            . '</form></section>';
+            . '<p class="cms-form-status" role="status" aria-live="polite"></p>'
+            . '</form>'
+            // Progressive enhancement. Without JavaScript the form posts normally
+            // and the endpoint's JSON is shown — it still works. With it, the
+            // submit is caught, sent in the background, and the visitor gets the
+            // confirmation in place rather than a page of JSON. No inline handler
+            // and no framework: one listener bound to this form.
+            . '<script>' . self::FORM_ENHANCE_JS . '</script>'
+            . '</section>';
     }
+
+    /**
+     * The one script that upgrades a contact form's submit into a background
+     * request. Kept tiny and dependency-free; the form is fully functional
+     * without it.
+     */
+    private const FORM_ENHANCE_JS = <<<'JS'
+        (function () {
+          var form = document.currentScript.previousElementSibling;
+          if (!form || form.tagName !== 'FORM') { return; }
+          var status = form.querySelector('.cms-form-status');
+          form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var button = form.querySelector('button[type=submit]');
+            if (button) { button.disabled = true; }
+            if (status) { status.textContent = 'Sending…'; }
+            fetch(form.action, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(Object.fromEntries(new FormData(form)))
+            }).then(function (r) { return r.json().catch(function () { return {}; }); })
+              .then(function (body) {
+                if (body && body.success) {
+                  form.innerHTML = '<p class="cms-form-thanks">' +
+                    (form.getAttribute('data-confirmation') || 'Thank you.') + '</p>';
+                } else {
+                  if (status) { status.textContent = (body && body.error) || 'Something went wrong. Please try again.'; }
+                  if (button) { button.disabled = false; }
+                }
+              }).catch(function () {
+                if (status) { status.textContent = 'Could not send. Please try again.'; }
+                if (button) { button.disabled = false; }
+              });
+          });
+        })();
+        JS;
 
     /**
      * @param array<string, mixed> $values
