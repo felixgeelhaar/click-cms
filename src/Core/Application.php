@@ -21,6 +21,7 @@ use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\HealthCheck;
 use Click\Cms\Http\SectionRenderer;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
@@ -610,35 +611,12 @@ class Application
 
     private function handleHealthLive(): array
     {
-        return [
-            'status' => 200,
-            'data' => [
-                'status' => 'alive',
-                'timestamp' => time()
-            ]
-        ];
+        return (new HealthCheck($this->basePath, $this->pluginManager !== null))->live();
     }
 
     private function handleHealthReady(): array
     {
-        $checks = [];
-        $contentPath = $this->basePath . '/content';
-        $dataPath = $this->basePath . '/data';
-
-        $checks['content_dir'] = is_dir($contentPath) && is_writable($contentPath);
-        $checks['data_dir'] = is_dir($dataPath) && is_writable($dataPath);
-        $checks['plugins_loaded'] = $this->pluginManager !== null;
-
-        $ready = !in_array(false, $checks, true);
-
-        return [
-            'status' => $ready ? 200 : 503,
-            'data' => [
-                'status' => $ready ? 'ready' : 'not_ready',
-                'timestamp' => time(),
-                'checks' => $checks
-            ]
-        ];
+        return (new HealthCheck($this->basePath, $this->pluginManager !== null))->ready();
     }
 
     private function applySecurityHeaders(): void
