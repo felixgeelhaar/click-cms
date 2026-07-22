@@ -1,0 +1,10 @@
+{
+  "name": "Forms",
+  "description": "Contact forms: stores visitor submissions as content and lists them for editors",
+  "version": "1.0.0",
+  "author": "Click CMS",
+  "dependencies": [],
+  "hooks": [
+    "api.routes"
+  ]
+}
