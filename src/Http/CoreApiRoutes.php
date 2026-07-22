@@ -802,6 +802,15 @@ final class CoreApiRoutes
         $info = @getimagesize($path);
         $mimeType = is_array($info) ? ($info['mime'] ?? '') : '';
 
+        // getimagesize cannot read SVG, so a stored SVG resolves to an empty
+        // mime and would 404. An SVG here has already been sanitised to a safe
+        // allowlist at upload, and its name was validated by pathForFile, so it
+        // is safe to serve — but as its declared type, not sniffed.
+        $isSvg = $mimeType === '' && str_ends_with(strtolower($path), '.svg');
+        if ($isSvg) {
+            $mimeType = 'image/svg+xml';
+        }
+
         if (!UploadPolicy::isAccepted($mimeType)) {
             return ['status' => 404, 'error' => 'File not found'];
         }
@@ -809,6 +818,15 @@ final class CoreApiRoutes
         header('Content-Type: ' . $mimeType);
         header('Content-Length: ' . (string) filesize($path));
         header('X-Content-Type-Options: nosniff');
+
+        if ($isSvg) {
+            // Defence in depth. The sanitiser is the real boundary, but an SVG
+            // is a same-origin document when served inline, so a strict policy
+            // makes any gap the sanitiser ever has non-executable rather than
+            // trusting it alone.
+            header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox");
+        }
+
         header('Content-Disposition: inline');
         // Stored names carry random bytes and content never changes under a
         // given name, so this can be cached hard.
