@@ -299,7 +299,7 @@ final class SectionRendererTest extends TestCase
             ]],
         ]));
 
-        $this->assertStringContainsString('<form class="cms-form" method="POST" action="/api/forms/submit">', $html);
+        $this->assertStringContainsString('<form class="cms-form" method="POST" action="/api/forms/submit"', $html);
         $this->assertStringContainsString('name="name"', $html);
         $this->assertStringContainsString('name="email"', $html);
         $this->assertStringContainsString('name="message"', $html);
@@ -308,6 +308,29 @@ final class SectionRendererTest extends TestCase
         // The label is escaped, not rendered as a tag.
         $this->assertStringNotContainsString('<b>Go</b>', $html);
         $this->assertStringContainsString('&lt;b&gt;Go&lt;/b&gt;', $html);
+    }
+
+    /**
+     * The form is progressively enhanced: it posts normally without JavaScript,
+     * and the confirmation the editor wrote is carried on the form for the
+     * enhancement script to show in place. Editor text landing in an attribute
+     * is escaped like everywhere else.
+     */
+    public function testAFormCarriesItsConfirmationForTheEnhancementScript(): void
+    {
+        $html = $this->renderer->render($this->page([
+            ['type' => 'form', 'values' => [
+                'heading' => 'Contact us',
+                'confirmation' => 'Thanks, "Hanna" <will> reply.',
+            ]],
+        ]));
+
+        // The confirmation rides on the form, escaped — not as raw markup.
+        $this->assertStringContainsString('data-confirmation="Thanks, &quot;Hanna&quot; &lt;will&gt; reply."', $html);
+        $this->assertStringNotContainsString('<will>', $html);
+        // A status region for the "Sending…"/error text, and the enhancement itself.
+        $this->assertStringContainsString('class="cms-form-status"', $html);
+        $this->assertStringContainsString('form.addEventListener(\'submit\'', $html);
     }
 
     public function testMalformedSectionsAreIgnoredRatherThanFatal(): void
