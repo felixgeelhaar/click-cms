@@ -539,6 +539,11 @@ final class CoreApiRoutes
             'data' => [
                 'restoredFrom' => $result['version']->summary(),
                 'page' => $page?->toArray(),
+                // What the restored content no longer fits in the current schema,
+                // so the editor can fix it before publishing rather than after a
+                // section silently fails to render on the live page. Empty when
+                // everything still fits, which is the ordinary case.
+                'warnings' => $result['warnings']?->toArray(),
             ],
         ];
     }
@@ -825,7 +830,15 @@ final class CoreApiRoutes
 
     private function history(): HistoryService
     {
-        return $this->history ??= new HistoryService($this->storage(), $this->versions());
+        // The section types are passed so a restore can report content the
+        // current schema no longer declares — a version restored verbatim may
+        // hold a section whose design has since been removed, and the editor
+        // needs telling before they publish it into a page that will not render.
+        return $this->history ??= new HistoryService(
+            $this->storage(),
+            $this->versions(),
+            $this->sectionTypes()
+        );
     }
 
     /**
