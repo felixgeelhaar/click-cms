@@ -11,8 +11,23 @@
     <p v-if="rows.length === 0" class="repeater-empty">No entries yet.</p>
 
     <ol v-else class="repeater-rows">
-      <li v-for="(row, index) in rows" :key="index" class="repeater-row">
+      <li
+        v-for="(row, index) in rows"
+        :key="index"
+        class="repeater-row"
+        :class="{ dragging: dragIndex === index, 'drag-over': overIndex === index }"
+        :aria-grabbed="dragIndex === index ? 'true' : 'false'"
+        @dragover="onDragOver(index, $event)"
+        @drop="onDrop(index)"
+      >
         <div class="row-head">
+          <span
+            class="drag-handle"
+            draggable="true"
+            :aria-label="`Reorder entry ${index + 1} — drag to move, or use the arrow buttons`"
+            @dragstart="onDragStart(index)"
+            @dragend="onDragEnd"
+          >⠿</span>
           <span class="row-number">{{ index + 1 }}</span>
           <div class="row-controls">
             <button
@@ -60,6 +75,7 @@
 import { computed, ref, watch } from 'vue';
 import FieldInput from './FieldInput.vue';
 import ImageField from './ImageField.vue';
+import { moveItem, useDragReorder } from '../../lib/dragReorder.js';
 
 const props = defineProps({
   field: { type: Object, required: true },
@@ -123,11 +139,19 @@ const setCell = (index, name, value) => {
 const move = (index, delta) => {
   const target = index + delta;
   if (target < 0 || target >= rows.value.length) return;
-
-  const next = [...rows.value];
-  [next[index], next[target]] = [next[target], next[index]];
-  commit(next);
+  commit(moveItem(rows.value, index, target));
 };
+
+// Drag-and-drop is the same reorder as the arrow buttons, reached by pointer.
+const reorder = (from, to) => commit(moveItem(rows.value, from, to));
+const {
+  dragIndex,
+  overIndex,
+  start: onDragStart,
+  over: onDragOver,
+  drop: onDrop,
+  end: onDragEnd,
+} = useDragReorder(reorder);
 </script>
 
 <style scoped>
@@ -139,8 +163,12 @@ const move = (index, delta) => {
 .repeater-empty { margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--app-text-muted); }
 .repeater-rows { list-style: none; margin: 0 0 0.75rem; padding: 0; display: grid; gap: 0.75rem; }
 .repeater-row { border: 1px solid var(--app-border); border-radius: 8px; padding: 0.875rem; background: var(--app-surface-strong); }
-.row-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
-.row-number { font-size: 0.75rem; font-weight: 600; color: var(--app-text-muted); }
+.repeater-row.dragging { opacity: 0.5; }
+.repeater-row.drag-over { border-color: var(--color-primary-600); }
+.row-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.drag-handle { cursor: grab; user-select: none; color: var(--app-text-muted); line-height: 1; padding: 0 0.15rem; }
+.drag-handle:active { cursor: grabbing; }
+.row-number { font-size: 0.75rem; font-weight: 600; color: var(--app-text-muted); margin-right: auto; }
 .row-controls { display: flex; gap: 0.25rem; }
 .icon-btn { width: 28px; height: 28px; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; line-height: 1; }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
