@@ -6,10 +6,14 @@
     </span>
 
     <div v-if="selected" class="selected">
+      <!-- The preview crops with object-fit, so honouring the item's
+           object-position shows the effect of the focal point the editor set in
+           the media library — visible here rather than only on the live site. -->
       <img
         :src="selected.urls?.variants?.sm?.url ?? selected.urls?.original"
         :alt="selected.alt || selected.originalName"
         class="preview"
+        :style="{ objectPosition: selected.objectPosition ?? '50% 50%' }"
       />
       <div class="selected-meta">
         <p class="selected-name">{{ selected.originalName }}</p>

@@ -181,6 +181,39 @@ final class MediaServiceTest extends TestCase
         $this->assertSame('A blue crane', $this->service->find($stored->id)?->alt);
     }
 
+    public function testFocalPointCanBeSetAndPersists(): void
+    {
+        $stored = $this->service->store($this->upload('photo.jpg'))['item'];
+
+        $updated = $this->service->updateFocalPoint($stored->id, 0.2, 0.8);
+
+        $this->assertNotNull($updated);
+        $this->assertSame(0.2, $updated->focalPoint->x);
+        $this->assertSame(0.8, $updated->focalPoint->y);
+
+        // Persisted, not just returned: reading it back off disk agrees.
+        $reloaded = $this->service->find($stored->id);
+        $this->assertSame(0.2, $reloaded?->focalPoint->x);
+        $this->assertSame(0.8, $reloaded?->focalPoint->y);
+        $this->assertSame('20% 80%', $reloaded?->toArray()['objectPosition']);
+    }
+
+    /** Setting a focal point must not throw away the description beside it. */
+    public function testFocalPointDoesNotDisturbTheAltText(): void
+    {
+        $stored = $this->service->store($this->upload('photo.jpg'))['item'];
+        $this->service->updateAlt($stored->id, 'A blue crane');
+
+        $this->service->updateFocalPoint($stored->id, 0.3, 0.6);
+
+        $this->assertSame('A blue crane', $this->service->find($stored->id)?->alt);
+    }
+
+    public function testUpdatingTheFocalPointOfAMissingItemReturnsNull(): void
+    {
+        $this->assertNull($this->service->updateFocalPoint('does-not-exist', 0.5, 0.5));
+    }
+
     public function testDeleteRemovesOriginalVariantsAndMetadata(): void
     {
         $stored = $this->service->store($this->upload('photo.jpg'))['item'];

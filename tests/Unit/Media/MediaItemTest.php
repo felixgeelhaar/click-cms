@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Tests\Unit\Media;
 
+use Click\Cms\Domain\Media\FocalPoint;
 use Click\Cms\Domain\Media\ImageSize;
 use Click\Cms\Domain\Media\MediaItem;
 use Click\Cms\Domain\Media\UploadPolicy;
@@ -140,6 +141,45 @@ final class MediaItemTest extends TestCase
         $this->assertSame('', $original->alt);
         $this->assertSame('A crane at dusk', $described->alt);
         $this->assertSame($original->id, $described->id);
+    }
+
+    /** With nothing marked, an item is centred and says so in the payload. */
+    public function testDefaultsToACentredFocalPoint(): void
+    {
+        $array = $this->item()->toArray();
+
+        $this->assertSame(['x' => 0.5, 'y' => 0.5], $array['focalPoint']);
+        $this->assertSame('50% 50%', $array['objectPosition']);
+    }
+
+    public function testFocalPointIsReplacedWithoutMutating(): void
+    {
+        $original = $this->item();
+        $marked = $original->withFocalPoint(FocalPoint::at(0.2, 0.8));
+
+        $this->assertTrue($original->focalPoint->isCenter());
+        $this->assertSame(0.2, $marked->focalPoint->x);
+        $this->assertSame(0.8, $marked->focalPoint->y);
+        $this->assertSame($original->id, $marked->id);
+    }
+
+    /** A front end reading the payload gets the object-position for free. */
+    public function testFocalPointSurfacesAsObjectPositionInThePayload(): void
+    {
+        $array = $this->item()->withFocalPoint(FocalPoint::at(0.25, 0.75))->toArray();
+
+        $this->assertSame(['x' => 0.25, 'y' => 0.75], $array['focalPoint']);
+        $this->assertSame('25% 75%', $array['objectPosition']);
+    }
+
+    public function testRoundTripsAFocalPointThroughArray(): void
+    {
+        $marked = $this->item()->withFocalPoint(FocalPoint::at(0.1, 0.9));
+
+        $restored = MediaItem::fromArray($marked->toArray());
+
+        $this->assertSame(0.1, $restored->focalPoint->x);
+        $this->assertSame(0.9, $restored->focalPoint->y);
     }
 
     public function testSizeLadderNamesFilesPredictably(): void
