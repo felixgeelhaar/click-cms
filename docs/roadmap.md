@@ -65,9 +65,18 @@ Every item here holds the lines v1 was built on, because they are the product:
    points at the link and renders it as it would the published entry. The link
    reuses the one preview-signing secret pages already use.
 
-5. **Media cropping.** *(medium)* Focal points cover the common case; add
-   optional server-side cropping to fixed boxes for art-directed images. This was
-   deliberately deferred at v1 — object-position handled the 80%.
+5. ~~**Media cropping.**~~ *(medium)* **Done.** A site declares named
+   art-directed crops under `core.media.crops` — `{ name, aspectWidth,
+   aspectHeight }` — and the media pipeline cuts each one focal-point-aware at
+   upload and recuts it when the focal point moves, alongside the existing square
+   crop and never upscaling (long edge capped at 1600px). The crops and their
+   boxes ride through `MediaItem` into the delivery/media API (`urls.crops`), so
+   a front end drops the right-shaped image straight into an `<img>`. Empty by
+   default: a site that declares none keeps just the responsive ladder and the
+   square. `CropBox`/`CoreConfig` parse leniently, so one malformed entry costs
+   that crop, not the set. (Editor-facing crop previews in the media library
+   remain future polish — crops are a config/delivery concern, and the focal-point
+   editor that drives them already exists.)
 
 6. ~~**Relation ergonomics.**~~ *(small–medium)* **Done.** Back-references —
    "which posts point at this author?" — are answered by a new

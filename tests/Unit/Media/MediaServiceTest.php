@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Tests\Unit\Media;
 
 use Click\Cms\Application\Media\MediaService;
+use Click\Cms\Domain\Media\CropBox;
 use Click\Cms\Infrastructure\Media\GdImageProcessor;
 use PHPUnit\Framework\TestCase;
 
@@ -191,6 +192,75 @@ final class MediaServiceTest extends TestCase
         $this->service->delete($stored->id);
 
         $this->assertFileDoesNotExist($this->mediaDir . '/' . $stored->id . '-square.jpg');
+    }
+
+    /* ------------------------------------------------ art-directed crops -- */
+
+    private function serviceWithCrops(): MediaService
+    {
+        return new MediaService($this->mediaDir, crops: [
+            CropBox::fromArray(['name' => 'wide', 'aspectWidth' => 16, 'aspectHeight' => 9]),
+            CropBox::fromArray(['name' => 'portrait', 'aspectWidth' => 3, 'aspectHeight' => 4]),
+        ]);
+    }
+
+    public function testUploadCutsEveryDeclaredCrop(): void
+    {
+        $service = $this->serviceWithCrops();
+        $item = $service->store($this->upload('crane.jpg', 2400, 1600))['item'];
+
+        $this->assertNotNull($item);
+        $this->assertArrayHasKey('wide', $item->crops);
+        $this->assertArrayHasKey('portrait', $item->crops);
+        $this->assertFileExists($this->mediaDir . '/' . $item->id . '-crop-wide.jpg');
+        $this->assertFileExists($this->mediaDir . '/' . $item->id . '-crop-portrait.jpg');
+
+        // The wide crop is genuinely 16:9.
+        $this->assertEqualsWithDelta(16 / 9, $item->crops['wide']['width'] / $item->crops['wide']['height'], 0.02);
+        // And it is surfaced in the delivery URLs.
+        $this->assertArrayHasKey('crops', $item->urls());
+        $this->assertStringContainsString('-crop-wide.jpg', $item->urls()['crops']['wide']['url']);
+    }
+
+    public function testMovingTheFocalPointRecutsEveryCrop(): void
+    {
+        $service = $this->serviceWithCrops();
+        $stored = $service->store($this->upload('crane.jpg', 2400, 1600))['item'];
+        // The test source varies horizontally (its left half is coloured), so
+        // assert on the portrait crop: a 3:4 crop of a 3:2 source spans the full
+        // height and varies with the horizontal focal position.
+        $before = (string) file_get_contents($this->mediaDir . '/' . $stored->id . '-crop-portrait.jpg');
+
+        $updated = $service->updateFocalPoint($stored->id, 0.95, 0.5);
+
+        $this->assertNotNull($updated);
+        $this->assertArrayHasKey('portrait', $updated->crops);
+        $after = (string) file_get_contents($this->mediaDir . '/' . $stored->id . '-crop-portrait.jpg');
+        $this->assertNotSame($before, $after);
+        // The persisted record still carries the crop.
+        $this->assertArrayHasKey('portrait', $service->find($stored->id)?->crops ?? []);
+    }
+
+    public function testDeletingRemovesNamedCropsToo(): void
+    {
+        $service = $this->serviceWithCrops();
+        $stored = $service->store($this->upload('crane.jpg', 2400, 1600))['item'];
+        $this->assertFileExists($this->mediaDir . '/' . $stored->id . '-crop-wide.jpg');
+
+        $service->delete($stored->id);
+
+        $this->assertFileDoesNotExist($this->mediaDir . '/' . $stored->id . '-crop-wide.jpg');
+        $this->assertFileDoesNotExist($this->mediaDir . '/' . $stored->id . '-crop-portrait.jpg');
+    }
+
+    public function testASiteWithoutDeclaredCropsGetsNone(): void
+    {
+        // The default service declares no crops.
+        $item = $this->service->store($this->upload('crane.jpg', 2400, 1600))['item'];
+
+        $this->assertNotNull($item);
+        $this->assertSame([], $item->crops);
+        $this->assertArrayNotHasKey('crops', $item->urls());
     }
 
     public function testStoresAnImageAndGeneratesVariants(): void

@@ -37,6 +37,11 @@ final class GdImageProcessor
      */
     private const SQUARE_MAX = 1024;
 
+    // The longest edge an art-directed crop is scaled to. Larger than the square
+    // because a wide crop's long edge carries the whole width of the subject,
+    // where the square only ever holds the shorter dimension.
+    private const CROP_MAX = 1600;
+
     public function __construct(private readonly int $jpegQuality = 82) {}
 
     public static function isAvailable(): bool
@@ -212,6 +217,103 @@ final class GdImageProcessor
     }
 
     /**
+     * Cut a named crop of a fixed aspect ratio, focal-point-centred, from the
+     * source. The largest rectangle of that ratio the source can yield is taken —
+     * width-bound when the source is taller than the ratio, height-bound when it
+     * is wider — then centred on the focal point and clamped so it never samples
+     * off the edge, exactly as the square does. The output is never upscaled and
+     * its longest edge is capped at CROP_MAX.
+     *
+     * @return array{width: int, height: int}|null Null for an unsupported or
+     *         unreadable source, or when GD is absent — the caller then records
+     *         no crop rather than a file that is not there.
+     */
+    public function generateCrop(
+        string $sourcePath,
+        string $targetDir,
+        string $basename,
+        string $extension,
+        string $name,
+        int $aspectWidth,
+        int $aspectHeight,
+        float $focalX,
+        float $focalY
+    ): ?array {
+        if (!self::isAvailable() || $aspectWidth < 1 || $aspectHeight < 1) {
+            return null;
+        }
+        if (preg_match('/^[a-z0-9][a-z0-9-]*$/', $name) !== 1) {
+            return null;
+        }
+
+        $info = $this->inspect($sourcePath);
+        if ($info === null || !self::supports($info['mimeType'])) {
+            return null;
+        }
+
+        $source = $this->load($sourcePath, $info['mimeType']);
+        if ($source === null) {
+            return null;
+        }
+
+        // The largest rectangle of the wanted ratio that fits inside the source.
+        // Compare the source's ratio to the target's: a source wider than the
+        // target is limited by its height, a taller one by its width.
+        $targetRatio = $aspectWidth / $aspectHeight;
+        $sourceRatio = $info['width'] / $info['height'];
+
+        if ($sourceRatio > $targetRatio) {
+            $regionHeight = $info['height'];
+            $regionWidth = (int) round($regionHeight * $targetRatio);
+        } else {
+            $regionWidth = $info['width'];
+            $regionHeight = (int) round($regionWidth / $targetRatio);
+        }
+
+        // Rounding can push the region a pixel past the source; keep it inside.
+        $regionWidth = max(1, min($regionWidth, $info['width']));
+        $regionHeight = max(1, min($regionHeight, $info['height']));
+
+        $srcX = $this->clampOffset((int) round($focalX * $info['width'] - $regionWidth / 2), $info['width'], $regionWidth);
+        $srcY = $this->clampOffset((int) round($focalY * $info['height'] - $regionHeight / 2), $info['height'], $regionHeight);
+
+        // Never upscale: scale down only when the long edge exceeds CROP_MAX.
+        $longEdge = max($regionWidth, $regionHeight);
+        $scale = $longEdge > self::CROP_MAX ? self::CROP_MAX / $longEdge : 1.0;
+        $outWidth = max(1, (int) round($regionWidth * $scale));
+        $outHeight = max(1, (int) round($regionHeight * $scale));
+
+        $target = imagecreatetruecolor($outWidth, $outHeight);
+        if (!$target instanceof GdImage) {
+            return null;
+        }
+
+        if ($info['mimeType'] !== 'image/jpeg') {
+            imagealphablending($target, false);
+            imagesavealpha($target, true);
+            $transparent = imagecolorallocatealpha($target, 0, 0, 0, 127);
+            imagefilledrectangle($target, 0, 0, $outWidth, $outHeight, $transparent);
+        }
+
+        $ok = imagecopyresampled(
+            $target, $source,
+            0, 0, $srcX, $srcY,
+            $outWidth, $outHeight,
+            $regionWidth, $regionHeight
+        );
+
+        if (!$ok) {
+            return null;
+        }
+
+        $path = $targetDir . '/' . $basename . '-crop-' . $name . '.' . $extension;
+
+        return $this->write($target, $path, $info['mimeType'])
+            ? ['width' => $outWidth, 'height' => $outHeight]
+            : null;
+    }
+
+    /**
      * Keep a crop window of $window pixels inside an axis of $length pixels: the
      * offset is pinned into [0, length - window] so the square never samples off
      * the edge.
@@ -240,6 +342,15 @@ final class GdImageProcessor
         $square = $dir . '/' . $basename . '-square.' . $extension;
         if (is_file($square) && @unlink($square)) {
             $removed++;
+        }
+
+        // Every named crop, whatever the site declared, matched by the id-scoped
+        // pattern so a removed item leaves nothing behind. glob escaping is not
+        // needed: the basename is a validated slug.
+        foreach (glob($dir . '/' . $basename . '-crop-*.' . $extension) ?: [] as $crop) {
+            if (@unlink($crop)) {
+                $removed++;
+            }
         }
 
         return $removed;

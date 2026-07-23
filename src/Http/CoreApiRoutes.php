@@ -946,6 +946,9 @@ final class CoreApiRoutes
 
     private function media(): MediaService
     {
-        return $this->media ??= new MediaService($this->basePath . '/content/media');
+        return $this->media ??= new MediaService(
+            $this->basePath . '/content/media',
+            crops: $this->config?->mediaCrops() ?? [],
+        );
     }
 }

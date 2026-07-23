@@ -31,6 +31,9 @@
     "history": {
       "retainVersions": 20
     },
+    "media": {
+      "crops": []
+    },
     "marketplace": {
       "enabled": true,
       "registryUrl": "https://felixgeelhaar.github.io/click-cms-marketplace/registry.json",

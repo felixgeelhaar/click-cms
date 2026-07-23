@@ -69,6 +69,39 @@ final class MediaItemTest extends TestCase
         $this->assertEquals([ImageSize::Small, ImageSize::Medium], $restored->variants);
     }
 
+    public function testCarriesNamedCropsIntoUrlsAndSurvivesARoundTrip(): void
+    {
+        $item = $this->item()->withCrops([
+            'wide' => ['width' => 1600, 'height' => 900],
+        ]);
+
+        $urls = $item->urls();
+        $this->assertSame('/api/media/file/harbour-crane-a1b2c3-crop-wide.jpg', $urls['crops']['wide']['url']);
+        $this->assertSame(1600, $urls['crops']['wide']['width']);
+        $this->assertSame(900, $urls['crops']['wide']['height']);
+
+        // Round-trips through storage.
+        $restored = MediaItem::fromArray($item->toArray());
+        $this->assertSame(['wide' => ['width' => 1600, 'height' => 900]], $restored->crops);
+    }
+
+    public function testMalformedCropEntriesAreDropped(): void
+    {
+        $item = $this->item()->withCrops([
+            'wide' => ['width' => 1600, 'height' => 900],
+            'BadName' => ['width' => 100, 'height' => 100],   // non-slug
+            'zero' => ['width' => 0, 'height' => 100],        // non-positive
+        ]);
+
+        $this->assertSame(['wide'], array_keys($item->crops));
+    }
+
+    public function testAnItemWithoutCropsExposesNoCropsKey(): void
+    {
+        $this->assertArrayNotHasKey('crops', $this->item()->urls());
+        $this->assertSame([], $this->item()->crops);
+    }
+
     public function testQualityIsReportedInThePayloadSoAnyClientCanShowIt(): void
     {
         $small = MediaItem::create(
