@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Application\Media;
 
+use Click\Cms\Domain\Media\CropBox;
 use Click\Cms\Domain\Media\FocalPoint;
 use Click\Cms\Domain\Media\MediaItem;
 use Click\Cms\Domain\Media\SvgSanitizer;
@@ -20,11 +21,50 @@ use RuntimeException;
  */
 final class MediaService
 {
+    /**
+     * @param list<CropBox> $crops The art-directed crops this site declares, cut
+     *        focal-point-aware at upload and recut when the point moves. Empty by
+     *        default, so a site that declares none keeps just the ladder and the
+     *        square.
+     */
     public function __construct(
         private readonly string $mediaDir,
         private readonly GdImageProcessor $processor = new GdImageProcessor(),
         private readonly SvgSanitizer $svgSanitizer = new SvgSanitizer(),
+        private readonly array $crops = [],
     ) {}
+
+    /**
+     * Cut every declared crop from the stored original around a focal point, and
+     * return the boxes actually produced, keyed by crop name. Shared by upload
+     * (centre focal) and a focal-point move (the new point), so the two can never
+     * drift apart. A crop the processor cannot cut — an SVG, or GD absent —
+     * simply does not appear, keeping the metadata honest.
+     *
+     * @return array<string, array{width: int, height: int}>
+     */
+    private function cutCrops(string $sourcePath, string $id, string $extension, float $focalX, float $focalY): array
+    {
+        $out = [];
+        foreach ($this->crops as $crop) {
+            $dims = $this->processor->generateCrop(
+                $sourcePath,
+                $this->mediaDir,
+                $id,
+                $extension,
+                $crop->name,
+                $crop->aspectWidth,
+                $crop->aspectHeight,
+                $focalX,
+                $focalY
+            );
+            if ($dims !== null) {
+                $out[$crop->name] = $dims;
+            }
+        }
+
+        return $out;
+    }
 
     /**
      * Accept an uploaded file.
@@ -102,6 +142,10 @@ final class MediaService
             $target, $this->mediaDir, $id, $extension, 0.5, 0.5
         );
 
+        // Every declared art-directed crop, cut around the default centre focal
+        // point at upload and recut when the editor moves it.
+        $crops = $this->cutCrops($target, $id, $extension, 0.5, 0.5);
+
         $item = MediaItem::create(
             id: $id,
             extension: $extension,
@@ -112,6 +156,7 @@ final class MediaService
             height: $info['height'],
             variants: $variants,
             squareCrop: $squareCrop,
+            crops: $crops,
         );
 
         $this->writeMetadata($item);
@@ -246,6 +291,12 @@ final class MediaService
             $y
         );
         $updated = $updated->withSquareCrop($squareCrop);
+
+        // Recut every declared crop around the new point, so an art-directed box
+        // tracks the subject the same way the square does.
+        $updated = $updated->withCrops(
+            $this->cutCrops($this->mediaDir . '/' . $item->filename(), $item->id, $item->extension, $x, $y)
+        );
 
         $this->writeMetadata($updated);
 

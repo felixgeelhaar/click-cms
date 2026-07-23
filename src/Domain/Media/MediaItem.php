@@ -37,6 +37,11 @@ final class MediaItem
         // when none exists — a resolution-independent SVG never has one, and a
         // raster only gains one once the processor could produce it.
         public readonly ?int $squareCrop,
+        // Art-directed fixed-box crops the site declared, by name, each with the
+        // pixel dimensions actually produced: `['wide' => ['width' => 1200,
+        // 'height' => 675]]`. Empty when the site declares none, or for an SVG.
+        // Focal-point-centred like the square, and recut when the point moves.
+        public readonly array $crops = [],
     ) {}
 
     /**
@@ -55,6 +60,7 @@ final class MediaItem
         ?string $uploadedAt = null,
         ?FocalPoint $focalPoint = null,
         ?int $squareCrop = null,
+        array $crops = [],
     ): self {
         if (preg_match('/^[a-z0-9][a-z0-9-]*$/', $id) !== 1) {
             throw new InvalidArgumentException(
@@ -85,7 +91,40 @@ final class MediaItem
             uploadedAt: $uploadedAt ?? gmdate('c'),
             focalPoint: $focalPoint ?? FocalPoint::center(),
             squareCrop: $squareCrop !== null && $squareCrop > 0 ? $squareCrop : null,
+            crops: self::normaliseCrops($crops),
         );
+    }
+
+    /**
+     * Keep only well-formed crop entries: a slug name mapping to positive
+     * width/height. A stored file written before crops existed, or a malformed
+     * one, simply contributes nothing rather than a broken URL.
+     *
+     * @param  mixed $crops
+     * @return array<string, array{width: int, height: int}>
+     */
+    private static function normaliseCrops(mixed $crops): array
+    {
+        if (!is_array($crops)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($crops as $name => $dims) {
+            if (!is_string($name) || preg_match('/^[a-z0-9][a-z0-9-]*$/', $name) !== 1) {
+                continue;
+            }
+            if (!is_array($dims)) {
+                continue;
+            }
+            $width = (int) ($dims['width'] ?? 0);
+            $height = (int) ($dims['height'] ?? 0);
+            if ($width > 0 && $height > 0) {
+                $out[$name] = ['width' => $width, 'height' => $height];
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -116,6 +155,7 @@ final class MediaItem
                 is_array($row['focalPoint'] ?? null) ? $row['focalPoint'] : []
             ),
             squareCrop: isset($row['squareCrop']) ? (int) $row['squareCrop'] : null,
+            crops: is_array($row['crops'] ?? null) ? $row['crops'] : [],
         );
     }
 
@@ -134,6 +174,18 @@ final class MediaItem
         return $this->squareCrop === null
             ? null
             : $this->id . '-square.' . $this->extension;
+    }
+
+    /**
+     * The stored name of a named art-directed crop, following the same id-based
+     * rule the serving path already resolves. Null when the crop was not
+     * produced for this item.
+     */
+    public function cropFilename(string $name): ?string
+    {
+        return isset($this->crops[$name])
+            ? $this->id . '-crop-' . $name . '.' . $this->extension
+            : null;
     }
 
     public function isImage(): bool
@@ -177,6 +229,20 @@ final class MediaItem
                 'width' => $this->squareCrop,
                 'height' => $this->squareCrop,
             ];
+        }
+
+        // Named art-directed crops, each with the box it was cut to, so a front
+        // end drops the right one into an <img> without knowing the naming rule.
+        if ($this->crops !== []) {
+            $crops = [];
+            foreach ($this->crops as $name => $dims) {
+                $crops[$name] = [
+                    'url' => $base . '/' . $this->cropFilename($name),
+                    'width' => $dims['width'],
+                    'height' => $dims['height'],
+                ];
+            }
+            $urls['crops'] = $crops;
         }
 
         return $urls;
@@ -225,6 +291,7 @@ final class MediaItem
             $this->id, $this->extension, $this->mimeType, $this->originalName,
             $this->bytes, $this->width, $this->height, $this->variants,
             $alt, $this->uploadedAt, $this->focalPoint, $this->squareCrop,
+            $this->crops,
         );
     }
 
@@ -234,6 +301,7 @@ final class MediaItem
             $this->id, $this->extension, $this->mimeType, $this->originalName,
             $this->bytes, $this->width, $this->height, $this->variants,
             $this->alt, $this->uploadedAt, $focalPoint, $this->squareCrop,
+            $this->crops,
         );
     }
 
@@ -252,6 +320,24 @@ final class MediaItem
             $this->bytes, $this->width, $this->height, $this->variants,
             $this->alt, $this->uploadedAt, $this->focalPoint,
             $squareCrop !== null && $squareCrop > 0 ? $squareCrop : null,
+            $this->crops,
+        );
+    }
+
+    /**
+     * Record (or clear) the art-directed crops produced for this item. Set right
+     * after the focal point moves, alongside the square, so the stored boxes
+     * always match the point last marked; a malformed entry is dropped.
+     *
+     * @param array<string, array{width: int, height: int}> $crops
+     */
+    public function withCrops(array $crops): self
+    {
+        return new self(
+            $this->id, $this->extension, $this->mimeType, $this->originalName,
+            $this->bytes, $this->width, $this->height, $this->variants,
+            $this->alt, $this->uploadedAt, $this->focalPoint, $this->squareCrop,
+            self::normaliseCrops($crops),
         );
     }
 
@@ -281,6 +367,9 @@ final class MediaItem
             // front end needing a fixed box reads urls.square; this is the plain
             // number beside it.
             'squareCrop' => $this->squareCrop,
+            // The named crops and their boxes, mirroring squareCrop: the plain
+            // dimensions beside the ready-made URLs in urls.crops.
+            'crops' => $this->crops,
             'urls' => $this->urls(),
             'srcset' => $this->srcset(),
             // The mark itself, plus a ready-made CSS value so a front end that

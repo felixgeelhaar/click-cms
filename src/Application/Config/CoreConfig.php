@@ -187,6 +187,38 @@ final class CoreConfig
         return max(1, $this->int('core.history.retainVersions', RetentionPolicy::DEFAULT_LIMIT));
     }
 
+    /* -------------------------------------------------------------- media -- */
+
+    /**
+     * The art-directed crops a site declares, under `core.media.crops` as a list
+     * of `{ name, aspectWidth, aspectHeight }`. A malformed entry is dropped and
+     * a duplicate name keeps the first, so a typo costs that one crop rather than
+     * the whole set. Empty by default: a site that wants none declares none, and
+     * the media pipeline then cuts only the original ladder and the square.
+     *
+     * @return list<\Click\Cms\Domain\Media\CropBox>
+     */
+    public function mediaCrops(): array
+    {
+        $raw = $this->get('core.media.crops');
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $crops = [];
+        foreach ($raw as $spec) {
+            if (!is_array($spec)) {
+                continue;
+            }
+            $box = \Click\Cms\Domain\Media\CropBox::fromArray($spec);
+            if ($box !== null) {
+                $crops[$box->name] ??= $box;
+            }
+        }
+
+        return array_values($crops);
+    }
+
     /* --------------------------------------------------------------- auth -- */
 
     public function authEnabled(): bool

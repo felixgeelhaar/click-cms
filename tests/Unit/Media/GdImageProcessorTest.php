@@ -229,6 +229,66 @@ final class GdImageProcessorTest extends TestCase
         $this->assertLessThanOrEqual(300, $side);
     }
 
+    public function testGeneratesAnArtDirectedCropAtTheDeclaredAspect(): void
+    {
+        // A near-square source cut to 16:9 must end up wider than it is tall.
+        $path = $this->makeImage('portraitish.jpg', 1200, 1000);
+
+        $dims = $this->processor->generateCrop($path, $this->dir, 'portraitish', 'jpg', 'wide', 16, 9, 0.5, 0.5);
+
+        $this->assertNotNull($dims);
+        $file = $this->dir . '/portraitish-crop-wide.jpg';
+        $this->assertFileExists($file);
+        // The output aspect matches 16:9 within a pixel of rounding.
+        $this->assertEqualsWithDelta(16 / 9, $dims['width'] / $dims['height'], 0.02);
+    }
+
+    public function testArtDirectedCropNeverUpscales(): void
+    {
+        // A 800×450 source is already 16:9 and below CROP_MAX, so the crop is the
+        // source size, never larger.
+        $path = $this->makeImage('exact.jpg', 800, 450);
+
+        $dims = $this->processor->generateCrop($path, $this->dir, 'exact', 'jpg', 'wide', 16, 9, 0.5, 0.5);
+
+        $this->assertNotNull($dims);
+        $this->assertLessThanOrEqual(800, $dims['width']);
+        $this->assertLessThanOrEqual(450, $dims['height']);
+    }
+
+    public function testArtDirectedCropCapsItsLongEdge(): void
+    {
+        // A very wide source cut to 16:9: the long edge is capped (CROP_MAX 1600),
+        // so a 4000-wide source does not yield a 4000-wide crop.
+        $path = $this->makeImage('huge.jpg', 4000, 3000);
+
+        $dims = $this->processor->generateCrop($path, $this->dir, 'huge', 'jpg', 'wide', 16, 9, 0.5, 0.5);
+
+        $this->assertNotNull($dims);
+        $this->assertLessThanOrEqual(1600, max($dims['width'], $dims['height']));
+    }
+
+    public function testArtDirectedCropRefusesAMalformedName(): void
+    {
+        $path = $this->makeImage('src.jpg', 1200, 800);
+
+        $this->assertNull($this->processor->generateCrop($path, $this->dir, 'src', 'jpg', 'bad name', 16, 9, 0.5, 0.5));
+        $this->assertNull($this->processor->generateCrop($path, $this->dir, 'src', 'jpg', 'wide', 0, 9, 0.5, 0.5));
+    }
+
+    public function testDeletingVariantsRemovesNamedCropsToo(): void
+    {
+        $path = $this->makeImage('gone.jpg', 1200, 800);
+        $this->processor->generateSquareCrop($path, $this->dir, 'gone', 'jpg', 0.5, 0.5);
+        $this->processor->generateCrop($path, $this->dir, 'gone', 'jpg', 'wide', 16, 9, 0.5, 0.5);
+        $this->assertFileExists($this->dir . '/gone-crop-wide.jpg');
+
+        $this->processor->deleteVariants($this->dir, 'gone', 'jpg');
+
+        $this->assertFileDoesNotExist($this->dir . '/gone-crop-wide.jpg');
+        $this->assertFileDoesNotExist($this->dir . '/gone-square.jpg');
+    }
+
     /**
      * The focal point steers which part of a wide image the square keeps. A
      * focal point at the far right must keep the right edge — the crop region is
