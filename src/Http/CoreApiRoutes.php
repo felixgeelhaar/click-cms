@@ -823,16 +823,23 @@ final class CoreApiRoutes
             return ['status' => 404, 'error' => 'File not found'];
         }
 
+        $extension = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
+
         $info = @getimagesize($path);
         $mimeType = is_array($info) ? ($info['mime'] ?? '') : '';
 
-        // getimagesize cannot read SVG, so a stored SVG resolves to an empty
-        // mime and would 404. An SVG here has already been sanitised to a safe
-        // allowlist at upload, and its name was validated by pathForFile, so it
-        // is safe to serve — but as its declared type, not sniffed.
-        $isSvg = $mimeType === '' && str_ends_with(strtolower($path), '.svg');
+        // getimagesize cannot read SVG or video, so those resolve to an empty
+        // mime and would 404. Their name was validated by pathForFile and their
+        // type is fixed by the stored extension, so they are served as that
+        // declared type rather than being sniffed.
+        $isSvg = $mimeType === '' && $extension === 'svg';
         if ($isSvg) {
             $mimeType = 'image/svg+xml';
+        }
+
+        $isVideo = $mimeType === '' && UploadPolicy::isVideoExtension($extension);
+        if ($isVideo) {
+            $mimeType = $extension === 'webm' ? 'video/webm' : 'video/mp4';
         }
 
         if (!UploadPolicy::isAccepted($mimeType)) {
@@ -840,8 +847,11 @@ final class CoreApiRoutes
         }
 
         header('Content-Type: ' . $mimeType);
-        header('Content-Length: ' . (string) filesize($path));
         header('X-Content-Type-Options: nosniff');
+        header('Content-Disposition: inline');
+        // Stored names carry random bytes and content never changes under a
+        // given name, so this can be cached hard.
+        header('Cache-Control: public, max-age=31536000, immutable');
 
         if ($isSvg) {
             // Defence in depth. The sanitiser is the real boundary, but an SVG
@@ -851,14 +861,70 @@ final class CoreApiRoutes
             header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox");
         }
 
-        header('Content-Disposition: inline');
-        // Stored names carry random bytes and content never changes under a
-        // given name, so this can be cached hard.
-        header('Cache-Control: public, max-age=31536000, immutable');
+        // Video is served with byte-range support so a browser can seek and
+        // start playback before the whole file arrives — Safari in particular
+        // will not play a video that ignores its Range request.
+        if ($isVideo) {
+            $this->serveWithRanges($path);
+            return ['raw' => true, 'html' => ''];
+        }
 
+        header('Content-Length: ' . (string) filesize($path));
         readfile($path);
 
         return ['raw' => true, 'html' => ''];
+    }
+
+    /**
+     * Stream a file, honouring a single HTTP Range request with a 206 response
+     * so a video can be sought and progressively played. A malformed or absent
+     * Range falls back to the whole file.
+     */
+    private function serveWithRanges(string $path): void
+    {
+        $size = filesize($path) ?: 0;
+        header('Accept-Ranges: bytes');
+
+        $range = $_SERVER['HTTP_RANGE'] ?? '';
+        $start = 0;
+        $end = $size - 1;
+
+        if (is_string($range) && preg_match('/^bytes=(\d*)-(\d*)$/', $range, $m) === 1 && $size > 0) {
+            if ($m[1] !== '') {
+                $start = (int) $m[1];
+            }
+            if ($m[2] !== '') {
+                $end = (int) $m[2];
+            }
+            // An unsatisfiable range is answered as such rather than served wrong.
+            if ($start > $end || $start >= $size) {
+                http_response_code(416);
+                header("Content-Range: bytes */{$size}");
+                return;
+            }
+            $end = min($end, $size - 1);
+            http_response_code(206);
+            header("Content-Range: bytes {$start}-{$end}/{$size}");
+        }
+
+        $length = $end - $start + 1;
+        header('Content-Length: ' . (string) $length);
+
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            return;
+        }
+        fseek($handle, $start);
+        $remaining = $length;
+        while ($remaining > 0 && !feof($handle)) {
+            $chunk = fread($handle, (int) min(8192, $remaining));
+            if ($chunk === false) {
+                break;
+            }
+            echo $chunk;
+            $remaining -= strlen($chunk);
+        }
+        fclose($handle);
     }
 
     /* ------------------------------------------------------------ wiring -- */
