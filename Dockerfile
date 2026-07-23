@@ -76,7 +76,7 @@ RUN set -eux; \
         libfreetype6-dev \
         libwebp-dev; \
     docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \
-    docker-php-ext-install -j"$(nproc)" pdo pdo_sqlite zip gd; \
+    docker-php-ext-install -j"$(nproc)" pdo pdo_sqlite pdo_mysql zip gd; \
     # Purge the headers by name. Nothing is auto-removed, so the runtime
     # libraries above survive.
     apt-get purge -y \
@@ -84,7 +84,7 @@ RUN set -eux; \
         libfreetype6-dev libwebp-dev; \
     rm -rf /var/lib/apt/lists/*; \
     # Fail the build rather than ship an image whose extensions cannot load.
-    php -r 'foreach (["gd","zip","pdo_sqlite"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR, "missing extension: $e\n"); exit(1); } }'
+    php -r 'foreach (["gd","zip","pdo_sqlite","pdo_mysql"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR, "missing extension: $e\n"); exit(1); } }'
 
 # Uploads are limited here as well as in application code: a request larger than
 # this is rejected before PHP ever buffers it.

@@ -171,6 +171,55 @@ final class CoreConfig
         return trim($this->string('core.storage.sqlite.path', 'data/content.sqlite'));
     }
 
+    /*
+     * MySQL connection settings, under core.storage.mysql. Each falls back to an
+     * environment variable so credentials — a password especially — can be kept
+     * out of a committed config file and injected by the runtime (a container's
+     * secret, for instance). The environment wins only when the config value is
+     * empty, so an explicit config setting is still honoured.
+     */
+
+    public function storageMysqlHost(): string
+    {
+        return $this->mysqlSetting('core.storage.mysql.host', 'CLICK_CMS_MYSQL_HOST', '127.0.0.1');
+    }
+
+    public function storageMysqlPort(): int
+    {
+        $configured = $this->int('core.storage.mysql.port', 0);
+        if ($configured > 0) {
+            return $configured;
+        }
+        $env = getenv('CLICK_CMS_MYSQL_PORT');
+        return is_string($env) && is_numeric($env) ? (int) $env : 3306;
+    }
+
+    public function storageMysqlDatabase(): string
+    {
+        return $this->mysqlSetting('core.storage.mysql.database', 'CLICK_CMS_MYSQL_DATABASE', 'clickcms');
+    }
+
+    public function storageMysqlUser(): string
+    {
+        return $this->mysqlSetting('core.storage.mysql.user', 'CLICK_CMS_MYSQL_USER', 'clickcms');
+    }
+
+    public function storageMysqlPassword(): string
+    {
+        return $this->mysqlSetting('core.storage.mysql.password', 'CLICK_CMS_MYSQL_PASSWORD', '');
+    }
+
+    private function mysqlSetting(string $path, string $envVar, string $default): string
+    {
+        $configured = trim($this->string($path, ''));
+        if ($configured !== '') {
+            return $configured;
+        }
+        $env = getenv($envVar);
+
+        return is_string($env) && $env !== '' ? $env : $default;
+    }
+
     /* ------------------------------------------------------------ history -- */
 
     /**

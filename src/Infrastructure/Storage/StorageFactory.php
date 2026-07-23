@@ -24,7 +24,7 @@ use Click\Cms\Domain\Storage\StorageInterface;
 final class StorageFactory
 {
     /** Every backend core itself provides. Others are what plugins are for. */
-    private const BACKENDS = ['json', 'sqlite'];
+    private const BACKENDS = ['json', 'sqlite', 'mysql'];
 
     public static function create(CoreConfig $config, string $basePath): StorageInterface
     {
@@ -37,8 +37,34 @@ final class StorageFactory
         return match (strtolower($requested)) {
             'json' => new JsonStorage($basePath . '/content', $config->defaultLocale()),
             'sqlite' => self::sqlite($config, $basePath),
+            'mysql', 'mariadb' => self::mysql($config),
             default => throw new ConfigurationException(self::unknownBackendMessage($requested)),
         };
+    }
+
+    private static function mysql(CoreConfig $config): MysqlStorage
+    {
+        // Checked before construction rather than left to PDO, whose "could not
+        // find driver" surfaces deep in a request and gives no help deciding what
+        // to do about it.
+        if (!extension_loaded('pdo_mysql')) {
+            throw new ConfigurationException(
+                'Storage backend "mysql" is configured at core.storage.backend in '
+                . 'config/core.json, but this PHP build has no pdo_mysql extension, '
+                . 'so the database cannot be reached. Either enable pdo_mysql in '
+                . 'php.ini and restart PHP, or set core.storage.backend to "json" to '
+                . 'use flat files, which need no database and no extension.'
+            );
+        }
+
+        return new MysqlStorage(
+            $config->storageMysqlHost(),
+            $config->storageMysqlPort(),
+            $config->storageMysqlDatabase(),
+            $config->storageMysqlUser(),
+            $config->storageMysqlPassword(),
+            $config->defaultLocale(),
+        );
     }
 
     private static function sqlite(CoreConfig $config, string $basePath): SqliteStorage
@@ -91,8 +117,7 @@ final class StorageFactory
             'Unknown storage backend %s configured at core.storage.backend in '
             . 'config/core.json. Core provides: %s. Set it to one of those, or '
             . 'remove the setting entirely to use the default ("json"), which '
-            . 'stores content as flat files and requires no database. Backends '
-            . 'beyond these — MySQL, PostgreSQL — are supplied by plugins, not core.',
+            . 'stores content as flat files and requires no database.',
             $quoted,
             '"' . implode('", "', self::BACKENDS) . '"'
         );
