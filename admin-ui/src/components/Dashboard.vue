@@ -18,8 +18,8 @@ import StatCard from './StatCard.vue';
 
 const stats = ref([
   { icon: 'M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z', label: 'Total Pages', value: 0, color: 'blue' },
-  { icon: 'M5 13l4 4L19 7', label: 'Published', value: 0, color: 'green' },
-  { icon: 'M4 20h16M14 4l6 6M6 14l8-8 4 4-8 8H6z', label: 'Drafts', value: 0, color: 'yellow' },
+  { icon: 'M5 13l4 4L19 7', label: 'Live', value: 0, color: 'green' },
+  { icon: 'M4 20h16M14 4l6 6M6 14l8-8 4 4-8 8H6z', label: 'Edits pending', value: 0, color: 'yellow' },
   { icon: 'M7 3v4M17 3v4M5 7h14v4a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5V7zM12 16v5', label: 'Active Plugins', value: 0, color: 'purple' },
 ]);
 
@@ -30,13 +30,18 @@ onMounted(async () => {
     const pluginsData = await pluginsRes.json();
     const pages = pagesData.data || [];
     const plugins = pluginsData.data || [];
-    const published = pages.filter(p => (p.data?.status || '').toLowerCase() === 'published').length;
-    const drafts = pages.filter(p => (p.data?.status || '').toLowerCase() === 'draft').length;
+    // Read from `publication`, not a `status` field. That field was removed when
+    // publishing became a thing that happens rather than a value that is set,
+    // and this screen went on counting it — so the landing page of the admin
+    // reported "0 published, 0 drafts" for a site that was entirely live.
+    const live = pages.filter(p => p.publication?.published).length;
+    const pending = pages.filter(p => p.publication?.hasUnpublishedChanges).length;
     const activePlugins = plugins.filter(p => p.state === 'activated').length;
     stats.value = [
       { icon: 'M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z', label: 'Total Pages', value: pages.length, color: 'blue' },
-      { icon: 'M5 13l4 4L19 7', label: 'Published', value: published, color: 'green' },
-      { icon: 'M4 20h16M14 4l6 6M6 14l8-8 4 4-8 8H6z', label: 'Drafts', value: drafts, color: 'yellow' },
+      { icon: 'M5 13l4 4L19 7', label: 'Live', value: live, color: 'green' },
+      // The number worth acting on: work that is finished but not yet public.
+      { icon: 'M4 20h16M14 4l6 6M6 14l8-8 4 4-8 8H6z', label: 'Edits pending', value: pending, color: 'yellow' },
       { icon: 'M7 3v4M17 3v4M5 7h14v4a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5V7zM12 16v5', label: 'Active Plugins', value: activePlugins, color: 'purple' },
     ];
   } catch (e) { console.error(e); }

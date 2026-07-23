@@ -1,0 +1,243 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Click\Cms\Tests\Unit\Config;
+
+use Click\Cms\Application\Config\CoreConfig;
+use Click\Cms\Domain\ValueObjects\Locale;
+use PHPUnit\Framework\TestCase;
+
+final class CoreConfigTest extends TestCase
+{
+    public function testEverySettingHasADefaultSoAnEmptyConfigRuns(): void
+    {
+        $config = CoreConfig::fromArray([]);
+
+        $this->assertTrue($config->restApiEnabled());
+        $this->assertTrue($config->authEnabled());
+        $this->assertSame(28_800, $config->sessionTtlSeconds());
+        $this->assertSame(5, $config->lockoutMaxAttempts());
+        $this->assertSame(['admin-ui', 'authentication'], $config->excludedPluginIds());
+        $this->assertSame('json', $config->storageBackend());
+        $this->assertSame('data/content.sqlite', $config->storageSqlitePath());
+    }
+
+    /** Core must never require a database, whatever else the file says. */
+    public function testStorageDefaultsToFlatFilesWhenNothingIsConfigured(): void
+    {
+        $config = CoreConfig::fromArray(['core' => ['auth' => ['enabled' => false]]]);
+
+        $this->assertSame('json', $config->storageBackend());
+    }
+
+    public function testStorageBackendAndPathAreReadFromTheFile(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => [
+                'storage' => [
+                    'backend' => 'sqlite',
+                    'sqlite' => ['path' => '/var/lib/click/content.sqlite'],
+                ],
+            ],
+        ]);
+
+        $this->assertSame('sqlite', $config->storageBackend());
+        $this->assertSame('/var/lib/click/content.sqlite', $config->storageSqlitePath());
+    }
+
+    /**
+     * Returned verbatim apart from surrounding space, so that a value the
+     * factory cannot match can be quoted back to whoever typed it.
+     */
+    public function testAnUnknownBackendIsReturnedUnchangedForTheFactoryToReject(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['storage' => ['backend' => '  MongoDB  ']],
+        ]);
+
+        $this->assertSame('MongoDB', $config->storageBackend());
+    }
+
+    public function testAMissingFileIsNotAnError(): void
+    {
+        $config = CoreConfig::load('/nowhere/at/all/core.json');
+
+        $this->assertTrue($config->restApiEnabled());
+    }
+
+    public function testAnUnreadableOrCorruptFileFallsBackToDefaults(): void
+    {
+        $path = sys_get_temp_dir() . '/click-cms-config-' . bin2hex(random_bytes(4)) . '.json';
+        file_put_contents($path, '{ not json');
+
+        $this->assertTrue(CoreConfig::load($path)->restApiEnabled());
+
+        @unlink($path);
+    }
+
+    public function testValuesAreReadFromTheFile(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => [
+                'restApi' => ['enabled' => false],
+                'auth' => ['sessionTtlSeconds' => 60, 'lockoutMaxAttempts' => 2],
+            ],
+        ]);
+
+        $this->assertFalse($config->restApiEnabled());
+        $this->assertSame(60, $config->sessionTtlSeconds());
+        $this->assertSame(2, $config->lockoutMaxAttempts());
+    }
+
+    public function testRememberedSessionsUseTheirOwnLifetime(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['auth' => ['sessionTtlSeconds' => 60, 'rememberTtlSeconds' => 9_999]],
+        ]);
+
+        $this->assertSame(60, $config->sessionTtlSeconds(false));
+        $this->assertSame(9_999, $config->sessionTtlSeconds(true));
+    }
+
+    /**
+     * Configuration must not be able to weaken this below what the code
+     * considers safe.
+     */
+    public function testPasswordMinimumCannotBeConfiguredBelowEight(): void
+    {
+        $config = CoreConfig::fromArray(['core' => ['auth' => ['passwordMinLength' => 1]]]);
+
+        $this->assertSame(8, $config->passwordMinLength());
+    }
+
+    public function testPasswordMinimumCanBeRaised(): void
+    {
+        $config = CoreConfig::fromArray(['core' => ['auth' => ['passwordMinLength' => 16]]]);
+
+        $this->assertSame(16, $config->passwordMinLength());
+    }
+
+    public function testWrongTypesFallBackRatherThanCoercingNonsense(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['auth' => ['sessionTtlSeconds' => 'soon']],
+        ]);
+
+        $this->assertSame(28_800, $config->sessionTtlSeconds());
+    }
+
+    public function testNonStringEntriesAreDroppedFromLists(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['plugins' => ['exclude' => ['ids' => ['good', 42, null, 'also-good']]]],
+        ]);
+
+        $this->assertSame(['good', 'also-good'], $config->excludedPluginIds());
+    }
+
+    public function testHistoryRetentionDefaultsToTwenty(): void
+    {
+        $this->assertSame(20, CoreConfig::fromArray([])->historyRetainedVersions());
+    }
+
+    public function testHistoryRetentionIsConfigurable(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['history' => ['retainVersions' => 5]],
+        ]);
+
+        $this->assertSame(5, $config->historyRetainedVersions());
+    }
+
+    /**
+     * Zero would leave history looking enabled while keeping nothing, which an
+     * editor would only discover on the day they needed it.
+     */
+    public function testHistoryRetentionIsNeverBelowOne(): void
+    {
+        foreach ([0, -1] as $configured) {
+            $config = CoreConfig::fromArray([
+                'core' => ['history' => ['retainVersions' => $configured]],
+            ]);
+
+            $this->assertSame(1, $config->historyRetainedVersions());
+        }
+    }
+
+    public function testBothDeliveryApisCanBeDisabled(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['restApi' => ['enabled' => false], 'graphql' => ['enabled' => false]],
+        ]);
+
+        // A site that renders its own pages runs like this; management is
+        // unaffected, so this must simply be allowed.
+        $this->assertFalse($config->restApiEnabled());
+        $this->assertFalse($config->graphqlEnabled());
+    }
+
+    /* ---------------------------------------------------------- languages -- */
+
+    public function testASiteWithNoLanguageConfigurationIsEnglishOnly(): void
+    {
+        $config = CoreConfig::fromArray([]);
+
+        $this->assertSame('en', $config->defaultLocale()->code);
+        $this->assertSame(['en'], $this->codes($config->locales()));
+    }
+
+    public function testTheDefaultAndAvailableLanguagesAreRead(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['languages' => ['default' => 'de', 'available' => ['de', 'en', 'fr']]],
+        ]);
+
+        $this->assertSame('de', $config->defaultLocale()->code);
+        $this->assertSame(['de', 'en', 'fr'], $this->codes($config->locales()));
+    }
+
+    /**
+     * A site whose configuration excluded the language its fallback serves
+     * would have a fallback nobody is allowed to ask for.
+     */
+    public function testTheDefaultLanguageIsAlwaysAvailable(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['languages' => ['default' => 'de', 'available' => ['fr']]],
+        ]);
+
+        $this->assertSame(['de', 'fr'], $this->codes($config->locales()));
+        $this->assertTrue($config->supportsLocale(Locale::fromString('de')));
+        $this->assertFalse($config->supportsLocale(Locale::fromString('it')));
+    }
+
+    /** A typo should cost that one language, not the site. */
+    public function testAnUnparseableLanguageIsDroppedRatherThanFatal(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['languages' => ['default' => '../escape', 'available' => ['de', 'not a tag']]],
+        ]);
+
+        $this->assertSame('en', $config->defaultLocale()->code);
+        $this->assertSame(['en', 'de'], $this->codes($config->locales()));
+    }
+
+    public function testLanguagesAreNormalisedAndDeduplicated(): void
+    {
+        $config = CoreConfig::fromArray([
+            'core' => ['languages' => ['default' => 'EN', 'available' => ['en', 'pt-br', 'PT-BR']]],
+        ]);
+
+        $this->assertSame(['en', 'pt-BR'], $this->codes($config->locales()));
+    }
+
+    /**
+     * @param list<Locale> $locales
+     * @return list<string>
+     */
+    private function codes(array $locales): array
+    {
+        return array_map(static fn (Locale $l): string => $l->code, $locales);
+    }
+}

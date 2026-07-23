@@ -1,5 +1,8 @@
 node_modules/
 admin-ui/node_modules/
+admin-ui/.astro/
+# admin-ui/dist is rebuilt inside the image by the admin-ui stage.
+admin-ui/dist/
 vendor/
 .git/
 .gitignore
@@ -8,3 +11,16 @@ tests/
 coverage/
 .phpunit.cache/
 .DS_Store
+
+# Runtime state. Mounted as volumes at run time, so baking a build machine's
+# content and users into the image would ship one person's data to every deploy.
+content/
+data/
+
+# Local environment and build definitions.
+.env
+.env.*
+*.log
+Dockerfile
+.dockerignore
+docker-compose*.yml

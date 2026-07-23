@@ -10,11 +10,15 @@
             <directory>tests/Unit</directory>
         </testsuite>
     </testsuites>
-    <coverage>
-        <report>
-            <html outputDirectory="coverage"/>
-        </report>
-    </coverage>
+
+    <!--
+        Deliberately no coverage block here. Declaring a coverage report in this
+        file makes PHPUnit 13 execute nothing at all when no coverage driver
+        (Xdebug/PCOV) is installed: it fails silently with "No tests executed",
+        which is how this suite went unnoticed. Generate coverage on demand from
+        the command line instead, passing the coverage-html flag with an output
+        directory.
+    -->
     <source>
         <include>
             <directory>src</directory>

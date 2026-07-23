@@ -1,0 +1,11 @@
+{
+  "label": "Team members",
+  "description": "People to show on an About or Team page.",
+  "titleField": "name",
+  "fields": [
+    { "name": "name", "type": "text", "label": "Name", "required": true },
+    { "name": "role", "type": "text", "label": "Role" },
+    { "name": "photo", "type": "image", "label": "Photo" },
+    { "name": "bio", "type": "textarea", "label": "Bio" }
+  ]
+}

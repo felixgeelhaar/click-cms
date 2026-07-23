@@ -1,0 +1,11 @@
+{
+  "label": "Call to action",
+  "description": "A short prompt with a button.",
+  "icon": "megaphone",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading", "required": true },
+    { "name": "body", "type": "textarea", "label": "Text" },
+    { "name": "buttonLabel", "type": "text", "label": "Button label", "required": true },
+    { "name": "buttonUrl", "type": "url", "label": "Button link", "required": true, "labelField": "buttonLabel" }
+  ]
+}

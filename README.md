@@ -13,7 +13,7 @@ A modern PHP CMS with plugin architecture, Vue admin UI, Visual Builder, and mar
 - **Modern Admin UI** - Vue 3 + Astro with collapsible sidebar, theme toggle
 - **REST & GraphQL APIs** - Headless content management
 - **Marketplace** - GitHub Pages-based plugin marketplace with signed manifests
-- **Multiple Storage Backends** - JSON, SQLite, MySQL, PostgreSQL
+- **Two Storage Backends** - flat JSON files by default, SQLite when you want one
 
 ## Quick Start
 
@@ -40,14 +40,34 @@ cd admin-ui && npm run dev
 - Username: `admin`
 - Password: `admin`
 
+## Storage
+
+Content is stored as flat JSON files by default — no database, nothing to
+install. To use SQLite instead, set the backend in `config/core.json`:
+
+```json
+{
+  "core": {
+    "storage": {
+      "backend": "sqlite",
+      "sqlite": { "path": "data/content.sqlite" }
+    }
+  }
+}
+```
+
+`backend` accepts `json` or `sqlite`; SQLite additionally needs PHP's
+`pdo_sqlite` extension. An unrecognised backend, or SQLite without the
+extension, fails at boot with a message saying what to change — it never falls
+back silently. Switching backends does not migrate existing content. See
+[`docs/core.md`](docs/core.md) for the details.
+
 ## Plugins
 
 ### Core Plugins (Pre-installed)
 - **REST API** - RESTful content API
 - **GraphQL API** - GraphQL endpoint
 - **Visual Builder** - Drag-and-drop page builder
-- **JSON Storage** - File-based content storage
-- **SQLite Storage** - SQLite database storage
 
 ### Available Plugins
 - Authentication & 2FA

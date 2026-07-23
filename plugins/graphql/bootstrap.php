@@ -4,8 +4,39 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../src/Application/Plugin/BasePlugin.php';
 
+/**
+ * A read-only delivery API for published pages, shaped like GraphQL.
+ *
+ * This deliberately does much less than the version it replaces, because that
+ * version did dangerous things:
+ *
+ *  - It answered `{ user(username: "admin") { password } }`. A user document
+ *    holds the password hash under `data.password`, and the field filter reached
+ *    straight into `data`, so any caller who reached this endpoint could read
+ *    every account's hash. Behind authentication that is already a privilege
+ *    escalation — an author reading the admin's hash — and it made the endpoint
+ *    impossible to expose for the one thing a delivery API is for.
+ *  - It carried a `createPage` mutation that called storage directly, bypassing
+ *    the schema validation every other write goes through. That let arbitrary,
+ *    undeclared content be written, which is the exact guarantee the schema
+ *    exists to hold.
+ *
+ * A delivery API serves published content to a front end that has no account. It
+ * has no business reading accounts and no business writing anything. So this
+ * exposes exactly two queries — `pages` and `page(slug:)` — over a fixed
+ * allowlist of fields, reads only what is published, and never writes. With that
+ * surface it is safe to answer anonymously, which is registered in the core
+ * kernel's public allowlist.
+ */
 class Plugin_graphql_api extends \Click\Cms\Application\Plugin\BasePlugin
 {
+    /**
+     * The only fields a query may ask for. Everything else is refused, so a new
+     * internal field on a document can never become readable here by accident —
+     * which is precisely how the password hash used to be reachable.
+     */
+    private const PUBLIC_FIELDS = ['slug', 'title', 'sections', 'locale', 'updatedAt'];
+
     public function getPluginId(): string
     {
         return 'graphql';
@@ -34,154 +65,117 @@ class Plugin_graphql_api extends \Click\Cms\Application\Plugin\BasePlugin
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function handleGraphQL(): array
     {
-        $input = json_decode(file_get_contents('php://input'), true);
-        
-        if (!$input || !isset($input['query'])) {
-            return ['errors' => [['message' => 'No query provided']]];
+        $input = json_decode((string) file_get_contents('php://input'), true);
+
+        // A GET, or a POST with the query in the URL, so the endpoint is usable
+        // from a browser and from a client that sends the query either way.
+        $query = is_array($input) && isset($input['query'])
+            ? (string) $input['query']
+            : (string) ($_GET['query'] ?? '');
+
+        if (trim($query) === '') {
+            return ['errors' => [['message' => 'No query provided.']]];
         }
 
-        $query = $input['query'];
-        $variables = $input['variables'] ?? [];
+        // A mutation reaching a read-only delivery endpoint is a category error,
+        // not a syntax one: say so rather than trying to parse it.
+        if (preg_match('/\bmutation\b/', $query) === 1) {
+            return ['errors' => [['message' => 'This endpoint is read-only. Content is written through the management API.']]];
+        }
 
         try {
-            $result = $this->executeQuery($query, $variables);
-            return ['data' => $result];
-        } catch (\Exception $e) {
+            return ['data' => $this->executeQuery($query)];
+        } catch (\Throwable $e) {
             return ['errors' => [['message' => $e->getMessage()]]];
         }
     }
 
-    private function executeQuery(string $query, array $variables): array
+    /**
+     * @return array<string, mixed>
+     */
+    private function executeQuery(string $query): array
     {
         $contentService = $this->pluginManager->getContentService();
-        
-        // Simple GraphQL-like query parsing
-        // Support: { pages { title content } }
-        // Support: { page(slug: "home") { title content } }
-        
-        if (strpos($query, 'pages') !== false && strpos($query, 'page(') === false) {
-            // List all pages
-            $pages = $contentService->pages();
-            $fields = $this->extractFields($query, 'pages');
-            
+
+        // page(slug: "...") — a single published page. Checked before the plural
+        // so "pages" inside "page(" does not match the list branch.
+        if (preg_match('/page\s*\(\s*slug:\s*["\']([^"\']+)["\']\s*\)/', $query, $matches) === 1) {
+            $fields = $this->requestedFields($query, 'page');
+
+            // page() reads the published document only — the same source the
+            // public site renders from — so a working copy never leaks here.
+            $page = $contentService->page($matches[1]);
+
+            return ['page' => $page === null ? null : $this->project($page->toArray(), $fields)];
+        }
+
+        // pages — every published page.
+        if (preg_match('/\bpages\b/', $query) === 1) {
+            $fields = $this->requestedFields($query, 'pages');
+
             return [
-                'pages' => array_map(fn($p) => $this->filterFields($p->toArray(), $fields), $pages)
+                'pages' => array_map(
+                    fn ($p): array => $this->project($p->toArray(), $fields),
+                    $contentService->pages()
+                ),
             ];
         }
-        
-        if (preg_match('/page\s*\(\s*slug:\s*["\']([^"\']+)["\']\s*\)/', $query, $matches)) {
-            // Get single page
-            $slug = $matches[1];
-            $page = $contentService->page($slug);
-            
-            if (!$page) {
-                return ['page' => null];
-            }
-            
-            $fields = $this->extractFields($query, 'page');
-            return ['page' => $this->filterFields($page->toArray(), $fields)];
+
+        // Named so a caller who tried `users` or `user(...)` learns those are
+        // gone on purpose, rather than getting a bare "not recognized".
+        if (preg_match('/\busers?\b/', $query) === 1) {
+            throw new \RuntimeException('Accounts are not readable through the delivery API.');
         }
-        
-        if (strpos($query, 'users') !== false && strpos($query, 'user(') === false) {
-            // List all users
-            $users = $contentService->all('user');
-            $fields = $this->extractFields($query, 'users');
-            
-            return [
-                'users' => array_map(fn($u) => $this->filterFields($u->toArray(), $fields), $users)
-            ];
-        }
-        
-        if (preg_match('/user\s*\(\s*username:\s*["\']([^"\']+)["\']\s*\)/', $query, $matches)) {
-            // Get single user
-            $username = $matches[1];
-            $user = $contentService->user($username);
-            
-            if (!$user) {
-                return ['user' => null];
-            }
-            
-            $fields = $this->extractFields($query, 'user');
-            return ['user' => $this->filterFields($user->toArray(), $fields)];
-        }
-        
-        if (preg_match('/mutation\s*\{[^}]*createPage/', $query)) {
-            // Create page mutation
-            return $this->handleCreatePage($query, $variables);
-        }
-        
-        return ['error' => 'Query not recognized'];
+
+        throw new \RuntimeException('Only the "pages" and "page(slug:)" queries are supported.');
     }
 
-    private function extractFields(string $query, string $rootField): array
+    /**
+     * The fields a query selected, narrowed to the ones a delivery caller is
+     * allowed to see. An unknown or internal field is dropped rather than
+     * refused, which keeps a harmless typo from failing an otherwise valid query
+     * while still making the field unreadable.
+     *
+     * @return list<string>
+     */
+    private function requestedFields(string $query, string $root): array
     {
-        // Extract fields between { }
-        if (preg_match('/' . $rootField . '[^}]*\{([^}]*)\}/s', $query, $matches)) {
-            $content = $matches[1];
-            // Split by whitespace and filter
-            return array_filter(array_map('trim', preg_split('/[\s,]+/', $content)));
+        if (preg_match('/' . preg_quote($root, '/') . '[^{]*\{([^}]*)\}/s', $query, $matches) !== 1) {
+            // No selection set named: return the whole allowlist rather than
+            // nothing, so `{ pages }` is a valid "everything public".
+            return self::PUBLIC_FIELDS;
         }
-        
-        return [];
+
+        $selected = array_filter(array_map('trim', preg_split('/[\s,]+/', $matches[1]) ?: []));
+
+        return array_values(array_intersect(self::PUBLIC_FIELDS, $selected));
     }
 
-    private function filterFields(array $data, array $fields): array
+    /**
+     * Build the response object from a content array, taking only allowlisted
+     * fields and looking them up at the top level or under `data` — never
+     * anywhere else, so nothing outside the allowlist can be reached.
+     *
+     * @param array<string, mixed> $content
+     * @param list<string>         $fields
+     * @return array<string, mixed>
+     */
+    private function project(array $content, array $fields): array
     {
-        if (empty($fields)) {
-            return $data;
-        }
-        
-        $result = [];
+        $flat = array_merge($content, is_array($content['data'] ?? null) ? $content['data'] : []);
+
+        $out = [];
         foreach ($fields as $field) {
-            if (isset($data[$field])) {
-                $result[$field] = $data[$field];
-            } elseif (isset($data['data'][$field])) {
-                $result[$field] = $data['data'][$field];
+            if (array_key_exists($field, $flat)) {
+                $out[$field] = $flat[$field];
             }
         }
-        
-        return $result;
-    }
 
-    private function handleCreatePage(string $query, array $variables): array
-    {
-        $contentService = $this->pluginManager->getContentService();
-        
-        // Extract input from query or variables
-        $input = $variables['input'] ?? [];
-        
-        if (!isset($input['title'])) {
-            return ['errors' => [['message' => 'Title is required']]];
-        }
-
-        $slugInput = trim((string) ($input['slug'] ?? ''));
-        if ($slugInput !== '') {
-            $slug = $this->slugify($slugInput);
-        } else {
-            $slug = $this->slugify($input['title'] ?? 'untitled');
-        }
-
-        if ($slug === '') {
-            $slug = 'untitled';
-        }
-        
-        $content = \Click\Cms\Domain\Content\Content::create(
-            \Click\Cms\Domain\ValueObjects\ContentKey::page($slug),
-            $input
-        );
-        
-        $contentService->save($content);
-        
-        return ['createPage' => $content->toArray()];
-    }
-
-    private function slugify(string $text): string
-    {
-        $text = strtolower($text);
-        $text = preg_replace('/[^a-z0-9-]/', '-', $text);
-        $text = preg_replace('/-+/', '-', $text);
-        return trim($text, '-');
+        return $out;
     }
 }
