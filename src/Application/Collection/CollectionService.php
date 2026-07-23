@@ -57,7 +57,7 @@ final class CollectionService
      */
     public function all(string $typeId, string|Locale|null $locale = null): array
     {
-        return $this->content->workingCopies($typeId, $locale);
+        return $this->ordered($typeId, $this->content->workingCopies($typeId, $locale));
     }
 
     /**
@@ -68,7 +68,23 @@ final class CollectionService
      */
     public function published(string $typeId, string|Locale|null $locale = null): array
     {
-        return $this->content->all($typeId, $locale);
+        return $this->ordered($typeId, $this->content->all($typeId, $locale));
+    }
+
+    /**
+     * Order a type's entries by its declared sort. Kept in one place so the
+     * editor's listing and the public delivery present entries in the same order
+     * — a reader and an editor disagreeing about what comes first is exactly the
+     * kind of quiet mismatch this avoids.
+     *
+     * @param list<Content> $entries
+     * @return list<Content>
+     */
+    private function ordered(string $typeId, array $entries): array
+    {
+        $type = $this->types->find($typeId);
+
+        return $type === null ? $entries : $type->order($entries);
     }
 
     /** The working copy of one entry, or null. */

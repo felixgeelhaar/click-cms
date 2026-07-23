@@ -28,6 +28,14 @@ final class CollectionType
         public readonly SectionType $schema,
         /** The field whose value titles an entry and seeds its slug. */
         public readonly string $titleField,
+        /**
+         * The field a listing is ordered by, or '' to fall back to recency
+         * (most-recently-edited first). A blog wants its posts by date, not by
+         * the accident of when each was created.
+         */
+        public readonly string $sortField,
+        /** 'asc' or 'desc'. */
+        public readonly string $sortDirection,
     ) {}
 
     /**
@@ -52,7 +60,52 @@ final class CollectionType
             'fields' => is_array($spec['fields'] ?? null) ? $spec['fields'] : [],
         ]);
 
-        return new self($id, $label, $description, $schema, $titleField);
+        $sort = is_array($spec['sort'] ?? null) ? $spec['sort'] : [];
+        $sortField = isset($sort['field']) && is_string($sort['field']) ? $sort['field'] : '';
+        // Anything that is not an explicit ascending request means descending —
+        // the useful default for the common case, a newest-first date listing.
+        $sortDirection = (isset($sort['direction']) && $sort['direction'] === 'asc') ? 'asc' : 'desc';
+
+        return new self($id, $label, $description, $schema, $titleField, $sortField, $sortDirection);
+    }
+
+    /**
+     * Order entries by this type's declared sort. A missing or empty sort value
+     * sorts last regardless of direction, so entries yet to be given (say) a date
+     * do not jump to the top of a newest-first list. Comparison is numeric when
+     * both values are numeric and lexical otherwise, so dates (ISO 8601) and
+     * numbers both order correctly. Ties fall back to most-recently-edited, and
+     * a type with no sort field falls back to that entirely.
+     *
+     * @param list<\Click\Cms\Domain\Content\Content> $entries
+     * @return list<\Click\Cms\Domain\Content\Content>
+     */
+    public function order(array $entries): array
+    {
+        usort($entries, function ($a, $b): int {
+            if ($this->sortField !== '') {
+                $va = $a->data[$this->sortField] ?? null;
+                $vb = $b->data[$this->sortField] ?? null;
+                $ea = $va === null || $va === '';
+                $eb = $vb === null || $vb === '';
+                if ($ea !== $eb) {
+                    return $ea ? 1 : -1; // empties always last
+                }
+                if (!$ea) {
+                    $cmp = (is_numeric($va) && is_numeric($vb))
+                        ? ($va <=> $vb)
+                        : strcmp((string) $va, (string) $vb);
+                    if ($cmp !== 0) {
+                        return $this->sortDirection === 'asc' ? $cmp : -$cmp;
+                    }
+                }
+            }
+
+            // Tie-break (and the no-sort-field default): newest edit first.
+            return $b->updatedAt() <=> $a->updatedAt();
+        });
+
+        return $entries;
     }
 
     /**
@@ -89,6 +142,7 @@ final class CollectionType
             'label' => $this->label,
             'description' => $this->description,
             'titleField' => $this->titleField,
+            'sort' => ['field' => $this->sortField, 'direction' => $this->sortDirection],
             'fields' => array_map(
                 static fn ($field): array => $field->toArray(),
                 $this->schema->fields
