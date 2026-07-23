@@ -1,0 +1,109 @@
+# Runs every test suite the project has on every push and pull request, so a
+# released project cannot regress in silence. Three independent jobs — they share
+# no state and fail in isolation, so a red PHP suite still tells you whether the
+# admin suite and the container are healthy.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch or PR cancels the run already in flight —
+# nobody waits on results for code that has been superseded.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php:
+    name: PHP tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 8.3 matches the runtime image (Dockerfile: php:8.3-apache), so the suite
+      # runs on the version production actually serves. gd/zip/pdo_sqlite are the
+      # extensions the application loads at boot.
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: gd, zip, pdo_sqlite
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run test suite
+        run: vendor/bin/phpunit --no-progress
+
+  admin:
+    name: Admin UI tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-ui
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 22 matches the admin-ui build stage in the Dockerfile.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: admin-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npm test
+
+  container:
+    name: Container smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Building the image proves the multi-stage build still assembles: Composer
+      # deps, the admin UI build, the extension check, and the file layout. The
+      # build itself fails if any of those break.
+      - name: Build image
+        run: docker build -t click-cms:ci .
+
+      # Then prove the built image actually serves. The health endpoint boots
+      # nothing but confirms PHP runs and the writable paths exist — the failure
+      # that matters in a container.
+      - name: Run container
+        run: docker run -d --name click-cms-ci -p 8080:80 click-cms:ci
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            body="$(curl -fsS http://127.0.0.1:8080/health.php || true)"
+            echo "$body"
+            if printf '%s' "$body" | grep -q '"status":"ok"'; then
+              echo "Container healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Container did not become healthy in time." >&2
+          docker logs click-cms-ci >&2
+          exit 1
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f click-cms-ci || true
