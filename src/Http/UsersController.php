@@ -7,7 +7,6 @@ namespace Click\Cms\Http;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Domain\Content\Content;
-use Click\Cms\Domain\ValueObjects\ContentKey;
 
 /**
  * Managing the people who can sign in.
@@ -102,7 +101,7 @@ final class UsersController
             return ['status' => 409, 'error' => 'User already exists'];
         }
 
-        $content = Content::create(ContentKey::user($username), $data);
+        $content = Content::create($this->content->userKey($username), $data);
         $this->content->save($content);
 
         $this->hook('user_create', [
@@ -172,7 +171,7 @@ final class UsersController
             return ['status' => 404, 'error' => 'User not found'];
         }
 
-        $this->content->delete(ContentKey::user($username));
+        $this->content->delete($this->content->userKey($username));
         $this->hook('user_delete', ['username' => $username]);
 
         return ['data' => ['deleted' => true, 'username' => $username]];
