@@ -6,9 +6,11 @@ namespace Click\Cms\Http;
 
 use Click\Cms\Application\Collection\CollectionService;
 use Click\Cms\Application\Collection\ReferenceResolver;
+use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Domain\Collection\CollectionType;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Schema\FieldType;
+use Click\Cms\Domain\ValueObjects\ContentKey;
 
 /**
  * The management and delivery API for collections and their entries.
@@ -33,6 +35,11 @@ final class CollectionsController
         private readonly CollectionService $collections,
         private readonly ReferenceResolver $references,
         private readonly mixed $currentUser,
+        // Version history is keyed purely by ContentKey, so the same service the
+        // page endpoints use answers for a collection entry once handed the
+        // entry's key. Optional so a controller built without it (an older test)
+        // still constructs; the history routes then report the feature absent.
+        private readonly ?HistoryService $history = null,
     ) {}
 
     /**
@@ -56,6 +63,13 @@ final class CollectionsController
             'DELETE /api/collections/:type/entries/:slug' => [$this, 'deleteEntry'],
             'POST /api/collections/:type/entries/:slug/publish' => [$this, 'publishEntry'],
             'POST /api/collections/:type/entries/:slug/unpublish' => [$this, 'unpublishEntry'],
+
+            // History, mirroring the page endpoints so an entry is as recoverable
+            // as a page. Declared after the entry routes; the extra path segment
+            // keeps them from colliding with an entry slug.
+            'GET /api/collections/:type/entries/:slug/versions' => [$this, 'listEntryVersions'],
+            'GET /api/collections/:type/entries/:slug/versions/:id' => [$this, 'getEntryVersion'],
+            'POST /api/collections/:type/entries/:slug/versions/:id/restore' => [$this, 'restoreEntryVersion'],
         ];
     }
 
@@ -112,7 +126,17 @@ final class CollectionsController
             return ['status' => 404, 'error' => 'Entry not found.'];
         }
 
-        return ['data' => $this->entryView($collectionType, $entry, true)];
+        $response = ['data' => $this->entryView($collectionType, $entry, true)];
+
+        // Which other languages this entry exists in, so the editor's language
+        // switcher can show what is written and what is still untranslated —
+        // exactly as the page editor does.
+        $response['availableLocales'] = array_map(
+            static fn ($l): string => $l->code,
+            $this->collections->translationsOf($type, $slug)
+        );
+
+        return $response;
     }
 
     public function createEntry(string $type): array
@@ -155,6 +179,88 @@ final class CollectionsController
             $type,
             $this->collections->unpublish($type, $slug, $this->user(), $this->localeParam())
         );
+    }
+
+    /* ------------------------------------------------------------- history -- */
+
+    public function listEntryVersions(string $type, string $slug): array
+    {
+        if ($this->collections->collectionType($type) === null) {
+            return ['status' => 404, 'error' => 'Unknown collection.'];
+        }
+        if ($this->history === null) {
+            return ['status' => 501, 'error' => 'Version history is not available.'];
+        }
+
+        // Versions belong to one translation, so the key carries the locale the
+        // rest of the entry API uses. Without it a German entry would show — and
+        // restore from — English history, the exact bug the page endpoints fixed.
+        $result = $this->history->all(
+            ContentKey::for($type, $slug, $this->localeParam()),
+            $this->user()
+        );
+
+        if ($result['error'] !== null) {
+            return ['status' => $result['status'], 'error' => $result['error']];
+        }
+
+        return ['data' => $result['versions']];
+    }
+
+    public function getEntryVersion(string $type, string $slug, string $id): array
+    {
+        if ($this->collections->collectionType($type) === null) {
+            return ['status' => 404, 'error' => 'Unknown collection.'];
+        }
+        if ($this->history === null) {
+            return ['status' => 501, 'error' => 'Version history is not available.'];
+        }
+
+        $result = $this->history->get(
+            ContentKey::for($type, $slug, $this->localeParam()),
+            $id,
+            $this->user()
+        );
+
+        if ($result['error'] !== null) {
+            return ['status' => $result['status'], 'error' => $result['error']];
+        }
+
+        return ['data' => $result['version']->toArray()];
+    }
+
+    public function restoreEntryVersion(string $type, string $slug, string $id): array
+    {
+        $collectionType = $this->collections->collectionType($type);
+        if ($collectionType === null) {
+            return ['status' => 404, 'error' => 'Unknown collection.'];
+        }
+        if ($this->history === null) {
+            return ['status' => 501, 'error' => 'Version history is not available.'];
+        }
+
+        $locale = $this->localeParam();
+        $result = $this->history->restore(
+            ContentKey::for($type, $slug, $locale),
+            $id,
+            $this->user()
+        );
+
+        if ($result['error'] !== null) {
+            return ['status' => $result['status'], 'error' => $result['error']];
+        }
+
+        // The entry as it now stands, so the editor sees the result of the
+        // restore rather than the version they asked for — in the language that
+        // was restored, not the default one.
+        $entry = $this->collections->find($type, $slug, $locale);
+
+        return [
+            'data' => [
+                'restoredFrom' => $result['version']->summary(),
+                'entry' => $entry !== null ? $this->entryView($collectionType, $entry, true) : null,
+            ],
+        ];
     }
 
     /* ------------------------------------------------------------ delivery -- */

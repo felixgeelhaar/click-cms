@@ -105,6 +105,18 @@ final class CollectionService
     }
 
     /**
+     * Which languages this entry has actually been written in — the same
+     * per-document translation view a page has, so the entry editor can offer a
+     * language switcher and show what is still untranslated.
+     *
+     * @return list<Locale>
+     */
+    public function translationsOf(string $typeId, string $slug): array
+    {
+        return $this->content->translationsOf($typeId, $slug);
+    }
+
+    /**
      * @param array<string, mixed> $body   The submitted `{ slug?, values }`.
      * @param array<string, mixed> $user
      * @return array{entry: ?Content, error: ?string, status: int, errors: array<string, string>}
