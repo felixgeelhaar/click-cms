@@ -299,4 +299,27 @@ final class SectionValidatorTest extends TestCase
         $this->assertTrue($result->isValid());
         $this->assertArrayNotHasKey('injected', $result->values['rows'][0]);
     }
+
+    public function testASingleReferenceCoercesToItsSlugString(): void
+    {
+        $type = $this->type([['name' => 'author', 'type' => 'reference', 'references' => 'team-member']]);
+        $result = $this->validator->validate($type, ['author' => 'ada']);
+        $this->assertTrue($result->isValid());
+        $this->assertSame('ada', $result->values['author']);
+    }
+
+    public function testAMultipleReferenceCoercesToACleanListOfSlugs(): void
+    {
+        $type = $this->type([['name' => 'related', 'type' => 'reference', 'references' => 'post', 'multiple' => true]]);
+        // Duplicates collapsed, empties and non-strings dropped, order kept.
+        $result = $this->validator->validate($type, ['related' => ['a', 'b', 'a', '', 7, 'c']]);
+        $this->assertTrue($result->isValid());
+        $this->assertSame(['a', 'b', 'c'], $result->values['related']);
+    }
+
+    public function testAMultipleReferenceRejectsANonList(): void
+    {
+        $type = $this->type([['name' => 'related', 'type' => 'reference', 'references' => 'post', 'multiple' => true]]);
+        $this->assertFalse($this->validator->validate($type, ['related' => 'not-a-list'])->isValid());
+    }
 }

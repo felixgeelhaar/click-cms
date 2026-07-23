@@ -36,6 +36,13 @@
       "type": "richtext",
       "label": "Body",
       "required": true
+    },
+    {
+      "name": "relatedPosts",
+      "type": "reference",
+      "label": "Related posts",
+      "references": "post",
+      "multiple": true
     }
   ],
   "sort": {
