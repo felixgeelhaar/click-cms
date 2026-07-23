@@ -10,6 +10,12 @@
       "required": true
     },
     {
+      "name": "author",
+      "type": "reference",
+      "label": "Author",
+      "references": "team-member"
+    },
+    {
       "name": "date",
       "type": "date",
       "label": "Date"

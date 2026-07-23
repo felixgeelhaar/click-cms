@@ -48,6 +48,11 @@ final class FieldDefinition
         public readonly ?int $max,
         public readonly ?string $labelField,
         public readonly ?int $displayWidth,
+        /**
+         * For a Reference field: what it points at — a collection type id, or
+         * 'page'. Null on every other type.
+         */
+        public readonly ?string $references = null,
     ) {}
 
     /**
@@ -91,6 +96,17 @@ final class FieldDefinition
             $fields = self::parseSubFields($spec['fields'] ?? null, $name);
         }
 
+        $references = null;
+        if ($type === FieldType::Reference) {
+            $references = $spec['references'] ?? null;
+            if (!is_string($references) || trim($references) === '') {
+                throw new InvalidArgumentException(
+                    "Reference field \"{$name}\" must declare what it \"references\" (a collection id or \"page\")."
+                );
+            }
+            $references = trim($references);
+        }
+
         return new self(
             name: $name,
             type: $type,
@@ -114,6 +130,7 @@ final class FieldDefinition
                 && (int) $spec['displayWidth'] > 0
                 ? (int) $spec['displayWidth']
                 : null,
+            references: $references,
         );
     }
 
@@ -155,6 +172,9 @@ final class FieldDefinition
         }
         if ($this->displayWidth !== null) {
             $out['displayWidth'] = $this->displayWidth;
+        }
+        if ($this->references !== null) {
+            $out['references'] = $this->references;
         }
 
         return $out;

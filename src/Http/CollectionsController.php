@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Click\Cms\Http;
 
 use Click\Cms\Application\Collection\CollectionService;
+use Click\Cms\Application\Collection\ReferenceResolver;
 use Click\Cms\Domain\Collection\CollectionType;
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Schema\FieldType;
 
 /**
  * The management and delivery API for collections and their entries.
@@ -29,6 +31,7 @@ final class CollectionsController
      */
     public function __construct(
         private readonly CollectionService $collections,
+        private readonly ReferenceResolver $references,
         private readonly mixed $currentUser,
     ) {}
 
@@ -226,6 +229,15 @@ final class CollectionsController
             'updatedAt' => $entry->updatedAt()->format(DATE_ATOM),
         ];
 
+        $resolvedRefs = $this->resolveReferences($type, $entry, $includePublication);
+        if ($resolvedRefs !== []) {
+            // References are expanded alongside the raw data, not into it: `data`
+            // keeps the bare slugs it was saved with, and `references` carries the
+            // resolved titles a client shows. A public delivery view resolves
+            // published targets only.
+            $view['references'] = $resolvedRefs;
+        }
+
         if ($includePublication) {
             $state = $this->collections->publicationOf($type->id, $entry->slug(), $entry->locale());
             $view['publication'] = [
@@ -237,6 +249,35 @@ final class CollectionsController
         }
 
         return $view;
+    }
+
+    /**
+     * Resolve each of the type's reference fields for one entry. Editors resolve
+     * against working copies (so a title shows for a target not yet published);
+     * a delivery view resolves published targets only.
+     *
+     * @return array<string, array{type: string, slug: string, title: string, exists: bool}>
+     */
+    private function resolveReferences(CollectionType $type, Content $entry, bool $editorView): array
+    {
+        $out = [];
+        foreach ($type->fields() as $field) {
+            if ($field->type !== FieldType::Reference || $field->references === null) {
+                continue;
+            }
+            $slug = $entry->data[$field->name] ?? null;
+            if (!is_string($slug) || $slug === '') {
+                continue;
+            }
+            $out[$field->name] = $this->references->resolve(
+                $field->references,
+                $slug,
+                $entry->locale(),
+                !$editorView,
+            );
+        }
+
+        return $out;
     }
 
     /** @return array<string, mixed> */
