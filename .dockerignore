@@ -10,7 +10,16 @@ vendor/
 tests/
 coverage/
 .phpunit.cache/
+.phpunit.result.cache
 .DS_Store
+
+# Tooling and agent scratch, none of it application code. .claude in particular
+# holds agent worktrees with their own node_modules — well over a gigabyte — so
+# leaving it in the build context both bloats the image and, when chown -R walks
+# it, fills the build disk. That is a real build failure, not just waste.
+.claude/
+.github/
+.roady/
 
 # Runtime state. Mounted as volumes at run time, so baking a build machine's
 # content and users into the image would ship one person's data to every deploy.
