@@ -142,6 +142,21 @@
         @restore="restoreVersion"
         @reload="loadVersions"
       />
+
+      <!--
+        What links here — the entries that reference this one, so an editor sees
+        an entry's incoming relations before renaming or deleting it. Shown only
+        when something points at it, to avoid an empty box on the common case.
+      -->
+      <section v-if="!isNew && !translationMissing && backReferences.length" class="backrefs" aria-labelledby="backrefs-heading">
+        <h2 id="backrefs-heading" class="backrefs-heading">Referenced by</h2>
+        <ul class="backrefs-list">
+          <li v-for="ref in backReferences" :key="`${ref.type}:${ref.slug}:${ref.field}`" class="backref">
+            <span class="backref-title">{{ ref.title }}</span>
+            <span class="backref-meta">{{ ref.type }} · {{ ref.field }}</span>
+          </li>
+        </ul>
+      </section>
     </div>
   </div>
 </template>
@@ -378,9 +393,25 @@ const loadVersions = async () => {
   }
 };
 
+const backReferences = ref([]);
+
+const loadBackReferences = async () => {
+  if (!storedSlug.value || translationMissing.value) {
+    backReferences.value = [];
+    return;
+  }
+  try {
+    const res = await fetch(entryUrl(`/backreferences${localeQuery()}`));
+    const body = await res.json().catch(() => ({}));
+    backReferences.value = res.ok && Array.isArray(body.data) ? body.data : [];
+  } catch {
+    backReferences.value = [];
+  }
+};
+
 const reload = async () => {
   await loadEntry();
-  await Promise.all([loadTranslations(), loadVersions()]);
+  await Promise.all([loadTranslations(), loadVersions(), loadBackReferences()]);
 };
 
 /* -------------------------------------------------------------- write -- */
@@ -434,7 +465,7 @@ const save = async () => {
     translationMissing.value = false;
     notice.value = 'Saved. This is not on the public site until you publish.';
     emit('saved', storedSlug.value);
-    await Promise.all([loadTranslations(), loadVersions()]);
+    await Promise.all([loadTranslations(), loadVersions(), loadBackReferences()]);
   } catch (e) {
     saveError.value = `Could not save: ${e.message}`;
   } finally {
@@ -457,7 +488,7 @@ const publicationAction = async (action) => {
     notice.value = action === 'publish'
       ? 'Published. This entry is now on the public site.'
       : 'Taken down. This entry is no longer on the public site.';
-    await Promise.all([loadTranslations(), loadVersions()]);
+    await Promise.all([loadTranslations(), loadVersions(), loadBackReferences()]);
   } catch (e) {
     publishError.value = `Could not ${action} this entry: ${e.message}`;
   } finally {
@@ -566,7 +597,7 @@ onMounted(async () => {
 
     if (storedSlug.value) {
       await loadEntry();
-      await Promise.all([loadTranslations(), loadVersions()]);
+      await Promise.all([loadTranslations(), loadVersions(), loadBackReferences()]);
     } else {
       values.value = blankValues();
     }
@@ -603,6 +634,14 @@ onMounted(async () => {
 .preview-link-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .preview-link-row input { flex: 1; min-width: 14rem; padding: 0.5rem 0.75rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.backrefs { margin-top: 1.5rem; padding: 1rem 1.25rem; border: 1px solid var(--app-border); border-radius: 10px; background: var(--app-surface-strong); }
+.backrefs-heading { margin: 0 0 0.5rem; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--app-text-muted); }
+.backrefs-list { list-style: none; margin: 0; padding: 0; }
+.backref { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0.4rem 0; border-top: 1px solid var(--app-border); }
+.backref:first-child { border-top: none; }
+.backref-title { font-size: 0.875rem; color: var(--app-text); }
+.backref-meta { font-size: 0.75rem; color: var(--app-text-muted); white-space: nowrap; }
 
 .actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem; }
 .btn-primary, .btn-secondary, .btn-danger { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; }

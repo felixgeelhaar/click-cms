@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Tests\Unit\Http;
 
+use Click\Cms\Application\Collection\BackReferenceService;
 use Click\Cms\Application\Collection\CollectionService;
 use Click\Cms\Application\Collection\ReferenceResolver;
 use Click\Cms\Application\Content\ContentService;
@@ -45,6 +46,7 @@ final class CollectionEntryDepthTest extends TestCase
             'fields' => [
                 ['name' => 'title', 'type' => 'text', 'required' => true],
                 ['name' => 'body', 'type' => 'richtext'],
+                ['name' => 'related', 'type' => 'reference', 'references' => 'post', 'multiple' => true],
             ],
         ]));
 
@@ -60,6 +62,8 @@ final class CollectionEntryDepthTest extends TestCase
             new ReferenceResolver($content, $types),
             fn (): array => $this->admin,
             new HistoryService($storage, $versions),
+            null,
+            new BackReferenceService($types, $content),
         );
 
         $_GET = [];
@@ -126,6 +130,26 @@ final class CollectionEntryDepthTest extends TestCase
     {
         $result = $this->controller->listEntryVersions('nope', 'hello');
         $this->assertSame(404, $result['status']);
+    }
+
+    public function testBackReferencesListWhatPointsAtAnEntry(): void
+    {
+        $this->saveEntry('target', ['title' => 'Target'], null);
+        $this->saveEntry('pointer', ['title' => 'Pointer', 'related' => ['target']], null);
+
+        $_GET = [];
+        $result = $this->controller->listBackReferences('post', 'target');
+
+        $this->assertCount(1, $result['data']);
+        $this->assertSame('pointer', $result['data'][0]['slug']);
+        $this->assertSame('related', $result['data'][0]['field']);
+    }
+
+    public function testBackReferencesRequireAuthentication(): void
+    {
+        $this->admin = [];
+        $result = $this->controller->listBackReferences('post', 'target');
+        $this->assertSame(401, $result['status']);
     }
 
     public function testWithoutAHistoryServiceTheRoutesReportItAbsent(): void

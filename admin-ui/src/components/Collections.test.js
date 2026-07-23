@@ -206,6 +206,11 @@ describe('entry editor depth — languages and history', () => {
     const versionsMatch = path.match(/^\/api\/collections\/blog\/entries\/([^/]+)\/versions$/);
     if (method === 'GET' && versionsMatch) return jsonRes(200, { data: clone(VERSIONS) });
 
+    const backrefMatch = path.match(/^\/api\/collections\/blog\/entries\/([^/]+)\/backreferences$/);
+    if (method === 'GET' && backrefMatch) {
+      return jsonRes(200, { data: [{ type: 'blog', slug: 'related-post', title: 'Related Post', field: 'related', locale: 'en' }] });
+    }
+
     const restoreMatch = path.match(/^\/api\/collections\/blog\/entries\/([^/]+)\/versions\/([^/]+)\/restore$/);
     if (method === 'POST' && restoreMatch) {
       return jsonRes(200, { data: { restoredFrom: {}, entry: { slug: restoreMatch[1], data: { title: 'Older Draft' }, publication: NEVER } } });
@@ -260,6 +265,16 @@ describe('entry editor depth — languages and history', () => {
     expect(askedGerman).toBe(true);
     // And says the translation does not exist yet.
     expect(wrapper.text()).toContain('not translated');
+  });
+
+  it('shows what references the entry', async () => {
+    global.fetch = deepFetch();
+    const wrapper = await openDraftEditor();
+
+    const panel = wrapper.find('.backrefs');
+    expect(panel.exists()).toBe(true);
+    expect(panel.text()).toContain('Related Post');
+    expect(panel.text()).toContain('related');
   });
 
   it('mints a preview link and shows it', async () => {
