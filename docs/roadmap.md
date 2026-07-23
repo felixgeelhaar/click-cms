@@ -49,11 +49,23 @@ Every item here holds the lines v1 was built on, because they are the product:
 
 ## Rounding out what shipped
 
-4. **Collections admin depth.** *(medium)* Entries already inherit version
-   history, preview and per-language documents at the storage layer, but the
-   collection entry editor exposes none of them — unlike the page editor. Wire
-   history, signed preview links and translation switching into the collection
-   admin so an entry is as fully editable as a page.
+4. **Collections admin depth.** *(medium)* **History and translation switching
+   done; preview is an open question.** The collection entry editor now reuses
+   the page editor's `PageVersions` and `PageLanguages` panels: an entry's
+   version history lists and restores per language (new `/versions` routes on
+   `CollectionsController`, backed by the same `HistoryService` a page uses), and
+   `getEntry` returns `availableLocales` so the editor offers a language switcher
+   and creates a translation on first save in a new language.
+
+   **Signed preview links remain unresolved** — deliberately, not by oversight.
+   A page preview renders server-side HTML through `PageShell`; a collection
+   entry has *no* server-rendered view (it is delivered as JSON to a front end
+   that renders it). So "preview an entry" cannot mean the same thing, and the
+   honest options are: (a) a signed link that returns the *draft* entry through
+   the delivery API, for a front-end preview environment to render; (b) skip
+   entry preview entirely, since the delivery API already serves the published
+   copy; or (c) a generic entry-detail template the CMS renders. This needs a
+   product decision before building, to avoid shipping the wrong preview.
 
 5. **Media cropping.** *(medium)* Focal points cover the common case; add
    optional server-side cropping to fixed boxes for art-directed images. This was

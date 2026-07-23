@@ -260,6 +260,9 @@ class Application
             new CollectionService($this->contentService, $collectionTypes, new SectionValidator()),
             new ReferenceResolver($this->contentService, $collectionTypes),
             fn (): array => $this->getSessionUser() ?? [],
+            // The same history service the page endpoints use; an entry's key is
+            // all it needs, so entries get version history for free.
+            $this->history,
         );
 
         // Sessions and login throttling are collaborators rather than methods on

@@ -10,8 +10,28 @@
     <div v-if="loading" class="banner">Loading…</div>
 
     <div v-else class="edit-form">
+      <!--
+        Languages, shown only when the entry exists and the site has more than
+        one. Same panel and same rules as the page editor: publication is per
+        language, so this is where an editor sees which translations are live,
+        stale or missing. Switching creates the translation on first save.
+      -->
+      <PageLanguages
+        v-if="!isNew && siteLocales.length > 1"
+        :locales="siteLocales"
+        :current="locale"
+        :translations="translations"
+        :busy="saving || !!busy"
+        @select="switchLocale"
+      />
+
+      <p v-if="translationMissing" class="banner notice" role="status">
+        This entry is not translated into {{ languageName(locale) }} yet. The
+        fields are empty — saving here creates that translation.
+      </p>
+
       <!-- Publication only means something once the entry exists on disk. -->
-      <div v-if="!isNew" class="publication-bar">
+      <div v-if="!isNew && !translationMissing" class="publication-bar">
         <span :class="['status-badge', state]">{{ stateLabel(state) }}</span>
         <div class="pub-actions">
           <button
@@ -61,7 +81,7 @@
       <div class="actions">
         <button type="button" class="btn-secondary" :disabled="saving" @click="$emit('cancel')">Cancel</button>
         <button
-          v-if="!isNew"
+          v-if="!isNew && !translationMissing"
           type="button"
           class="btn-danger"
           :disabled="saving"
@@ -71,6 +91,22 @@
           {{ saving ? 'Saving…' : 'Save' }}
         </button>
       </div>
+
+      <!--
+        Version history, reusing the page editor's panel unchanged: it is a
+        collection entry's now, keyed on this entry and this language. Restoring
+        rewinds the working copy, not the live entry — the panel says so itself.
+      -->
+      <PageVersions
+        v-if="!isNew && !translationMissing"
+        :versions="versions"
+        :loading="versionsLoading"
+        :error="versionsError"
+        :can-restore="can('content.restore')"
+        :restoring="restoringId"
+        @restore="restoreVersion"
+        @reload="loadVersions"
+      />
     </div>
   </div>
 </template>
@@ -80,6 +116,8 @@ import { ref, computed, onMounted } from 'vue';
 import FieldInput from '../fields/FieldInput.vue';
 import ImageField from '../fields/ImageField.vue';
 import RepeaterField from '../fields/RepeaterField.vue';
+import PageLanguages from '../PageLanguages.vue';
+import PageVersions from '../PageVersions.vue';
 
 const props = defineProps({
   // The full type object, including its `fields` schema.
@@ -108,6 +146,51 @@ const loadError = ref('');
 const saveError = ref('');
 const publishError = ref('');
 const notice = ref('');
+
+/* ------------------------------------------------ capabilities & langs -- */
+
+// Asked of the server, so the panel draws only what this account may do — a
+// Restore button an author would get a 403 from teaches them the product is
+// broken. An empty set fails closed.
+const capabilities = ref([]);
+const can = (capability) => capabilities.value.includes(capability);
+
+const siteLocales = ref([]);
+// CoreConfig lists the default language first, so no second request is needed.
+const defaultLocale = computed(() => siteLocales.value[0] ?? '');
+const locale = ref('');
+const translations = ref({});
+// True when the entry exists in some language but not the one being edited, so
+// the form shows empty and a save creates the translation rather than a 404.
+const translationMissing = ref(false);
+
+const displayNames = (() => {
+  try {
+    return new Intl.DisplayNames(undefined, { type: 'language' });
+  } catch {
+    return null;
+  }
+})();
+
+const languageName = (code) => {
+  if (!code) return 'the default language';
+  try {
+    return displayNames?.of(code) || code;
+  } catch {
+    return code;
+  }
+};
+
+// Appended to entry endpoints only for a non-default language, matching the
+// page API where `/home` is the default and `/de/home` is German.
+const localeQuery = () =>
+  locale.value && locale.value !== defaultLocale.value
+    ? `?locale=${encodeURIComponent(locale.value)}`
+    : '';
+
+// The version and translation endpoints key on the exact language, so they are
+// always given one.
+const versionLocale = () => locale.value || defaultLocale.value;
 
 /* ------------------------------------------------------------ fields -- */
 
@@ -157,14 +240,51 @@ const canUnpublish = computed(() => !isNew.value && (state.value === 'live' || s
 
 /* --------------------------------------------------------------- load -- */
 
+const versions = ref([]);
+const versionsLoading = ref(false);
+const versionsError = ref('');
+const restoringId = ref('');
+
+const loadCapabilities = async () => {
+  try {
+    const res = await fetch('/api/auth/check');
+    const body = await res.json();
+    capabilities.value = body.data?.user?.capabilities ?? [];
+  } catch {
+    capabilities.value = [];
+  }
+};
+
+const loadSiteLocales = async () => {
+  try {
+    const res = await fetch('/api/pages');
+    const body = await res.json();
+    siteLocales.value = Array.isArray(body.locales) ? body.locales : [];
+    if (!locale.value) locale.value = body.locale || siteLocales.value[0] || '';
+  } catch {
+    siteLocales.value = [];
+  }
+};
+
+const entryUrl = (extra = '') =>
+  `/api/collections/${encodeURIComponent(props.type.id)}/entries/${encodeURIComponent(storedSlug.value)}${extra}`;
+
 const loadEntry = async () => {
   loading.value = true;
   loadError.value = '';
+  translationMissing.value = false;
   try {
-    const res = await fetch(
-      `/api/collections/${encodeURIComponent(props.type.id)}/entries/${encodeURIComponent(storedSlug.value)}`
-    );
+    const res = await fetch(entryUrl(localeQuery()));
     const body = await res.json().catch(() => ({}));
+
+    if (res.status === 404) {
+      // The entry exists (we have its slug from another language) but not in
+      // this one — an empty form to translate into, not an error.
+      values.value = blankValues();
+      publication.value = null;
+      translationMissing.value = true;
+      return;
+    }
     if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
 
     const data = body.data ?? {};
@@ -179,6 +299,54 @@ const loadEntry = async () => {
   }
 };
 
+// Where every other language of this entry stands, one request per configured
+// language, so the language panel can show live/stale/missing at a glance.
+const loadTranslations = async () => {
+  if (!storedSlug.value) return;
+
+  const results = await Promise.all(siteLocales.value.map(async (code) => {
+    const query = code === defaultLocale.value ? '' : `?locale=${encodeURIComponent(code)}`;
+    try {
+      const res = await fetch(entryUrl(query));
+      if (!res.ok) return [code, { exists: false, publication: null }];
+      const body = await res.json();
+      return [code, { exists: true, publication: body.data?.publication ?? null }];
+    } catch {
+      return [code, { exists: false, publication: null }];
+    }
+  }));
+
+  translations.value = Object.fromEntries(results);
+};
+
+const loadVersions = async () => {
+  if (!storedSlug.value || translationMissing.value) {
+    versions.value = [];
+    return;
+  }
+
+  versionsLoading.value = true;
+  versionsError.value = '';
+  try {
+    const res = await fetch(entryUrl(`/versions?locale=${encodeURIComponent(versionLocale())}`));
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      versionsError.value = body.error || `Could not read the history (${res.status}).`;
+      return;
+    }
+    versions.value = Array.isArray(body.data) ? body.data : [];
+  } catch (e) {
+    versionsError.value = `Could not read the history: ${e.message}`;
+  } finally {
+    versionsLoading.value = false;
+  }
+};
+
+const reload = async () => {
+  await loadEntry();
+  await Promise.all([loadTranslations(), loadVersions()]);
+};
+
 /* -------------------------------------------------------------- write -- */
 
 const save = async () => {
@@ -187,14 +355,21 @@ const save = async () => {
   fieldErrors.value = {};
   notice.value = '';
 
-  const creating = isNew.value;
+  // A translation that does not exist yet still has to be *created* in this
+  // language: entries are separate documents per locale, so a PUT to a missing
+  // one is a 404 by design rather than an upsert.
+  const creating = isNew.value || translationMissing.value;
   const base = `/api/collections/${encodeURIComponent(props.type.id)}/entries`;
-  const url = creating ? base : `${base}/${encodeURIComponent(storedSlug.value)}`;
+  const url = creating
+    ? `${base}${localeQuery()}`
+    : `${base}/${encodeURIComponent(storedSlug.value)}${localeQuery()}`;
 
   // The API takes the field values under a single `values` key; a slug rides
-  // along only when creating, and only if the editor supplied one.
+  // along when creating. For a new translation the slug is the entry's existing
+  // address, so both languages share it.
+  const slug = isNew.value ? slugInput.value : storedSlug.value;
   const payload = creating
-    ? { ...(slugInput.value ? { slug: slugInput.value } : {}), values: values.value }
+    ? { ...(slug ? { slug } : {}), values: values.value }
     : { values: values.value };
 
   try {
@@ -220,8 +395,10 @@ const save = async () => {
     storedSlug.value = data.slug || storedSlug.value || slugInput.value;
     if (data.data) values.value = { ...blankValues(), ...data.data };
     publication.value = data.publication ?? publication.value;
+    translationMissing.value = false;
     notice.value = 'Saved. This is not on the public site until you publish.';
     emit('saved', storedSlug.value);
+    await Promise.all([loadTranslations(), loadVersions()]);
   } catch (e) {
     saveError.value = `Could not save: ${e.message}`;
   } finally {
@@ -234,10 +411,7 @@ const publicationAction = async (action) => {
   notice.value = '';
   busy.value = action;
   try {
-    const res = await fetch(
-      `/api/collections/${encodeURIComponent(props.type.id)}/entries/${encodeURIComponent(storedSlug.value)}/${action}`,
-      { method: 'POST' }
-    );
+    const res = await fetch(entryUrl(`/${action}${localeQuery()}`), { method: 'POST' });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       publishError.value = body.error || `Could not ${action} this entry (${res.status}).`;
@@ -247,6 +421,7 @@ const publicationAction = async (action) => {
     notice.value = action === 'publish'
       ? 'Published. This entry is now on the public site.'
       : 'Taken down. This entry is no longer on the public site.';
+    await Promise.all([loadTranslations(), loadVersions()]);
   } catch (e) {
     publishError.value = `Could not ${action} this entry: ${e.message}`;
   } finally {
@@ -254,24 +429,62 @@ const publicationAction = async (action) => {
   }
 };
 
+// Confirmation happens inside PageVersions, in the product's own voice.
+const restoreVersion = async (version) => {
+  restoringId.value = version.id;
+  versionsError.value = '';
+  notice.value = '';
+  try {
+    const res = await fetch(
+      entryUrl(`/versions/${encodeURIComponent(version.id)}/restore?locale=${encodeURIComponent(versionLocale())}`),
+      { method: 'POST' }
+    );
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      versionsError.value = body.error || `Could not restore that version (${res.status}).`;
+      return;
+    }
+    await reload();
+    notice.value = 'Working copy restored. The live entry is unchanged until you publish.';
+  } catch (e) {
+    versionsError.value = `Could not restore that version: ${e.message}`;
+  } finally {
+    restoringId.value = '';
+  }
+};
+
+const switchLocale = async (code) => {
+  if (code === locale.value) return;
+  locale.value = code;
+  notice.value = '';
+  publishError.value = '';
+  saveError.value = '';
+  await reload();
+};
+
 const remove = async () => {
   if (!window.confirm('Delete this entry? This cannot be undone.')) return;
   try {
-    await fetch(
-      `/api/collections/${encodeURIComponent(props.type.id)}/entries/${encodeURIComponent(storedSlug.value)}`,
-      { method: 'DELETE' }
-    );
+    await fetch(entryUrl(localeQuery()), { method: 'DELETE' });
     emit('deleted', storedSlug.value);
   } catch (e) {
     saveError.value = `Could not delete this entry: ${e.message}`;
   }
 };
 
-onMounted(() => {
-  if (storedSlug.value) {
-    loadEntry();
-  } else {
-    values.value = blankValues();
+onMounted(async () => {
+  loading.value = true;
+  try {
+    await Promise.all([loadCapabilities(), loadSiteLocales()]);
+
+    if (storedSlug.value) {
+      await loadEntry();
+      await Promise.all([loadTranslations(), loadVersions()]);
+    } else {
+      values.value = blankValues();
+    }
+  } finally {
+    loading.value = false;
   }
 });
 </script>
