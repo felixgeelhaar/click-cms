@@ -31,7 +31,8 @@ echo "\n3. Testing ContentKey...\n";
 $key = ContentKey::page('home');
 assert($key->type === 'page', 'ContentKey type failed');
 assert($key->slug === 'home', 'ContentKey slug failed');
-assert($key->toString() === 'page:home', 'ContentKey toString failed');
+assert($key->locale->code === 'en', 'ContentKey default locale failed');
+assert($key->toString() === 'page:en:home', 'ContentKey toString failed');
 echo "   ✓ page() works\n";
 
 $key2 = ContentKey::fromString('user:john');

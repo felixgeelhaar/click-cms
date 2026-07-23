@@ -86,11 +86,13 @@ class PluginManager
             if ($this->isExcludedId($pluginId->value)) {
                 continue;
             }
-            $savedState = $this->state[$pluginId->value] ?? [];
-            $state = isset($savedState['activated']) && $savedState['activated'] 
-                ? $PluginState::ACTIVATED 
-                : $PluginState::DISCOVERED;
-
+            // Every plugin is discovered in the inactive state. The runtime
+            // activation — loading the bootstrap, registering its hooks and
+            // routes — happens in activate(), which the kernel calls at boot for
+            // each plugin that should be on. Pre-marking a plugin activated here
+            // made activate() short-circuit with "already activated" and never
+            // load the bootstrap, so on any boot after the first (when a state
+            // file exists) an activated plugin's routes silently vanished.
             $plugin = Plugin::create(
                 id: $pluginId,
                 name: $metadata->name,
@@ -101,10 +103,6 @@ class PluginManager
                 hooks: $metadata->hooks,
                 path: $dir
             );
-
-            if ($state === $PluginState::ACTIVATED) {
-                $plugin = $plugin->activate();
-            }
 
             $this->plugins[$pluginId->value] = $plugin;
         }
@@ -397,6 +395,21 @@ class PluginManager
         }
         
         $this->plugins = $sorted;
+    }
+
+    /**
+     * Whether a plugin has been explicitly turned off and that choice persisted.
+     *
+     * Absence of any saved state means "never toggled", which defaults to on —
+     * a plugin dropped into the directory should work without an extra step.
+     * Only a stored `activated: false` keeps it off, which is what makes a
+     * deactivation survive a restart.
+     */
+    public function isDeactivated(PluginId $id): bool
+    {
+        $saved = $this->state[$id->value] ?? [];
+
+        return array_key_exists('activated', $saved) && $saved['activated'] === false;
     }
 
     private function loadState(): void

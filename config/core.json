@@ -1,10 +1,22 @@
 {
   "core": {
+    "storage": {
+      "backend": "json",
+      "sqlite": {
+        "path": "data/content.sqlite"
+      }
+    },
     "restApi": {
       "enabled": true
     },
     "graphql": {
       "enabled": true
+    },
+    "languages": {
+      "default": "en",
+      "available": [
+        "en"
+      ]
     },
     "auth": {
       "enabled": true,
@@ -16,6 +28,9 @@
       "lockoutDurationSeconds": 900,
       "passwordMinLength": 8
     },
+    "history": {
+      "retainVersions": 20
+    },
     "marketplace": {
       "enabled": true,
       "registryUrl": "https://felixgeelhaar.github.io/click-cms-marketplace/registry.json",
@@ -23,9 +38,18 @@
     },
     "plugins": {
       "exclude": {
-        "ids": ["admin-ui", "authentication"],
-        "dirs": ["admin-ui", "auth"]
+        "ids": [
+          "admin-ui",
+          "authentication"
+        ],
+        "dirs": [
+          "admin-ui",
+          "auth"
+        ]
       }
+    },
+    "delivery": {
+      "allowedOrigins": []
     }
   }
 }

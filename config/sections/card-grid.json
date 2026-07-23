@@ -1,0 +1,19 @@
+{
+  "label": "Card grid",
+  "description": "A repeating grid of cards, each with a title, text and optional image.",
+  "icon": "grid",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading" },
+    { "name": "intro", "type": "richtext", "label": "Introduction" },
+    { "name": "columns", "type": "select", "label": "Columns",
+      "options": ["2", "3", "4"], "default": "3" },
+    { "name": "cards", "type": "repeater", "label": "Cards", "min": 1, "max": 12,
+      "fields": [
+        { "name": "title", "type": "text", "label": "Title", "required": true },
+        { "name": "body", "type": "textarea", "label": "Text" },
+        { "name": "image", "type": "image", "label": "Image", "displayWidth": 360 },
+        { "name": "link", "type": "url", "label": "Link" }
+      ]
+    }
+  ]
+}

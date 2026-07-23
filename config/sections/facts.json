@@ -1,0 +1,15 @@
+{
+  "label": "Facts",
+  "description": "A row of figures with captions.",
+  "icon": "chart",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading" },
+    { "name": "items", "type": "repeater", "label": "Figures", "min": 1, "max": 6,
+      "fields": [
+        { "name": "value", "type": "text", "label": "Figure", "required": true,
+          "help": "For example 2013, 50+, ISO 9001." },
+        { "name": "caption", "type": "text", "label": "Caption", "required": true }
+      ]
+    }
+  ]
+}

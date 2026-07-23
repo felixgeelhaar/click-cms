@@ -26,14 +26,21 @@ logs/
 *.swo
 
 # Data & Content
-data/
-content/
-storage/
+#
+# Anchored with a leading slash so these match ONLY the runtime directories at
+# the repository root. Unanchored, Git applies them at every depth, which
+# silently excluded src/Domain/Content, src/Application/Content,
+# src/Domain/Storage and src/Infrastructure/Storage from every commit.
+/data/
+/content/
+/storage/
 *.sqlite
 *.sqlite3
 
 # PHP
 .phpunit.result.cache
+# PHPUnit 10+ writes a cache directory, not the old single file.
+.phpunit.cache/
 
 # Test coverage
 coverage/
@@ -47,3 +54,6 @@ marketplace-registry/
 
 # Roady project management
 .roady/
+
+# Agent worktrees and local session state.
+.claude/
