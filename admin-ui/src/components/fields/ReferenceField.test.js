@@ -86,4 +86,23 @@ describe('ReferenceField', () => {
     await wrapper.findAll('.ref-chip-remove')[0].trigger('click');
     expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([['grace']]);
   });
+
+  it('multiple: moving a chip down reorders the array', async () => {
+    const wrapper = mountMulti(['ada', 'grace']);
+    await flushPromises();
+    // The first chip's "down" arrow is its second move button.
+    const firstChipMoves = wrapper.findAll('.ref-chip')[0].findAll('.ref-chip-move');
+    await firstChipMoves[1].trigger('click');
+    expect(wrapper.emitted('update:modelValue').at(-1)).toEqual([['grace', 'ada']]);
+  });
+
+  it('multiple: the first chip cannot move up and the last cannot move down', async () => {
+    const wrapper = mountMulti(['ada', 'grace']);
+    await flushPromises();
+    const chips = wrapper.findAll('.ref-chip');
+    // First chip: up disabled.
+    expect(chips[0].findAll('.ref-chip-move')[0].attributes('disabled')).toBeDefined();
+    // Last chip: down disabled.
+    expect(chips[1].findAll('.ref-chip-move')[1].attributes('disabled')).toBeDefined();
+  });
 });

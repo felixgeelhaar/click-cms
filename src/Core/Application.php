@@ -24,6 +24,7 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\MarketplaceController;
+use Click\Cms\Application\Collection\BackReferenceService;
 use Click\Cms\Application\Collection\CollectionService;
 use Click\Cms\Application\Collection\ReferenceResolver;
 use Click\Cms\Domain\Publishing\Publishable;
@@ -279,6 +280,9 @@ class Application
             // Preview links share the one signing secret with the page previews,
             // so a token minted anywhere verifies everywhere.
             new PreviewLinks($this->basePath . '/data/preview-secret'),
+            // "What links here" scans reference fields on demand rather than
+            // keeping a stored index a flat-file write would have to maintain.
+            new BackReferenceService($collectionTypes, $this->contentService),
         );
 
         // Sessions and login throttling are collaborators rather than methods on

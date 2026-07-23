@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Http;
 
+use Click\Cms\Application\Collection\BackReferenceService;
 use Click\Cms\Application\Collection\CollectionService;
 use Click\Cms\Application\Collection\ReferenceResolver;
 use Click\Cms\Application\History\HistoryService;
@@ -46,6 +47,9 @@ final class CollectionsController
         // Signs preview links for an entry's draft. Optional for the same reason;
         // without it the preview endpoints report the feature absent.
         private readonly ?PreviewLinks $previewLinks = null,
+        // Answers "what links here?" by scanning reference fields. Optional; the
+        // back-reference route reports the feature absent without it.
+        private readonly ?BackReferenceService $backReferences = null,
     ) {}
 
     /**
@@ -81,6 +85,10 @@ final class CollectionsController
             'GET /api/collections/:type/entries/:slug/versions' => [$this, 'listEntryVersions'],
             'GET /api/collections/:type/entries/:slug/versions/:id' => [$this, 'getEntryVersion'],
             'POST /api/collections/:type/entries/:slug/versions/:id/restore' => [$this, 'restoreEntryVersion'],
+
+            // What links here — the entries that reference this one, so an editor
+            // can see an entry's incoming relations before changing or deleting it.
+            'GET /api/collections/:type/entries/:slug/backreferences' => [$this, 'listBackReferences'],
 
             // Minting a preview link for an entry's draft. A POST, so it stays
             // authenticated — handing out a link to unpublished work is a
@@ -277,6 +285,27 @@ final class CollectionsController
                 'entry' => $entry !== null ? $this->entryView($collectionType, $entry, true) : null,
             ],
         ];
+    }
+
+    /* ------------------------------------------------------ back-references -- */
+
+    /**
+     * The entries that reference this one — "which posts point at this author?".
+     * A read for a signed-in editor; it may surface drafts, so it is not public.
+     */
+    public function listBackReferences(string $type, string $slug): array
+    {
+        if ($this->collections->collectionType($type) === null) {
+            return ['status' => 404, 'error' => 'Unknown collection.'];
+        }
+        if ($this->backReferences === null) {
+            return ['status' => 501, 'error' => 'Back-references are not available.'];
+        }
+        if ($this->user() === []) {
+            return ['status' => 401, 'error' => 'Not authenticated'];
+        }
+
+        return ['data' => $this->backReferences->referencesTo($type, $slug, $this->localeParam())];
     }
 
     /* ------------------------------------------------------------- preview -- */

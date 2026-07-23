@@ -69,9 +69,15 @@ Every item here holds the lines v1 was built on, because they are the product:
    optional server-side cropping to fixed boxes for art-directed images. This was
    deliberately deferred at v1 — object-position handled the 80%.
 
-6. **Relation ergonomics.** *(small–medium)* Back-references (which posts point
-   at this author?) and ordering within a many-reference. Both build directly on
-   the reference field added late in v1.
+6. ~~**Relation ergonomics.**~~ *(small–medium)* **Done.** Back-references —
+   "which posts point at this author?" — are answered by a new
+   `BackReferenceService` that scans, on demand, only the collection types whose
+   schema declares a reference field pointing at the target (no stored index for
+   a flat-file write to keep consistent). A `GET …/entries/:slug/backreferences`
+   route (authenticated, since it may surface drafts) feeds a "Referenced by"
+   panel in the entry editor. Ordering within a many-reference is now editable:
+   the reference picker's chips carry accessible up/down move controls, and the
+   stored order is the delivery order.
 
 7. **Marketplace: decide or drop.** *(varies)* The plugin marketplace is present
    but unexercised. An unused path that installs arbitrary (signed) code is a

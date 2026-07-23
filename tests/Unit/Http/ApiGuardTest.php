@@ -91,6 +91,8 @@ final class ApiGuardTest extends TestCase
         // signature-gated /preview are open.
         $this->assertFalse($this->guard->isPublic('collections/blog/entries', 'GET'));
         $this->assertFalse($this->guard->isPublic('collections/blog/entries/hello', 'GET'));
+        // "What links here" may surface drafts, so it is management, not delivery.
+        $this->assertFalse($this->guard->isPublic('collections/blog/entries/hello/backreferences', 'GET'));
         // Minting a preview link is a POST and must stay authenticated.
         $this->assertFalse($this->guard->isPublic('collections/blog/entries/hello/preview', 'POST'));
     }
