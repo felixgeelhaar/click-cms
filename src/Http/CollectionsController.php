@@ -265,16 +265,26 @@ final class CollectionsController
             if ($field->type !== FieldType::Reference || $field->references === null) {
                 continue;
             }
-            $slug = $entry->data[$field->name] ?? null;
-            if (!is_string($slug) || $slug === '') {
-                continue;
-            }
-            $out[$field->name] = $this->references->resolve(
+            $value = $entry->data[$field->name] ?? null;
+            $resolve = fn (string $slug): array => $this->references->resolve(
                 $field->references,
                 $slug,
                 $entry->locale(),
                 !$editorView,
             );
+
+            if ($field->multiple) {
+                // A list of descriptors, in the order the slugs were stored, so a
+                // client can render "featured posts" without a second lookup.
+                if (is_array($value) && $value !== []) {
+                    $out[$field->name] = array_values(array_map(
+                        $resolve,
+                        array_filter($value, static fn ($s): bool => is_string($s) && $s !== '')
+                    ));
+                }
+            } elseif (is_string($value) && $value !== '') {
+                $out[$field->name] = $resolve($value);
+            }
         }
 
         return $out;

@@ -53,6 +53,11 @@ final class FieldDefinition
          * 'page'. Null on every other type.
          */
         public readonly ?string $references = null,
+        /**
+         * For a Reference field: whether it links to many items (stored as a list
+         * of slugs) rather than one. False on every other type.
+         */
+        public readonly bool $multiple = false,
     ) {}
 
     /**
@@ -131,6 +136,7 @@ final class FieldDefinition
                 ? (int) $spec['displayWidth']
                 : null,
             references: $references,
+            multiple: $type === FieldType::Reference && (bool) ($spec['multiple'] ?? false),
         );
     }
 
@@ -175,6 +181,9 @@ final class FieldDefinition
         }
         if ($this->references !== null) {
             $out['references'] = $this->references;
+        }
+        if ($this->multiple) {
+            $out['multiple'] = true;
         }
 
         return $out;

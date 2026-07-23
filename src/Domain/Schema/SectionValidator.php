@@ -71,11 +71,14 @@ final class SectionValidator
             FieldType::Email => $this->coerceFiltered($field, $raw, FILTER_VALIDATE_EMAIL, 'a valid email address'),
             FieldType::Date => $this->coerceDate($field, $raw),
             FieldType::Image, FieldType::File => $this->coerceString($field, $raw),
-            // A reference is stored as the referenced item's slug — a string.
-            // Whether it still resolves is a read-time concern, not a validation
-            // one: a target deleted after the reference was set must not make the
-            // whole entry invalid to save.
-            FieldType::Reference => $this->coerceString($field, $raw),
+            // A reference is stored as the referenced item's slug — a string, or
+            // a list of them when the field links to many. Whether each still
+            // resolves is a read-time concern, not a validation one: a target
+            // deleted after the reference was set must not make the whole entry
+            // invalid to save.
+            FieldType::Reference => $field->multiple
+                ? $this->coerceReferenceList($field, $raw)
+                : $this->coerceString($field, $raw),
             FieldType::Repeater => $this->coerceRepeater($field, $raw),
         };
     }
@@ -99,6 +102,31 @@ final class SectionValidator
         }
 
         return ['value' => $value, 'error' => null];
+    }
+
+    /**
+     * A many-valued reference: a list of target slugs. Anything that is not a
+     * non-empty string is dropped rather than rejected — the same forgiving
+     * stance a single reference takes — and duplicates are collapsed so the same
+     * target cannot be linked twice. Result is always a list (empty if nothing
+     * usable was sent), keyed from zero.
+     *
+     * @return array{value: mixed, error: ?string}
+     */
+    private function coerceReferenceList(FieldDefinition $field, mixed $raw): array
+    {
+        if (!is_array($raw) || !array_is_list($raw)) {
+            return ['value' => null, 'error' => "{$field->label} must be a list of references."];
+        }
+
+        $slugs = [];
+        foreach ($raw as $item) {
+            if (is_string($item) && $item !== '' && !in_array($item, $slugs, true)) {
+                $slugs[] = $item;
+            }
+        }
+
+        return ['value' => $slugs, 'error' => null];
     }
 
     /**
