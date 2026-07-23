@@ -11,12 +11,15 @@ use Click\Cms\Application\Plugin\PluginMarketplace;
 /**
  * The plugin marketplace endpoint: browse a registry and install from it.
  *
- * Installing a plugin means adding executable code, so the kernel's ApiGuard
- * already refuses anyone without the install capability before this runs. The
- * two install paths are not equally trusted, and that is on purpose: a registry
- * install verifies a signed manifest against a configured public key, while an
- * uploaded archive verifies nothing — an administrator-only action, matching
- * what other CMSs do, but a stated decision rather than an accident.
+ * Installing a plugin means adding executable code, so the kernel gates this
+ * surface on a capability before the controller runs: browsing needs
+ * ManagePlugins and installing needs InstallPlugins, both administrator-only by
+ * default, on top of the authentication and CSRF the request pipeline already
+ * enforces. The two install paths are not equally trusted, and that is on
+ * purpose: a registry install verifies a signed manifest against a configured
+ * public key and checks the package checksum, while an uploaded archive is
+ * trusted to the administrator who uploaded it. Both extract defensively —
+ * every archive entry is validated against path traversal before a byte lands.
  *
  * Pulled out of the kernel because browsing and installing plugins is not the
  * job of the thing that turns requests into responses.
