@@ -88,10 +88,28 @@ Every item here holds the lines v1 was built on, because they are the product:
    the reference picker's chips carry accessible up/down move controls, and the
    stored order is the delivery order.
 
-7. **Marketplace: decide or drop.** *(varies)* The plugin marketplace is present
-   but unexercised. An unused path that installs arbitrary (signed) code is a
-   liability, not a feature. Either commit to it — exercise it end to end and
-   threat-model the install path — or remove it.
+7. ~~**Marketplace: decide or drop.**~~ *(varies)* **Kept and hardened.** The
+   install path was exercised end to end and threat-modelled, and it had real
+   holes:
+   - **Zip Slip.** `installFromZip` called `ZipArchive::extractTo` with no entry
+     validation — a crafted archive could write a PHP shell into the document
+     root. Extraction now validates every entry (no absolute paths, no `..`, no
+     backslashes/NUL, no drive letters), writes each file itself (so an archived
+     symlink becomes an inert file, never a live link), caps entry count and
+     total inflated size against a zip bomb, and extracts to a same-filesystem
+     temp dir so the install is an atomic rename.
+   - **Missing authorization.** The controller's docstring claimed the guard
+     enforced an install capability; nothing did — any signed-in account could
+     install code. The kernel now gates browsing on `ManagePlugins` and
+     installing on `InstallPlugins`, both administrator-only, on top of the
+     existing auth and CSRF.
+   - **Signed-id integrity.** A registry install now requires the package to
+     install under the same id the signed manifest vouched for, so a valid
+     signature for one plugin cannot smuggle in different code.
+
+   Covered by a new end-to-end test (generated keypair, `file://` registry →
+   signed manifest → checksummed package → safe extraction → install) plus Zip
+   Slip, oversize, id-mismatch and capability-gate tests.
 
 ## Depth and adoption
 

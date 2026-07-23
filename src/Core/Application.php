@@ -885,6 +885,18 @@ class Application
                 return ['status' => 404, 'error' => 'Marketplace disabled'];
             }
 
+            // Installing a plugin is running code on the server, so it is gated on
+            // a capability, not merely on being signed in. Authentication and CSRF
+            // are already enforced above; this is the authorization the
+            // marketplace controller's own docstring assumed but nothing applied.
+            // Browsing the catalogue needs the weaker ManagePlugins; the install
+            // POST needs InstallPlugins. Both are administrator-only by default.
+            $role = Role::fromName(($this->getSessionUser() ?? [])['role'] ?? null);
+            $needed = ($method === 'POST') ? Capability::InstallPlugins : Capability::ManagePlugins;
+            if (!$role->can($needed)) {
+                return ['status' => 403, 'error' => 'You do not have permission to manage plugins.'];
+            }
+
             return $this->marketplaceController->handle($path, $method);
         }
 
