@@ -49,23 +49,21 @@ Every item here holds the lines v1 was built on, because they are the product:
 
 ## Rounding out what shipped
 
-4. **Collections admin depth.** *(medium)* **History and translation switching
-   done; preview is an open question.** The collection entry editor now reuses
-   the page editor's `PageVersions` and `PageLanguages` panels: an entry's
-   version history lists and restores per language (new `/versions` routes on
-   `CollectionsController`, backed by the same `HistoryService` a page uses), and
-   `getEntry` returns `availableLocales` so the editor offers a language switcher
-   and creates a translation on first save in a new language.
+4. ~~**Collections admin depth.**~~ *(medium)* **Done.** The collection entry
+   editor now reuses the page editor's `PageVersions` and `PageLanguages` panels:
+   an entry's version history lists and restores per language (new `/versions`
+   routes on `CollectionsController`, backed by the same `HistoryService` a page
+   uses), and `getEntry` returns `availableLocales` so the editor offers a
+   language switcher and creates a translation on first save in a new language.
 
-   **Signed preview links remain unresolved** — deliberately, not by oversight.
-   A page preview renders server-side HTML through `PageShell`; a collection
-   entry has *no* server-rendered view (it is delivered as JSON to a front end
-   that renders it). So "preview an entry" cannot mean the same thing, and the
-   honest options are: (a) a signed link that returns the *draft* entry through
-   the delivery API, for a front-end preview environment to render; (b) skip
-   entry preview entirely, since the delivery API already serves the published
-   copy; or (c) a generic entry-detail template the CMS renders. This needs a
-   product decision before building, to avoid shipping the wrong preview.
+   **Preview** is resolved as a signed draft-delivery link, chosen because a
+   collection entry has no server-rendered view (it is delivered as JSON for a
+   front end to render). `POST …/entries/:slug/preview` mints a signed,
+   permission-gated link; `GET …/preview/:slug` returns the entry's *draft* as
+   delivery JSON, reachable anonymously but gated by the signature (or a
+   session), and marked `no-store` / `noindex`. A front-end preview environment
+   points at the link and renders it as it would the published entry. The link
+   reuses the one preview-signing secret pages already use.
 
 5. **Media cropping.** *(medium)* Focal points cover the common case; add
    optional server-side cropping to fixed boxes for art-directed images. This was

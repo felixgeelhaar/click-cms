@@ -97,6 +97,16 @@ final class ApiGuard
             return true;
         }
 
+        // A collection entry preview: a signed link that returns the DRAFT entry
+        // as delivery JSON, for a front-end preview environment with no account.
+        // The path is reachable anonymously, but the handler returns nothing
+        // without a valid signed token (or a session) — as with the page
+        // `/preview/` route, the signature is the gate, not the guard. Minting a
+        // link is a POST and so is not caught here: it stays authenticated.
+        if (preg_match('#^collections/[^/]+/preview/[^/]+$#', $path) === 1) {
+            return true;
+        }
+
         return false;
     }
 
