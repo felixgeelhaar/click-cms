@@ -51,6 +51,7 @@ const emit = defineEmits(['navigate']);
 const iconPaths = {
   dashboard: ['M3 3h8v8H3z', 'M13 3h8v5h-8z', 'M13 10h8v11h-8z', 'M3 13h8v8H3z'],
   pages: ['M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z', 'M14 3v5h5'],
+  collections: ['M4 4h7v7H4z', 'M13 4h7v7h-7z', 'M13 13h7v7h-7z', 'M4 13h7v7H4z'],
   media: ['M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'],
   builder: ['M3 4h8v8H3z', 'M13 4h8v4h-8z', 'M13 10h8v10h-8z', 'M3 14h8v6H3z'],
   plugins: ['M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z'],
@@ -78,6 +79,7 @@ const navGroups = computed(() => {
 
   const content = [
     { href: '/admin/pages', icon: 'pages', label: 'Pages' },
+    { href: '/admin/collections', icon: 'collections', label: 'Collections' },
     { href: '/admin/media', icon: 'media', label: 'Media' },
   ];
   if (props.showBuilder) content.push({ href: '/admin/builder', icon: 'builder', label: 'Builder' });

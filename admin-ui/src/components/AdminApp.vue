@@ -51,6 +51,7 @@ import Sidebar from './Sidebar.vue';
 import Login from './Login.vue';
 import Dashboard from './Dashboard.vue';
 import Pages from './Pages.vue';
+import Collections from './Collections.vue';
 import PageEdit from './PageEdit.vue';
 import Media from './Media.vue';
 import Users from './Users.vue';
@@ -132,6 +133,7 @@ const getRouteComponent = () => {
   const path = currentRoute.value.split('?')[0];
   if (path === '/admin' || path === '/admin/') return Dashboard;
   if (path === '/admin/pages') return Pages;
+  if (path === '/admin/collections') return Collections;
   if (path === '/admin/media') return Media;
   if (path === '/admin/users') return can('users.manage') ? Users : Dashboard;
   if (path === '/admin/profile') return Profile;
