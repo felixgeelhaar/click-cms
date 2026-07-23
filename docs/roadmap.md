@@ -21,18 +21,20 @@ Every item here holds the lines v1 was built on, because they are the product:
 
 ## Near-term — foundations a released project needs
 
-1. **Continuous integration for the test suites.** *(small)* There is no
-   workflow that runs the 810 PHP and 151 admin tests; the only workflow is the
-   marketplace registry. A released project must not regress silently — add a
-   GitHub Actions workflow that runs both suites (and ideally the container
-   smoke test) on every push and pull request, and require it before merge.
+1. ~~**Continuous integration for the test suites.**~~ *(small)* **Done.** A
+   `ci.yml` workflow runs the PHP suite (on PHP 8.3, the runtime version), the
+   admin suite (on Node 22), and a container smoke test that builds the image and
+   polls `/health.php`, on every push and pull request. Jobs are independent and
+   fail in isolation; in-flight runs are cancelled when a branch is superseded.
 
-2. **Builder pages bypass the site chrome.** *(medium)* The visual-builder
-   plugin renders a standalone HTML document, so a page built with the builder
-   has **no navigation, no SEO metadata, and no theme**. Route builder output
-   through the same `<head>`/header wrapper ordinary pages use — extract a shared
-   page shell so both the section renderer and the builder produce a full,
-   navigable, indexable page.
+2. ~~**Builder pages bypass the site chrome.**~~ *(medium)* **Done.** A shared
+   `Http\PageShell` now produces the document chrome — `lang`, the SEO head, the
+   site header/navigation, the theme link, the `<main>` wrapper — and both the
+   section renderer and the visual builder wrap their body in it. Core hands the
+   shell to the `web.render` hook, so a builder page is navigable and indexable
+   like any other; a full theme may still ignore the shell and return its own
+   document. Per-breakpoint builder styles ride into the head via the shell's
+   `$extraHead`.
 
 3. **Delivery pagination and filtering.** *(medium)* Collection `/published`
    (and page delivery) return every item. A blog with hundreds of posts needs
