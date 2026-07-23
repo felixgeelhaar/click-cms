@@ -95,7 +95,7 @@ final class AuthController
             'createdAt' => gmdate('c'),
         ];
 
-        $this->contentService->save(Content::create(ContentKey::user('admin'), $admin));
+        $this->contentService->save(Content::create($this->contentService->userKey('admin'), $admin));
     }
 
     /* --------------------------------------------------------- login -- */

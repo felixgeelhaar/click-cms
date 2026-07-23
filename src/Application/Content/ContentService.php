@@ -58,12 +58,26 @@ final class ContentService
         return $this->storage->find(ContentKey::page($slug, $this->locale($locale)));
     }
 
+    /**
+     * The storage key for a user account.
+     *
+     * Accounts are not translated — there is one admin, not an English one and a
+     * German one — so they live under the *configured* default locale. Every read
+     * and write of a user must key on the same locale, which is exactly what this
+     * guarantees: a caller that built `ContentKey::user($name)` itself would get
+     * the hard-coded fallback locale instead, so an account seeded or created on a
+     * site whose default is not that fallback could never be found again. All user
+     * reads and writes go through here so seed, create, look-up and delete cannot
+     * disagree.
+     */
+    public function userKey(string $username): ContentKey
+    {
+        return ContentKey::user($username, $this->defaultLocale);
+    }
+
     public function user(string $username): ?Content
     {
-        // Accounts are not translated: there is one admin, not an English one
-        // and a German one. They are stored under the default locale so they
-        // have somewhere to live, and asked for the same way every time.
-        return $this->storage->find(ContentKey::user($username, $this->defaultLocale));
+        return $this->storage->find($this->userKey($username));
     }
 
     public function media(string $filename): ?Content
