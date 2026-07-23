@@ -71,6 +71,11 @@ final class SectionValidator
             FieldType::Email => $this->coerceFiltered($field, $raw, FILTER_VALIDATE_EMAIL, 'a valid email address'),
             FieldType::Date => $this->coerceDate($field, $raw),
             FieldType::Image, FieldType::File => $this->coerceString($field, $raw),
+            // A reference is stored as the referenced item's slug — a string.
+            // Whether it still resolves is a read-time concern, not a validation
+            // one: a target deleted after the reference was set must not make the
+            // whole entry invalid to save.
+            FieldType::Reference => $this->coerceString($field, $raw),
             FieldType::Repeater => $this->coerceRepeater($field, $raw),
         };
     }

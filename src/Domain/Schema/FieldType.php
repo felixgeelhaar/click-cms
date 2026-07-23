@@ -28,6 +28,11 @@ enum FieldType: string
     /** A repeating group of sub-fields, e.g. rows in a table or cards in a grid. */
     case Repeater = 'repeater';
 
+    // A pointer to another content item — a collection entry or a page — stored
+    // as that item's slug. It is what lets a post name its author or a page list
+    // its featured entries, turning separate collections into a connected model.
+    case Reference = 'reference';
+
     public static function tryFromName(string $name): ?self
     {
         return self::tryFrom(strtolower(trim($name)));

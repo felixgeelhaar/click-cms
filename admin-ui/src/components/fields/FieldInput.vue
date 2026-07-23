@@ -41,6 +41,15 @@
       <option v-for="option in field.options || []" :key="option" :value="option">{{ option }}</option>
     </select>
 
+    <ReferenceField
+      v-else-if="field.type === 'reference'"
+      :field="field"
+      :model-value="modelValue"
+      :input-id="inputId"
+      :described-by="describedBy"
+      @update:model-value="emitValue"
+    />
+
     <label v-else-if="field.type === 'boolean'" class="switch">
       <input
         :id="inputId"
@@ -74,6 +83,7 @@
 <script setup>
 import { computed, useId } from 'vue';
 import RichTextField from './RichTextField.vue';
+import ReferenceField from './ReferenceField.vue';
 
 const props = defineProps({
   field: { type: Object, required: true },

@@ -24,6 +24,7 @@ use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\MarketplaceController;
 use Click\Cms\Application\Collection\CollectionService;
+use Click\Cms\Application\Collection\ReferenceResolver;
 use Click\Cms\Domain\Publishing\Publishable;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository;
@@ -257,6 +258,7 @@ class Application
         ));
         $this->collectionsController = new CollectionsController(
             new CollectionService($this->contentService, $collectionTypes, new SectionValidator()),
+            new ReferenceResolver($this->contentService, $collectionTypes),
             fn (): array => $this->getSessionUser() ?? [],
         );
 
