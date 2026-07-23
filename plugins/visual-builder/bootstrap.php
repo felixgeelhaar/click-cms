@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Click\Cms\Application\Plugin\BasePlugin;
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Http\PageShell;
 
 class Plugin_visual_builder extends BasePlugin
 {
@@ -30,23 +31,33 @@ class Plugin_visual_builder extends BasePlugin
             return null;
         }
 
-        $title = htmlspecialchars($page->title(), ENT_QUOTES, 'UTF-8');
-        $body = $this->renderBuilder($builder);
-
-        return '<!doctype html><html><head><meta charset="utf-8"><title>' . $title . '</title></head><body>' . $body . '</body></html>';
-    }
-
-    private function renderBuilder(array $builder): string
-    {
         $nodes = $builder['nodes'] ?? [];
         $rootId = $builder['root'] ?? null;
         if (!is_string($rootId) || !isset($nodes[$rootId])) {
-            return '';
+            return null;
         }
-        $responsiveStyles = $this->buildResponsiveStyles($nodes, $builder['breakpoints'] ?? []);
-        $styleTag = $responsiveStyles !== '' ? '<style>' . $responsiveStyles . '</style>' : '';
 
-        return $styleTag . $this->renderNode($nodes, $rootId);
+        $body = $this->renderNode($nodes, $rootId);
+
+        // The per-breakpoint media queries are a head concern, not body markup,
+        // so they ride into the shell's head rather than being inlined before
+        // the body. An empty rule set adds no style tag.
+        $responsiveStyles = $this->buildResponsiveStyles($nodes, $builder['breakpoints'] ?? []);
+        $extraHead = $responsiveStyles !== '' ? '<style>' . $responsiveStyles . '</style>' : '';
+
+        // Wrap the node tree in the site's shared shell so a builder page carries
+        // the same navigation, SEO metadata and theme as an ordinary page. When
+        // the shell is unavailable — an older core, or a direct call — fall back
+        // to a minimal standalone document so the page still renders.
+        $shell = $params['shell'] ?? null;
+        if ($shell instanceof PageShell) {
+            return $shell->render($body, $extraHead);
+        }
+
+        $title = htmlspecialchars($page->title(), ENT_QUOTES, 'UTF-8');
+        $head = $extraHead !== '' ? '<title>' . $title . '</title>' . $extraHead : '<title>' . $title . '</title>';
+
+        return '<!doctype html><html><head><meta charset="utf-8">' . $head . '</head><body>' . $body . '</body></html>';
     }
 
     private function renderNode(array $nodes, string $id): string

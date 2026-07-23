@@ -641,39 +641,12 @@ class Application
         ?Locale $locale = null,
         bool $preview = false,
     ): string {
-        // A plugin may take over rendering entirely — a theme, or the free-form
-        // builder for a page built that way.
-        foreach ($this->pluginManager?->executeHook('web.render', ['page' => $page, 'preview' => $preview]) ?? [] as $result) {
-            if (is_string($result) && $result !== '') {
-                // The mark is added here rather than left to the plugin. A theme
-                // that had never heard of preview would otherwise render an
-                // unpublished page indistinguishable from the live site, which
-                // is the exact mistake this is meant to prevent.
-                return $preview ? $this->markAsPreview($result, $page) : $result;
-            }
-        }
-
         $title = htmlspecialchars($page->title(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
         // One media service, shared by the renderer (which resolves in-page
         // images) and the SEO head (which resolves the Open Graph image), so all
         // media I/O stays here and SeoMeta stays pure.
         $media = new \Click\Cms\Application\Media\MediaService($this->basePath . '/content/media');
-
-        // Sections are the CMS's own content model, so it renders them itself.
-        // Without this a site could store a page but not show it.
-        $renderer = new SectionRenderer(
-            new JsonSectionTypeRepository($this->basePath . '/config/sections'),
-            $media
-        );
-        $body = $renderer->render($page);
-
-        // Pages predating sections keep their plain content field.
-        if ($body === '' && $page->content() !== '') {
-            $body = '<div class="cms-content">'
-                . nl2br(htmlspecialchars($page->content(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'))
-                . '</div>';
-        }
 
         // The language actually served, not the one requested. A German URL
         // showing English prose because the translation is missing must still
@@ -712,18 +685,41 @@ class Application
         // built neither simply has no header, not a broken one.
         $nav = $this->renderSiteHeader($page, $locale ?? $page->locale());
 
-        $html = '<!doctype html>
-<html lang="' . $lang . '">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    ' . $head . '
-    <link rel="stylesheet" href="/theme.css">
-</head>
-<body>
-    ' . $nav . '<main>' . $body . '</main>
-</body>
-</html>';
+        // The shared document chrome — head, header, theme link — that every page
+        // gets regardless of how its body is produced. Handed to the render hook
+        // so a plugin (the visual builder) can wrap its own body in the same
+        // navigable, indexable shell instead of emitting a bare document.
+        $shell = new \Click\Cms\Http\PageShell($lang, $head, $nav);
+
+        // A plugin may take over rendering. The builder wraps its node tree in the
+        // shell above, so the page keeps nav, SEO and theme; a full theme is free
+        // to ignore the shell and return its own complete document.
+        foreach ($this->pluginManager?->executeHook('web.render', ['page' => $page, 'preview' => $preview, 'shell' => $shell]) ?? [] as $result) {
+            if (is_string($result) && $result !== '') {
+                // The mark is added here rather than left to the plugin. A theme
+                // that had never heard of preview would otherwise render an
+                // unpublished page indistinguishable from the live site, which
+                // is the exact mistake this is meant to prevent.
+                return $preview ? $this->markAsPreview($result, $page) : $result;
+            }
+        }
+
+        // Sections are the CMS's own content model, so it renders them itself.
+        // Without this a site could store a page but not show it.
+        $renderer = new SectionRenderer(
+            new JsonSectionTypeRepository($this->basePath . '/config/sections'),
+            $media
+        );
+        $body = $renderer->render($page);
+
+        // Pages predating sections keep their plain content field.
+        if ($body === '' && $page->content() !== '') {
+            $body = '<div class="cms-content">'
+                . nl2br(htmlspecialchars($page->content(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'))
+                . '</div>';
+        }
+
+        $html = $shell->render($body);
 
         return $preview ? $this->markAsPreview($html, $page) : $html;
     }
