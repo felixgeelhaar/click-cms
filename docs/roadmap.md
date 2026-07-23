@@ -36,10 +36,16 @@ Every item here holds the lines v1 was built on, because they are the product:
    document. Per-breakpoint builder styles ride into the head via the shell's
    `$extraHead`.
 
-3. **Delivery pagination and filtering.** *(medium)* Collection `/published`
-   (and page delivery) return every item. A blog with hundreds of posts needs
-   `?limit`/`?offset` (or a cursor) and simple field filtering, so a front end
-   is not forced to fetch and discard. Additive to the API — safe within v1.x.
+3. ~~**Delivery pagination and filtering.**~~ *(medium)* **Done.** A shared
+   `Http\DeliveryQuery` parses `?limit`, `?offset` and `?filter[field]=value`
+   and applies them to a published listing in memory; both `GET /api/pages` and
+   `GET /api/collections/:type/published` use it. `limit` is capped at 100 so one
+   request cannot ask for an unbounded slice, and a malformed control falls back
+   to the unpaginated default rather than erroring. Filtering is a shallow exact
+   match on a top-level `data` field, or membership when the field is a list (a
+   tag, a category). The response gains a `meta` block (`total` after filtering,
+   `count`, `limit`, `offset`); with no parameters present the listing is
+   unchanged, so this is additive and v1.x-safe.
 
 ## Rounding out what shipped
 

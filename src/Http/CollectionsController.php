@@ -166,11 +166,20 @@ final class CollectionsController
             return ['status' => 404, 'error' => 'Unknown collection.'];
         }
 
+        // Filter and page the published set before rendering views, so a blog
+        // with hundreds of entries is not fetched whole. `meta` reports the total
+        // after filtering so a client can build its own pager; with no limit,
+        // offset or filter present the result is every entry, as before.
+        $page = DeliveryQuery::fromQuery($_GET)->paginate(
+            $this->collections->published($type, $this->localeParam())
+        );
+
         return [
             'data' => array_map(
                 fn (Content $entry): array => $this->entryView($collectionType, $entry, false),
-                $this->collections->published($type, $this->localeParam())
+                $page['items']
             ),
+            'meta' => $page['meta'],
         ];
     }
 

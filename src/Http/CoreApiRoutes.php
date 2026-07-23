@@ -130,6 +130,12 @@ final class CoreApiRoutes
             ? $this->pages()->all($locale['locale'])
             : $this->pages()->published($locale['locale']);
 
+        // `?limit`, `?offset` and `?filter[field]=value` page and filter the
+        // listing so a front end (or a large admin page list) need not fetch
+        // every page. Absent those parameters this returns the whole list as it
+        // always did; `meta` reports the total after filtering either way.
+        $page = DeliveryQuery::fromQuery($_GET)->paginate($pages);
+
         return [
             'data' => array_map(
                 // Publication state only for an editor. An anonymous reader is
@@ -139,8 +145,9 @@ final class CoreApiRoutes
                 fn ($page): array => $signedIn
                     ? $page->toArray() + ['publication' => $this->publicationOf($page)]
                     : $page->toArray(),
-                $pages
+                $page['items']
             ),
+            'meta' => $page['meta'],
             // Echoed so a client can tell which language it is looking at
             // without having to remember what it asked for, and so the admin UI
             // can offer the rest.
