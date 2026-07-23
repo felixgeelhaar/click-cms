@@ -63,3 +63,7 @@ demo/state/
 demo/turboscience-web/node_modules/
 demo/turboscience-web/dist/
 demo/turboscience-web/package-lock.json
+
+# Local demos — never committed.
+demo/
+docker-compose.turboscience.yml

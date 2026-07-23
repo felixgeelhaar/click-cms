@@ -1,0 +1,288 @@
+<style>
+  :root {
+    --accent: #1f5fd6;
+    --accent-strong: #1748a8;
+    --ink: #131a26;
+    --body: #33405a;
+    --muted: #64708a;
+    --bg: #eef2f8;
+    --surface: #ffffff;
+    --surface-2: #f6f9fd;
+    --border: #dbe3f0;
+    --border-strong: #c3cee0;
+    --live: #157a4a;
+    --live-bg: #dcf5e7;
+    --tip: #8a5a12;
+    --tip-bg: #fdf3dd;
+    --shadow: 0 1px 2px rgba(19,26,38,.05), 0 12px 30px -12px rgba(19,26,38,.18);
+    --radius: 14px;
+    --measure: 66ch;
+    --sans: "Inter var", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent: #6ea1ff;
+      --accent-strong: #93b8ff;
+      --ink: #eef2fa;
+      --body: #c3cddf;
+      --muted: #8b97ad;
+      --bg: #0c1017;
+      --surface: #141a24;
+      --surface-2: #1a222f;
+      --border: #26303f;
+      --border-strong: #33404f;
+      --live: #58d69a;
+      --live-bg: rgba(88,214,154,.14);
+      --tip: #f0c977;
+      --tip-bg: rgba(240,201,119,.12);
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 18px 40px -16px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"] {
+    --accent: #1f5fd6; --accent-strong: #1748a8; --ink: #131a26; --body: #33405a; --muted: #64708a;
+    --bg: #eef2f8; --surface: #fff; --surface-2: #f6f9fd; --border: #dbe3f0; --border-strong: #c3cee0;
+    --live: #157a4a; --live-bg: #dcf5e7; --tip: #8a5a12; --tip-bg: #fdf3dd;
+    --shadow: 0 1px 2px rgba(19,26,38,.05), 0 12px 30px -12px rgba(19,26,38,.18);
+  }
+  :root[data-theme="dark"] {
+    --accent: #6ea1ff; --accent-strong: #93b8ff; --ink: #eef2fa; --body: #c3cddf; --muted: #8b97ad;
+    --bg: #0c1017; --surface: #141a24; --surface-2: #1a222f; --border: #26303f; --border-strong: #33404f;
+    --live: #58d69a; --live-bg: rgba(88,214,154,.14); --tip: #f0c977; --tip-bg: rgba(240,201,119,.12);
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 18px 40px -16px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--body);
+    font-family: var(--sans); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ---- hero ---- */
+  .hero { padding: 72px 0 40px; border-bottom: 1px solid var(--border); }
+  .kicker { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 0 0 20px; }
+  .kicker .spark { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+  h1 { font-size: clamp(2.1rem, 5vw, 3.1rem); line-height: 1.05; letter-spacing: -.022em;
+    color: var(--ink); margin: 0 0 18px; text-wrap: balance; font-weight: 800; }
+  .lede { font-size: 1.2rem; color: var(--body); max-width: var(--measure); margin: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+  .meta span { font-size: 13px; color: var(--muted); background: var(--surface); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 999px; }
+
+  /* ---- table of contents ---- */
+  nav.toc { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); margin: 0 -24px 0; padding: 12px 24px; }
+  nav.toc ol { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 4px; margin: 0; padding: 0;
+    font-size: 13.5px; counter-reset: toc; }
+  nav.toc a { color: var(--muted); text-decoration: none; padding: 5px 11px; border-radius: 999px; white-space: nowrap; }
+  nav.toc a:hover { color: var(--ink); background: var(--surface); }
+
+  /* ---- steps ---- */
+  section.step { padding: 56px 0; border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
+  .step-head { display: flex; gap: 18px; align-items: baseline; margin-bottom: 6px; }
+  .num { flex: none; font-variant-numeric: tabular-nums; font-weight: 800; font-size: 15px; color: var(--accent);
+    border: 1.5px solid var(--accent); width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+    align-self: flex-start; margin-top: 6px; }
+  h2 { font-size: clamp(1.5rem, 3vw, 1.95rem); line-height: 1.15; letter-spacing: -.015em; color: var(--ink);
+    margin: 0; text-wrap: balance; font-weight: 750; }
+  .step-body { max-width: var(--measure); }
+  .step-body p { margin: 16px 0; }
+  .step-body ul, .step-body ol { max-width: var(--measure); padding-left: 22px; margin: 16px 0; }
+  .step-body li { margin: 8px 0; }
+  strong { color: var(--ink); font-weight: 650; }
+  a { color: var(--accent); }
+  code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .9em;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; color: var(--ink); }
+
+  /* ---- screenshot frame ---- */
+  figure { margin: 30px 0 8px; }
+  .shot { border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden;
+    background: var(--surface); box-shadow: var(--shadow); }
+  .shot .bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; background: var(--surface-2);
+    border-bottom: 1px solid var(--border); }
+  .shot .bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--border-strong); }
+  .shot .bar .addr { margin-left: 10px; font-size: 12.5px; color: var(--muted);
+    font-family: ui-monospace, Menlo, monospace; }
+  .shot img { display: block; width: 100%; height: auto; }
+  figcaption { font-size: 14px; color: var(--muted); margin-top: 12px; padding-left: 2px; }
+  figcaption b { color: var(--body); font-weight: 650; }
+
+  /* ---- callouts ---- */
+  .note { border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 12px 12px 0;
+    padding: 16px 20px; margin: 24px 0; max-width: var(--measure); box-shadow: var(--shadow); }
+  .note.tip { border-left-color: var(--tip); }
+  .note .label { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 6px; }
+  .note.tip .label { color: var(--tip); }
+  .note p { margin: 6px 0; font-size: 15.5px; }
+
+  /* ---- state pills, to teach the vocabulary ---- */
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 650;
+    padding: 3px 10px; border-radius: 999px; vertical-align: middle; }
+  .pill.live { color: var(--live); background: var(--live-bg); }
+  .pill.live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
+  .pill.draft { color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); }
+
+  /* ---- closing ---- */
+  .outro { padding: 56px 0 0; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .card h3 { margin: 0 0 8px; font-size: 15px; color: var(--ink); }
+  .card p { margin: 0; font-size: 14.5px; color: var(--muted); }
+  .signoff { margin-top: 40px; font-size: 15px; color: var(--muted); }
+
+  :is(a, button):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+  @media (max-width: 640px) { body { font-size: 16px; } .hero { padding: 48px 0 32px; } .step-head { gap: 12px; } .num { width: 30px; height: 30px; } }
+</style>
+
+<title>TurboScience × Click CMS — Anleitung für Hanna</title>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="kicker"><span class="spark"></span> Anleitung · TurboScience</p>
+    <h1>Die TurboScience‑Website pflegen</h1>
+    <p class="lede">Hallo Hanna! Diese Anleitung zeigt dir Schritt für Schritt, wie du Seiten, Blogbeiträge und Bilder auf der TurboScience‑Website änderst — komplett im Browser, ganz ohne Programmieren.</p>
+    <div class="meta">
+      <span>⏱️ In 10 Minuten gelesen</span>
+      <span>🧪 Für Redakteur:innen</span>
+      <span>💾 Nichts geht kaputt — jede Änderung ist rückgängig zu machen</span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Inhalt">
+    <ol>
+      <li><a href="#anmelden">1 · Anmelden</a></li>
+      <li><a href="#dashboard">2 · Dashboard</a></li>
+      <li><a href="#seite">3 · Seite bearbeiten</a></li>
+      <li><a href="#blog">4 · Blogbeiträge</a></li>
+      <li><a href="#bilder">5 · Bilder</a></li>
+      <li><a href="#veroeffentlichen">6 · Veröffentlichen</a></li>
+      <li><a href="#ergebnis">7 · Ergebnis prüfen</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section class="step" id="anmelden">
+      <div class="step-head"><span class="num">1</span><h2>Anmelden</h2></div>
+      <div class="step-body">
+        <p>Öffne im Browser die Adresse des Verwaltungsbereichs — sie endet auf <code>/admin</code>. Für den Test läuft die Seite unter <code>http://localhost:8791/admin</code>; im echten Betrieb bekommst du die richtige Adresse von deinem Team.</p>
+        <p>Gib <strong>Benutzername</strong> und <strong>Passwort</strong> ein, die du erhalten hast, und klicke auf <strong>Sign In</strong>. Beim allerersten Login wirst du gebeten, ein eigenes Passwort zu vergeben — das ist Absicht und schützt die Seite.</p>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span class="addr">localhost:8791/admin</span></div>{{IMG:03-login}}</div>
+          <figcaption><b>Der Anmeldebildschirm.</b> Benutzername oben, Passwort darunter, dann „Sign In“.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="step" id="dashboard">
+      <div class="step-head"><span class="num">2</span><h2>Das Dashboard — dein Startpunkt</h2></div>
+      <div class="step-body">
+        <p>Nach dem Anmelden landest du auf dem <strong>Dashboard</strong>. Oben siehst du auf einen Blick, wie viele Seiten es gibt und wie viele davon <span class="pill live">Live</span> (also öffentlich sichtbar) sind.</p>
+        <p>Alles, was du brauchst, steht links in der Seitenleiste:</p>
+        <ul>
+          <li><strong>Pages</strong> — die einzelnen Seiten (Startseite, Über uns …).</li>
+          <li><strong>Collections</strong> — wiederkehrende Inhalte wie <em>Blogbeiträge</em> und <em>Team</em>.</li>
+          <li><strong>Media</strong> — alle Bilder.</li>
+          <li><strong>Menus</strong> — die Navigation oben auf der Website.</li>
+        </ul>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span class="addr">Dashboard</span></div>{{IMG:04-dashboard}}</div>
+          <figcaption><b>Das Dashboard.</b> Die Kacheln zeigen den Stand, die Seitenleiste führt überallhin.</figcaption>
+        </figure>
+        <div class="note tip">
+          <p class="label">Gut zu wissen</p>
+          <p>Oben rechts kannst du mit <strong>Light</strong> zwischen hellem und dunklem Design wechseln — reine Ansichtssache, an der Website ändert das nichts.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="seite">
+      <div class="step-head"><span class="num">3</span><h2>Eine Seite bearbeiten und Abschnitte hinzufügen</h2></div>
+      <div class="step-body">
+        <p>Klicke links auf <strong>Pages</strong>. Du siehst die Liste aller Seiten mit ihrem Status. Bei jeder Seite gibt es einen <strong>Edit</strong>‑Knopf zum Bearbeiten — oder oben rechts <strong>+ New Page</strong> für eine ganz neue Seite.</p>
+        <p>Eine Seite besteht aus <strong>Abschnitten</strong> („Sections“). Jeder Abschnitt ist ein fertiges Design‑Bauteil — eine Überschrift mit Text, eine Zahlen‑Reihe, eine Kartengruppe, ein Aufruf zum Handeln. Du füllst nur die Felder aus, das Aussehen ist vorgegeben und kann nicht „kaputtgehen“.</p>
+        <ol>
+          <li>Gib der Seite einen <strong>Title</strong> (Titel) und einen <strong>Slug</strong> — das ist der Teil der Adresse, z. B. <code>ueber-uns</code>.</li>
+          <li>Unter <strong>Sections</strong> wählst du bei <strong>„Choose a design…“</strong> einen Abschnittstyp und klickst <strong>Add</strong>.</li>
+          <li>Fülle die Felder des Abschnitts aus. Reihenfolge ändern? Mit den Pfeilen. Entfernen? Mit dem ✕.</li>
+        </ol>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span class="addr">Pages › New Page</span></div>{{IMG:10-section-editor}}</div>
+          <figcaption><b>Der Seiten‑Editor.</b> Titel, Slug und darunter die Abschnitte. Über „Choose a design…“ kommt ein neuer Abschnitt dazu.</figcaption>
+        </figure>
+        <div class="note">
+          <p class="label">Wichtig</p>
+          <p><strong>Speichern ist nicht dasselbe wie Veröffentlichen.</strong> <em>Save</em> sichert deine Arbeit, aber auf der öffentlichen Website erscheint noch nichts. Das kommt in Schritt&nbsp;6.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="blog">
+      <div class="step-head"><span class="num">4</span><h2>Blogbeiträge pflegen</h2></div>
+      <div class="step-body">
+        <p>Blogbeiträge sind eine <strong>Collection</strong> — eine Sammlung gleichartiger Einträge. Klicke links auf <strong>Collections</strong> und dann auf <strong>Blog posts</strong>.</p>
+        <p>Mit <strong>+ New entry</strong> legst du einen neuen Artikel an. Jeder Beitrag hat Felder wie <strong>Title</strong>, <strong>Author</strong> (aus dem Team ausgewählt), <strong>Date</strong>, eine <strong>Excerpt</strong> (kurze Zusammenfassung) und den <strong>Body</strong> (den eigentlichen Text). Bestehende Beiträge öffnest du mit <strong>Edit</strong>.</p>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span class="addr">Collections › Blog posts</span></div>{{IMG:08-blog-entries}}</div>
+          <figcaption><b>Die Blog‑Übersicht.</b> Jeder Beitrag wird einzeln veröffentlicht — die <span class="pill live">Live</span>‑Markierung zeigt, was online ist.</figcaption>
+        </figure>
+        <div class="note tip">
+          <p class="label">Tipp</p>
+          <p>Ein Beitrag kann auf einen anderen verweisen (z. B. „passende Artikel“). Beim Feld <strong>Author</strong> oder <strong>Related</strong> wählst du einfach aus einer Liste — du musst dir keine Kürzel merken.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="bilder">
+      <div class="step-head"><span class="num">5</span><h2>Bilder hochladen</h2></div>
+      <div class="step-body">
+        <p>Unter <strong>Media</strong> liegen alle Bilder. Hier lädst du neue hoch — die passenden Größen für Handy, Tablet und Desktop erzeugt das System automatisch, du musst nichts zuschneiden.</p>
+        <p>Wenn du in einem Abschnitt oder Blogbeitrag ein Bildfeld ausfüllst, wählst du das Bild aus genau dieser Mediathek. Praktisch: Du kannst pro Bild einen <strong>Fokuspunkt</strong> setzen — den wichtigsten Bildbereich —, damit beim Zuschneiden nie der Kopf abgeschnitten wird.</p>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span class="addr">Media</span></div>{{IMG:09-media}}</div>
+          <figcaption><b>Die Mediathek.</b> Einmal hochladen, überall wiederverwenden.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="step" id="veroeffentlichen">
+      <div class="step-head"><span class="num">6</span><h2>Speichern und Veröffentlichen</h2></div>
+      <div class="step-body">
+        <p>Das ist der wichtigste Schritt — und ganz einfach, wenn man den Unterschied kennt:</p>
+        <ul>
+          <li><strong>Save</strong> speichert deinen Entwurf. Nur du siehst ihn, die Website bleibt unverändert. Du kannst also in Ruhe arbeiten.</li>
+          <li><strong>Publish</strong> schaltet den aktuellen Stand öffentlich. Erst jetzt sehen ihn die Besucher:innen.</li>
+        </ul>
+        <p>Solange etwas noch nicht veröffentlicht ist, weist dich der Editor oben deutlich darauf hin („<em>Not published</em>“) und bietet direkt einen <strong>Publish</strong>‑Knopf an. Der Status jeder Seite ist immer sichtbar:</p>
+        <p><span class="pill live">Live</span> — öffentlich sichtbar &nbsp;·&nbsp; <span class="pill draft">Draft</span> — Entwurf, nur intern</p>
+        <div class="note">
+          <p class="label">Keine Sorge</p>
+          <p>Jede Version wird gespeichert. Über die <strong>Versionshistorie</strong> einer Seite kannst du jederzeit zu einem früheren Stand zurück — und mit <strong>Preview</strong> einen geheimen Vorschau‑Link erzeugen, um etwas vor dem Veröffentlichen zeigen zu lassen.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="ergebnis">
+      <div class="step-head"><span class="num">7</span><h2>Das Ergebnis prüfen</h2></div>
+      <div class="step-body">
+        <p>Öffne die öffentliche Website (die Adresse ohne <code>/admin</code>). Deine veröffentlichten Abschnitte erscheinen genau in der Reihenfolge, in der du sie angelegt hast — mit Navigation, Design und passenden Bildgrößen, um die du dich nicht kümmern musst.</p>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span class="addr">turboscience.example / (öffentlich)</span></div>{{IMG:01-home}}</div>
+          <figcaption><b>Die fertige Startseite.</b> Genau dieselben Abschnitte, die du im Editor gepflegt hast — Titel, Zahlen, Karten, Handlungsaufruf.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="outro">
+      <h2 style="margin-bottom:8px;">Noch ein paar nützliche Dinge</h2>
+      <div class="cards">
+        <div class="card"><h3>SEO</h3><p>Im Editor unter „Search &amp; social (SEO)“ legst du Titel und Beschreibung für Google und soziale Netzwerke fest.</p></div>
+        <div class="card"><h3>Vorschau</h3><p>Mit <strong>Preview</strong> bekommst du einen Link, der auch ohne Login funktioniert — ideal zum Gegenlesen.</p></div>
+        <div class="card"><h3>Sprachen</h3><p>Gibt es die Seite in mehreren Sprachen, wechselst du oben im Editor die Sprache und pflegst jede Fassung getrennt.</p></div>
+        <div class="card"><h3>Menü</h3><p>Unter <strong>Menus</strong> bestimmst du, welche Seiten oben in der Navigation erscheinen und in welcher Reihenfolge.</p></div>
+      </div>
+      <p class="signoff">Das war's schon — mehr brauchst du für den Alltag nicht. Wenn etwas unklar ist: erst <strong>Save</strong>, dann in Ruhe ausprobieren, nichts geht verloren. Viel Freude beim Pflegen der TurboScience‑Seite! 🚀</p>
+    </section>
+  </main>
+</div>
