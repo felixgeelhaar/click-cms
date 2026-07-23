@@ -46,13 +46,24 @@ final class CollectionServiceTest extends TestCase
             ],
         ]));
 
+        // A second type that declares an order: newest date first.
+        file_put_contents($this->base . '/collections/article.json', json_encode([
+            'label' => 'Articles',
+            'titleField' => 'title',
+            'sort' => ['field' => 'date', 'direction' => 'desc'],
+            'fields' => [
+                ['name' => 'title', 'type' => 'text', 'required' => true],
+                ['name' => 'date', 'type' => 'date'],
+            ],
+        ]));
+
         $storage = new VersioningStorage(
             new JsonStorage($this->base . '/content'),
             new JsonVersionStore($this->base . '/versions'),
         );
         // A collection's entries are publishable, exactly as a site's boot would
         // register them, so the draft-and-publish lifecycle applies here too.
-        Publishable::register(['post']);
+        Publishable::register(['post', 'article']);
 
         $this->content = new ContentService($storage);
         $this->service = new CollectionService(
@@ -92,9 +103,12 @@ final class CollectionServiceTest extends TestCase
     public function testTheDeclaredTypesAreListed(): void
     {
         $types = $this->service->collectionTypes();
-        $this->assertCount(1, $types);
-        $this->assertSame('post', $types[0]->id);
-        $this->assertSame('Blog posts', $types[0]->label);
+        $ids = array_map(static fn ($t) => $t->id, $types);
+        $this->assertEqualsCanonicalizing(['post', 'article'], $ids);
+
+        $post = $this->service->collectionType('post');
+        $this->assertNotNull($post);
+        $this->assertSame('Blog posts', $post->label);
     }
 
     public function testCreatingAnEntryValidatesAgainstTheTypeAndDropsUnknownFields(): void
@@ -184,6 +198,35 @@ final class CollectionServiceTest extends TestCase
         $result = $this->service->delete('post', 'bye', $this->editor());
         $this->assertSame(200, $result['status']);
         $this->assertNull($this->service->find('post', 'bye'));
+    }
+
+    public function testEntriesAreReturnedInTheTypesDeclaredOrder(): void
+    {
+        // Created deliberately out of date order.
+        $this->service->create('article', ['values' => ['title' => 'Middle', 'date' => '2026-05-10']], $this->editor());
+        $this->service->create('article', ['values' => ['title' => 'Newest', 'date' => '2026-09-01']], $this->editor());
+        $this->service->create('article', ['values' => ['title' => 'Oldest', 'date' => '2026-01-15']], $this->editor());
+
+        $titles = array_map(static fn ($e) => $e->data['title'], $this->service->all('article'));
+        $this->assertSame(['Newest', 'Middle', 'Oldest'], $titles);
+
+        // The public delivery order matches the editor's, so nobody disagrees
+        // about what comes first.
+        foreach (['middle', 'newest', 'oldest'] as $slug) {
+            $this->service->publish('article', $slug, $this->editor());
+        }
+        $published = array_map(static fn ($e) => $e->data['title'], $this->service->published('article'));
+        $this->assertSame(['Newest', 'Middle', 'Oldest'], $published);
+    }
+
+    public function testAnEntryWithNoSortValueSortsLast(): void
+    {
+        $this->service->create('article', ['values' => ['title' => 'Dated', 'date' => '2026-03-03']], $this->editor());
+        $this->service->create('article', ['values' => ['title' => 'Undated']], $this->editor());
+
+        $titles = array_map(static fn ($e) => $e->data['title'], $this->service->all('article'));
+        // Undated sorts last even though it was created most recently.
+        $this->assertSame(['Dated', 'Undated'], $titles);
     }
 
     public function testAnAuthorCannotEditAnEntryOwnedByAnother(): void
