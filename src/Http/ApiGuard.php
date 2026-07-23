@@ -89,6 +89,14 @@ final class ApiGuard
             return true;
         }
 
+        // Published collection entries, read by a front end with no account. Only
+        // the `/published` delivery paths are opened — never the `/entries`
+        // management paths, which return working copies and drafts — so this can
+        // no more leak an unpublished entry than /api/pages can leak a draft.
+        if (preg_match('#^collections/[^/]+/published(/[^/]+)?$#', $path) === 1) {
+            return true;
+        }
+
         return false;
     }
 
