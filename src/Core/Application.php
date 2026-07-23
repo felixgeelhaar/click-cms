@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Core;
 
 use Click\Cms\Application\Content\ContentService;
+use Click\Cms\Application\Preview\PreviewLinks;
 use Click\Cms\Application\Authentication\CsrfGuard;
 use Click\Cms\Application\Authentication\LoginThrottle;
 use Click\Cms\Application\Authentication\SessionStore;
@@ -127,6 +128,18 @@ class Application
         } else {
             // JSON response
             header('Content-Type: application/json; charset=utf-8');
+
+            // A handler may ask for extra response headers — a preview delivery
+            // marking itself no-store, for instance — by returning a `headers`
+            // map. It is applied here and removed from the body, so it directs
+            // the response rather than being serialised into it.
+            if (isset($response['headers']) && is_array($response['headers'])) {
+                foreach ($response['headers'] as $name => $value) {
+                    header($name . ': ' . $value);
+                }
+                unset($response['headers']);
+            }
+
             http_response_code($response['status'] ?? 200);
             echo json_encode($response);
         }
@@ -263,6 +276,9 @@ class Application
             // The same history service the page endpoints use; an entry's key is
             // all it needs, so entries get version history for free.
             $this->history,
+            // Preview links share the one signing secret with the page previews,
+            // so a token minted anywhere verifies everywhere.
+            new PreviewLinks($this->basePath . '/data/preview-secret'),
         );
 
         // Sessions and login throttling are collaborators rather than methods on

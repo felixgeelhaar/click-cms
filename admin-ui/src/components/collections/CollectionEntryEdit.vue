@@ -78,6 +78,34 @@
         @update:model-value="setValue(field.name, $event)"
       />
 
+      <!--
+        A collection entry has no page the CMS renders, so a preview is the draft
+        itself as delivery JSON behind a signed link. It is shown rather than
+        opened, because the point is to hand it to a front-end preview
+        environment (or a reviewer) that has no account.
+      -->
+      <div v-if="previewUrl" class="preview-link">
+        <p class="preview-link-title">Preview link ready</p>
+        <p class="field-help">
+          This link returns the entry's current draft as delivery JSON — point a
+          front-end preview environment at it. Anyone with the link can read the
+          draft until {{ previewExpiry }}. It stops working after that.
+        </p>
+        <div class="preview-link-row">
+          <label class="visually-hidden" for="entry-preview-url">Preview link</label>
+          <input
+            id="entry-preview-url"
+            :value="previewAbsoluteUrl"
+            readonly
+            @focus="$event.target.select()"
+          />
+          <button type="button" class="btn-secondary" @click="copyPreviewLink">{{ copied ? 'Copied' : 'Copy' }}</button>
+          <a class="btn-secondary" :href="previewUrl" target="_blank" rel="noopener">Open</a>
+        </div>
+      </div>
+
+      <p v-if="previewError" class="banner error" role="alert">{{ previewError }}</p>
+
       <div class="actions">
         <button type="button" class="btn-secondary" :disabled="saving" @click="$emit('cancel')">Cancel</button>
         <button
@@ -87,6 +115,13 @@
           :disabled="saving"
           @click="remove"
         >Delete</button>
+        <button
+          v-if="canPreview && !isNew && !translationMissing"
+          type="button"
+          class="btn-secondary"
+          :disabled="saving"
+          @click="previewEntry"
+        >{{ previewing ? 'Preparing…' : 'Preview' }}</button>
         <button type="button" class="btn-primary" :disabled="saving" @click="save">
           {{ saving ? 'Saving…' : 'Save' }}
         </button>
@@ -154,6 +189,7 @@ const notice = ref('');
 // broken. An empty set fails closed.
 const capabilities = ref([]);
 const can = (capability) => capabilities.value.includes(capability);
+const canPreview = computed(() => can('content.preview'));
 
 const siteLocales = ref([]);
 // CoreConfig lists the default language first, so no second request is needed.
@@ -453,6 +489,57 @@ const restoreVersion = async (version) => {
   }
 };
 
+/* ------------------------------------------------------------ preview -- */
+
+const previewUrl = ref('');
+const previewExpiry = ref('');
+const previewError = ref('');
+const previewing = ref(false);
+const copied = ref('');
+
+const previewAbsoluteUrl = computed(() =>
+  previewUrl.value ? new URL(previewUrl.value, window.location.origin).toString() : ''
+);
+
+// Save first, so the link shows the draft as it stands on screen rather than the
+// last saved copy — a preview of stale content is exactly the quiet wrongness
+// that makes a preview untrustworthy.
+const previewEntry = async () => {
+  previewing.value = true;
+  previewError.value = '';
+  previewUrl.value = '';
+  copied.value = '';
+
+  try {
+    await save();
+    if (saveError.value || translationMissing.value) return;
+
+    const res = await fetch(entryUrl(`/preview${localeQuery()}`), { method: 'POST' });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      previewError.value = body.error || `Could not prepare a preview (${res.status}).`;
+      return;
+    }
+    previewUrl.value = body.data.url;
+    previewExpiry.value = new Date(body.data.expiresAt * 1000).toLocaleString();
+  } catch (e) {
+    previewError.value = `Could not prepare a preview: ${e.message}`;
+  } finally {
+    previewing.value = false;
+  }
+};
+
+const copyPreviewLink = async () => {
+  try {
+    await navigator.clipboard.writeText(previewAbsoluteUrl.value);
+    copied.value = 'copied';
+  } catch {
+    // Clipboard access is not always granted; the field is selectable, so there
+    // is still a way to get the link out. Say nothing rather than raise an error
+    // for something the editor can do by hand.
+  }
+};
+
 const switchLocale = async (code) => {
   if (code === locale.value) return;
   locale.value = code;
@@ -509,6 +596,13 @@ onMounted(async () => {
 .form-group { margin-bottom: 1.5rem; }
 .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
 .form-group input { width: 100%; padding: 0.75rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+
+.preview-link { margin-top: 1.5rem; padding: 1rem 1.25rem; border: 1px solid var(--app-border); border-radius: 10px; background: var(--app-surface-strong); }
+.preview-link-title { margin: 0 0 0.25rem; font-size: 0.875rem; font-weight: 600; color: var(--app-text); }
+.field-help { margin: 0.25rem 0 0.75rem; font-size: 0.8125rem; line-height: 1.45; color: var(--app-text-muted); }
+.preview-link-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.preview-link-row input { flex: 1; min-width: 14rem; padding: 0.5rem 0.75rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 .actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem; }
 .btn-primary, .btn-secondary, .btn-danger { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; }

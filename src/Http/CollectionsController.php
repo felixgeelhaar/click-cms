@@ -7,8 +7,11 @@ namespace Click\Cms\Http;
 use Click\Cms\Application\Collection\CollectionService;
 use Click\Cms\Application\Collection\ReferenceResolver;
 use Click\Cms\Application\History\HistoryService;
+use Click\Cms\Application\Preview\PreviewLinks;
 use Click\Cms\Domain\Collection\CollectionType;
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Identity\Capability;
+use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\Schema\FieldType;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 
@@ -40,6 +43,9 @@ final class CollectionsController
         // entry's key. Optional so a controller built without it (an older test)
         // still constructs; the history routes then report the feature absent.
         private readonly ?HistoryService $history = null,
+        // Signs preview links for an entry's draft. Optional for the same reason;
+        // without it the preview endpoints report the feature absent.
+        private readonly ?PreviewLinks $previewLinks = null,
     ) {}
 
     /**
@@ -56,6 +62,11 @@ final class CollectionsController
             'GET /api/collections/:type/published' => [$this, 'listPublished'],
             'GET /api/collections/:type/published/:slug' => [$this, 'getPublished'],
 
+            // Preview delivery — the DRAFT entry as delivery JSON, gated by a
+            // signed token (or a session), for a front-end preview environment.
+            // The `preview` segment keeps it distinct from an entry slug.
+            'GET /api/collections/:type/preview/:slug' => [$this, 'previewEntry'],
+
             'GET /api/collections/:type/entries' => [$this, 'listEntries'],
             'POST /api/collections/:type/entries' => [$this, 'createEntry'],
             'GET /api/collections/:type/entries/:slug' => [$this, 'getEntry'],
@@ -70,6 +81,11 @@ final class CollectionsController
             'GET /api/collections/:type/entries/:slug/versions' => [$this, 'listEntryVersions'],
             'GET /api/collections/:type/entries/:slug/versions/:id' => [$this, 'getEntryVersion'],
             'POST /api/collections/:type/entries/:slug/versions/:id/restore' => [$this, 'restoreEntryVersion'],
+
+            // Minting a preview link for an entry's draft. A POST, so it stays
+            // authenticated — handing out a link to unpublished work is a
+            // decision only a permitted account may make.
+            'POST /api/collections/:type/entries/:slug/preview' => [$this, 'createEntryPreviewLink'],
         ];
     }
 
@@ -259,6 +275,107 @@ final class CollectionsController
             'data' => [
                 'restoredFrom' => $result['version']->summary(),
                 'entry' => $entry !== null ? $this->entryView($collectionType, $entry, true) : null,
+            ],
+        ];
+    }
+
+    /* ------------------------------------------------------------- preview -- */
+
+    /**
+     * Mint a signed link that returns this entry's draft through the preview
+     * delivery endpoint. A collection entry has no server-rendered page, so a
+     * preview is the draft itself as delivery JSON — a front-end preview
+     * environment points at the link and renders it as it would the published
+     * entry. Authenticated and permission-gated, because a link to unpublished
+     * work lets it out of the building.
+     */
+    public function createEntryPreviewLink(string $type, string $slug): array
+    {
+        if ($this->collections->collectionType($type) === null) {
+            return ['status' => 404, 'error' => 'Unknown collection.'];
+        }
+        if ($this->previewLinks === null) {
+            return ['status' => 501, 'error' => 'Preview links are not available.'];
+        }
+
+        $user = $this->user();
+        if ($user === []) {
+            return ['status' => 401, 'error' => 'Not authenticated'];
+        }
+        if (!Role::fromName($user['role'] ?? null)->can(Capability::PreviewContent)) {
+            return ['status' => 403, 'error' => 'You do not have permission to share a preview of this entry.'];
+        }
+
+        $locale = $this->localeParam();
+        $key = ContentKey::for($type, $slug, $locale);
+
+        // The working copy — the thing preview exists to show. Exactly this
+        // language, no fallback: a link minted for a German draft that does not
+        // exist must not verify and then show the English one.
+        if ($this->collections->find($type, $slug, $locale) === null) {
+            return ['status' => 404, 'error' => 'Entry not found.'];
+        }
+
+        $link = $this->previewLinks->issue($key);
+        if ($link === null) {
+            return ['status' => 500, 'error' => 'A preview link could not be signed. Check that data/ is writable.'];
+        }
+
+        // The link points at the entry's own preview delivery endpoint. The
+        // language rides along only when it is not the default, mirroring the key
+        // the token signed — the handler rebuilds the same key to verify.
+        $url = '/api/collections/' . rawurlencode($type) . '/preview/' . rawurlencode($slug)
+            . '?token=' . rawurlencode($link['token'])
+            . ($locale !== null ? '&locale=' . rawurlencode($locale) : '');
+
+        return ['data' => [
+            'url' => $url,
+            'expiresAt' => $link['expiresAt'],
+            'expiresInSeconds' => max(0, $link['expiresAt'] - time()),
+        ]];
+    }
+
+    /**
+     * The draft entry as delivery JSON, for a preview environment. Reachable
+     * anonymously, but only ever answers when a valid signed token is presented
+     * — or the caller is signed in, so an editor clicking through need not mint a
+     * link to look at their own work. A visitor with neither gets the same 404
+     * the public delivery gives, so an unpublished entry's existence is not
+     * disclosed either.
+     */
+    public function previewEntry(string $type, string $slug): array
+    {
+        $collectionType = $this->collections->collectionType($type);
+        if ($collectionType === null) {
+            return ['status' => 404, 'error' => 'Unknown collection.'];
+        }
+
+        $locale = $this->localeParam();
+        $key = ContentKey::for($type, $slug, $locale);
+
+        $token = $_GET['token'] ?? null;
+        $bySignature = $this->previewLinks?->accepts($key, is_string($token) ? $token : null) ?? false;
+
+        if (!$bySignature && $this->user() === []) {
+            return ['status' => 404, 'error' => 'Entry not found.'];
+        }
+
+        // The working copy, in exactly this language with no fallback — the draft
+        // is the thing a preview shows, and a preview of a missing translation
+        // must be absent rather than quietly show another language.
+        $entry = $this->collections->find($type, $slug, $locale);
+        if ($entry === null) {
+            return ['status' => 404, 'error' => 'Entry not found.'];
+        }
+
+        // The public delivery shape, with a marker that this is a draft preview
+        // and must not be cached or treated as live.
+        return [
+            'data' => $this->entryView($collectionType, $entry, false),
+            'preview' => true,
+            'headers' => [
+                'Cache-Control' => 'no-store, private',
+                'X-Robots-Tag' => 'noindex, nofollow, noarchive',
             ],
         ];
     }

@@ -191,7 +191,11 @@ describe('entry editor depth — languages and history', () => {
     const query = String(url).split('?')[1] || '';
 
     if (path === '/api/auth/check') {
-      return jsonRes(200, { data: { user: { username: 'ed', capabilities: ['content.restore'] } } });
+      return jsonRes(200, { data: { user: { username: 'ed', capabilities: ['content.restore', 'content.preview'] } } });
+    }
+    const previewMint = path.match(/^\/api\/collections\/blog\/entries\/([^/]+)\/preview$/);
+    if (method === 'POST' && previewMint) {
+      return jsonRes(200, { data: { url: `/api/collections/blog/preview/${previewMint[1]}?token=tok`, expiresAt: 4102444800 } });
     }
     if (method === 'GET' && path === '/api/pages') {
       return jsonRes(200, { data: [], locale: 'en', locales: ['en', 'de'] });
@@ -256,6 +260,27 @@ describe('entry editor depth — languages and history', () => {
     expect(askedGerman).toBe(true);
     // And says the translation does not exist yet.
     expect(wrapper.text()).toContain('not translated');
+  });
+
+  it('mints a preview link and shows it', async () => {
+    global.fetch = deepFetch();
+    const wrapper = await openDraftEditor();
+
+    const previewButton = wrapper.findAll('.actions button').find((b) => b.text().includes('Preview'));
+    expect(previewButton).toBeTruthy();
+
+    await previewButton.trigger('click');
+    await flushPromises();
+
+    // It minted a link for this entry...
+    const minted = global.fetch.mock.calls.some(
+      ([u, i]) => (i?.method || 'GET') === 'POST'
+        && /\/api\/collections\/blog\/entries\/draft-post\/preview/.test(String(u))
+    );
+    expect(minted).toBe(true);
+    // ...and surfaced it for copying.
+    expect(wrapper.find('.preview-link').exists()).toBe(true);
+    expect(wrapper.find('#entry-preview-url').element.value).toContain('/api/collections/blog/preview/draft-post');
   });
 
   it('lists version history and restores an earlier version', async () => {

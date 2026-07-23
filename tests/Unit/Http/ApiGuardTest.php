@@ -71,6 +71,11 @@ final class ApiGuardTest extends TestCase
         $this->assertTrue($this->guard->isPublic('search', 'GET'));
         $this->assertTrue($this->guard->isPublic('forms/submit', 'POST'));
         $this->assertTrue($this->guard->isPublic('auth/login', 'POST'));
+        $this->assertTrue($this->guard->isPublic('collections/blog/published', 'GET'));
+        $this->assertTrue($this->guard->isPublic('collections/blog/published/hello', 'GET'));
+        // The entry preview delivery is reachable anonymously; the handler gates
+        // it on a signed token, exactly as the page /preview route does.
+        $this->assertTrue($this->guard->isPublic('collections/blog/preview/hello', 'GET'));
     }
 
     public function testManagementAndWritesAreNotPublic(): void
@@ -82,6 +87,12 @@ final class ApiGuardTest extends TestCase
         // prefix but must never be anonymously readable.
         $this->assertFalse($this->guard->isPublic('pages/home/versions', 'GET'));
         $this->assertFalse($this->guard->isPublic('pages/home/versions/abc', 'GET'));
+        // Entry management and draft reads stay private; only /published and the
+        // signature-gated /preview are open.
+        $this->assertFalse($this->guard->isPublic('collections/blog/entries', 'GET'));
+        $this->assertFalse($this->guard->isPublic('collections/blog/entries/hello', 'GET'));
+        // Minting a preview link is a POST and must stay authenticated.
+        $this->assertFalse($this->guard->isPublic('collections/blog/entries/hello/preview', 'POST'));
     }
 
     /* --------------------------------------------- authentication -- */
