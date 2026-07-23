@@ -7,6 +7,7 @@ namespace Click\Cms\Tests\Unit\Infrastructure;
 use Click\Cms\Application\Config\ConfigurationException;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
+use Click\Cms\Infrastructure\Storage\MysqlStorage;
 use Click\Cms\Infrastructure\Storage\SqliteStorage;
 use Click\Cms\Infrastructure\Storage\StorageFactory;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
@@ -44,6 +45,18 @@ final class StorageFactoryTest extends TestCase
     public function testBackendNameIsMatchedRegardlessOfCaseOrSurroundingSpace(): void
     {
         $this->assertInstanceOf(SqliteStorage::class, $this->build('  SQLite '));
+    }
+
+    /**
+     * MySQL is built lazily — it connects on first query, not at construction —
+     * so the factory returns a MysqlStorage without needing a reachable server.
+     * `mariadb` is accepted as an alias for the same wire protocol.
+     */
+    #[RequiresPhpExtension('pdo_mysql')]
+    public function testMysqlIsBuiltWhenConfigured(): void
+    {
+        $this->assertInstanceOf(MysqlStorage::class, $this->build('mysql'));
+        $this->assertInstanceOf(MysqlStorage::class, $this->build('  MariaDB '));
     }
 
     /**
