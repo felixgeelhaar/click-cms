@@ -1,0 +1,30 @@
+# Warden — the commit/push gate for click-cms.
+#
+# Pre-commit stays fast (a PHP syntax lint). Pre-push runs the full gate the CI
+# workflow runs: both test suites, in a disposable worktree seeded from the
+# commit — so "passes in warden" means "passes in CI".
+agent: auto
+hooks:
+  pre_commit: true
+  pre_push: true
+commands:
+  # A quick syntax check over the source and plugins — catches a broken file
+  # before it is ever committed, in well under a second.
+  lint: "find src plugins bin -name '*.php' -print0 | xargs -0 -n1 php -l >/dev/null"
+  # The 878-test PHP suite. The disposable worktree has composer.json/lock but no
+  # vendor/ (gitignored, and warden auto-exposes only node_modules), so install
+  # first — composer's global cache makes the repeat install fast, and phpunit is
+  # the only dependency.
+  test-php: "composer install --no-interaction --no-progress --quiet && php vendor/bin/phpunit --no-progress"
+  # The 158-test admin suite. Warden hardlinks node_modules into the worktree, so
+  # this needs no install.
+  test-admin: "cd admin-ui && npm test"
+steps:
+  # Fast enough to run on every commit.
+  pre_commit: [lint]
+  # The thorough gate before code leaves the machine: rebase clean, then lint and
+  # both suites, mirroring .github/workflows/ci.yml.
+  pre_push: [rebase, lint, test-php, test-admin]
+risk:
+  diff_lines_high: 400
+  files_touched_high: 15
