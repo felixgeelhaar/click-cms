@@ -194,6 +194,59 @@ final class MediaServiceTest extends TestCase
         $this->assertFileDoesNotExist($this->mediaDir . '/' . $stored->id . '-square.jpg');
     }
 
+    /* ------------------------------------------------------------- video -- */
+
+    /** @return array{name: string, type: string, tmp_name: string, error: int, size: int} */
+    private function uploadVideo(string $name): array
+    {
+        // A minimal but valid MP4 header (an `ftyp` box), enough for content
+        // detection to see it as video/mp4 without shipping a real clip.
+        $bytes = "\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom";
+        $tmp = $this->root . '/upload-' . bin2hex(random_bytes(4)) . '.mp4';
+        file_put_contents($tmp, $bytes);
+
+        return ['name' => $name, 'type' => 'video/mp4', 'tmp_name' => $tmp, 'error' => UPLOAD_ERR_OK, 'size' => filesize($tmp)];
+    }
+
+    public function testStoresAVideoWithoutVariantsOrCrops(): void
+    {
+        $item = $this->service->store($this->uploadVideo('header-clip.mp4'))['item'];
+
+        $this->assertNotNull($item);
+        $this->assertSame('mp4', $item->extension);
+        $this->assertSame('video/mp4', $item->mimeType);
+        $this->assertFalse($item->isImage());
+        // No transcoding: no ladder, no crop, no raster dimensions.
+        $this->assertSame([], $item->variants);
+        $this->assertNull($item->width);
+        $this->assertNull($item->squareCrop);
+        $this->assertSame([], $item->crops);
+        $this->assertFileExists($this->mediaDir . '/' . $item->id . '.mp4');
+    }
+
+    public function testAStoredVideoResolvesThroughTheServingPath(): void
+    {
+        $item = $this->service->store($this->uploadVideo('clip.mp4'))['item'];
+        $this->assertNotNull($item);
+
+        // The serving path validates the name and finds the file on disk.
+        $this->assertNotNull($this->service->pathForFile($item->id . '.mp4'));
+        // Its delivery URL points at the original, with no variants offered.
+        $urls = $item->urls();
+        $this->assertStringEndsWith($item->id . '.mp4', $urls['original']);
+        $this->assertSame([], $urls['variants']);
+    }
+
+    public function testAVideoOverTheVideoLimitIsRefused(): void
+    {
+        $upload = $this->uploadVideo('huge.mp4');
+        $upload['size'] = \Click\Cms\Domain\Media\UploadPolicy::MAX_VIDEO_BYTES + 1;
+
+        $result = $this->service->store($upload);
+        $this->assertNull($result['item']);
+        $this->assertStringContainsString('smaller than', (string) $result['error']);
+    }
+
     /* ------------------------------------------------ art-directed crops -- */
 
     private function serviceWithCrops(): MediaService

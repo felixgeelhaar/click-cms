@@ -87,8 +87,10 @@ final class MediaService
         if ($bytes <= 0) {
             return ['item' => null, 'error' => 'The file is empty.'];
         }
-        if ($bytes > UploadPolicy::MAX_BYTES) {
-            $limit = (int) (UploadPolicy::MAX_BYTES / 1024 / 1024);
+        // The absolute ceiling (video's), so a huge file is rejected early; the
+        // precise per-type limit is applied once the content type is known.
+        if ($bytes > UploadPolicy::MAX_VIDEO_BYTES) {
+            $limit = (int) (UploadPolicy::MAX_VIDEO_BYTES / 1024 / 1024);
             return ['item' => null, 'error' => "Files must be smaller than {$limit} MB."];
         }
 
@@ -98,7 +100,20 @@ final class MediaService
         // is the sanitiser's output, never the raw upload.
         $raw = @file_get_contents($tmp);
         if ($raw !== false && SvgSanitizer::looksLikeSvg($raw)) {
+            if ($bytes > UploadPolicy::MAX_BYTES) {
+                return ['item' => null, 'error' => $this->sizeError('image/svg+xml')];
+            }
             return $this->storeSvg($raw, (string) ($file['name'] ?? ''));
+        }
+
+        // Video is content-detected and stored as-is — no getimagesize, no
+        // variant ladder, no crop. It gets its own (larger) size ceiling.
+        $detected = $this->detectMime($tmp);
+        if (UploadPolicy::isVideo($detected)) {
+            if ($bytes > UploadPolicy::maxBytesFor($detected)) {
+                return ['item' => null, 'error' => $this->sizeError($detected)];
+            }
+            return $this->storeVideo($tmp, $detected, (string) ($file['name'] ?? ''), $bytes);
         }
 
         // Type comes from the file's content. The browser-supplied type and the
@@ -111,6 +126,9 @@ final class MediaService
         $mimeType = $info['mimeType'];
         if (!UploadPolicy::isAccepted($mimeType)) {
             return ['item' => null, 'error' => UploadPolicy::refusalReason($mimeType)];
+        }
+        if ($bytes > UploadPolicy::maxBytesFor($mimeType)) {
+            return ['item' => null, 'error' => $this->sizeError($mimeType)];
         }
 
         $extension = UploadPolicy::extensionFor($mimeType);
@@ -211,6 +229,70 @@ final class MediaService
         $this->writeMetadata($item);
 
         return ['item' => $item, 'error' => null];
+    }
+
+    /**
+     * Store a video: moved to disk verbatim, with no variant ladder, crop or
+     * raster dimensions, because the CMS does not transcode. It is served back
+     * as-is under its declared type. The name is generated like every other
+     * upload, so nothing the uploader chose reaches the path.
+     *
+     * @return array{item: ?MediaItem, error: ?string}
+     */
+    private function storeVideo(string $tmp, string $mimeType, string $originalName, int $bytes): array
+    {
+        $extension = UploadPolicy::extensionFor($mimeType);
+        if ($extension === null) {
+            return ['item' => null, 'error' => UploadPolicy::refusalReason($mimeType)];
+        }
+
+        $id = UploadPolicy::slugFor($originalName) . '-' . bin2hex(random_bytes(4));
+
+        $this->ensureDir();
+        $target = $this->mediaDir . '/' . $id . '.' . $extension;
+
+        if (!$this->moveUpload($tmp, $target)) {
+            return ['item' => null, 'error' => 'The file could not be saved.'];
+        }
+        @chmod($target, 0o644);
+
+        $item = MediaItem::create(
+            id: $id,
+            extension: $extension,
+            mimeType: $mimeType,
+            originalName: $originalName,
+            bytes: filesize($target) ?: $bytes,
+            // A video has no raster dimensions to read here and no variant ladder,
+            // so these stay null/empty, exactly as an SVG's do.
+            width: null,
+            height: null,
+            variants: [],
+        );
+
+        $this->writeMetadata($item);
+
+        return ['item' => $item, 'error' => null];
+    }
+
+    /** Content-based MIME detection, used to spot video before the raster path. */
+    private function detectMime(string $path): string
+    {
+        if (!class_exists(\finfo::class)) {
+            return '';
+        }
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($path);
+
+        return is_string($mime) ? $mime : '';
+    }
+
+    /** The size-limit message for a type, in whole megabytes. */
+    private function sizeError(string $mimeType): string
+    {
+        $limit = (int) (UploadPolicy::maxBytesFor($mimeType) / 1024 / 1024);
+        $noun = UploadPolicy::isVideo($mimeType) ? 'Videos' : 'Files';
+
+        return "{$noun} must be smaller than {$limit} MB.";
     }
 
     /**

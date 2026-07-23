@@ -29,6 +29,11 @@ final class UploadPolicy
 {
     public const MAX_BYTES = 10 * 1024 * 1024;
 
+    // Video is legitimately larger than a raster, so it gets its own ceiling
+    // rather than being forced under the image limit. Still bounded, because an
+    // unbounded upload is a denial-of-service vector regardless of type.
+    public const MAX_VIDEO_BYTES = 64 * 1024 * 1024;
+
     /**
      * MIME type => canonical extension. Anything absent is refused.
      *
@@ -45,7 +50,22 @@ final class UploadPolicy
         'image/gif' => 'gif',
         'image/webp' => 'webp',
         'image/svg+xml' => 'svg',
+        // Video is stored and served as-is: there is no variant ladder, no crop
+        // and no dimension to read, because the CMS does not transcode. It is
+        // accepted so a site can host its own hero/background clips headlessly
+        // rather than depending on a front end's bundled assets.
+        //
+        // video/quicktime is included because an MP4 (ISO base-media format) is
+        // frequently reported as quicktime by libmagic — the two share a
+        // container — so it is stored and served as MP4, which every browser
+        // plays.
+        'video/mp4' => 'mp4',
+        'video/quicktime' => 'mp4',
+        'video/webm' => 'webm',
     ];
+
+    /** The accepted video MIME types, which take a different storage path. */
+    private const VIDEO = ['video/mp4', 'video/quicktime', 'video/webm'];
 
     /**
      * Types that are refused with a specific explanation rather than a generic
@@ -59,6 +79,24 @@ final class UploadPolicy
     public static function isAccepted(string $mimeType): bool
     {
         return isset(self::ACCEPTED[$mimeType]);
+    }
+
+    /** Whether a type is video, which is stored without variants or crops. */
+    public static function isVideo(string $mimeType): bool
+    {
+        return in_array($mimeType, self::VIDEO, true);
+    }
+
+    /** Whether a stored extension names a video file. */
+    public static function isVideoExtension(string $extension): bool
+    {
+        return in_array($extension, ['mp4', 'webm'], true);
+    }
+
+    /** The size ceiling for a given type — larger for video than for images. */
+    public static function maxBytesFor(string $mimeType): int
+    {
+        return self::isVideo($mimeType) ? self::MAX_VIDEO_BYTES : self::MAX_BYTES;
     }
 
     public static function extensionFor(string $mimeType): ?string
@@ -88,7 +126,7 @@ final class UploadPolicy
     public static function refusalReason(string $mimeType): string
     {
         return self::EXPLAINED_REFUSALS[$mimeType]
-            ?? 'Only JPEG, PNG, GIF, WebP and SVG images can be uploaded.';
+            ?? 'Only JPEG, PNG, GIF, WebP and SVG images, and MP4 or WebM video, can be uploaded.';
     }
 
     /**
