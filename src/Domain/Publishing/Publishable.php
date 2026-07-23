@@ -24,18 +24,46 @@ namespace Click\Cms\Domain\Publishing;
 final class Publishable
 {
     /**
-     * Pages, and for now only pages.
-     *
-     * Adding a type here is a deliberate act: it changes what saving that type
-     * means everywhere at once.
+     * Pages are publishable in the code itself. Collections are publishable too,
+     * but which ones exist is a site's decision expressed in config, not the
+     * codebase's — so their ids are registered at boot rather than named here.
+     * The rule is still one deliberate act per type: a page by being on this
+     * list, a collection by a site declaring it. What is refused is inferring
+     * publishability from a flag on a document, which would let a crafted payload
+     * make a page unpublishable or an account publishable.
      */
-    private const TYPES = ['page'];
+    private const CORE_TYPES = ['page'];
+
+    /** @var list<string> Collection type ids, registered from config at boot. */
+    private static array $registered = [];
 
     private function __construct() {}
 
+    /**
+     * Declare additional publishable types — the site's collection ids. Additive
+     * and idempotent, so booting twice or registering in two passes is safe.
+     *
+     * @param list<string> $types
+     */
+    public static function register(array $types): void
+    {
+        foreach ($types as $type) {
+            if (is_string($type) && $type !== '' && !in_array($type, self::$registered, true)) {
+                self::$registered[] = $type;
+            }
+        }
+    }
+
+    /** Clear the registered set. For tests that must not leak into one another. */
+    public static function reset(): void
+    {
+        self::$registered = [];
+    }
+
     public static function includes(string $type): bool
     {
-        return in_array($type, self::TYPES, true);
+        return in_array($type, self::CORE_TYPES, true)
+            || in_array($type, self::$registered, true);
     }
 
     /**
@@ -43,6 +71,6 @@ final class Publishable
      */
     public static function types(): array
     {
-        return self::TYPES;
+        return array_values(array_unique([...self::CORE_TYPES, ...self::$registered]));
     }
 }

@@ -75,6 +75,25 @@ class ContentKey
         return new self('media', $slug, self::locale($locale));
     }
 
+    /**
+     * A key for an entry of an arbitrary content type — a collection entry, whose
+     * type is the collection's id rather than one of the fixed kinds above. The
+     * type is validated the same way the string parser validates it, so a
+     * collection id can never be empty or carry the `:` that separates key parts.
+     */
+    public static function for(string $type, string $slug, string|Locale|null $locale = null): self
+    {
+        $type = trim($type);
+        if ($type === '' || trim($slug) === '') {
+            throw new InvalidArgumentException('ContentKey type and slug cannot be empty');
+        }
+        if (str_contains($type, ':') || str_contains($slug, ':')) {
+            throw new InvalidArgumentException('ContentKey type and slug cannot contain ":"');
+        }
+
+        return new self($type, $slug, self::locale($locale));
+    }
+
     /** The same document in another language. */
     public function withLocale(string|Locale $locale): self
     {

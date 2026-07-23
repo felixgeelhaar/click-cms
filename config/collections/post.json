@@ -1,0 +1,12 @@
+{
+  "label": "Blog posts",
+  "description": "Articles and news, each published on its own.",
+  "titleField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "label": "Title", "required": true },
+    { "name": "date", "type": "date", "label": "Date" },
+    { "name": "excerpt", "type": "textarea", "label": "Excerpt", "help": "A short summary shown in listings." },
+    { "name": "coverImage", "type": "image", "label": "Cover image" },
+    { "name": "body", "type": "richtext", "label": "Body", "required": true }
+  ]
+}

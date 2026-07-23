@@ -166,4 +166,23 @@ final class ApiGuardTest extends TestCase
         $this->signIn('admin');
         $this->assertNull($this->guard->enforceCsrf('forms/submit', 'POST', []));
     }
+
+    /**
+     * Published collection entries are delivery — a public read for a front end
+     * with no account, like /api/pages. Only the /published paths open; the
+     * /entries management paths, which hand back drafts and working copies, stay
+     * behind authentication so a draft cannot be read anonymously.
+     */
+    public function testPublishedCollectionEntriesArePublicButManagementIsNot(): void
+    {
+        $this->assertTrue($this->guard->isPublic('collections/post/published', 'GET'));
+        $this->assertTrue($this->guard->isPublic('collections/post/published/hello-world', 'GET'));
+
+        // The management surface is not public.
+        $this->assertFalse($this->guard->isPublic('collections/post/entries', 'GET'));
+        $this->assertFalse($this->guard->isPublic('collections/post/entries/hello-world', 'GET'));
+        $this->assertFalse($this->guard->isPublic('collections', 'GET'));
+        // A write to a published path is still not a public read.
+        $this->assertFalse($this->guard->isPublic('collections/post/published', 'POST'));
+    }
 }

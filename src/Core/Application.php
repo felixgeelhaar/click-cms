@@ -23,6 +23,11 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Http\MarketplaceController;
+use Click\Cms\Application\Collection\CollectionService;
+use Click\Cms\Domain\Publishing\Publishable;
+use Click\Cms\Domain\Schema\SectionValidator;
+use Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository;
+use Click\Cms\Http\CollectionsController;
 use Click\Cms\Http\MenusController;
 use Click\Cms\Http\NavigationRenderer;
 use Click\Cms\Http\RedirectsController;
@@ -61,6 +66,7 @@ class Application
     private ?MarketplaceController $marketplaceController = null;
     private ?RedirectsController $redirectsController = null;
     private ?MenusController $menusController = null;
+    private ?CollectionsController $collectionsController = null;
     private ?NavigationRenderer $navigationRenderer = null;
     private ?HistoryService $history = null;
     private ?\Click\Cms\Application\Audit\AuditService $auditService = null;
@@ -237,6 +243,22 @@ class Application
         // header, both reading the same stored menu.
         $this->menusController = new MenusController($this->contentService);
         $this->navigationRenderer = new NavigationRenderer();
+
+        // Collections — repeatable content types (posts, team members, …) defined
+        // in config/collections. Their entries are ordinary content documents, so
+        // registering the ids here is what gives each the draft-and-publish
+        // lifecycle a page has; without it saving an entry would put it live at
+        // once. Done before the routes are gathered so the storage stack already
+        // treats these types as publishable on the first write.
+        $collectionTypes = new JsonCollectionTypeRepository($this->basePath . '/config/collections');
+        Publishable::register(array_map(
+            static fn ($type): string => $type->id,
+            $collectionTypes->all()
+        ));
+        $this->collectionsController = new CollectionsController(
+            new CollectionService($this->contentService, $collectionTypes, new SectionValidator()),
+            fn (): array => $this->getSessionUser() ?? [],
+        );
 
         // Sessions and login throttling are collaborators rather than methods on
         // this class, so each can be understood and tested on its own.
@@ -877,6 +899,7 @@ class Application
             $this->pluginsController->routes(),
             $this->redirectsController->routes(),
             $this->menusController->routes(),
+            $this->collectionsController->routes(),
         ];
         foreach ($coreTables as $table) {
             $match = $this->matchRouteTable($table, $path, $method);
