@@ -1,0 +1,86 @@
+/* ---------------------------------------------------------------------------
+   TurboScience brand — "Science, accelerated."
+   Deliberately its own identity: electric-blue on deep navy, bold grotesque
+   headings, generous air. Nothing here is click-cms's default theme — this is a
+   separate front end that only borrows the *content* over the delivery API.
+--------------------------------------------------------------------------- */
+:root {
+  --ink: #0a1024;
+  --body: #3a4460;
+  --muted: #6b7590;
+  --bg: #ffffff;
+  --surface: #f6f8fd;
+  --border: #e5eaf4;
+  --electric: #2563eb;
+  --electric-strong: #1d4ed8;
+  --spark: #06b6d4;
+  --navy: #0a1024;
+  --navy-2: #131b3a;
+  --on-navy: #dbe4ff;
+  --on-navy-muted: #8ea0cf;
+  --radius: 16px;
+  --maxw: 1120px;
+  --display: "Söhne", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sans: var(--display);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--body);
+  font-family: var(--sans); font-size: 17px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+a { color: var(--electric); text-decoration: none; }
+a:hover { color: var(--electric-strong); }
+img { max-width: 100%; display: block; }
+h1, h2, h3 { color: var(--ink); letter-spacing: -.02em; line-height: 1.08; margin: 0; text-wrap: balance; font-weight: 800; }
+
+.container { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+.section { padding: 76px 0; }
+.section + .section { border-top: 1px solid var(--border); }
+.eyebrow { display: inline-block; font-size: 12.5px; font-weight: 700; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--electric); margin-bottom: 16px; }
+
+.rich :is(p, ul, ol) { margin: 0 0 1em; max-width: 68ch; }
+.rich a { text-decoration: underline; text-underline-offset: 3px; }
+
+.btn { display: inline-flex; align-items: center; gap: 8px; font-weight: 650; font-size: 16px;
+  padding: 13px 24px; border-radius: 999px; background: var(--electric); color: #fff;
+  border: 1px solid transparent; cursor: pointer; transition: transform .12s ease, background .12s ease; }
+.btn:hover { background: var(--electric-strong); color: #fff; transform: translateY(-1px); }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--border); }
+.btn.ghost:hover { border-color: var(--electric); color: var(--electric); background: transparent; }
+.btn.on-navy { background: #fff; color: var(--navy); }
+.btn.on-navy:hover { background: var(--on-navy); color: var(--navy); }
+
+/* ---- site chrome ---- */
+.site-header { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.86);
+  backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+.site-header .inner { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; color: var(--ink); letter-spacing: -.02em; }
+.brand .mark { width: 30px; height: 30px; border-radius: 9px;
+  background: linear-gradient(135deg, var(--electric), var(--spark)); display: grid; place-items: center;
+  color: #fff; font-size: 16px; font-weight: 900; box-shadow: 0 6px 18px -6px var(--electric); }
+.nav { display: flex; align-items: center; gap: 6px; }
+.nav a { padding: 8px 14px; border-radius: 999px; color: var(--body); font-weight: 600; font-size: 15px; }
+.nav a:hover { color: var(--ink); background: var(--surface); }
+.nav a.router-link-active { color: var(--electric); }
+
+.site-footer { background: var(--navy); color: var(--on-navy-muted); padding: 48px 0; margin-top: 40px; }
+.site-footer .inner { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; }
+.site-footer .brand { color: #fff; }
+.site-footer a { color: var(--on-navy); }
+
+/* ---- states ---- */
+.loading, .error { padding: 120px 24px; text-align: center; color: var(--muted); }
+.error { color: #b42318; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .fade-up { animation: fadeUp .6s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+}
+@media (max-width: 760px) {
+  .section { padding: 52px 0; }
+  .nav a { padding: 6px 10px; }
+}

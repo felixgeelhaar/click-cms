@@ -21,6 +21,11 @@ coverage/
 .github/
 .roady/
 
+# The headless demo (a separate front end + its own compose stack) is not part
+# of the CMS image — it has its own build. Excluding it keeps the CMS image lean
+# and out of the front end's node_modules.
+demo/
+
 # Runtime state. Mounted as volumes at run time, so baking a build machine's
 # content and users into the image would ship one person's data to every deploy.
 content/
