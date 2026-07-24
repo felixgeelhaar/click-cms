@@ -220,6 +220,41 @@ final class CoreConfig
         return is_string($env) && $env !== '' ? $env : $default;
     }
 
+    /*
+     * PostgreSQL connection settings, under core.storage.postgres, with the same
+     * environment-variable fallback the MySQL settings use.
+     */
+
+    public function storagePostgresHost(): string
+    {
+        return $this->mysqlSetting('core.storage.postgres.host', 'CLICK_CMS_POSTGRES_HOST', '127.0.0.1');
+    }
+
+    public function storagePostgresPort(): int
+    {
+        $configured = $this->int('core.storage.postgres.port', 0);
+        if ($configured > 0) {
+            return $configured;
+        }
+        $env = getenv('CLICK_CMS_POSTGRES_PORT');
+        return is_string($env) && is_numeric($env) ? (int) $env : 5432;
+    }
+
+    public function storagePostgresDatabase(): string
+    {
+        return $this->mysqlSetting('core.storage.postgres.database', 'CLICK_CMS_POSTGRES_DATABASE', 'clickcms');
+    }
+
+    public function storagePostgresUser(): string
+    {
+        return $this->mysqlSetting('core.storage.postgres.user', 'CLICK_CMS_POSTGRES_USER', 'clickcms');
+    }
+
+    public function storagePostgresPassword(): string
+    {
+        return $this->mysqlSetting('core.storage.postgres.password', 'CLICK_CMS_POSTGRES_PASSWORD', '');
+    }
+
     /* ------------------------------------------------------------ history -- */
 
     /**

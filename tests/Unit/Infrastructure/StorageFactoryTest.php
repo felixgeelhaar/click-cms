@@ -8,6 +8,7 @@ use Click\Cms\Application\Config\ConfigurationException;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
 use Click\Cms\Infrastructure\Storage\MysqlStorage;
+use Click\Cms\Infrastructure\Storage\PostgresStorage;
 use Click\Cms\Infrastructure\Storage\SqliteStorage;
 use Click\Cms\Infrastructure\Storage\StorageFactory;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
@@ -57,6 +58,19 @@ final class StorageFactoryTest extends TestCase
     {
         $this->assertInstanceOf(MysqlStorage::class, $this->build('mysql'));
         $this->assertInstanceOf(MysqlStorage::class, $this->build('  MariaDB '));
+    }
+
+    /**
+     * PostgreSQL is built lazily too — it connects on first query — so the
+     * factory returns a PostgresStorage without a reachable server. `postgresql`
+     * and `pgsql` are accepted as aliases.
+     */
+    #[RequiresPhpExtension('pdo_pgsql')]
+    public function testPostgresIsBuiltWhenConfigured(): void
+    {
+        $this->assertInstanceOf(PostgresStorage::class, $this->build('postgres'));
+        $this->assertInstanceOf(PostgresStorage::class, $this->build('  PostgreSQL '));
+        $this->assertInstanceOf(PostgresStorage::class, $this->build('pgsql'));
     }
 
     /**
