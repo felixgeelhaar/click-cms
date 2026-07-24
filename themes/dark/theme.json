@@ -1,0 +1,7 @@
+{
+  "name": "Dark",
+  "version": "1.0.0",
+  "description": "A dark ground with high-contrast text. Styles exactly the same class names as the default theme, and nothing else — proof that switching themes changes only the design.",
+  "author": "Click CMS",
+  "stylesheet": "theme.css"
+}
