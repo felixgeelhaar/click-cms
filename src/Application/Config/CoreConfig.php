@@ -7,6 +7,7 @@ namespace Click\Cms\Application\Config;
 use Click\Cms\Domain\ValueObjects\Locale;
 
 use Click\Cms\Domain\History\RetentionPolicy;
+use Click\Cms\Domain\Update\UpdatePolicy;
 
 /**
  * Typed access to `config/core.json`.
@@ -358,6 +359,48 @@ final class CoreConfig
     public function marketplacePublicKey(): string
     {
         return $this->string('core.marketplace.publicKey', '');
+    }
+
+    /* ------------------------------------------------------------ updates -- */
+
+    /**
+     * What the site may install without asking a human.
+     *
+     * {@see UpdatePolicy::Security} when unset, which is the setting's whole
+     * point: a site nobody is watching still repairs itself against known
+     * vulnerabilities, and anything that could change behaviour waits.
+     */
+    public function updatePolicy(): UpdatePolicy
+    {
+        return UpdatePolicy::fromString($this->string('core.updates.policy', ''));
+    }
+
+    /*
+     * Where releases are published and which key signs them. Both fall back to
+     * an environment variable, like the database credentials do, so a fleet can
+     * be pointed at its own release channel by the runtime rather than by
+     * editing a committed file on every instance. Empty by default: an update
+     * feed is a decision to let a third party choose what code this site runs,
+     * so it is named on purpose or not at all.
+     */
+
+    public function updateFeedUrl(): string
+    {
+        return $this->mysqlSetting('core.updates.feedUrl', 'CLICK_CMS_UPDATE_FEED_URL', '');
+    }
+
+    public function updatePublicKey(): string
+    {
+        return $this->mysqlSetting('core.updates.publicKey', 'CLICK_CMS_UPDATE_PUBLIC_KEY', '');
+    }
+
+    /**
+     * Whether pre-releases are offered at all. False by default, and never
+     * installed unattended even when true — see {@see UpdatePolicy}.
+     */
+    public function updateAllowPreRelease(): bool
+    {
+        return $this->bool('core.updates.allowPreRelease', false);
     }
 
     /* ------------------------------------------------------------ plugins -- */

@@ -23,7 +23,13 @@ use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Application\Theme\ThemeRepository;
+use Click\Cms\Application\Update\ReleaseFeed;
+use Click\Cms\Application\Update\UpdateInstaller;
+use Click\Cms\Application\Update\UpdateService;
 use Click\Cms\Http\MarketplaceController;
+use Click\Cms\Http\ThemesController;
+use Click\Cms\Http\UpdatesController;
 use Click\Cms\Application\Collection\BackReferenceService;
 use Click\Cms\Application\Collection\CollectionService;
 use Click\Cms\Application\Collection\ReferenceResolver;
@@ -52,6 +58,13 @@ use Click\Cms\Infrastructure\Storage\VersioningStorage;
 class Application
 {
     /**
+     * The release this code is. The updater compares it against the versions a
+     * signed feed offers, so it is the single answer to "what is running here?"
+     * — bumping it is part of cutting a release, not an afterthought.
+     */
+    public const VERSION = '1.0.0';
+
+    /**
      * The password the installer seeds. Published in the documentation and
      * therefore not a secret — the account is unusable until it is changed.
      */
@@ -69,6 +82,9 @@ class Application
     private ?MarketplaceController $marketplaceController = null;
     private ?RedirectsController $redirectsController = null;
     private ?MenusController $menusController = null;
+    private ?ThemesController $themesController = null;
+    private ?UpdatesController $updatesController = null;
+    private ?ThemeRepository $themes = null;
     private ?CollectionsController $collectionsController = null;
     private ?NavigationRenderer $navigationRenderer = null;
     private ?HistoryService $history = null;
@@ -283,6 +299,27 @@ class Application
             // "What links here" scans reference fields on demand rather than
             // keeping a stored index a flat-file write would have to maintain.
             new BackReferenceService($collectionTypes, $this->contentService),
+        );
+
+        // Themes live outside the application so a site's design survives a
+        // deploy; the repository discovers them and remembers which is active.
+        $this->themes = ThemeRepository::forInstallation($this->basePath);
+        $this->themesController = new ThemesController(
+            $this->themes,
+            fn (): array => $this->getSessionUser() ?? [],
+        );
+
+        // Self-update. The installer replaces the application's own code, so the
+        // service is handed the running version to compare a signed feed against.
+        $this->updatesController = new UpdatesController(
+            new UpdateService(
+                $this->basePath,
+                new ReleaseFeed(),
+                new UpdateInstaller($this->basePath),
+                self::VERSION,
+            ),
+            $this->config,
+            fn (): array => $this->getSessionUser() ?? [],
         );
 
         // Sessions and login throttling are collaborators rather than methods on
@@ -712,7 +749,15 @@ class Application
         // gets regardless of how its body is produced. Handed to the render hook
         // so a plugin (the visual builder) can wrap its own body in the same
         // navigable, indexable shell instead of emitting a bare document.
-        $shell = new \Click\Cms\Http\PageShell($lang, $head, $nav);
+        // The active theme's stylesheet, cache-busted. Falls back to the historic
+        // /theme.css when a site has no themes directory at all, so an install
+        // that predates theming renders unchanged.
+        $theme = $this->themes?->active();
+        $stylesheet = $theme !== null && $this->themes !== null
+            ? $this->themes->stylesheetUrl($theme)
+            : '/theme.css';
+
+        $shell = new \Click\Cms\Http\PageShell($lang, $head, $nav, $stylesheet);
 
         // A plugin may take over rendering. The builder wraps its node tree in the
         // shell above, so the page keeps nav, SEO and theme; a full theme is free
@@ -933,6 +978,8 @@ class Application
             $this->redirectsController->routes(),
             $this->menusController->routes(),
             $this->collectionsController->routes(),
+            $this->themesController->routes(),
+            $this->updatesController->routes(),
         ];
         foreach ($coreTables as $table) {
             $match = $this->matchRouteTable($table, $path, $method);

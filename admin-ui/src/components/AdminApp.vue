@@ -63,6 +63,8 @@ import FormSubmissions from './FormSubmissions.vue';
 import Plugins from './Plugins.vue';
 import PluginDetail from './PluginDetail.vue';
 import Marketplace from './Marketplace.vue';
+import Themes from './Themes.vue';
+import Updates from './Updates.vue';
 import Builder from './Builder.vue';
 import ChangePassword from './ChangePassword.vue';
 import { installCsrfFetch, setCsrfToken } from '../lib/api.js';
@@ -141,6 +143,8 @@ const getRouteComponent = () => {
   if (path === '/admin/plugins') return Plugins;
   if (path === '/admin/marketplace') return can('plugins.install') ? Marketplace : Dashboard;
   if (path === '/admin/settings') return can('settings.manage') ? Settings : Dashboard;
+  if (path === '/admin/themes') return can('settings.manage') ? Themes : Dashboard;
+  if (path === '/admin/updates') return can('plugins.install') ? Updates : Dashboard;
   if (path === '/admin/redirects') return Redirects;
   if (path === '/admin/menus') return Menus;
   if (path === '/admin/submissions') return FormSubmissions;
