@@ -1,0 +1,7 @@
+{
+  "name": "Default",
+  "version": "1.0.0",
+  "description": "The light, quiet default. Enough that a fresh install renders something presentable, styled entirely through the class names the renderer emits.",
+  "author": "Click CMS",
+  "stylesheet": "theme.css"
+}

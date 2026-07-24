@@ -29,11 +29,17 @@ final class PageShell
      *                        page, or the title-plus-noindex for a preview.
      * @param string $header The site header markup (brand and main navigation),
      *                        or empty when the site has built neither.
+     * @param string $stylesheetUrl The active theme's stylesheet, already
+     *        cache-busted by the theme repository. It defaults to the historic
+     *        `/theme.css` so an installation with no themes directory — and
+     *        every existing caller, including the builder's shell — renders
+     *        exactly as before.
      */
     public function __construct(
         private string $lang,
         private string $head,
         private string $header,
+        private string $stylesheetUrl = '/theme.css',
     ) {
     }
 
@@ -54,7 +60,7 @@ final class PageShell
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     ' . $head . '
-    <link rel="stylesheet" href="/theme.css">
+    <link rel="stylesheet" href="' . htmlspecialchars($this->stylesheetUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">
 </head>
 <body>
     ' . $this->header . '<main>' . $body . '</main>
