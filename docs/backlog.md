@@ -71,15 +71,61 @@ That is a configuration gap, not a reason to drop either mode.
 
 ## Storage
 
-Backends sit behind `Domain\Storage\StorageInterface`. JSON files are the
-default because they need no database and therefore run on shared hosting;
-SQLite is available for sites that outgrow flat files. Both are core, since the
-application cannot boot without a storage backend.
+Backends sit behind `Domain\Storage\StorageInterface` — five methods: `find`,
+`findByType`, `save`, `delete`, `exists`. Four backends now implement it, all
+core, all passing one shared contract test (`StorageContractTestCase`), so a
+site switches between them by changing `core.storage.backend` and nothing in the
+application changes:
 
-MySQL and PostgreSQL backends are wanted but not written. They belong as
-plugins: an alternative implementation of an existing port is exactly what the
-plugin system is for. The previous directories of those names were removed
-because they had no manifest and had never loaded.
+- **`json`** (default) — flat files, no database, runs on shared hosting. The
+  property that defines the product; never regress it.
+- **`sqlite`** — one file, needs only `pdo_sqlite`, for a site that outgrows
+  flat files but still has no database server.
+- **`mysql`** (alias **`mariadb`**) — needs `pdo_mysql`, for a shared database
+  behind several app servers.
+- **`postgres`** (aliases `postgresql`, `pgsql`) — needs `pdo_pgsql`.
+
+All three SQL backends keep the payload as JSON in a single column, with
+`type`/`locale`/`slug` as the only real columns, and enforce the same
+`ContentKeyRules` as the flat-file backend — so the legal key space is identical
+and content is portable between any backend. They differ only in dialect (the
+upsert, and how a database is auto-created). Each is opt-in: `StorageFactory`
+checks the PDO driver up front and fails loudly rather than falling back, since
+a site silently running on a different store than it asked for looks exactly
+like every document having vanished.
+
+The earlier plan was for these to be plugins. In practice a SQL backend is a
+~150-line PDO adapter that must satisfy the *same* contract as the others, so it
+belongs beside them in core, exercised by the same test — not behind a plugin
+boundary that would only make the shared contract harder to guarantee.
+
+### NoSQL / document stores — a later idea, not a commitment
+
+Worth recording because it comes up and the trade-off is not obvious. The port
+is already document-shaped — a JSON payload addressed by `(type, locale, slug)`
+— so a document store, **MongoDB** especially, is the most *natural* technical
+fit of any backend; `MongoStorage` would be short and direct.
+
+The reasons it is parked, not built:
+
+- **It breaks the dependency posture.** JSON needs nothing; SQLite/MySQL/Postgres
+  need a PDO driver that *ships with PHP*. MongoDB needs the `ext-mongodb` PECL
+  extension (not bundled), and its ergonomic API needs the `mongodb/mongodb`
+  Composer library — a **runtime dependency**, which cuts against the
+  zero-runtime-dependency line the whole product is built on. The extension
+  requirement alone is a step past "runs anywhere."
+- **It serves a segment that isn't the audience.** A document store earns its
+  keep at sharding / horizontal scale / very large document volumes. This CMS's
+  range — shared hosting → SQLite → one MySQL/Postgres — already spans its niche;
+  someone who needs Mongo's scale is choosing a different class of CMS.
+
+If it is ever pursued, the shape is decided: implement it against the **raw
+`MongoDB\Driver\*` API** (Manager/Query/BulkWrite/Command) to avoid the Composer
+runtime dependency, make it **opt-in** and **fail loudly** when `ext-mongodb` is
+absent — exactly the shape SQLite and the SQL backends already have — and run it
+against the same `StorageContractTestCase` before claiming it works. A
+key-value store (Redis, DynamoDB) would fit the port just as cleanly and carries
+the same "not the audience" caveat.
 
 ---
 
