@@ -63,6 +63,7 @@ RUN set -eux; \
     # auto-removal when the build-time headers go.
     apt-get install -y --no-install-recommends \
         libpng16-16 \
+        libpq5 \
         libjpeg62-turbo \
         libwebp7 \
         libfreetype6 \
@@ -70,21 +71,22 @@ RUN set -eux; \
     # Build-time headers only.
     apt-get install -y --no-install-recommends \
         libsqlite3-dev \
+        libpq-dev \
         libzip-dev \
         libpng-dev \
         libjpeg62-turbo-dev \
         libfreetype6-dev \
         libwebp-dev; \
     docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \
-    docker-php-ext-install -j"$(nproc)" pdo pdo_sqlite pdo_mysql zip gd; \
+    docker-php-ext-install -j"$(nproc)" pdo pdo_sqlite pdo_mysql pdo_pgsql zip gd; \
     # Purge the headers by name. Nothing is auto-removed, so the runtime
     # libraries above survive.
     apt-get purge -y \
-        libsqlite3-dev libzip-dev libpng-dev libjpeg62-turbo-dev \
+        libsqlite3-dev libpq-dev libzip-dev libpng-dev libjpeg62-turbo-dev \
         libfreetype6-dev libwebp-dev; \
     rm -rf /var/lib/apt/lists/*; \
     # Fail the build rather than ship an image whose extensions cannot load.
-    php -r 'foreach (["gd","zip","pdo_sqlite","pdo_mysql"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR, "missing extension: $e\n"); exit(1); } }'
+    php -r 'foreach (["gd","zip","pdo_sqlite","pdo_mysql","pdo_pgsql"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR, "missing extension: $e\n"); exit(1); } }'
 
 # Uploads are limited here as well as in application code: a request larger than
 # this is rejected before PHP ever buffers it.

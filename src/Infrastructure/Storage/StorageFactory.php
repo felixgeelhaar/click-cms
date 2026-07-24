@@ -24,7 +24,7 @@ use Click\Cms\Domain\Storage\StorageInterface;
 final class StorageFactory
 {
     /** Every backend core itself provides. Others are what plugins are for. */
-    private const BACKENDS = ['json', 'sqlite', 'mysql'];
+    private const BACKENDS = ['json', 'sqlite', 'mysql', 'postgres'];
 
     public static function create(CoreConfig $config, string $basePath): StorageInterface
     {
@@ -38,8 +38,32 @@ final class StorageFactory
             'json' => new JsonStorage($basePath . '/content', $config->defaultLocale()),
             'sqlite' => self::sqlite($config, $basePath),
             'mysql', 'mariadb' => self::mysql($config),
+            'postgres', 'postgresql', 'pgsql' => self::postgres($config),
             default => throw new ConfigurationException(self::unknownBackendMessage($requested)),
         };
+    }
+
+    private static function postgres(CoreConfig $config): PostgresStorage
+    {
+        if (!extension_loaded('pdo_pgsql')) {
+            throw new ConfigurationException(
+                'Storage backend "postgres" is configured at core.storage.backend '
+                . 'in config/core.json, but this PHP build has no pdo_pgsql '
+                . 'extension, so the database cannot be reached. Either enable '
+                . 'pdo_pgsql in php.ini and restart PHP, or set core.storage.backend '
+                . 'to "json" to use flat files, which need no database and no '
+                . 'extension.'
+            );
+        }
+
+        return new PostgresStorage(
+            $config->storagePostgresHost(),
+            $config->storagePostgresPort(),
+            $config->storagePostgresDatabase(),
+            $config->storagePostgresUser(),
+            $config->storagePostgresPassword(),
+            $config->defaultLocale(),
+        );
     }
 
     private static function mysql(CoreConfig $config): MysqlStorage
