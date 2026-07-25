@@ -19,6 +19,8 @@ class PluginManager
     private array $state = [];
     private array $excludedIds = [];
     private array $excludedDirs = [];
+    /** @var array<string, bool> Memo for {@see hasHookListeners()}, cleared whenever the active set changes. */
+    private array $listenerCache = [];
     private ?EventDispatcher $eventDispatcher = null;
     private ?object $contentService = null;
 
@@ -64,7 +66,8 @@ class PluginManager
     public function discover(): array
     {
         $this->plugins = [];
-        
+        $this->listenerCache = [];
+
         if (!is_dir($this->pluginsPath)) {
             return [];
         }
@@ -150,6 +153,7 @@ class PluginManager
         }
 
         $this->plugins[$id->value] = $plugin->activate();
+        $this->listenerCache = [];
         $this->state[$id->value] = ['activated' => true, 'activated_at' => date('c')];
         $this->saveState();
 
@@ -184,6 +188,7 @@ class PluginManager
         }
 
         $this->plugins[$id->value] = $plugin->deactivate();
+        $this->listenerCache = [];
         $this->state[$id->value] = ['activated' => false, 'deactivated_at' => date('c')];
         $this->saveState();
 
@@ -265,6 +270,46 @@ class PluginManager
     public function executeHook(string $hookName, array $params = []): array
     {
         return $this->dispatch($hookName, $params, false);
+    }
+
+    /**
+     * Whether firing this hook could reach anybody — cheaply enough to ask on
+     * every write.
+     *
+     * The events fired from the storage stack run on every save, delete and
+     * unpublish a site ever performs, and most sites will listen to none of
+     * them. Without this the cost of *having* those events would be a payload
+     * built and thrown away on every write, plus the storage reads needed to
+     * fill it. With it, a site with no listeners pays one array lookup.
+     *
+     * Answered from the `hooks` array each `plugin.json` already put in memory
+     * at discovery: no bootstrap is loaded and no file is read, which is the
+     * whole point — `dispatch()` cannot answer the question without doing
+     * exactly the work being avoided.
+     *
+     * Metadata is trusted, so a plugin that declares a hook it never implements
+     * counts as a listener. It then costs one `method_exists` in dispatch and
+     * gets no results, which is a far better trade than loading every bootstrap
+     * to find out. Declaring a hook is the plugin's statement of intent.
+     *
+     * Memoised per hook name because the answer only changes when the active
+     * set does, and the three places that can change it clear the memo.
+     */
+    public function hasHookListeners(string $hookName): bool
+    {
+        if (array_key_exists($hookName, $this->listenerCache)) {
+            return $this->listenerCache[$hookName];
+        }
+
+        $normalizedHook = str_replace('_', '.', $hookName);
+
+        foreach ($this->getActive() as $plugin) {
+            if (in_array($hookName, $plugin->hooks, true) || in_array($normalizedHook, $plugin->hooks, true)) {
+                return $this->listenerCache[$hookName] = true;
+            }
+        }
+
+        return $this->listenerCache[$hookName] = false;
     }
 
     /**

@@ -240,14 +240,19 @@ deploy.
 
 Capability 8. A plugin declares the hooks it wants in its `plugin.json` and
 implements `hook_<name_with_underscores>`; core fires each by name and collects
-what came back. There are four, and they fall into two kinds.
+what came back. There are nine, in three kinds.
 
 | Hook | Kind | What it is handed | What it may do |
 |---|---|---|---|
 | `api.routes` | collect | nothing | return `"METHOD /path" => handler` |
 | `web.render` | transform | the page, the shell, whether this is a preview | return replacement markup |
+| `content.before_save` | **veto** | `key`, `type`, `slug`, `locale`, `user`, `created`, `reason` | refuse the write, with a reason |
+| `content.saved` | announce | the same | nothing that changes the outcome |
+| `content.before_delete` | **veto** | `key`, `type`, `slug`, `locale`, `user` | refuse the removal, with a reason |
+| `content.deleted` | announce | the same | nothing that changes the outcome |
 | `content.before_publish` | **veto** | `key`, `type`, `slug`, `locale`, `user` | refuse the publish, with a reason |
 | `content.published` | announce | the same | nothing that changes the outcome |
+| `content.unpublished` | announce | the same | nothing that changes the outcome |
 
 The first two only ever *add*. `content.before_publish` is the first that can
 stop core doing something, which is what an editorial workflow needs: a review
@@ -288,6 +293,90 @@ the veto would spend an approval on a publish that then failed in storage.
 Both fire from `PageService::publish()` rather than from the HTTP handler.
 Publishing has several callers — the management API, the seeder, a plugin
 publishing a release — and a gate any of them can walk around is decoration.
+
+#### The content lifecycle
+
+The five save/delete/unpublish hooks obey exactly the rules above — silence
+permits, a throw is not an opinion, the first refusal wins, announcements are
+advisory — and are stated in `Application\Plugin\ContentGate`. What they add is
+reach: a search index that stays current, a webhook that rebuilds one page of a
+static front end, an audit shipper, a validator that refuses a document its own
+schema says is incomplete. None of that is expressible against `api.routes` and
+`web.render`, which can only add.
+
+They fire from `Infrastructure\Plugin\ContentEventStorage`, a storage decorator,
+for the reason `CacheInvalidatingStorage` is one: *"also fire the event"* is the
+instruction that gets forgotten — by the handler added next year, by the CLI, by
+the seeder — and an event system that fires on some write paths and not others is
+worse than none, because a search index that is usually current gets trusted. In
+storage, the question stops being "did this code path remember?" and becomes "did
+it write?". A write it cannot see is one that bypassed storage, and there is no
+such path. The proof is that the first-boot admin seed in `AuthController` is
+observable to a plugin, and nothing was added to `AuthController` to make it so.
+
+It sits **outermost** of the write decorators — outside cache invalidation, which
+is outside authorization, versioning and audit. So:
+
+- an announcement means the write was authorised, versioned, audited, on disk
+  *and* the stale render cache dropped. A listener that re-renders the page it was
+  just told about cannot warm a cache from content it has been told is old.
+- a `before_` hook can fire for a write a layer beneath then refuses. Treat the
+  before-hooks as side-effect-free; only `content.saved` / `content.deleted` mean
+  it happened.
+
+**A refused write throws** `Application\Plugin\ContentRefusedException`, carrying
+the hook, the key and the plugin's reason. `save()` returns `void`, so unlike
+`publish()` there is no in-band channel, and returning normally from a write that
+wrote nothing is how an editor comes to believe their work is on disk. Handlers
+that want a `409` instead of a `500` should catch it.
+
+**An event only fires once the thing happened.** A save that threw in storage is
+never announced; a delete that removed nothing and an unpublish that took nothing
+down are silent. Over-firing would have a listener drop an index entry for a
+document that never existed.
+
+**Payloads carry identity, not content.** `key`, `type`, `slug`, `locale`, the
+acting `user` reduced to `username` and `role`, plus `created` and `reason` on a
+save. The document's `data` is deliberately absent: users are ordinary content
+documents, so a payload carrying `data` would hand every plugin a password hash
+on every password change, and would keep doing so for whatever secret a future
+content type holds. A plugin that needs the body reads the key it was given.
+
+**A hook nobody listens to costs nothing.** These fire on every write, so before
+building a payload the gate asks `PluginManager::hasHookListeners()`, which
+answers from the `hooks` array each `plugin.json` already put in memory —
+memoised, no bootstrap loaded, no file read. Measured on a site listening to none
+of them: **0.15 µs per write and zero extra storage reads**, against ~290 µs for
+one real versioned flat-file write — under 0.06% of a write, and nothing at all on
+a read. The two reads that decide `created` happen only when somebody is
+listening.
+
+`content.published` is fired by the publish gate at the service layer and *not*
+also by the decorator, which would deliver every publish twice.
+`content.unpublished` is the reverse: nothing at the service layer announces a
+takedown, so it fires from storage and is therefore seen wherever the takedown
+came from.
+
+#### Not offered, deliberately
+
+Not everything worth an event is reachable from a place that cannot be bypassed,
+and a hook that fires on some paths only is a trap:
+
+- **Media upload and deletion.** `MediaService` writes files and their metadata
+  JSON directly, not through the content port, so a storage decorator cannot see
+  them. Doing this properly means a port for media and a decorator on it, not a
+  call bolted into one HTTP handler.
+- **Sign-in, failed sign-in, sign-out.** The natural need (2FA, an audit shipper,
+  lockout alerting), and the natural home is `AuthController` plus a gate class
+  shaped like `PublishGate`. Authentication has no storage seam to hang it on —
+  a session is not a content document — so it wants its own deliberate design
+  rather than a hook wedged into the login handler.
+- **Settings changed.** Settings live in `data/settings.json`, outside the content
+  port, and are invalidated by their own handlers.
+- **`content.before_unpublish`.** A takedown is reversible by republishing, and
+  the editorial question a veto exists to answer — "may this go live?" — is
+  already answered by `content.before_publish`. A second gate here would be a
+  veto with no case behind it.
 
 ### Explicitly not core
 
