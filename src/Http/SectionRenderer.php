@@ -6,6 +6,7 @@ namespace Click\Cms\Http;
 
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Content\RichTextSanitizer;
+use Click\Cms\Application\Collection\EntryListings;
 use Click\Cms\Application\Media\MediaService;
 use Click\Cms\Domain\Schema\FieldDefinition;
 use Click\Cms\Domain\Schema\FieldType;
@@ -34,6 +35,14 @@ use Click\Cms\Domain\Schema\SectionTypeRepository;
  */
 final class SectionRenderer
 {
+    /**
+     * The section type whose content is not its own field values but other
+     * documents: the published entries of a collection. Special-cased by id for
+     * the same reason `form` is — the generic field renderer would print the
+     * configuration ("post", "6") as paragraphs, which is not what any of it means.
+     */
+    private const COLLECTION_LIST = 'collection-list';
+
     private readonly RichTextSanitizer $sanitizer;
 
     public function __construct(
@@ -41,6 +50,13 @@ final class SectionRenderer
         private readonly ?MediaService $media = null,
         private readonly string $mediaBaseUrl = '/api/media/file',
         ?RichTextSanitizer $sanitizer = null,
+        /**
+         * Where a listing section's entries come from. Optional because most
+         * renders have no listing on the page and because every existing caller
+         * constructs this without one; left out, a listing section renders nothing
+         * rather than half of something.
+         */
+        private readonly ?EntryListings $listings = null,
     ) {
         // Defaulted rather than required so existing callers are unaffected: the
         // sanitiser is pure domain logic with no dependencies of its own.
@@ -73,16 +89,101 @@ final class SectionRenderer
 
             $values = is_array($section['values'] ?? null) ? $section['values'] : [];
 
-            // A form section is not display content — its fields configure an
-            // actual form. It is rendered as a working <form> that posts to the
-            // forms plugin, rather than through the generic field renderer that
-            // would just print the labels as text.
-            $html .= $section['type'] === 'form'
-                ? $this->renderForm($values, $page)
-                : $this->renderSection($type, $values);
+            // Two section types configure something rather than describing it, so
+            // neither goes through the generic field renderer: a form's fields are
+            // the form's labels, and a listing's fields say which entries to fetch.
+            // Printing either as prose is how "post" and "6" end up as paragraphs
+            // on a page.
+            $html .= match ($section['type']) {
+                'form' => $this->renderForm($values, $page),
+                self::COLLECTION_LIST => $this->renderCollectionList($values, $page),
+                default => $this->renderSection($type, $values),
+            };
         }
 
         return $html;
+    }
+
+    /**
+     * Render a set of field values against a schema, as one section.
+     *
+     * This is what gives a collection entry a body: a collection type's field set
+     * *is* a {@see SectionType}, so an entry's stored values render through exactly
+     * the machinery a section does — the same escaping, the same rich-text
+     * sanitising, the same media resolution and responsive images. A second
+     * renderer for entries would be a second place for an unescaped value to get
+     * out, which is the one thing this class exists to prevent.
+     *
+     * @param array<string, mixed> $values
+     */
+    public function renderFields(SectionType $type, array $values): string
+    {
+        return $this->renderSection($type, $values);
+    }
+
+    /**
+     * A listing of a collection's published entries.
+     *
+     * Which entries, in what order and how many is decided by
+     * {@see EntryListings}; everything here is markup and escaping. Every value
+     * printed is editor input — an entry's title and summary reach this method
+     * straight from storage — so all of it goes through {@see escape()}, and the
+     * picture through the same {@see imageTag()} the rest of the class uses.
+     *
+     * An entry links to its own address when its collection declares one, and is
+     * plain text when it does not: a listing of team members on a site that never
+     * gave team members a public page is a perfectly good listing, and inventing
+     * an href for it would be a link to a 404.
+     *
+     * Nothing at all is rendered when the collection is empty — a heading over an
+     * absent list is worse than silence, and it is what an unpopulated Journal
+     * page would otherwise show every visitor.
+     *
+     * @param array<string, mixed> $values
+     */
+    private function renderCollectionList(array $values, Content $page): string
+    {
+        // The language actually being served, taken from the document rather than
+        // the request: a German URL falling back to the English page must list the
+        // English entries it is showing prose in, not German ones.
+        $cards = $this->listings?->forSection($values, $page->locale()) ?? [];
+        if ($cards === []) {
+            return '';
+        }
+
+        $items = '';
+
+        foreach ($cards as $card) {
+            $title = $this->escape($card['title']);
+            $inner = $card['href'] !== null
+                ? '<h3 class="cms-entry-title"><a href="' . $this->escape($card['href']) . '">' . $title . '</a></h3>'
+                : '<h3 class="cms-entry-title">' . $title . '</h3>';
+
+            if ($card['image'] !== '') {
+                // The entry's own title as the fallback description, and only as a
+                // fallback: a description written in the media library was written
+                // about the picture and wins over the heading beside it.
+                $inner = $this->imageTag($card['image'], '', $card['title']) . $inner;
+            }
+
+            if ($card['excerpt'] !== '') {
+                $inner .= '<p class="cms-entry-excerpt">' . nl2br($this->escape($card['excerpt'])) . '</p>';
+            }
+
+            $items .= '<li class="cms-entry">' . $inner . '</li>';
+        }
+
+        $heading = isset($values['heading']) && is_scalar($values['heading']) && (string) $values['heading'] !== ''
+            ? '<h2 class="cms-field cms-field--heading">' . $this->escape((string) $values['heading']) . '</h2>'
+            : '';
+        $intro = is_string($values['intro'] ?? null)
+            ? $this->renderRichTextValue('cms-field cms-field--intro', $values['intro'])
+            : '';
+
+        return '<section class="cms-section cms-section--' . self::COLLECTION_LIST . '">'
+            . $heading . $intro
+            . '<ul class="cms-entries">' . $items . '</ul>'
+            . '</section>';
     }
 
     /**
@@ -255,6 +356,14 @@ final class SectionRenderer
             FieldType::RichText => $this->renderRichText($field, $value),
             FieldType::Textarea => $this->renderProse($field, $value),
             FieldType::Boolean => '',
+            // A reference is a pointer, not prose. Its stored value is the target's
+            // slug, so printing it puts `jun-park` on the page where a reader
+            // expects a name — visible the moment collection entries gained a
+            // public address, since a post's author is a reference. Showing the
+            // target properly means reading it, deciding whether it has an address
+            // of its own and how deep to follow the chain; until this renderer is
+            // given that, saying nothing is the honest output.
+            FieldType::Reference => '',
             default => $this->renderScalar($field, $value, $wording),
         };
     }
@@ -300,7 +409,18 @@ final class SectionRenderer
      */
     private function renderRichText(FieldDefinition $field, mixed $value): string
     {
-        if (!is_string($value) || trim($value) === '') {
+        return is_string($value)
+            ? $this->renderRichTextValue($this->fieldClass($field), $value)
+            : '';
+    }
+
+    /**
+     * The one place rich text becomes markup, so the sanitiser cannot be skipped
+     * by a caller that has a class name but no {@see FieldDefinition} to hand.
+     */
+    private function renderRichTextValue(string $class, string $value): string
+    {
+        if (trim($value) === '') {
             return '';
         }
 
@@ -309,7 +429,7 @@ final class SectionRenderer
             return '';
         }
 
-        return '<div class="' . $this->fieldClass($field) . '">' . $safe . '</div>';
+        return '<div class="' . $class . '">' . $safe . '</div>';
     }
 
     private function renderProse(FieldDefinition $field, mixed $value): string

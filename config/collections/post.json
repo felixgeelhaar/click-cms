@@ -2,6 +2,7 @@
   "label": "Blog posts",
   "description": "Articles and news, each published on its own.",
   "titleField": "title",
+  "route": "blog",
   "fields": [
     {
       "name": "title",
