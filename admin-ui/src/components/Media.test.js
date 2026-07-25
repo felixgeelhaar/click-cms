@@ -275,3 +275,97 @@ describe('svg items', () => {
     expect(text).not.toContain('no resized versions');
   });
 });
+
+/**
+ * A video is not a picture and the card must not pretend otherwise. Rendering
+ * one through the image card produced a broken thumbnail, an "×" where the
+ * dimensions go, a focal-point control that could not do anything, and "no
+ * resized versions" as though something had failed.
+ */
+describe('a video in the library', () => {
+  const clip = (overrides = {}) => item({
+    id: 'workshop-tour-d4e5f6',
+    extension: 'mp4',
+    mimeType: 'video/mp4',
+    originalName: 'Workshop Tour.mp4',
+    width: 0,
+    height: 0,
+    bytes: 4 * 1024 * 1024,
+    variants: [],
+    urls: { original: '/api/media/file/workshop-tour-d4e5f6.mp4', variants: {} },
+    ...overrides,
+  });
+
+  it('shows a player instead of a broken thumbnail', async () => {
+    const wrapper = await mountMedia([clip()]);
+
+    expect(wrapper.find('[data-test="video-thumb"]').exists()).toBe(true);
+    expect(wrapper.find('img').exists()).toBe(false);
+  });
+
+  it('does not download until the visitor asks', async () => {
+    const wrapper = await mountMedia([clip()]);
+
+    expect(wrapper.get('[data-test="video-thumb"]').attributes('preload')).toBe('none');
+  });
+
+  it('offers no focal point, because there is no crop to set', async () => {
+    const wrapper = await mountMedia([clip()]);
+
+    expect(wrapper.find('[data-test="focal-target"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="focal-marker"]').exists()).toBe(false);
+  });
+
+  it('reads out format and size rather than an empty pixel count', async () => {
+    const wrapper = await mountMedia([clip()]);
+
+    const meta = wrapper.get('.card-meta').text();
+    expect(meta).toContain('MP4');
+    expect(meta).not.toContain('×');
+    expect(meta).not.toContain('0x0');
+  });
+
+  it('says video is served as uploaded rather than reporting a failure', async () => {
+    const wrapper = await mountMedia([clip()]);
+
+    const variants = wrapper.get('.card-variants').text();
+    expect(variants).toContain('served as uploaded');
+    expect(variants).not.toContain('no resized versions');
+  });
+
+  it('is not counted as an image in the page subtitle', async () => {
+    const wrapper = await mountMedia([clip(), item()]);
+
+    const subtitle = wrapper.get('.page-subtitle').text();
+    expect(subtitle).toContain('1 picture');
+    expect(subtitle).toContain('1 video');
+    expect(subtitle).not.toContain('2 images');
+  });
+
+  it('does not promise video is resized when a ladder is configured', async () => {
+    // The resizing sentence only appears when the server reports a ladder, so
+    // this stubs one — otherwise there is no promise to qualify.
+    global.fetch = vi.fn(async (url, options) => {
+      if (String(url).includes('/api/media/capabilities')) {
+        return { ok: true, status: 200, json: async () => ({ data: {
+          acceptedMimeTypes: [], maxBytes: 0, resizingAvailable: true,
+          variants: [{ name: 'sm' }, { name: 'md' }],
+        } }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ data: options?.method === 'PUT' ? {} : [clip(), item()] }) };
+    });
+    const wrapper = mount(Media);
+    await flushPromises();
+
+    const subtitle = wrapper.get('.page-subtitle').text();
+    expect(subtitle).toContain('Each picture is resized to: sm, md');
+    expect(subtitle).toContain('Video is served as uploaded');
+  });
+
+  it('still shows pictures the way it always did', async () => {
+    const wrapper = await mountMedia([item()]);
+
+    expect(wrapper.find('[data-test="focal-target"]').exists()).toBe(true);
+    expect(wrapper.get('.card-meta').text()).toContain('2400×1600');
+  });
+});
