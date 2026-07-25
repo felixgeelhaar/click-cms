@@ -1,0 +1,10 @@
+{
+  "label": "Heading and lead-in",
+  "description": "A heading with an optional lead-in, to break a long page into parts.",
+  "icon": "heading",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading", "required": true },
+    { "name": "intro", "type": "textarea", "label": "Lead-in",
+      "help": "Optional. A sentence or two introducing the sections that follow." }
+  ]
+}

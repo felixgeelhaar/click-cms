@@ -1,0 +1,18 @@
+{
+  "label": "Questions and answers",
+  "description": "A list of questions with their answers.",
+  "icon": "help",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading" },
+    { "name": "intro", "type": "textarea", "label": "Intro text",
+      "help": "Optional. A sentence or two above the list." },
+    { "name": "items", "type": "repeater", "label": "Questions", "min": 1, "max": 24,
+      "fields": [
+        { "name": "title", "type": "text", "label": "Question", "required": true,
+          "help": "Word it the way a visitor would ask it." },
+        { "name": "answer", "type": "richtext", "label": "Answer", "required": true,
+          "help": "Answer it in full. Links and lists are allowed." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "label": "Details list",
+  "description": "Pairs of labels and values — opening hours, contact details, specifications.",
+  "icon": "list",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading",
+      "help": "For example Opening hours." },
+    { "name": "intro", "type": "textarea", "label": "Intro text",
+      "help": "Optional. Anything a visitor needs to know before reading the list, such as bank holiday closures." },
+    { "name": "rows", "type": "repeater", "label": "Rows", "min": 1, "max": 24,
+      "fields": [
+        { "name": "label", "type": "text", "label": "Label", "required": true,
+          "help": "The left-hand side, for example Monday, or Telephone." },
+        { "name": "value", "type": "text", "label": "Value", "required": true,
+          "help": "The right-hand side, for example 9:00 – 17:00, or Closed." }
+      ]
+    }
+  ]
+}

@@ -214,48 +214,67 @@ strip tells you to ask. Save, and say it is ready.
 
 ## Where entries appear on the public site
 
-This is the honest answer, and it is a bit less tidy than the rest of the page.
+Two things have to be true for a visitor to read one of your entries: something
+has to **list** it, and it needs an **address** of its own. Both are settings, and
+on the example site both are already switched on for blog posts.
 
-**It depends entirely on how your site was built**, and there is no setting here
-that changes it. A collection holds and publishes your content; **what displays
-it is a separate decision made when the site was made.** Broadly there are two
-arrangements:
+### The listing
 
-1. **A separate front end.** The CMS holds the content and hands it out; a
-   separately-built website reads it and decides how a post looks, what the
-   listing page shows and what a post's address is. Sites built this way often
-   look nothing like the admin's own themes.
-2. **Section designs made for the purpose.** A page can carry a section whose job
-   is to list a collection — a "latest posts" strip, a team grid.
+There is a section design called **Collection list**. Put it on a page, choose
+which collection it should show, and it lists the published entries — each one's
+title, its summary, its picture, linked to the entry itself.
 
-Two things follow, and they are worth knowing before somebody asks you why their
-new post is not showing:
+It has four settings:
 
-- **None of the six section designs that ship with the example site lists a
-  collection.** Rich text, Media and text, Card grid, Facts, Call to action and
-  Contact form all hold their own content. So on the shipped example site,
-  publishing a blog post does **not** make it appear anywhere on a page. The
-  Journal page in that site's menu is a single block of text, and it says as much
-  — it points you at *Blog posts* rather than listing them.
-- **There is no automatic address for an entry.** The CMS does not, by itself,
-  serve a post at `/journal/my-post`. If your site has addresses like that, they
-  come from the front end that was built for it.
+| | |
+|---|---|
+| **Collection** | Which one to list — *Blog posts* or *Team members* |
+| **Introduction** | Optional words above the list |
+| **How many** | At most this many entries. Six by default |
+| **Order** | Newest first, oldest first, by title, or the collection's own order |
 
-So the question to ask whoever built your site is: **"where does a published blog
-post show up, and at what address?"** It has a definite answer, it takes them one
-sentence, and it is not something this page can guess on your behalf. Write it
-down somewhere your colleagues will find it.
+On the example site the **Journal** page carries one, which is why publishing a
+post makes it appear there without you touching the page.
 
-What you can always rely on: an entry you have published **is** published, and
-whatever displays your site can see it. If it is not appearing, the thing to check
-first is the badge — *Draft* and *Unpublished changes* both mean the public does
-not have it yet.
+If no entries are published yet, the section renders **nothing at all** — not an
+empty heading. A page that is not ready simply looks unfinished rather than
+broken.
+
+### The address
+
+A collection can have its own stretch of the site. *Blog posts* ships with one,
+so a published post is readable at:
+
+```
+/blog/why-we-stopped-staining
+```
+
+That comes from the collection's own definition — an administrator or developer
+sets it once, in `config/collections/post.json`, and every post in that
+collection is addressed under it from then on.
+
+**A collection with no address set is admin-only.** *Team members* is deliberately
+that: the people appear in a section on the About page, and there is no
+`/team-member/jun-park` for a visitor to find. That is usually what you want for
+a collection that exists to be shown *inside* other pages.
+
+### What you can rely on
+
+- **A draft is never readable.** An unpublished entry at its own address returns
+  "page not found" — the same response as an address that never existed, so
+  nobody can tell from the outside that a draft is there at all.
+- **A page always wins.** If a page and a collection ever want the same address,
+  the page keeps it. Turning on an address for a collection can never take a URL
+  away from a page you already have.
+- **Your language prefix works as it does everywhere.** `/de/blog/…` behaves like
+  `/de/…` does for a page, including falling back to the default language when
+  there is no translation yet.
 
 ## Quick answers
 
 **I published a post and the site looks the same.** Check the badge says *Live*.
-If it does, the question is where posts are meant to appear — see the section
-above.
+If it does, check the page you expected it on actually carries a **Collection
+list** section pointing at the right collection — that is what does the listing.
 
 **I want a post in the top navigation.** You almost certainly do not, and a
 collection entry is not something the menu can point at. What goes in the menu is

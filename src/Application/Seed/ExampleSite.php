@@ -250,6 +250,33 @@ final class ExampleSite
                         ],
                     ],
                     [
+                        'type' => 'quote',
+                        'values' => [
+                            'quote' => 'They took the measurements of a room that is '
+                                . 'not square and did not once suggest we change the '
+                                . 'room. The table has been in daily use for four years.',
+                            'attribution' => 'Amara Ndiaye',
+                            'role' => 'Head of Facilities, Northgate Practice',
+                        ],
+                    ],
+                    [
+                        'type' => 'logos',
+                        'values' => [
+                            'heading' => 'Accredited by',
+                            'columns' => '4',
+                            'logos' => [
+                                [
+                                    'logo' => self::MEDIA_TOKEN_PREFIX . 'shelving',
+                                    'title' => 'Guild of Master Craftsmen',
+                                ],
+                                [
+                                    'logo' => self::MEDIA_TOKEN_PREFIX . 'tables',
+                                    'title' => 'FSC Chain of Custody',
+                                ],
+                            ],
+                        ],
+                    ],
+                    [
                         'type' => 'call-to-action',
                         'values' => [
                             'heading' => 'Come and see the timber',
@@ -293,6 +320,61 @@ final class ExampleSite
                             'imagePosition' => 'right',
                         ],
                     ],
+                    [
+                        'type' => 'section-heading',
+                        'values' => [
+                            'heading' => 'The people at the benches',
+                            'intro' => '<p>Twelve of us. These three answer most of '
+                                . 'what arrives by email.</p>',
+                        ],
+                    ],
+                    [
+                        'type' => 'people',
+                        'values' => [
+                            'columns' => '3',
+                            'people' => [
+                                [
+                                    'photo' => self::MEDIA_TOKEN_PREFIX . 'portrait-mara',
+                                    'title' => 'Mara Ellis',
+                                    'role' => 'Founder and lead maker',
+                                    'bio' => 'Works mostly in oak and elm.',
+                                ],
+                                [
+                                    'photo' => self::MEDIA_TOKEN_PREFIX . 'portrait-tobias',
+                                    'title' => 'Tobias Lind',
+                                    'role' => 'Cabinetmaker',
+                                    'bio' => 'Every drawer that has ever closed properly.',
+                                ],
+                                [
+                                    'photo' => self::MEDIA_TOKEN_PREFIX . 'portrait-jun',
+                                    'title' => 'Jun Park',
+                                    'role' => 'Finisher',
+                                    'bio' => 'Mixes the shop oil finishes by hand.',
+                                ],
+                            ],
+                        ],
+                    ],
+                    [
+                        'type' => 'gallery',
+                        'values' => [
+                            'heading' => 'Work leaving the shop',
+                            'columns' => '3',
+                            'images' => [
+                                [
+                                    'image' => self::MEDIA_TOKEN_PREFIX . 'tables',
+                                    'caption' => 'Oak dining table, 2.4 metres.',
+                                ],
+                                [
+                                    'image' => self::MEDIA_TOKEN_PREFIX . 'seating',
+                                    'caption' => 'Spindle-backed chair in ash.',
+                                ],
+                                [
+                                    'image' => self::MEDIA_TOKEN_PREFIX . 'shelving',
+                                    'caption' => 'Wall-mounted shelving in walnut.',
+                                ],
+                            ],
+                        ],
+                    ],
                 ],
             ],
             'journal' => [
@@ -307,6 +389,18 @@ final class ExampleSite
                                 . 'themselves are blog post entries — edit them under '
                                 . '<em>Blog posts</em> rather than here.</p>',
                             'width' => 'narrow',
+                        ],
+                    ],
+                    [
+                        // The section that closes the oldest hole in the product:
+                        // before this existed, publishing a post put it nowhere a
+                        // visitor could reach it.
+                        'type' => 'collection-list',
+                        'values' => [
+                            'heading' => 'Entries',
+                            'collection' => 'post',
+                            'limit' => 6,
+                            'sort' => 'newest',
                         ],
                     ],
                 ],
@@ -340,6 +434,88 @@ final class ExampleSite
                                 . 'submissions in the admin.',
                         ],
                     ],
+                    [
+                        'type' => 'details',
+                        'values' => [
+                            'heading' => 'Opening hours',
+                            'rows' => [
+                                ['label' => 'Monday', 'value' => 'Closed'],
+                                ['label' => 'Tuesday to Friday', 'value' => '9:00 – 17:00'],
+                                ['label' => 'Saturday', 'value' => '10:00 – 16:00'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            // A fifth page, added with the pricing and question designs: they
+            // belong together and neither reads well bolted onto an existing page.
+            'prices' => [
+                'title' => 'Prices',
+                'sections' => [
+                    [
+                        'type' => 'section-heading',
+                        'values' => [
+                            'heading' => 'What it costs, and how long it takes',
+                            'intro' => '<p>Every figure below is a price we have '
+                                . 'actually charged. None of them is an estimate '
+                                . 'that grows.</p>',
+                        ],
+                    ],
+                    [
+                        'type' => 'pricing',
+                        'values' => [
+                            'heading' => 'Ways to work with us',
+                            'columns' => '3',
+                            'plans' => [
+                                [
+                                    'title' => 'Repair',
+                                    'price' => 'from £180',
+                                    'summary' => 'For a piece with one thing wrong with it.',
+                                    'features' => "Collection and return\nA written report before we start\nTwo-year guarantee on the repair",
+                                ],
+                                [
+                                    'title' => 'From the range',
+                                    'price' => 'from £900',
+                                    'summary' => 'One of our own designs, in the timber you choose.',
+                                    'features' => "Six-week lead time\nFour timbers to choose from\n25-year structural guarantee",
+                                ],
+                                [
+                                    'title' => 'Commission',
+                                    'price' => 'from £2,400',
+                                    'summary' => 'Drawn for your room, and only your room.',
+                                    'features' => "A drawing and a fixed price first\nHalf on acceptance, half on delivery\n25-year structural guarantee",
+                                ],
+                            ],
+                            'buttonLabel' => 'Ask for a quote',
+                            'buttonUrl' => '/contact',
+                        ],
+                    ],
+                    [
+                        'type' => 'faq',
+                        'values' => [
+                            'heading' => 'Questions we are asked most',
+                            'items' => [
+                                [
+                                    'title' => 'How long does a commission take?',
+                                    'answer' => '<p>Six weeks from the day you accept '
+                                        . 'the drawing, and we tell you in week one '
+                                        . 'if that is going to slip.</p>',
+                                ],
+                                [
+                                    'title' => 'Can you match an existing piece?',
+                                    'answer' => '<p>Usually. Send a photograph and '
+                                        . 'the measurements of the piece you already '
+                                        . 'have before anything else.</p>',
+                                ],
+                                [
+                                    'title' => 'Do you deliver?',
+                                    'answer' => '<p>Within fifty miles, included in '
+                                        . 'the price. Beyond that we quote it '
+                                        . 'separately and it is never a surprise.</p>',
+                                ],
+                            ],
+                        ],
+                    ],
                 ],
             ],
         ];
@@ -367,6 +543,7 @@ final class ExampleSite
         return Menu::create('main', 'Main menu', [
             MenuItem::create('Home', 'home'),
             MenuItem::create('About', 'about'),
+            MenuItem::create('Prices', 'prices'),
             MenuItem::create('Journal', 'journal'),
             MenuItem::create('Contact', 'contact'),
         ]);

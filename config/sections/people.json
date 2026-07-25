@@ -1,0 +1,26 @@
+{
+  "label": "People",
+  "description": "A row of people with photographs, roles and short biographies.",
+  "icon": "users",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading" },
+    { "name": "intro", "type": "textarea", "label": "Intro text",
+      "help": "Optional. A sentence or two above the row." },
+    { "name": "columns", "type": "select", "label": "Columns",
+      "options": ["2", "3", "4"], "default": "3",
+      "help": "How many people sit side by side on a wide screen." },
+    { "name": "people", "type": "repeater", "label": "People", "min": 1, "max": 24,
+      "fields": [
+        { "name": "photo", "type": "image", "label": "Photograph", "displayWidth": 280,
+          "help": "Optional. If the media library has no description for it, the person's name is used instead." },
+        { "name": "title", "type": "text", "label": "Name", "required": true },
+        { "name": "role", "type": "text", "label": "Role",
+          "help": "For example Workshop manager." },
+        { "name": "bio", "type": "textarea", "label": "Short biography",
+          "help": "A sentence or two. Keep every entry about the same length so the row stays even." },
+        { "name": "email", "type": "email", "label": "Email address",
+          "help": "Optional. Shown as a link a visitor can write to, so only add it if this person is happy to be contacted directly." }
+      ]
+    }
+  ]
+}
