@@ -60,7 +60,7 @@
         </div>
 
         <component
-          :is="sub.type === 'image' ? ImageField : FieldInput"
+          :is="leafComponent(sub)"
           v-for="sub in field.fields || []"
           :key="sub.name"
           :field="sub"
@@ -79,8 +79,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue';
-import FieldInput from './FieldInput.vue';
-import ImageField from './ImageField.vue';
+import { leafComponent } from './leafComponent.js';
 import { moveItem, useDragReorder } from '../../lib/dragReorder.js';
 
 const props = defineProps({

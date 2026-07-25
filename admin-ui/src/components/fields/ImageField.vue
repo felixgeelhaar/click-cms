@@ -53,6 +53,12 @@
         {{ open ? 'Close library' : (selected ? 'Change image' : 'Choose image') }}
       </button>
       <span v-if="loading" class="hint">Loading library…</span>
+      <!-- A request that failed is not an empty library. Saying "upload images
+           first" to somebody whose library is full sends them to do work they
+           have already done, and hides the fact that something is wrong. -->
+      <span v-else-if="failed" class="hint hint-error" data-test="library-failed">
+        The library could not be loaded. Reload the page to try again.
+      </span>
       <span v-else-if="!items.length" class="hint">
         The library is empty — upload images on the Media page first.
       </span>
@@ -98,6 +104,7 @@ const emit = defineEmits(['update:modelValue']);
 
 const items = ref([]);
 const loading = ref(true);
+const failed = ref(false);
 const open = ref(false);
 
 const selected = computed(() => items.value.find((i) => i.id === props.modelValue) ?? null);
@@ -117,11 +124,19 @@ onMounted(async () => {
     // Ask for the library judged against this field's slot. The comparison and
     // its wording stay in the domain; this only says which slot to judge for.
     const width = Number(props.field.displayWidth) || 0;
-    const query = width > 0 ? `?displayWidth=${width}` : '';
+    // Pictures only. The library holds video too, and without this filter a clip
+    // appeared here as a broken thumbnail and could be chosen into a slot that
+    // renders an <img>.
+    const query = width > 0 ? `?kind=image&displayWidth=${width}` : '?kind=image';
     const res = await fetch(`/api/media${query}`);
+    // A 401 or a 500 still resolves the promise, and its body has no `data`.
+    // Without this check both land in the same empty array as a genuinely
+    // empty library.
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     items.value = (await res.json()).data ?? [];
   } catch {
     items.value = [];
+    failed.value = true;
   } finally {
     loading.value = false;
   }
@@ -141,6 +156,7 @@ onMounted(async () => {
 .unknown { margin: 0 0 0.5rem; font-size: 0.8125rem; color: var(--app-text-muted); }
 .picker { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; }
 .hint { font-size: 0.8125rem; color: var(--app-text-muted); }
+.hint-error { color: var(--color-danger-600, #dc2626); }
 .chooser { list-style: none; margin: 0.75rem 0 0; padding: 0.6rem; display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); border: 1px solid var(--control-border); border-radius: 8px; max-height: 280px; overflow-y: auto; }
 .chooser-item { width: 100%; padding: 0.3rem; border: 1px solid transparent; border-radius: 6px; background: none; cursor: pointer; text-align: left; }
 .chooser-item.current { border-color: var(--color-primary-600); }

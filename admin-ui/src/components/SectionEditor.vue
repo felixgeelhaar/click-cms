@@ -125,9 +125,8 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
-import FieldInput from './fields/FieldInput.vue';
 import RepeaterField from './fields/RepeaterField.vue';
-import ImageField from './fields/ImageField.vue';
+import { leafComponent } from './fields/leafComponent.js';
 import { moveItem, useDragReorder } from '../lib/dragReorder.js';
 
 const props = defineProps({
@@ -188,8 +187,8 @@ const labelFor = (id) => typeFor(id)?.label ?? id;
 
 const fieldComponent = (field) => {
   if (field.type === 'repeater') return RepeaterField;
-  if (field.type === 'image') return ImageField;
-  return FieldInput;
+
+  return leafComponent(field);
 };
 
 const pendingDescription = computed(() => typeFor(pendingType.value)?.description ?? '');

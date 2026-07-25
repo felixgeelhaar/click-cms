@@ -194,6 +194,24 @@ final class MediaItem
     }
 
     /**
+     * What this item is, in the vocabulary a field picker asks in: `image` or
+     * `video`.
+     *
+     * The two are not interchangeable in any slot. An image field wants a
+     * picture and a file field wants a clip, and before this existed neither
+     * could say so — every picker listed the whole library, which put videos in
+     * the image chooser with a broken thumbnail and made them selectable into a
+     * field that renders an `<img>`.
+     *
+     * Derived from the mime type rather than stored, because the mime type is
+     * what upload already decided and a second copy could disagree with it.
+     */
+    public function kind(): string
+    {
+        return $this->isImage() ? 'image' : 'video';
+    }
+
+    /**
      * Public URLs for the original and every generated variant.
      *
      * Returned as data rather than built in a template so a front end can put
