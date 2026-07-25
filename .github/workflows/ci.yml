@@ -23,20 +23,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 8.3 matches the runtime image (Dockerfile: php:8.3-apache), so the suite
-      # runs on the version production actually serves. gd/zip/pdo_sqlite are the
+      # Matches the runtime image (Dockerfile: php:8.5-apache), so the suite runs
+      # on the version production actually serves. gd/zip/pdo_sqlite are the
       # extensions the application loads at boot.
       #
-      # This is also why phpunit is constrained to a version that installs on
-      # 8.3. It was briefly ^13, which requires 8.4.1 — so `composer install`
-      # failed here and this job was red for two days and through a release,
-      # while it passed for anyone whose local PHP happened to be newer. A test
-      # suite that cannot run on the version production serves is not a test
-      # suite for this project.
+      # Keep this, the Dockerfile and the phpunit constraint moving together.
+      # They came apart once: phpunit was raised to ^13, which needs 8.4.1,
+      # while this job ran 8.3 — `composer install` failed outright, so the
+      # suite never ran here at all, and it stayed red for two days and through
+      # a release because it passed for anyone whose local PHP was newer.
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.5'
           extensions: gd, zip, pdo_sqlite
           coverage: none
 
@@ -62,6 +61,57 @@ jobs:
           php scripts/docs/build-site.php /tmp/docs-site
           test -f /tmp/docs-site/index.html
           echo "built $(find /tmp/docs-site -type f | wc -l) files"
+
+  minimum-php:
+    name: Minimum supported PHP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # composer.json says `php: >=8.1`, the README badge says 8.1+, and every
+      # entry in the signed update feed advertises `requiresPhp: "8.1"` — which
+      # is what an installation checks before it will take an upgrade. Nothing
+      # tested any of that. The suite runs on the latest PHP, so a feature used
+      # in `src/` that 8.1 cannot parse would have shipped, and the first person
+      # to find out would have been someone on 8.1 whose site stopped booting.
+      #
+      # The test suite deliberately does not run here: phpunit needs a far newer
+      # PHP than the floor, and pinning the whole project's tooling to the
+      # oldest version it supports is the wrong trade. What matters is the
+      # promise itself — that the shipped code parses and the application boots
+      # and serves a page.
+      - name: Set up the oldest PHP the project claims to support
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: gd, zip, pdo_sqlite
+          coverage: none
+
+      - name: Every shipped file parses
+        run: |
+          fail=0
+          for f in $(find src plugins bin public -name '*.php'); do
+            php -l "$f" > /dev/null || { echo "does not parse on 8.1: $f"; fail=1; }
+          done
+          exit $fail
+
+      # Parsing is not booting. This seeds a site and asks for a real page,
+      # because a runtime call to a function added after 8.1 parses perfectly
+      # and fails on the request.
+      - name: The application boots and serves a page
+        run: |
+          composer dump-autoload --no-interaction
+          php bin/click-seed.php
+          php -S 127.0.0.1:9111 -t public &
+          for i in $(seq 1 20); do
+            sleep 1
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9111/ || true)"
+            [ "$code" = "200" ] && break
+          done
+          body="$(curl -fsS http://127.0.0.1:9111/)"
+          printf '%s' "$body" | grep -q '<h1' || { echo "no page rendered:"; printf '%s' "$body" | head -c 400; exit 1; }
+          echo "8.1 serves a rendered page."
 
   admin:
     name: Admin UI tests
