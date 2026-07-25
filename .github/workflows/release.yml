@@ -80,7 +80,11 @@ jobs:
           for dir in src public plugins vendor bin themes; do
             [ -d "$dir" ] && cp -r "$dir" "$stage/"
           done
-          cp composer.json LICENSE "$stage/" 2>/dev/null || true
+          # Not `|| true`: that swallowed a missing LICENSE for every release
+          # ever cut, so each archive shipped with no licence at all while the
+          # README claimed MIT. A package nobody may legally use should fail to
+          # build, not build quietly.
+          cp composer.json LICENSE "$stage/"
           zip -qr "$stage.zip" "$stage"
           echo "sha256=$(sha256sum "$stage.zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
