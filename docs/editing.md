@@ -5,6 +5,8 @@ steps: find the page, open it, change what you want, save. Nothing reaches the
 public site until you publish, so you can work at your own pace.
 
 If you have not signed in yet, start with [Getting started](getting-started.md).
+If you are not sure which buttons your account gets, see
+[What your account can do](roles.md).
 
 ## Find the page
 
@@ -17,11 +19,12 @@ Each row tells you four things:
 
 - **The title** — the name of the page.
 - **The address** — such as `/about`. That is what a visitor types or clicks.
-- **A LIVE badge and a published date** — this page is on the public site, and
-  when it last went live.
+- **A badge and a published date** — where this page stands, and when it last
+  went live. The badges read **Live**, **Live, edits pending**, **Never
+  published** or **Taken down**.
 - **Edit** and **Delete**.
 
-The tabs above the list narrow it down:
+The tabs above the list narrow it down, and each carries a count:
 
 | Tab | Shows |
 |---|---|
@@ -40,6 +43,11 @@ finished something.
 visitors for a while — for that, open the page and take it down, which keeps
 everything. See [Publishing your changes](publishing.md).
 
+The Delete button is shown to everybody, but not everybody may use it. An editor
+can delete only pages they created themselves; an author likewise. If your
+account may not delete a particular page, the site refuses when you click and
+tells you so — nothing is harmed by finding out this way.
+
 ## Open it
 
 Click **Edit** on the row you want. The page editor opens.
@@ -57,28 +65,20 @@ Below it:
 - **Slug** — the last part of the page's web address. **It cannot be changed
   here**, and the editor says so. Addresses that change break other people's
   links, so this is deliberate. If an address really must change, ask whoever
-  looks after the site.
-
-## Change some text
-
-Click into a field and type, exactly as you would in any form. There is no
-special mode to switch on.
-
-Some fields have a **red asterisk** next to their label. Those are required —
-the section will not work without them, so do not empty one out.
-
-Nothing you type has left the editor yet. If you close the tab now, the change
-is gone; if you save, it is kept but still not public.
+  looks after the site: they can change it and put a **redirect** in place so
+  the old address still works. See [Redirects](admin-tour.md#redirects).
 
 ## What a section is
 
 A page is built from **sections** stacked one above the other — a banner, then
 some text with a picture, then a row of figures, then a button. Each section
 uses a **design** the site provides, and each design comes with its own set of
-fields to fill in.
+fields to fill in. The editor says as much above them: *add sections to build the
+page. Each one uses a design the site provides.*
 
 You do not lay anything out by hand. Fill in the fields, and the design puts
-them in the right place, on a laptop and on a phone alike.
+them in the right place, on a laptop and on a phone alike. That is the trade: you
+give up control of the layout, and in exchange you cannot break it.
 
 ![A section in the editor. Above, an image field with a thumbnail of workshop.svg, a Change image button, an Image description field and an Image position dropdown. Below it, section 2, "Facts", with its heading field and a numbered list of figures — each with its own move up, move down and remove buttons.](images/section-controls.png)
 
@@ -92,6 +92,196 @@ Every section has a header strip with:
 **Duplicate** is more useful than it sounds. To add a second item that looks
 like one you already have, copy it and change the words, rather than starting
 from an empty section.
+
+## Which design does what
+
+Choosing a design should not be guesswork, so here is what each of the six that
+ship with the example site is for. Your site may have others, added when it was
+built; the ones below are the common set.
+
+### Rich text
+
+*A heading and a block of formatted text.* The workhorse. Use it for anything
+that is mostly words — a paragraph of explanation, a list of opening hours, a
+short story about the business.
+
+- **Heading** — optional. Leave it empty when the text follows on from the
+  section above.
+- **Body** — **required**. Formatted text, with the toolbar described
+  [below](#formatting-text).
+- **Width** — how wide the text runs: **narrow**, **wide** or **full**. Narrow is
+  the default and the right answer for reading; a long line of text is tiring to
+  follow. Reach for wide or full only when the content is not prose.
+
+### Media and text
+
+*An image beside a block of text.* Use it when a picture and some words explain
+each other — a photograph of a workshop next to a description of what happens in
+it.
+
+- **Heading** and **Body** — both optional.
+- **Image** — **required**. This design is about the picture; without one, use
+  Rich text instead.
+- **Image description** — *describes the image for screen readers and when it
+  fails to load.* Worth thirty seconds. See
+  [Pictures and video](pictures.md#write-a-description-this-one-matters).
+- **Image position** — **left** or **right**. If you have several of these
+  sections in a row, alternating left and right stops the page looking like a
+  form.
+
+### Card grid
+
+*A repeating grid of cards, each with a title, text and optional image.* Use it
+for a set of similar small things: services, product types, frequently-asked
+questions, the people on your team.
+
+- **Heading** and **Introduction** — optional, above the grid.
+- **Columns** — **2**, **3** or **4** cards across. Three is the default. Choose
+  based on how many cards you have: four cards in three columns leaves one alone
+  on the second row.
+- **Cards** — a repeating list, at least one and at most twelve. Each card has a
+  **Title** (**required**), some **Text**, an **Image**, and a **Link**.
+
+If you find yourself wanting a thirteenth card, or cards that need their own
+addresses, what you actually want is a [collection](collections.md).
+
+### Facts
+
+*A row of figures with captions.* Numbers you want a visitor to notice: a
+founding year, a count, a certification.
+
+- **Heading** — optional.
+- **Figures** — a repeating list, at least one and at most six. Each has a
+  **Figure** (**required** — *for example 2013, 50+, ISO 9001*) and a **Caption**
+  (**required**).
+
+Keep the figure short. It is set large, and a sentence in that slot looks like a
+mistake. The explanation goes in the caption.
+
+### Call to action
+
+*A short prompt with a button.* One job: get somebody to the next step. Put it at
+the bottom of a page that has convinced somebody of something.
+
+- **Heading** — **required**.
+- **Text** — optional, a sentence or two.
+- **Button label** — **required**. The words on the button. Say what happens —
+  "Book a visit" beats "Click here".
+- **Button link** — **required**. Where the button goes; see
+  [Fields that point at a page](#fields-that-point-at-a-page).
+
+### Contact form
+
+*A form a visitor can fill in. Submissions are stored and read under Form
+submissions.* This is how you let people write to you without publishing an email
+address.
+
+- **Heading** — **required**.
+- **Intro text** — *shown above the form.* A line about what you will do with the
+  message, or how quickly you reply.
+- **Name field label**, **Email field label**, **Message field label** — all
+  **required**, and all filled in for you already (*Your name*, *Email address*,
+  *Message*). Change them only if your site's tone calls for it.
+- **Submit button label** — **required**, and set to *Send message*.
+- **Confirmation message** — *shown to the visitor after a successful
+  submission.* Worth writing. The default behaviour is fine, but "Thank you — we
+  answer within two working days" sets an expectation.
+- **Destination note** — *a private note for editors on where these submissions
+  go. Not shown to visitors.* Use it to record who is meant to be checking. This
+  is the field that stops a form quietly collecting messages nobody reads.
+
+What visitors send arrives under **Submissions** — see
+[Submissions](admin-tour.md#submissions). Nothing is emailed anywhere unless
+somebody set that up separately.
+
+## Change some text
+
+Click into a field and type, exactly as you would in any form. There is no
+special mode to switch on.
+
+Nothing you type has left the editor yet. If you close the tab now, the change
+is gone; if you save, it is kept but still not public.
+
+### Formatting text
+
+Fields that take formatted text — a Rich text **Body**, a blog post's **Body** —
+have a small toolbar above them. There are seven buttons and nothing hidden
+behind them:
+
+| Button | What it does |
+|---|---|
+| **B** | Bold. Select some words first. |
+| *I* | Italic. |
+| 🔗 | Adds a link. It asks for the address, starting `https://`. |
+| **H2** | Turns the line into a **heading**. |
+| **H3** | Turns the line into a **subheading** — a heading inside a heading. |
+| ¶ | Turns it back into an ordinary paragraph. |
+| • | Bulleted list. |
+| 1. | Numbered list. |
+
+Two habits worth having:
+
+- **Use H2 and H3 for structure, not for size.** A heading is a signpost saying
+  "a new part of the page starts here". Somebody using a screen reader navigates
+  by them, and search engines read them as an outline. Making a line into a
+  heading because you wanted it bigger breaks both of those, and **B** is what you
+  actually wanted.
+- **Go H2, then H3 underneath it.** Do not jump to H3 for the first heading on a
+  page because you prefer the size.
+
+Plain boxes with no toolbar — a card's **Text**, a form's **Intro text**, a team
+member's **Bio** — take plain words only. There is no formatting to be had there,
+and that is the design rather than something missing.
+
+### Fields that point at a page
+
+Some fields ask for a destination rather than words: a **Button link** on a Call
+to action, a **Link** on a card. You do not type an address into these. You
+**choose a page from a list of your pages**, by its title, with its address shown
+alongside so that two similarly-named pages can be told apart.
+
+If the destination is somewhere else altogether — another organisation, a booking
+system, a social account — choose the **external link** option instead, and a box
+appears for the full web address. It needs to start with `https://`.
+
+Two things this buys you: you cannot mistype an address, and if a saved link
+points at a page that has since been deleted, the field says so plainly instead
+of leaving a dead button on your site. When that happens, pick a replacement.
+
+The site's navigation works the same way, on the **Menus** screen — though that
+one is administrator-only. See [Menus](admin-tour.md#menus).
+
+### Repeating lists
+
+Some designs hold a list of similar rows: **Cards** on a Card grid, **Figures**
+on a Facts section. Each row is numbered and has its own small buttons to move it
+up, move it down, and remove it.
+
+These lists have limits — a Facts section takes up to six figures, a Card grid up
+to twelve cards — and both need **at least one** row. If you empty a list
+completely, the save is refused rather than leaving you with an empty strip on
+your page. Remove the whole section instead.
+
+### Required fields and the red asterisk
+
+Some fields have a **red asterisk** next to their label. Those are required,
+because the design cannot do its job without them: a Call to action with no
+button label has nothing to click, and a Media and text with no image is Rich
+text with extra steps.
+
+**What happens if you leave one empty:** you find out when you click **Save**,
+and the save does not go through. Two things appear at once:
+
+1. **A message across the top of the editor** saying some sections are invalid.
+2. **A message against the field itself**, with a red border round it, naming
+   what is missing — *Body is required.*, *Button link is required.* The message
+   sits where that field's help text usually is.
+
+Inside a repeating list the message names the row, so you know which one to fix —
+*Cards entry 2: Title is required.*
+
+Nothing is lost when a save is refused. Everything you typed is still on screen.
+Fill in what it asks for and save again.
 
 ## Move, copy or remove a section
 
@@ -112,8 +302,9 @@ Scroll to the bottom of the sections. There is a box headed **Add a section**.
 ![The bottom of the editor: a "Call to action" section with Heading, Text, Button label and Button link fields — several marked with a red asterisk — and below it a box headed "Add a section" containing a "Choose a design…" dropdown and an Add button, followed by a collapsed "Search & social (SEO)" area.](images/add-section.png)
 
 1. Open the **Choose a design…** dropdown.
-2. Pick a design. The list is the set your site was built with, so it differs
-   from site to site.
+2. Pick a design. Its description appears underneath the dropdown, so you can
+   check you have the right one before committing. The list is the set your site
+   was built with, so it differs from site to site.
 3. Click **Add**.
 
 The new section appears at the bottom of the page with empty fields. Fill them
@@ -126,10 +317,31 @@ spent by trying one.
 ## Search & social (SEO)
 
 Near the bottom is a collapsed area called **Search & social (SEO)**. Click it
-to open. What is in there affects how the page is described in search results
-and when someone shares a link to it.
+to open. What is in there controls how the page is described **elsewhere** — in a
+search result, and in the little preview card that appears when somebody shares a
+link to it in a message or a post. None of it changes how your page looks.
 
-You can leave it closed. A page works perfectly well without touching it.
+**You can leave all of it empty.** A page works perfectly well untouched, because
+each field falls back to something sensible. Here is what each one is, and whether
+it is worth your time:
+
+| Field | What it is | Worth touching? |
+|---|---|---|
+| **Meta title** | *Shown in the browser tab and search results. Left empty, the page title is used.* | Only when the page's own title is not what you would want a stranger to read out of context. A page titled "Us" might want a meta title of "About Rivet & Oak — furniture made to be repaired". |
+| **Meta description** | *The snippet search engines and social cards show under the title.* | **Yes, this one is worth it.** One or two sentences, written for somebody who has not arrived yet. If you fill in nothing else here, fill in this. |
+| **Open Graph image** | *The image shown when this page is shared on social media.* | Worth setting on pages people are likely to share. A wide picture works best; see [Pictures and video](pictures.md). |
+| **Canonical URL** | *The preferred address for this page, when the same content is reachable at more than one URL.* | **No.** Leave it empty. It exists for an unusual situation, and filling it in wrongly can hide a page from search results. |
+| **Hide this page from search engines (noindex)** | A checkbox. | Rarely, and deliberately. See below. |
+
+**When to tick "hide from search engines".** When you want a page to exist and be
+reachable by anybody you send the link to, but not to be found by strangers
+searching. A thank-you page after a form, a price list for one particular client, a
+page you have not announced yet. It is not a lock — anybody with the link can
+still open it — so it is privacy by obscurity and nothing stronger. For most
+pages, leave it alone.
+
+Whichever of these you change, they are part of the page like any other field:
+they are kept when you **Save**, and they reach the public when you publish.
 
 ## Save
 
@@ -148,10 +360,17 @@ older content while your saved edits wait — that is exactly what the *Edits
 pending* tab lists. Putting them live is one more step, and it has its own page:
 [Publishing your changes](publishing.md).
 
+If your account is an **author**, that step is not yours to take, and the banner
+says so rather than offering a button. Save, leave a note, and tell whoever
+approves. See [What your account can do](roles.md#author).
+
 ## If it goes wrong
 
 - **You have not saved yet.** Click **Cancel**. The page returns to its last
   saved state.
+- **The save was refused.** Read the message against the red-bordered field. See
+  [Required fields](#required-fields-and-the-red-asterisk). Nothing you typed is
+  lost.
 - **You have saved, and want the old version back.** Below the Save button is
   **Version history**, with every save listed and a **Restore** button on the
   older ones. See

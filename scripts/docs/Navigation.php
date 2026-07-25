@@ -50,12 +50,23 @@ final class Navigation
         ],
         // Written for whoever maintains the content, in the admin panel, with no
         // interest in how any of it works. In the order someone new to the panel
-        // meets them: find your way around, change something, publish it.
+        // meets them: sign in, work out what your account may do, find your way
+        // around the menu, change something, publish it, then the two subjects
+        // that need their own page — pictures and collections.
+        //
+        // Roles comes second on purpose. The admin a reader sees depends on the
+        // kind of account they hold, so a reader whose sidebar does not match the
+        // screenshots needs that answer before anything else makes sense.
+        // Collections comes last because it is the one concept a reader can
+        // finish the other pages without ever needing.
         'Using your site' => [
             'docs/getting-started.md',
+            'docs/roles.md',
+            'docs/admin-tour.md',
             'docs/editing.md',
             'docs/publishing.md',
             'docs/pictures.md',
+            'docs/collections.md',
         ],
         'Running a site' => [
             'docs/install.md',
