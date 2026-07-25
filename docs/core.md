@@ -197,11 +197,44 @@ wrote, which is the quiet failure this document exists to forbid.
 Two caveats when moving content between backends:
 
 - **Migration is not automatic.** Switching `backend` points the CMS at an empty
-  store; it does not copy anything across. There is no migration command yet.
+  store; it does not copy anything across. Move it first with
+  `php bin/click-migrate-storage.php <from> <to>`, which is safe to re-run — a
+  document already present identically in the target is skipped, so an
+  interrupted run is finished by running it again. Version history is not moved.
 - **Slugs that differ only in case are not portable.** SQLite tells `page:Home`
   and `page:home` apart. The flat-file backend inherits whatever the host
   filesystem does, and on macOS or Windows those are one document. A site
   relying on the distinction loses content moving from SQLite to files.
+
+### The render cache
+
+Off by default. Turn it on with:
+
+```json
+{ "core": { "cache": { "enabled": true } } }
+```
+
+Rendered public pages are then stored under `data/cache/pages` as flat files —
+no new dependency, and the whole thing is safe to delete by hand.
+
+**What it will not cache.** A preview, and any request from a signed-in
+visitor. Both would let one person's view of the site become everyone's.
+
+**How it stays fresh.** Invalidation is wired into the storage layer rather than
+into each handler, so there is no code path that can change a document and
+forget to clear. Every write clears the whole cache rather than one entry:
+every document embeds the site header, so publishing a page that appears in the
+menu changes the header of every other page, and there is no dependency map
+from a rendered document back to what went into it. Admin writes are rare and
+public reads are not, so a full refill costs nothing worth measuring.
+
+**The one thing it cannot see.** A `web.render` plugin is handed the request and
+may vary its output on the query string, a cookie or the time of day. None of
+those are in the cache key and none of them are detectable from here. A site
+running such a plugin must leave the cache off. Section type definitions are the
+other blind spot: editing `config/sections/*.json` on disk is a deploy-time
+change with no handler to hook, so clear `data/cache/pages` as part of the
+deploy.
 
 ### Explicitly not core
 
@@ -210,8 +243,6 @@ Two caveats when moving content between backends:
 - **Page rendering and themes** — how a site looks is the site's business.
 - **Editorial features** — SEO, redirects, forms, comments, search, social,
   analytics. Most sites want some and no site wants all.
-- **Alternative storage backends** — MySQL, PostgreSQL. Implementations of an
-  existing port is exactly what plugins are for.
 - **Publishing a registry** — hosting a catalogue of plugins for others is a
   separate product. *Consuming* one is core; running one is not.
 - **Free-form building** — see `backlog.md`; a mode a site opts into.

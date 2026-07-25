@@ -33,6 +33,9 @@
     "history": {
       "retainVersions": 20
     },
+    "cache": {
+      "enabled": false
+    },
     "media": {
       "crops": []
     },

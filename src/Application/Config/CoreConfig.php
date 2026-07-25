@@ -272,6 +272,23 @@ final class CoreConfig
         return max(1, $this->int('core.history.retainVersions', RetentionPolicy::DEFAULT_LIMIT));
     }
 
+    /* -------------------------------------------------------------- cache -- */
+
+    /**
+     * Whether rendered public pages may be cached, under `core.cache.enabled`.
+     *
+     * Defaults to off. A cache that arrives switched on with an upgrade is a
+     * cache nobody chose, and the one failure mode that matters here — a visitor
+     * served a page that is no longer true — is invisible to the person who
+     * would have to notice it. A site turns this on deliberately, having read
+     * what it cannot see (a `web.render` plugin varying its output on anything
+     * that is not in the key).
+     */
+    public function cacheEnabled(): bool
+    {
+        return $this->bool('core.cache.enabled', false);
+    }
+
     /* -------------------------------------------------------------- media -- */
 
     /**
