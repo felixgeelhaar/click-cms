@@ -12,7 +12,7 @@ pictures. Video works differently in enough ways to need
 
 Click **Media** in the left-hand menu.
 
-![The Media screen, headed "7 images. Each upload is resized to: sm, md, lg, xl." It has a "+ Upload" button, a search box, a folder dropdown, a dashed area reading "Drag images here, or use the Upload button", and a grid of image cards. Each card shows a thumbnail, the file name and size, a Description field, and Copy reference and Delete buttons.](images/media-library.png)
+![The Media screen, headed "7 pictures. Each upload is resized to: sm, md, lg, xl." It has a "+ Upload" button, a search box, a folder dropdown, a dashed area reading "Drag pictures or video here, or use the Upload button", and a grid of cards. Each card shows a thumbnail, the file name and size, a Description field, and Copy reference and Delete buttons.](images/media-library.png)
 
 Each picture appears as a card showing:
 
