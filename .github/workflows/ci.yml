@@ -26,6 +26,13 @@ jobs:
       # 8.3 matches the runtime image (Dockerfile: php:8.3-apache), so the suite
       # runs on the version production actually serves. gd/zip/pdo_sqlite are the
       # extensions the application loads at boot.
+      #
+      # This is also why phpunit is constrained to a version that installs on
+      # 8.3. It was briefly ^13, which requires 8.4.1 — so `composer install`
+      # failed here and this job was red for two days and through a release,
+      # while it passed for anyone whose local PHP happened to be newer. A test
+      # suite that cannot run on the version production serves is not a test
+      # suite for this project.
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
