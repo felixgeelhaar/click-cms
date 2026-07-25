@@ -26,5 +26,23 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.js'],
     restoreMocks: true,
+    /**
+     * The accessibility tests mount a whole screen and run axe over it, which
+     * is seconds of real work rather than the milliseconds every other test
+     * here takes. Vitest's 5s default is comfortable on a developer's machine
+     * and not comfortable anywhere slower.
+     *
+     * The release build publishes a linux/arm64 image, which on an amd64 runner
+     * is built under QEMU emulation. Every axe test took between 5.5 and 11
+     * seconds there and nine of them timed out, which failed the image build
+     * for the 1.2.0 release — reported as nine accessibility failures when
+     * nothing was inaccessible.
+     *
+     * Raised rather than removed or scoped to those tests: a timeout is not the
+     * property under test, and a suite that passes only on fast hardware tells
+     * you about the hardware. Everything else here still finishes in
+     * milliseconds, so a genuine hang is still caught, just later.
+     */
+    testTimeout: 30_000,
   },
 });
