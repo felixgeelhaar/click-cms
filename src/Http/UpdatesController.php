@@ -103,7 +103,7 @@ final class UpdatesController
 
         $result = $this->updates->applyApproved(
             $this->config->updateFeedUrl(),
-            $this->config->updatePublicKey(),
+            $this->config->updatePublicKeys(),
             $this->config->updatePolicy(),
             $this->config->updateAllowPreRelease(),
         );
@@ -149,7 +149,7 @@ final class UpdatesController
     {
         $decision = $this->updates->check(
             $this->config->updateFeedUrl(),
-            $this->config->updatePublicKey(),
+            $this->config->updatePublicKeys(),
             $this->config->updatePolicy(),
             $this->config->updateAllowPreRelease(),
         );

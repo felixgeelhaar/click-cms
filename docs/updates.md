@@ -182,16 +182,55 @@ every site would refuse it.
   else. Anyone holding it can make every installation run their code.
 - The public half goes in each site's `core.updates.publicKey`.
 
-**There is no key rotation yet.** A compromised key means every site must be
-edited by hand. TUF solves this with a role hierarchy and a rotation path; that
-is the most significant gap remaining here, and it is worth closing before this
-channel has many users.
+### Rotating the signing key
+
+A feed may announce the keys to trust from now on, in a `keys` array. Because
+that announcement is inside the signed bytes, it is believed only when the feed
+carrying it was signed by a key that is *already* trusted — so a key cannot
+announce itself.
+
+```json
+{
+  "sequence": 1730000000,
+  "expires": "…",
+  "keys": ["-----BEGIN PUBLIC KEY-----\n…new…\n-----END PUBLIC KEY-----"],
+  "releases": [ … ]
+}
+```
+
+To rotate:
+
+1. Publish a feed **signed with the current key** whose `keys` lists both the
+   current and the new public key. Installations adopt the pair.
+2. Once installations have fetched at least once (a week, given the schedule),
+   publish a feed signed with the **new** key whose `keys` lists only the new
+   key. The old key is then retired everywhere.
+
+Announced keys are remembered in `data/updates/feed-state.json` and replace the
+previous announcement rather than accumulating, so a key really can be retired —
+a set that only grew would keep a compromised key trusted forever.
+
+**The configured key is never revocable this way.** `core.updates.publicKey` (or
+the `publicKeys` list) is trusted unconditionally, whatever a feed says, so the
+anchor of trust stays the thing the operator typed rather than something the
+network can talk them out of. The intended arrangement is TUF's: a rarely used
+**offline** key in the configuration, and an **online** signing key that it
+rotates. If the online key is compromised, the offline key signs a feed that
+retires it; if the offline key is compromised, every site must be edited by hand
+— which is why it should not be on the build machine.
+
+Configure several anchors when you want an overlap window:
+
+```json
+"updates": { "publicKeys": ["-----BEGIN PUBLIC KEY-----\n…a…", "-----BEGIN PUBLIC KEY-----\n…b…"] }
+```
 
 ## What is not implemented
 
 Stated plainly, because a half-known threat model is worse than a known one:
 
-- **No key rotation or revocation.** One key, changed by editing every site.
+- **No threshold signing.** One valid signature is enough; TUF would require *m
+  of n*, so a single stolen key is not sufficient on its own.
 - **No transparency log.** A maliciously signed release would not be publicly
   detectable the way Sigstore's log makes it.
 - **No mirror or mix-and-match protection beyond the above.** The feed is a

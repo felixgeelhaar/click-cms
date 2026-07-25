@@ -46,6 +46,22 @@ use Click\Cms\Domain\Update\Release;
  *    even though its signature is perfectly valid.
  *
  * Both fields sit inside the signed bytes, so neither can be edited in transit.
+ *
+ * ## Key rotation
+ *
+ * A single permanent key is its own problem: retiring it means editing every
+ * installation by hand, so in practice it never gets retired. A feed may
+ * therefore announce the set of keys that should be trusted from now on, in a
+ * `keys` array, and — because that announcement is inside the signed bytes — it
+ * is only believed when the feed carrying it was itself signed by a key already
+ * trusted. Announced keys are remembered, so the new signing key keeps working
+ * on the next fetch and the old one can then be dropped by a later feed.
+ *
+ * The operator's configured key is deliberately NOT revocable this way. It is
+ * always trusted, whatever a feed says, so the anchor of trust stays the thing
+ * the operator typed rather than something the network can talk them out of.
+ * The intended arrangement is the one TUF describes: a rarely-used offline key
+ * in the configuration, and an online signing key that it rotates.
  */
 final class ReleaseFeed
 {
@@ -66,12 +82,22 @@ final class ReleaseFeed
      *
      * @return array{releases: list<Release>, error: ?string}
      */
-    public function fetch(string $feedUrl, string $publicKey): array
+    /**
+     * @param string|list<string> $publicKey The configured key, or several. These
+     *        are the permanent anchor; any key a previous feed announced is
+     *        trusted in addition to them.
+     */
+    public function fetch(string $feedUrl, string|array $publicKey): array
     {
+        $configured = array_values(array_filter(
+            array_map(trim(...), is_array($publicKey) ? $publicKey : [$publicKey]),
+            static fn (string $k): bool => $k !== ''
+        ));
+
         if (trim($feedUrl) === '') {
             return $this->nothing('No update feed is configured.');
         }
-        if (trim($publicKey) === '') {
+        if ($configured === []) {
             // Without a key there is no way to tell a real feed from a forged
             // one, and a feed nobody can verify is worse than no feed at all.
             return $this->nothing('No update signing key is configured, so the feed was not trusted.');
@@ -90,7 +116,9 @@ final class ReleaseFeed
         // Verified against the bytes as received, before they are parsed — a
         // signature checked after decoding would only vouch for our reading of
         // the document rather than the document.
-        if (!$this->verifySignature($raw, trim($signature), $publicKey)) {
+        // The configured keys plus anything a previously trusted feed announced.
+        $trusted = array_merge($configured, $this->announcedKeys());
+        if (!$this->verifiesAgainstAny($raw, trim($signature), $trusted)) {
             return $this->nothing('The update feed signature does not verify, so nothing from it was used.');
         }
 
@@ -134,6 +162,13 @@ final class ReleaseFeed
         // Recorded only once the feed is fully believed, so a rejected feed
         // cannot raise the bar and lock out the legitimate one behind it.
         $this->rememberSequence($sequence);
+
+        // Adopted only now, once signature, freshness and sequence have all
+        // passed: a feed that was refused must never get to change who is
+        // trusted, or a forged one could install its own key.
+        if (isset($decoded['keys']) && is_array($decoded['keys'])) {
+            $this->rememberAnnouncedKeys($decoded['keys'], $configured);
+        }
 
         $releases = [];
         foreach ($entries as $entry) {
@@ -214,8 +249,94 @@ final class ReleaseFeed
         }
 
         $path = $this->stateDir . '/feed-state.json';
+
+        // Merged, not replaced. Writing only the sequence would drop the
+        // announced keys on the next ordinary feed, so a site that had just
+        // rotated would lose the new key and stop trusting the feed signed with
+        // it — the rotation quietly undoing itself one fetch later.
+        $state = json_decode((string) @file_get_contents($path), true);
+        $state = is_array($state) ? $state : [];
+        $state['highestSequence'] = $sequence;
+
         $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
-        if (@file_put_contents($tmp, json_encode(['highestSequence' => $sequence], JSON_PRETTY_PRINT), LOCK_EX) !== false) {
+        if (@file_put_contents($tmp, json_encode($state, JSON_PRETTY_PRINT), LOCK_EX) !== false) {
+            @rename($tmp, $path);
+        }
+    }
+
+    /* ------------------------------------------------------ key rotation -- */
+
+    /** True when the signature verifies under any one of the trusted keys. */
+    private function verifiesAgainstAny(string $payload, string $signature, array $keys): bool
+    {
+        foreach ($keys as $key) {
+            if ($this->verifySignature($payload, $signature, $key)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Keys a previously trusted feed asked this installation to trust.
+     *
+     * @return list<string>
+     */
+    private function announcedKeys(): array
+    {
+        if ($this->stateDir === null) {
+            return [];
+        }
+        $decoded = json_decode((string) @file_get_contents($this->stateDir . '/feed-state.json'), true);
+        $keys = is_array($decoded) ? ($decoded['announcedKeys'] ?? null) : null;
+        if (!is_array($keys)) {
+            return [];
+        }
+
+        return array_values(array_filter($keys, static fn ($k): bool => is_string($k) && $k !== ''));
+    }
+
+    /**
+     * Replace the announced set with what this feed says.
+     *
+     * Replace rather than merge, so retiring a key is possible at all: a set
+     * that only ever grew would mean a compromised online key stayed trusted
+     * forever, which is the failure rotation exists to fix. The configured keys
+     * are excluded from the stored set because they are trusted unconditionally
+     * anyway, and storing them would blur which trust came from the operator.
+     *
+     * @param array<mixed> $announced
+     * @param list<string> $configured
+     */
+    private function rememberAnnouncedKeys(array $announced, array $configured): void
+    {
+        if ($this->stateDir === null) {
+            return;
+        }
+
+        $keys = [];
+        foreach ($announced as $key) {
+            // Only something OpenSSL will actually accept as a public key; a
+            // malformed entry would silently shrink the trusted set.
+            if (!is_string($key) || $key === '' || openssl_pkey_get_public($key) === false) {
+                continue;
+            }
+            if (!in_array($key, $configured, true)) {
+                $keys[] = $key;
+            }
+        }
+
+        $path = $this->stateDir . '/feed-state.json';
+        $state = json_decode((string) @file_get_contents($path), true);
+        $state = is_array($state) ? $state : [];
+        $state['announcedKeys'] = array_values(array_unique($keys));
+
+        if (!is_dir($this->stateDir)) {
+            @mkdir($this->stateDir, 0o775, true);
+        }
+        $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
+        if (@file_put_contents($tmp, json_encode($state, JSON_PRETTY_PRINT), LOCK_EX) !== false) {
             @rename($tmp, $path);
         }
     }

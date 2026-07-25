@@ -69,7 +69,7 @@ final class UpdateService
      */
     public function check(
         string $feedUrl,
-        string $publicKey,
+        string|array $publicKey,
         UpdatePolicy $policy,
         bool $allowPreRelease = false,
     ): UpdateDecision {
@@ -97,7 +97,7 @@ final class UpdateService
      */
     public function applyIfAutomatic(
         string $feedUrl,
-        string $publicKey,
+        string|array $publicKey,
         UpdatePolicy $policy,
         bool $allowPreRelease = false,
     ): array {
@@ -125,7 +125,7 @@ final class UpdateService
      */
     public function applyApproved(
         string $feedUrl,
-        string $publicKey,
+        string|array $publicKey,
         UpdatePolicy $policy,
         bool $allowPreRelease = false,
     ): array {
