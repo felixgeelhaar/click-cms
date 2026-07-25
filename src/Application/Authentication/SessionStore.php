@@ -161,14 +161,50 @@ final class SessionStore
     /**
      * @param array<string, mixed> $session
      */
+    /**
+     * Replace the session file atomically.
+     *
+     * Written to a neighbouring temporary file and renamed into place, because
+     * `file_put_contents` — even with `LOCK_EX` — truncates the target when it
+     * opens it and only then takes the lock, while {@see read()} takes no lock
+     * at all. A reader landing in that window read an empty file, decoded
+     * nothing, and was told it was not authenticated.
+     *
+     * That was not theoretical. Every request touches the session to record
+     * activity, so a single admin page load firing half a dozen requests raced
+     * itself: roughly one request in thirteen came back 401 on a session that
+     * was valid the whole time, which surfaced as a picker reporting an empty
+     * media library and a comments panel refusing permission.
+     *
+     * `rename` within one directory is atomic on POSIX, so a concurrent reader
+     * now sees either the whole previous session or the whole new one.
+     */
     private function writeFile(string $id, array $session): void
     {
         if (!is_dir($this->directory) && !@mkdir($this->directory, 0o700, true) && !is_dir($this->directory)) {
             return;
         }
 
-        file_put_contents($this->pathFor($id), json_encode($session, JSON_PRETTY_PRINT), LOCK_EX);
-        @chmod($this->pathFor($id), 0o600);
+        $path = $this->pathFor($id);
+        // Same directory, so the rename stays within one filesystem; unique per
+        // writer, so two concurrent writes cannot corrupt each other's staging.
+        $temporary = $path . '.' . bin2hex(random_bytes(8)) . '.tmp';
+
+        if (@file_put_contents($temporary, json_encode($session, JSON_PRETTY_PRINT)) === false) {
+            @unlink($temporary);
+
+            return;
+        }
+
+        // Set before the rename: the file must never be readable by anyone else,
+        // not even for the moment between appearing and being locked down.
+        @chmod($temporary, 0o600);
+
+        if (!@rename($temporary, $path)) {
+            @unlink($temporary);
+
+            return;
+        }
 
         $this->collectGarbage();
     }
@@ -206,7 +242,15 @@ final class SessionStore
 
         $cutoff = time() - max(86_400, $this->idleTimeoutSeconds * 4);
 
-        foreach (glob($this->directory . '/*.json') ?: [] as $file) {
+        // Staging files are swept too. One only survives a crash between writing
+        // and renaming, which is rare — and rare is exactly what accumulates
+        // unnoticed when nothing collects it.
+        $stale = array_merge(
+            glob($this->directory . '/*.json') ?: [],
+            glob($this->directory . '/*.tmp') ?: [],
+        );
+
+        foreach ($stale as $file) {
             if (@filemtime($file) < $cutoff) {
                 @unlink($file);
             }
