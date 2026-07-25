@@ -3,6 +3,26 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] — 2026-07-25
+
+Nothing a site runs changes. This exists because 1.2.0 could not publish a
+container image, and neither could 1.0.0 or 1.1.0 — so this is the first
+release that actually ships one.
+
+### Fixed
+- The release build publishes a `linux/arm64` image alongside `amd64`, which on
+  an amd64 runner means QEMU. Every accessibility test took between 5.5 and 11
+  seconds there, nine of them passed Vitest's 5-second default, and the image
+  build failed reporting nine accessibility failures when nothing was
+  inaccessible. Both prior releases failed the same way and nobody noticed,
+  because the release itself succeeded and only the image was missing.
+- CI's PHP job had been red since 23 July, including through 1.1.0: a dev
+  dependency required PHP 8.4 while the job runs 8.3 to match the runtime image,
+  so `composer install` failed and the suite never ran there at all. It passed
+  for anyone whose local PHP happened to be newer. Verified now inside a
+  `php:8.3-cli` container — 1918 tests, all passing — and every shipped file
+  still parses on 8.1, which is the version the update feed advertises.
+
 ## [1.2.0] — 2026-07-25
 
 A minor release whose most consequential change is a bug fix. Sites running any
