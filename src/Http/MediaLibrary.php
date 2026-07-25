@@ -87,8 +87,23 @@ final class MediaLibrary
         // rather than recomputed per client — the same contract listMedia uses.
         $displayWidth = $this->displayWidth($query['displayWidth'] ?? null);
 
+        // What the caller can actually use. A field picker asks for one kind
+        // because the two are not substitutable: an image field renders an
+        // `<img>` and a file field a `<video>`. Without it every picker listed
+        // the whole library, so a clip appeared in the image chooser as a broken
+        // thumbnail and could be selected into a slot that cannot show it.
+        //
+        // An unrecognised kind filters nothing rather than everything: a
+        // mistyped parameter should not present an empty library as the truth.
+        $kind = trim((string) ($query['kind'] ?? ''));
+        $kind = in_array($kind, ['image', 'video'], true) ? $kind : null;
+
         $data = [];
         foreach ($all as $item) {
+            if ($kind !== null && $item->kind() !== $kind) {
+                continue;
+            }
+
             if ($needle !== '' && !$this->matchesName($item, $needle)) {
                 continue;
             }

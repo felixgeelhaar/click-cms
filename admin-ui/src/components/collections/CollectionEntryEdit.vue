@@ -163,9 +163,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import FieldInput from '../fields/FieldInput.vue';
-import ImageField from '../fields/ImageField.vue';
 import RepeaterField from '../fields/RepeaterField.vue';
+import { leafComponent } from '../fields/leafComponent.js';
 import PageLanguages from '../PageLanguages.vue';
 import PageVersions from '../PageVersions.vue';
 
@@ -245,12 +244,12 @@ const versionLocale = () => locale.value || defaultLocale.value;
 
 /* ------------------------------------------------------------ fields -- */
 
-// The same mapping the section editor uses: repeaters and images have dedicated
-// components, everything else is the shared FieldInput.
+// The same mapping the section editor uses, from the same module: a repeater is
+// a container this file handles, everything else is a leaf.
 const fieldComponent = (field) => {
   if (field.type === 'repeater') return RepeaterField;
-  if (field.type === 'image') return ImageField;
-  return FieldInput;
+
+  return leafComponent(field);
 };
 
 // A blank entry seeded from the schema, so declared defaults appear and repeater

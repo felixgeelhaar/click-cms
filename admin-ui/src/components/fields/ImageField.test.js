@@ -50,3 +50,44 @@ describe('focal point in the preview', () => {
     expect(preview.attributes('style')).toContain('object-position: 50% 50%');
   });
 });
+
+/**
+ * The picker used to report every failed request as an empty library, which
+ * sent an editor whose library is full off to upload the pictures again.
+ */
+describe('when the library cannot be loaded', () => {
+  it('says so rather than claiming the library is empty', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({ status: 401, error: 'Not authenticated' }),
+    }));
+    const wrapper = mount(ImageField, { props: { field: { label: 'Photo' }, modelValue: '' } });
+    await flushPromises();
+
+    const hint = wrapper.get('[data-test="library-failed"]').text();
+    expect(hint).toContain('could not be loaded');
+    expect(hint).not.toContain('upload images on the Media page');
+  });
+
+  it('says the same when the request throws outright', async () => {
+    global.fetch = vi.fn(async () => { throw new Error('offline'); });
+    const wrapper = mount(ImageField, { props: { field: { label: 'Photo' }, modelValue: '' } });
+    await flushPromises();
+
+    expect(wrapper.get('[data-test="library-failed"]').text()).toContain('could not be loaded');
+  });
+
+  it('still reports a genuinely empty library as empty', async () => {
+    const wrapper = await mountField([], '');
+
+    expect(wrapper.find('[data-test="library-failed"]').exists()).toBe(false);
+    expect(wrapper.get('.hint').text()).toContain('upload images on the Media page');
+  });
+
+  it('asks for pictures only, so a video never appears as a broken thumbnail', async () => {
+    await mountField([media()], '');
+
+    expect(String(global.fetch.mock.calls[0][0])).toContain('kind=image');
+  });
+});

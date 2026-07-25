@@ -74,6 +74,26 @@ final class MediaLibraryTest extends TestCase
         file_put_contents($this->base . '/' . $id . '.jpg', 'not-a-real-image');
     }
 
+    /** A video, which the library stores as-is: no dimensions, no variants. */
+    private function seedVideo(string $id, string $originalName): void
+    {
+        $item = MediaItem::create(
+            id: $id,
+            extension: 'mp4',
+            mimeType: 'video/mp4',
+            originalName: $originalName,
+            bytes: 4_194_304,
+            width: 0,
+            height: 0,
+        );
+
+        file_put_contents(
+            $this->base . '/' . $id . '.json',
+            json_encode($item->toArray(), JSON_UNESCAPED_SLASHES),
+        );
+        file_put_contents($this->base . '/' . $id . '.mp4', 'not-a-real-video');
+    }
+
     private function library(Role $role = Role::Admin): MediaLibrary
     {
         return new MediaLibrary($this->media, static fn (): Role => $role);
@@ -234,5 +254,60 @@ final class MediaLibraryTest extends TestCase
 
         self::assertArrayNotHasKey('status', $result);
         self::assertSame(1, $result['data']['deleted']);
+    }
+
+    public function testKindFiltersToImages(): void
+    {
+        $this->seed('harbour-crane-aaaa', 'Harbour Crane.jpg');
+        $this->seedVideo('workshop-clip-bbbb', 'Workshop.mp4');
+
+        $result = $this->library()->list(['kind' => 'image']);
+
+        self::assertSame(['harbour-crane-aaaa'], $this->idsOf($result));
+        self::assertSame(1, $result['total']);
+    }
+
+    public function testKindFiltersToVideo(): void
+    {
+        $this->seed('harbour-crane-aaaa', 'Harbour Crane.jpg');
+        $this->seedVideo('workshop-clip-bbbb', 'Workshop.mp4');
+
+        $result = $this->library()->list(['kind' => 'video']);
+
+        self::assertSame(['workshop-clip-bbbb'], $this->idsOf($result));
+    }
+
+    public function testNoKindListsEverything(): void
+    {
+        $this->seed('harbour-crane-aaaa', 'Harbour Crane.jpg');
+        $this->seedVideo('workshop-clip-bbbb', 'Workshop.mp4');
+
+        $ids = $this->idsOf($this->library()->list([]));
+        sort($ids);
+
+        self::assertSame(['harbour-crane-aaaa', 'workshop-clip-bbbb'], $ids);
+    }
+
+    /**
+     * A mistyped kind must not present an empty library as the truth: showing
+     * everything is recoverable, showing nothing reads as "you have no files".
+     */
+    public function testUnknownKindFiltersNothing(): void
+    {
+        $this->seed('harbour-crane-aaaa', 'Harbour Crane.jpg');
+        $this->seedVideo('workshop-clip-bbbb', 'Workshop.mp4');
+
+        self::assertSame(2, $this->library()->list(['kind' => 'audio'])['total']);
+    }
+
+    public function testKindCombinesWithSearch(): void
+    {
+        $this->seed('harbour-crane-aaaa', 'Harbour Crane.jpg');
+        $this->seedVideo('harbour-clip-bbbb', 'Harbour Clip.mp4');
+        $this->seedVideo('workshop-clip-cccc', 'Workshop.mp4');
+
+        $result = $this->library()->list(['kind' => 'video', 'q' => 'harbour']);
+
+        self::assertSame(['harbour-clip-bbbb'], $this->idsOf($result));
     }
 }
