@@ -59,9 +59,19 @@ permissions:
   id-token: write
 
 concurrency:
-  # Shared with the release workflow: never two publishes at once, and never
-  # cancelled half-way, because a cancelled deploy leaves the site as whatever
-  # the last complete one wrote.
+  # Every Pages deploy queues here, including the one the release workflow
+  # triggers by calling this workflow — a called workflow's concurrency applies
+  # to it, which is what makes one group enough.
+  #
+  # This has to hold, and for a while it did not: the release workflow declared
+  # its own separate group, so the two never serialised. A release and a docs
+  # push deployed at the same time, the earlier one landed last, and its feed —
+  # built one minute before the tag existed, and so offering no releases at all —
+  # replaced the correct one. The site was not broken and nothing failed; it just
+  # silently advertised no upgrade.
+  #
+  # Not cancelled in progress: a cancelled deploy leaves the site as whatever the
+  # last complete one wrote, which is the same failure by another route.
   group: pages
   cancel-in-progress: false
 

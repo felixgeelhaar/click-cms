@@ -22,9 +22,18 @@ permissions:
   pages: write      # publish the feed
   id-token: write
 
-concurrency:
-  group: release-feed
-  cancel-in-progress: false   # never race two feed publishes
+# Deliberately no workflow-level concurrency.
+#
+# The Pages deploy is serialised by the `pages` group declared in pages.yml,
+# which this workflow calls — and a called workflow's own concurrency applies to
+# it. Declaring `pages` here as well would have this run hold the group while
+# waiting for its own called workflow to acquire it, which is a deadlock.
+#
+# This previously said `release-feed` while pages.yml said `pages`, so the two
+# groups never matched and nothing serialised anything. A documentation push and
+# a release deployed concurrently, the earlier one finished last, and a feed
+# built before the tag existed — offering zero releases — overwrote the correct
+# one. Whatever deploys last wins, so what matters is that deploys queue.
 
 jobs:
   package:
