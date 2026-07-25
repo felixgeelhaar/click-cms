@@ -101,7 +101,7 @@ final class RepeaterLabelFieldTest extends TestCase
             ]]]]]
         ));
 
-        $this->assertStringContainsString('Guild of Master Craftsmen</h2>', $html);
+        $this->assertStringContainsString('Guild of Master Craftsmen</h3>', $html);
         $this->assertStringContainsString('alt="Guild of Master Craftsmen"', $html);
     }
 
@@ -123,10 +123,10 @@ final class RepeaterLabelFieldTest extends TestCase
 
         // The linked one becomes the link's wording, and appears once.
         $this->assertStringContainsString('>Linked Mark</a>', $html);
-        $this->assertStringNotContainsString('Linked Mark</h2>', $html);
+        $this->assertStringNotContainsString('Linked Mark</h3>', $html);
 
         // The unlinked one keeps its heading.
-        $this->assertStringContainsString('Unlinked Mark</h2>', $html);
+        $this->assertStringContainsString('Unlinked Mark</h3>', $html);
     }
 
     /**

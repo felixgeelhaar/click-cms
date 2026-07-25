@@ -375,8 +375,10 @@ final class AddedSectionDesignsTest extends TestCase
         // part heading at the same level as the sections around it gives a screen
         // reader a flat outline. It could not be anything but an h2 until a field
         // could declare its role.
-        $this->assertStringContainsString('<h3 class="cms-field cms-field--heading">What it costs</h3>', $html);
-        $this->assertStringNotContainsString('<h2', $html);
+        // An h2. It introduces the sections that follow, so it sits at their
+        // level — making it an h3 put a level-three heading above level-two ones,
+        // which is a worse outline than the flat one it was meant to fix.
+        $this->assertStringContainsString('<h2 class="cms-field cms-field--heading">What it costs</h2>', $html);
         // A blank line in the lead-in becomes a second paragraph, not a <br>.
         $this->assertSame(2, preg_match_all('#<p>#', $html));
     }
@@ -387,7 +389,7 @@ final class AddedSectionDesignsTest extends TestCase
 
         $this->assertSame(2, preg_match_all('#<li class="cms-item">#', $html));
         $this->assertStringContainsString(
-            '<h2 class="cms-field cms-field--title">How long does a commission take?</h2>',
+            '<h3 class="cms-field cms-field--title">How long does a commission take?</h3>',
             $html
         );
         // The answer is rich text, so its own markup survives sanitising.
@@ -484,7 +486,7 @@ final class AddedSectionDesignsTest extends TestCase
         $this->assertStringContainsString('alt="Ruth Ellery"', $html);
         $this->assertStringContainsString('<a href="mailto:ruth@example.com">', $html);
         // The second person has no photograph and no email, and still renders.
-        $this->assertStringContainsString('>Tomas Lindqvist</h2>', $html);
+        $this->assertStringContainsString('>Tomas Lindqvist</h3>', $html);
     }
 
     public function testADetailsListPairsEveryLabelWithItsValue(): void
@@ -507,7 +509,7 @@ final class AddedSectionDesignsTest extends TestCase
         $html = $this->render('logos');
 
         $this->assertStringContainsString('alt="Guild of Master Craftsmen"', $html);
-        $this->assertStringContainsString('>FSC Chain of Custody</h2>', $html);
+        $this->assertStringContainsString('>FSC Chain of Custody</h3>', $html);
     }
 
     // ------------------------------------------------------------- helpers

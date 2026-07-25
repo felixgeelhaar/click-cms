@@ -7,8 +7,7 @@
       "name": "heading",
       "type": "text",
       "label": "Heading",
-      "required": true,
-      "as": "subheading"
+      "required": true
     },
     {
       "name": "intro",
