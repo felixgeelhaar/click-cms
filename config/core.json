@@ -26,6 +26,8 @@
       "lockoutMaxAttempts": 5,
       "lockoutWindowSeconds": 900,
       "lockoutDurationSeconds": 900,
+      "sprayMaxFailures": 50,
+      "sprayWindowSeconds": 900,
       "passwordMinLength": 8
     },
     "history": {

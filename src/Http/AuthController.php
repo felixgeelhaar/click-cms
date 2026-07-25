@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Http;
 
 use Click\Cms\Application\Authentication\CsrfGuard;
+use Click\Cms\Application\Authentication\LoginSprayGuard;
 use Click\Cms\Application\Authentication\LoginThrottle;
 use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Application\Config\CoreConfig;
@@ -32,6 +33,16 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
  */
 final class AuthController
 {
+    /**
+     * The site-wide failure ceiling, built once per request from configuration.
+     *
+     * Not a constructor argument: the throttle already knows where login state
+     * lives on this installation and this controller already holds the
+     * configuration, so the guard can be assembled from those two rather than
+     * threaded through every place a controller is built.
+     */
+    private ?LoginSprayGuard $sprayGuard = null;
+
     public function __construct(
         private readonly SessionStore $sessions,
         private readonly LoginThrottle $throttle,
@@ -112,6 +123,17 @@ final class AuthController
 
         if ($username === '' || $password === '') {
             return ['status' => 400, 'error' => 'Username and password required'];
+        }
+
+        // The site-wide ceiling is consulted before anything touches the named
+        // account, and before the password is verified. Verifying first and
+        // only then refusing would turn the refusal into an oracle — a wrong
+        // guess and a right one would come back differently — and an attacker
+        // could go on testing passwords at full speed through a block that
+        // announced which of them had worked.
+        $spray = $this->checkSprayCooloff();
+        if ($spray !== null) {
+            return $spray;
         }
 
         $lockout = $this->checkLockout($username);
@@ -207,7 +229,7 @@ final class AuthController
 
         $hash = $account->data['password'] ?? null;
         if (!is_string($hash) || !password_verify($current, $hash)) {
-            $this->recordFailedLogin($username);
+            $this->recordFailedLogin($username, false);
             return ['status' => 403, 'error' => 'The current password is not correct.'];
         }
 
@@ -305,10 +327,46 @@ final class AuthController
     private function checkLockout(string $username): ?array
     {
         $remaining = $this->throttle->secondsRemaining($username);
-        if ($remaining === null) {
-            return null;
-        }
 
+        return $remaining === null ? null : $this->tooManyAttempts($remaining);
+    }
+
+    /**
+     * Refuse every login while the site as a whole is over its failure ceiling.
+     *
+     * This is the one place the CMS knowingly fails closed. During a spray a
+     * legitimate editor arriving with the right password is turned away too,
+     * which is a real cost, and it is chosen over the alternative — letting
+     * correct credentials through — because that alternative is not a limit at
+     * all, only a slower way of telling an attacker which guess was right.
+     *
+     * What keeps the cost small is that the refusal is never longer than the
+     * evidence for it: {@see LoginSprayGuard} recomputes the window on every
+     * call instead of latching a deadline, so the door reopens the moment the
+     * failures age out. Sessions already established are untouched — everyone
+     * signed in when the attack started keeps working — and the ceiling sits
+     * far above the number of failures ordinary use produces. An attacker can
+     * still deny the login form to newcomers for a quarter of an hour at a
+     * time, and that is the residual risk being accepted here.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function checkSprayCooloff(): ?array
+    {
+        $remaining = $this->spray()->secondsRemaining();
+
+        return $remaining === null ? null : $this->tooManyAttempts($remaining);
+    }
+
+    /**
+     * Word for word what a per-account lockout says, on purpose. Somebody
+     * turned away during a spray must not be able to tell from the answer
+     * whether the account they named exists, is locked, or was never involved.
+     *
+     * @return array<string, mixed>
+     */
+    private function tooManyAttempts(int $remaining): array
+    {
         $minutes = (int) ceil($remaining / 60);
 
         return [
@@ -318,9 +376,29 @@ final class AuthController
         ];
     }
 
-    private function recordFailedLogin(string $username): void
+    /**
+     * @param bool $anonymous Whether the failure came from someone not yet
+     *   signed in. Only those count towards the site-wide ceiling: an editor
+     *   with a valid session mistyping their current password is not part of a
+     *   credential attack, and counting them would let ordinary clumsiness push
+     *   the site towards refusing logins for everybody. Their account's own
+     *   lockout still counts it, which is the right scope for that mistake.
+     */
+    private function recordFailedLogin(string $username, bool $anonymous = true): void
     {
         $this->throttle->recordFailure($username);
+
+        if ($anonymous) {
+            $this->spray()->recordFailure();
+        }
+    }
+
+    private function spray(): LoginSprayGuard
+    {
+        return $this->sprayGuard ??= $this->throttle->sprayGuard(
+            $this->config->sprayMaxFailures(),
+            $this->config->sprayWindowSeconds(),
+        );
     }
 
     private function clearFailedLogin(string $username): void

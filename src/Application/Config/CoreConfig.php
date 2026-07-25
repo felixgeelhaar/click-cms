@@ -338,6 +338,31 @@ final class CoreConfig
         return $this->int('core.auth.lockoutDurationSeconds', 900);
     }
 
+    /**
+     * How many failed logins across every account together are tolerated in a
+     * window before the site stops accepting logins at all.
+     *
+     * The lockout settings above count per username, so a password tried once
+     * against a hundred accounts never trips any of them. This is the ceiling
+     * on that shape of attack. Fifty by default: an installation of the size
+     * this CMS is built for sees a handful of fat-fingered logins in a quarter
+     * of an hour, never fifty, so the number is far above ordinary clumsiness
+     * and far below what makes a spray worth running.
+     *
+     * Zero or less turns the site-wide ceiling off, for an operator who has
+     * decided to bound login rate somewhere in front of the application.
+     */
+    public function sprayMaxFailures(): int
+    {
+        return $this->int('core.auth.sprayMaxFailures', 50);
+    }
+
+    /** The window {@see self::sprayMaxFailures()} counts over. */
+    public function sprayWindowSeconds(): int
+    {
+        return $this->int('core.auth.sprayWindowSeconds', 900);
+    }
+
     /** Never below eight, whatever the file says. */
     public function passwordMinLength(): int
     {
