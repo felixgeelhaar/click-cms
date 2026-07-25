@@ -825,6 +825,21 @@ class Application
         // previews the German page and `/preview/kontakt` the default one.
         [$locale, $slug] = $this->splitLocaleFromPath($rest);
 
+        // A collection entry is previewable at the address it will have once it
+        // is published — `/preview/blog/a-post` for `/blog/a-post`. Resolved by
+        // the same router the public route uses, so the two cannot disagree
+        // about where an entry lives.
+        //
+        // Without this, only a single-segment page slug matched, so an entry
+        // could not be previewed at all: an author could draft a post and
+        // nobody — including whoever had to approve it — could see it rendered.
+        // For a CMS whose author role exists precisely to draft for review, that
+        // was the review step missing its subject.
+        $entryAddress = $this->entryRouter?->match($slug);
+        if ($entryAddress !== null) {
+            return $this->previewEntry($entryAddress, $locale);
+        }
+
         // The slug reaches storage, so only the shape this application itself
         // generates is accepted. Anything else is refused before it is used to
         // build a key, rather than relying on a layer further down to notice.
@@ -869,6 +884,48 @@ class Application
         header('Content-Language: ' . $locale->code);
 
         echo $this->renderPageHtml($page, $locale, preview: true);
+
+        return ['raw' => true];
+    }
+
+    /**
+     * Preview one collection entry's working copy.
+     *
+     * Every guarantee the page preview makes is repeated here rather than
+     * assumed, because the consequence of getting one wrong is unpublished work
+     * reaching a stranger: a signed token for *this* document or a session
+     * entitled to see drafts, the working copy rather than the live entry, no
+     * language fallback, and headers that stop anything in between keeping it.
+     */
+    private function previewEntry(
+        \Click\Cms\Application\Collection\EntryAddress $address,
+        Locale $locale
+    ): array {
+        $key = ContentKey::for($address->type->id, $address->slug, $locale);
+
+        $token = $_GET['token'] ?? null;
+        $bySignature = $this->previewLinks()->accepts($key, is_string($token) ? $token : null);
+
+        if (!$bySignature && !$this->mayPreviewFromSession()) {
+            return $this->notFoundPage($locale);
+        }
+
+        // The working copy. Reading the live entry would show whatever is
+        // already public and silently omit the edit the link was minted for.
+        // Not the fallback-resolving read either: a preview of a translation
+        // that does not exist yet must be absent rather than quietly showing
+        // another language and letting it be approved as this one.
+        $entry = $this->contentService?->draft($key);
+        if ($entry === null) {
+            return $this->notFoundPage($locale);
+        }
+
+        header('Cache-Control: no-store, private');
+        header('X-Robots-Tag: noindex, nofollow, noarchive');
+        header('Content-Type: text/html');
+        header('Content-Language: ' . $locale->code);
+
+        echo $this->renderEntryHtml($address->type, $entry, $locale);
 
         return ['raw' => true];
     }
