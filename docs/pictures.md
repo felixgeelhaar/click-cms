@@ -26,16 +26,14 @@ Each picture appears as a card showing:
 
 The line under the heading tells you how many files you have, and that each
 upload is resized into several widths automatically. That is the site making
-sure a phone is not sent a picture built for a large screen. It counts films in
-with the pictures and says *images* for the lot, which is the screen being loose
-with a word rather than anything being wrong; a film is not resized, and
+sure a phone is not sent a picture built for a large screen. Pictures and films
+are counted separately, because a film is not resized —
 [the video section](#video) says what happens to one instead.
 
 **Copy reference** copies the library's own name for that file to your
-clipboard. Picking a *picture* for a page is done by choosing it from the
-library, so you will rarely need this — with one exception that matters: the
-**Video** section's video field is a box you paste a reference into. See
-[Putting a video on a page](#putting-a-video-on-a-page).
+clipboard. Picking a picture or a film for a page is done by choosing it from
+the library, so you will rarely need this — it is there for someone building a
+site or writing to the CMS from another program.
 
 ### Finding one picture among hundreds
 
@@ -242,9 +240,10 @@ Open the page from **Pages**, and add a **Video** section — see
 It has four fields, and only the second is required:
 
 - **Heading** — optional, as everywhere else.
-- **Video** — **required**, and the one unusual field in the whole editor: it is
-  a plain box rather than a picker. Go to **Media**, find the film, click **Copy
-  reference** on its card, come back, and paste it in.
+- **Video** — **required**. Press **Choose video** and pick from the films in
+  your library, listed by name with their format and size. Only films appear
+  here, so there is nothing to pick by mistake. Once chosen it shows what you
+  picked, with **Change video** to swap it and **Remove** to clear it.
 - **Still frame** — an ordinary picture field, with a **Change image** button
   that opens the library. This is the picture a visitor sees before they press
   play. **Set one.** Without it they see a black rectangle, and a black rectangle

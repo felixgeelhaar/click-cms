@@ -192,10 +192,10 @@ are dropped when you save.
 **featured**, and *featured* marks the one you recommend. Set it on one plan.
 Setting it on all of them recommends nothing.
 
-**Video — the field is a box to paste into, not a picker.** Go to **Media**,
-find the film, click **Copy reference**, and paste it into the **Video** field.
-The **Still frame** field beside it is an ordinary picture field with a Change
-image button. What a visitor sees is covered in
+**Video — choose the film, then a still frame.** The **Video** field has a
+**Choose video** button that lists the films in your library by name; pick one
+and it shows the name, the format and the size. The **Still frame** field beside
+it works the same way for pictures. What a visitor sees is covered in
 [Pictures and video](pictures.md#video).
 
 **Quote — the portrait description is not shown on the page.** It is read aloud
