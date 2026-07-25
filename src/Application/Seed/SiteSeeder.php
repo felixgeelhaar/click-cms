@@ -239,7 +239,7 @@ final class SiteSeeder
             return;
         }
 
-        $this->content->save(Content::create($key, ExampleSite::menu()));
+        $this->content->save(Content::create($key, ExampleSite::menu()->toArray()));
         $report->created('menu/main');
     }
 

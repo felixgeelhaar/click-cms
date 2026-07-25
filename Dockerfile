@@ -30,11 +30,20 @@ RUN composer install \
 # ---------------------------------------------------------------------------
 FROM node:22-alpine AS admin-ui
 
-WORKDIR /app
+# The repository layout is mirrored rather than flattened into /app. The
+# accessibility tests read the CSS they assert about out of the shipped files —
+# `themes/default/theme.css` among them, which lives outside admin-ui — and
+# locate it by walking up from their own directory. Copied to /app that walk
+# lands on `/`, and two suites failed on a missing `/themes/default/theme.css`
+# with the tests passing perfectly well on a developer's machine. Keeping the
+# tree shaped like the repository is what makes "it passes locally" mean
+# something here.
+WORKDIR /repo/admin-ui
 COPY admin-ui/package.json admin-ui/package-lock.json* ./
 RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
 COPY admin-ui/ ./
+COPY themes/ /repo/themes/
 
 # Tests before the build, so a component that misreads the API cannot reach an
 # image. Four such defects shipped before this ran: the page list and the
@@ -119,7 +128,7 @@ COPY docker/health.php ./public/health.php
 # Serving the built admin UI as static files under the document root means
 # Apache answers /admin directly — the rewrite to index.php only fires for paths
 # that do not exist on disk, so PHP never sees these requests.
-COPY --from=admin-ui /app/dist ./public/admin
+COPY --from=admin-ui /repo/admin-ui/dist ./public/admin
 
 # content/ and data/ are volume mount points. They are created and owned here so
 # the container still starts when no volume is mounted, and www-data can write
