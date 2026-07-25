@@ -40,7 +40,20 @@ const server = ({ menu = MAIN, putStatus = 200, putError = null } = {}) => {
     }
     if (u.match(/\/api\/menus\/[^/]+$/)) return { ok: true, status: 200, json: async () => ({ data: menu }) };
     if (u.includes('/api/menus')) return { ok: true, status: 200, json: async () => ({ data: [{ id: menu.id, name: menu.name }] }) };
-    if (u.includes('/api/pages')) return { ok: true, status: 200, json: async () => ({ data: [{ slug: 'home' }, { slug: 'about' }] }) };
+    if (u.includes('/api/pages')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [
+            { key: 'page:en:home', slug: 'home', locale: 'en', data: { title: 'Home' } },
+            { key: 'page:en:about', slug: 'about', locale: 'en', data: { title: 'About the workshop' } },
+          ],
+          locale: 'en',
+          locales: ['en'],
+        }),
+      };
+    }
     return { ok: true, status: 200, json: async () => ({ data: [] }) };
   });
   return { putBodies };
@@ -133,13 +146,69 @@ describe('nesting', () => {
 
     await wrapper.find('[aria-label="Add a sub-item under item 1"]').trigger('click');
     await flushPromises();
-    const childInputs = wrapper.findAll('.child .text-input');
-    await childInputs[0].setValue('Widgets');
-    await childInputs[1].setValue('widgets');
+    // The label is still typed; the target is now picked from the site's pages.
+    await wrapper.find('.child .text-input').setValue('Widgets');
+    await wrapper.find('.child .link-select').setValue('about');
     await wrapper.find('form.editor').trigger('submit');
     await flushPromises();
 
-    expect(putBodies[0].items[0].children).toEqual([{ label: 'Widgets', target: 'widgets' }]);
+    expect(putBodies[0].items[0].children).toEqual([{ label: 'Widgets', target: 'about' }]);
+  });
+});
+
+describe('picking a target', () => {
+  it('lists the site\'s pages by title rather than asking for a slug from memory', async () => {
+    const { wrapper } = await mountMenus();
+    const options = wrapper.findAll('.item .link-select option').map((o) => o.text());
+
+    expect(options).toContain('About the workshop — /about');
+    // The free-text box and its slug-only datalist are gone.
+    expect(wrapper.find('datalist#page-slugs').exists()).toBe(false);
+  });
+
+  it('saves the bare slug the menu domain accepts, never a path', async () => {
+    const { wrapper, putBodies } = await mountMenus();
+
+    await wrapper.findAll('.item .link-select')[0].setValue('about');
+    await wrapper.find('form.editor').trigger('submit');
+    await flushPromises();
+
+    // MenuItem::classify() rejects "/about" outright, so a path here throws on
+    // save. This is the one value in the two contexts that must not be a path.
+    expect(putBodies[0].items[0].target).toBe('about');
+    for (const item of putBodies[0].items) {
+      expect(item.target).not.toMatch(/^\//);
+      expect(item.target).toMatch(/^(?:[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)?|https?:\/\/\S+)$/);
+    }
+  });
+
+  it('keeps an external URL through a round trip', async () => {
+    const { wrapper, putBodies } = await mountMenus();
+
+    const external = wrapper.findAll('.item .link-url');
+    expect(external).toHaveLength(1);
+    expect(external[0].element.value).toBe('https://example.com/docs');
+
+    await wrapper.find('form.editor').trigger('submit');
+    await flushPromises();
+    expect(putBodies[0].items[2].target).toBe('https://example.com/docs');
+  });
+
+  it('warns about a target that names no page, and saves it unchanged anyway', async () => {
+    const { wrapper, putBodies } = await mountMenus({
+      menu: { id: 'main', name: 'Main', items: [{ label: 'Old', target: 'renamed-away' }] },
+    });
+
+    const warning = wrapper.find('.item .link-warning');
+    expect(warning.exists()).toBe(true);
+    expect(warning.text()).toContain('no longer exists');
+
+    await wrapper.find('form.editor').trigger('submit');
+    await flushPromises();
+
+    // Opening the screen must not destroy content, so the broken target is still
+    // exactly what it was — visible, flagged, and the editor's to fix.
+    expect(putBodies[0].items).toEqual([{ label: 'Old', target: 'renamed-away' }]);
   });
 });
 

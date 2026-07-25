@@ -46,6 +46,20 @@
       <option v-for="option in field.options || []" :key="option" :value="option">{{ option }}</option>
     </select>
 
+    <!-- A url field is linked as-is by the renderer, so an internal page is the
+         root-relative address the public router serves it at. Typing that from
+         memory is how `/contct` reaches the live site. -->
+    <LinkField
+      v-else-if="field.type === 'url'"
+      :model-value="modelValue ?? ''"
+      format="path"
+      :required="!!field.required"
+      :invalid="!!error"
+      :input-id="inputId"
+      :described-by="describedBy"
+      @update:model-value="emitValue($event)"
+    />
+
     <ReferenceField
       v-else-if="field.type === 'reference'"
       :field="field"
@@ -89,6 +103,7 @@
 import { computed, useId } from 'vue';
 import RichTextField from './RichTextField.vue';
 import ReferenceField from './ReferenceField.vue';
+import LinkField from './LinkField.vue';
 
 const props = defineProps({
   field: { type: Object, required: true },

@@ -56,16 +56,15 @@
               </div>
               <div class="field">
                 <label class="field-label" :for="`item-${i}-target`">Target</label>
-                <input
-                  :id="`item-${i}-target`"
+                <LinkField
+                  :input-id="`item-${i}-target`"
                   v-model="item.target"
-                  class="text-input"
-                  type="text"
-                  list="page-slugs"
-                  placeholder="page slug or https:// URL"
-                  :aria-describedby="`item-${i}-target-hint`"
+                  format="slug"
+                  :pages="pages"
+                  :default-locale="defaultLocale"
+                  :described-by="`item-${i}-target-hint`"
                 />
-                <span :id="`item-${i}-target-hint`" class="field-hint">A page slug (e.g. <code>about</code>) or an http(s) URL.</span>
+                <span :id="`item-${i}-target-hint`" class="field-hint">One of this site's pages, or an external http(s) address.</span>
               </div>
             </div>
 
@@ -86,7 +85,13 @@
                 </div>
                 <div class="field">
                   <label class="field-label" :for="`item-${i}-${j}-target`">Sub-item target</label>
-                  <input :id="`item-${i}-${j}-target`" v-model="child.target" class="text-input" type="text" list="page-slugs" placeholder="page slug or https:// URL" />
+                  <LinkField
+                    :input-id="`item-${i}-${j}-target`"
+                    v-model="child.target"
+                    format="slug"
+                    :pages="pages"
+                    :default-locale="defaultLocale"
+                  />
                 </div>
               </div>
               <div class="item-controls">
@@ -98,12 +103,6 @@
           </ol>
         </li>
       </ol>
-
-      <!-- A single shared list of page slugs so a target can be picked rather
-           than only typed; free text is still allowed for external URLs. -->
-      <datalist id="page-slugs">
-        <option v-for="slug in pageSlugs" :key="slug" :value="slug" />
-      </datalist>
 
       <div class="actions">
         <button type="button" class="btn-secondary" @click="addItem">+ Add item</button>
@@ -118,6 +117,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import LinkField from './fields/LinkField.vue';
 
 // UI-only key so v-for keys stay stable across reorder without keying on the
 // index (which would move focus to the wrong row). Stripped before saving.
@@ -128,7 +128,10 @@ const menus = ref([]);
 const selectedId = ref('');
 const menuName = ref('');
 const items = ref([]);
-const pageSlugs = ref([]);
+// Fetched once for the whole screen and handed to every target picker. Twenty
+// menu items must not be twenty requests for the same list.
+const pages = ref([]);
+const defaultLocale = ref('');
 const newId = ref('');
 
 const loading = ref(true);
@@ -166,7 +169,6 @@ const loadMenus = async () => {
   } catch (e) {
     error.value = 'Could not load menus.';
   }
-  loading.value = false;
 };
 
 const applyMenu = (menu) => {
@@ -204,13 +206,14 @@ const createMenu = () => {
   error.value = '';
 };
 
-const loadPageSlugs = async () => {
+const loadPages = async () => {
   try {
     const res = await fetch('/api/pages');
     const body = await res.json();
-    pageSlugs.value = (body.data ?? []).map((p) => p.slug ?? String(p.key ?? '').split(':').pop()).filter(Boolean);
+    pages.value = Array.isArray(body.data) ? body.data : [];
+    defaultLocale.value = typeof body.locale === 'string' ? body.locale : '';
   } catch {
-    pageSlugs.value = [];
+    pages.value = [];
   }
 };
 
@@ -273,7 +276,11 @@ const save = async () => {
 };
 
 onMounted(async () => {
-  await Promise.all([loadMenus(), loadPageSlugs()]);
+  // Both, before the item list is drawn. A target picker handed an empty page
+  // list would report every existing target as a page that no longer exists —
+  // an alarm raised by a request that had simply not come back yet.
+  await Promise.all([loadMenus(), loadPages()]);
+  loading.value = false;
 });
 </script>
 
