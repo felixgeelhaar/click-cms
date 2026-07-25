@@ -1,0 +1,108 @@
+# Publishes the container image to the GitHub Container Registry.
+#
+# Runs on a published release, so the image and the update package a release
+# produces come from the same commit — an image tagged 1.2.0 that is not the
+# code in v1.2.0 is worse than no image.
+#
+# Also runnable by hand, which is how you get an image from a commit that is not
+# a release (a release candidate, or a fix being tested before it is tagged).
+# Those are tagged with the short SHA only: `latest` moves on releases alone, so
+# nobody who pulled `latest` gets an untagged build by surprise.
+#
+# On a pull request the image is built but never pushed. That is deliberate — a
+# Dockerfile that stopped building should fail the PR that broke it, not the
+# release three weeks later, and a PR from a fork must not be able to publish.
+
+name: Docker image
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker/**'
+      - '.github/workflows/docker-image.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      # Only what is needed to push a package. The default token is
+      # repository-scoped, so no registry credential has to be stored.
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Multi-architecture: this is software people run on whatever they have,
+      # and arm64 covers both Apple silicon and the cheaper cloud instances.
+      # QEMU makes the arm64 build possible on an x86 runner.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Sign in to the registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # `latest` is applied only on a release, and only when that release is not
+      # a pre-release — someone pulling latest wants the current stable version,
+      # not a release candidate that happened to be published most recently.
+      - name: Work out the tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A published image nobody has started is a guess. This runs the image the
+      # build just produced and waits for its own health endpoint to answer,
+      # so a container that builds but cannot boot fails here rather than on
+      # somebody's server.
+      - name: Check the image actually starts
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          image="$(echo '${{ steps.meta.outputs.tags }}' | head -n1)"
+          docker run -d --name click-cms-smoke -p 8080:80 "$image"
+
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/health.php >/dev/null 2>&1; then
+              echo "the image booted and reported healthy"
+              docker rm -f click-cms-smoke
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "the image did not become healthy within 60 seconds; its logs:"
+          docker logs click-cms-smoke
+          docker rm -f click-cms-smoke
+          exit 1

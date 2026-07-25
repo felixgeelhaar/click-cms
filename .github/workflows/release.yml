@@ -84,10 +84,33 @@ jobs:
           zip -qr "$stage.zip" "$stage"
           echo "sha256=$(sha256sum "$stage.zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
-      - name: Attach the package to the release
+      # A second archive, for installing rather than upgrading.
+      #
+      # The package above is what the updater unpacks over an existing site, so
+      # it deliberately omits config/ — the installer refuses to overwrite a
+      # site's own settings. That makes it useless to someone who has no site
+      # yet: unzip it and the first boot fails on a missing config/core.json.
+      #
+      # Shared hosting is the audience that most needs a download and least
+      # wants to run composer, so it gets an archive that actually starts:
+      # everything in the update package, plus the default configuration and the
+      # empty content and data directories the site will fill.
+      - name: Pack the install archive
+        run: |
+          version="${{ steps.meta.outputs.version }}"
+          stage="click-cms-$version"
+          install="click-cms-$version-install"
+          cp -r "$stage" "$install"
+          cp -r config "$install/"
+          mkdir -p "$install/content" "$install/data"
+          zip -qr "$install.zip" "$install"
+
+      - name: Attach the packages to the release
         uses: softprops/action-gh-release@v2
         with:
-          files: click-cms-${{ steps.meta.outputs.version }}.zip
+          files: |
+            click-cms-${{ steps.meta.outputs.version }}.zip
+            click-cms-${{ steps.meta.outputs.version }}-install.zip
 
   feed:
     name: Publish the signed feed
