@@ -193,6 +193,40 @@ final class SectionRendererTest extends TestCase
     }
 
     /**
+     * The same pairing, for pictures. An image and its description are one thing
+     * to a reader; rendered as two fields the description was announced twice by
+     * a screen reader — once as the alt text, once as the paragraph underneath —
+     * and shown to everyone else as a stray caption nobody wrote.
+     */
+    public function testAnImageDescriptionBecomesItsAltTextAndNotAParagraph(): void
+    {
+        $description = 'A workshop bench under a high window.';
+
+        $html = $this->renderer->render($this->page([
+            ['type' => 'media-text', 'values' => [
+                'heading' => 'The workshop',
+                'image' => 'bench-0a1b2c3d',
+                'alt' => $description,
+            ]],
+        ]));
+
+        $this->assertStringContainsString('alt="' . $description . '"', $html);
+        $this->assertSame(1, substr_count($html, $description));
+        $this->assertStringNotContainsString('cms-field--alt', $html);
+    }
+
+    /** Without a description the image still renders, rather than disappearing. */
+    public function testAnImageWithoutADescriptionStillRenders(): void
+    {
+        $html = $this->renderer->render($this->page([
+            ['type' => 'media-text', 'values' => ['image' => 'bench-0a1b2c3d']],
+        ]));
+
+        $this->assertStringContainsString('bench-0a1b2c3d', $html);
+        $this->assertStringContainsString('alt=""', $html);
+    }
+
+    /**
      * The label field may be empty even when the link is not, so the link still
      * has to render something rather than becoming unclickable text.
      */

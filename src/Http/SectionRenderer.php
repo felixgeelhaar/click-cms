@@ -196,11 +196,13 @@ final class SectionRenderer
         $body = '';
         $modifiers = '';
 
-        // Fields consumed as another field's link text must not also be printed
-        // on their own, or the page shows the wording twice.
+        // Fields consumed as another field's wording must not also be printed on
+        // their own, or the page shows it twice — a link's text beside its raw
+        // address, or an image's description as a paragraph under the picture it
+        // exists to stand in for.
         $consumed = [];
         foreach ($type->fields as $field) {
-            if ($field->type === FieldType::Url && $field->labelField !== null) {
+            if ($field->labelField !== null) {
                 $consumed[$field->labelField] = true;
             }
         }
@@ -220,15 +222,15 @@ final class SectionRenderer
                 continue;
             }
 
-            $linkText = null;
-            if ($field->type === FieldType::Url && $field->labelField !== null) {
+            $wording = null;
+            if ($field->labelField !== null) {
                 $candidate = $values[$field->labelField] ?? null;
                 if (is_scalar($candidate) && (string) $candidate !== '') {
-                    $linkText = (string) $candidate;
+                    $wording = (string) $candidate;
                 }
             }
 
-            $body .= $this->renderField($field, $values[$field->name], $linkText);
+            $body .= $this->renderField($field, $values[$field->name], $wording);
         }
 
         if (trim($body) === '') {
@@ -240,15 +242,20 @@ final class SectionRenderer
         return '<section class="' . $class . '">' . $body . '</section>';
     }
 
-    private function renderField(FieldDefinition $field, mixed $value, ?string $linkText = null): string
+    /**
+     * @param ?string $wording the value of this field's declared `labelField`,
+     *                         which is a link's text on a Url and a picture's
+     *                         description on an Image
+     */
+    private function renderField(FieldDefinition $field, mixed $value, ?string $wording = null): string
     {
         return match ($field->type) {
             FieldType::Repeater => $this->renderRepeater($field, $value),
-            FieldType::Image => $this->renderImage($field, $value),
+            FieldType::Image => $this->renderImage($field, $value, $wording ?? ''),
             FieldType::RichText => $this->renderRichText($field, $value),
             FieldType::Textarea => $this->renderProse($field, $value),
             FieldType::Boolean => '',
-            default => $this->renderScalar($field, $value, $linkText),
+            default => $this->renderScalar($field, $value, $wording),
         };
     }
 
@@ -324,13 +331,13 @@ final class SectionRenderer
         return '<div class="' . $this->fieldClass($field) . '">' . $html . '</div>';
     }
 
-    private function renderImage(FieldDefinition $field, mixed $value): string
+    private function renderImage(FieldDefinition $field, mixed $value, string $alt = ''): string
     {
         if (!is_string($value) || $value === '') {
             return '';
         }
 
-        return '<div class="' . $this->fieldClass($field) . '">' . $this->imageTag($value, '') . '</div>';
+        return '<div class="' . $this->fieldClass($field) . '">' . $this->imageTag($value, $alt) . '</div>';
     }
 
     /**
