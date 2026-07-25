@@ -236,6 +236,59 @@ other blind spot: editing `config/sections/*.json` on disk is a deploy-time
 change with no handler to hook, so clear `data/cache/pages` as part of the
 deploy.
 
+### Extension points
+
+Capability 8. A plugin declares the hooks it wants in its `plugin.json` and
+implements `hook_<name_with_underscores>`; core fires each by name and collects
+what came back. There are four, and they fall into two kinds.
+
+| Hook | Kind | What it is handed | What it may do |
+|---|---|---|---|
+| `api.routes` | collect | nothing | return `"METHOD /path" => handler` |
+| `web.render` | transform | the page, the shell, whether this is a preview | return replacement markup |
+| `content.before_publish` | **veto** | `key`, `type`, `slug`, `locale`, `user` | refuse the publish, with a reason |
+| `content.published` | announce | the same | nothing that changes the outcome |
+
+The first two only ever *add*. `content.before_publish` is the first that can
+stop core doing something, which is what an editorial workflow needs: a review
+step nothing enforces is a note-taking feature. Its contract is stated in
+`Application\Plugin\PublishGate` and is deliberately lopsided.
+
+**Refusing.** Return `['allowed' => false, 'reason' => '…']`. The reason is
+shown to the editor, so it must name the state that is blocking — *"this page is
+waiting for review"*, not *"not allowed"*. The publish is answered `409`: the
+request is well formed and the caller is entitled to make it, and calling that
+`403` would send an editor hunting for a permission they already hold.
+
+**Everything else permits.** `null`, an empty array, a missing `allowed`, a
+plugin that never implements the hook — all mean "no opinion". Fail-closed on a
+refusal, fail-open on silence.
+
+**A plugin that throws has no opinion.** The throw is logged and the publish goes
+ahead. That is the deliberate choice between two bad outcomes: a gate that failed
+to gate publishes a page early, which is visible and reversible, while a plugin
+fault that makes the site unpublishable locks out the person who would fix it.
+Each plugin is dispatched in isolation for this hook — via
+`PluginManager::executeHookIsolated()` — so one broken extension cannot swallow
+another's refusal and leave the gate silently disarmed. `api.routes` and
+`web.render` keep failing loudly, because a site quietly missing a plugin's
+endpoints is worse than one that refuses to boot.
+
+**First refusal wins.** Plugins run in dependency order, so which one answers is
+stable rather than a race.
+
+**There is no way to force a publish.** Permitting is already the default, so an
+"allow" return could only override another plugin's refusal, and a gate any
+plugin can switch off is not a gate.
+
+`content.published` is the companion, and exists because "clear the review now
+the change is live" is only true *after* the promotion landed. Doing that inside
+the veto would spend an approval on a publish that then failed in storage.
+
+Both fire from `PageService::publish()` rather than from the HTTP handler.
+Publishing has several callers — the management API, the seeder, a plugin
+publishing a release — and a gate any of them can walk around is decoration.
+
 ### Explicitly not core
 
 - **Delivery APIs** (`rest-api`, `graphql`) — how an *external* front end reads

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Application\Content;
 
+use Click\Cms\Application\Plugin\PublishGate;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\Schema\SectionValidator;
@@ -44,14 +45,28 @@ final class PageService
      * @param list<Locale> $supportedLocales Languages this site publishes in.
      *        Empty means no restriction, which is what a caller with no
      *        configuration to consult — a test, a plugin — should get.
+     * @param ?PublishGate $publishGate Who may veto a publish. Null falls back
+     *        to the process-wide gate the kernel installs at boot, so a caller
+     *        that knows nothing about plugins still cannot publish past one.
      */
     public function __construct(
         private readonly ContentService $content,
         private readonly SectionTypeRepository $sectionTypes,
         private readonly SectionValidator $validator = new SectionValidator(),
         array $supportedLocales = [],
+        private readonly ?PublishGate $publishGate = null,
     ) {
         $this->supportedLocales = array_values($supportedLocales);
+    }
+
+    /**
+     * Resolved per call rather than in the constructor: this service is built
+     * lazily by handlers that may exist before the kernel has finished booting
+     * its plugins, and a gate captured too early would be the empty one.
+     */
+    private function publishGate(): PublishGate
+    {
+        return $this->publishGate ?? PublishGate::ambient();
     }
 
     /**
@@ -284,6 +299,11 @@ final class PageService
      * publishing a German translation the moment its English original is
      * approved is exactly the accident this avoids.
      *
+     * This is also where an editorial gate — a review workflow, an embargo — is
+     * asked whether the publish may happen at all. Here rather than in the HTTP
+     * handler, because a gate the seeder, the CLI or a plugin walks past is not
+     * a gate; every route to the live site goes through this method.
+     *
      * @param array<string, mixed> $user
      * @return array{page: ?Content, error: ?string, status: int, errors: array<string, string>}
      */
@@ -304,7 +324,20 @@ final class PageService
             return $this->failure('You do not have permission to publish this page.', 403);
         }
 
-        $published = $this->content->publish(ContentKey::page($slug, $parsed['locale']));
+        $key = ContentKey::page($slug, $parsed['locale']);
+
+        // Asked after permission, so an account that may not publish at all is
+        // never told about an editorial state it has no business seeing.
+        $refusal = $this->publishGate()->refusalFor($key, $user);
+        if ($refusal !== null) {
+            // 409 rather than 403: the request is well formed and the caller is
+            // entitled to make it. What is wrong is the page's current state,
+            // and telling an editor "forbidden" would send them looking for a
+            // permission they already have.
+            return $this->failure($refusal, 409);
+        }
+
+        $published = $this->content->publish($key);
 
         if ($published === null) {
             // The working copy was there a moment ago, so this is a storage
@@ -312,6 +345,11 @@ final class PageService
             // send the editor looking for the wrong problem.
             return $this->failure('This page could not be published.', 500);
         }
+
+        // Only now, and only once it landed: whoever was gating this publish
+        // gets to close its own record, and cannot close it for a publish that
+        // never happened.
+        $this->publishGate()->announcePublished($key, $user);
 
         return ['page' => $published, 'error' => null, 'status' => 200, 'errors' => []];
     }

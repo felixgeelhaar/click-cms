@@ -1,10 +1,12 @@
 {
   "name": "Collaboration",
-  "description": "Polling-based presence and page comments so editors can see who else is on a page and leave review notes before publishing",
-  "version": "1.0.0",
+  "description": "Polling-based presence, page comments and a request-review workflow so editors can see who else is on a page, leave review notes, and publish an approved set of pages together",
+  "version": "1.1.0",
   "author": "Click CMS",
   "dependencies": [],
   "hooks": [
-    "api.routes"
+    "api.routes",
+    "content.before_publish",
+    "content.published"
   ]
 }

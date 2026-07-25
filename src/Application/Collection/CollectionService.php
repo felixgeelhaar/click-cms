@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Application\Collection;
 
 use Click\Cms\Application\Content\ContentService;
+use Click\Cms\Application\Plugin\PublishGate;
 use Click\Cms\Domain\Collection\CollectionType;
 use Click\Cms\Domain\Collection\CollectionTypeRepository;
 use Click\Cms\Domain\Content\Content;
@@ -36,7 +37,16 @@ final class CollectionService
         private readonly ContentService $content,
         private readonly CollectionTypeRepository $types,
         private readonly SectionValidator $validator,
+        // Optional for the same reason it is optional on PageService: existing
+        // callers construct this directly, and a gate they did not ask for must
+        // not change their behaviour. Left out, the process-wide one is used.
+        private readonly ?PublishGate $publishGate = null,
     ) {}
+
+    private function publishGate(): PublishGate
+    {
+        return $this->publishGate ?? PublishGate::ambient();
+    }
 
     /** @return list<CollectionType> */
     public function collectionTypes(): array
@@ -246,10 +256,25 @@ final class CollectionService
             return $this->failure('You do not have permission to publish this entry.', 403);
         }
 
-        $published = $this->content->publish(ContentKey::for($typeId, $slug, $locale));
+        $key = ContentKey::for($typeId, $slug, $locale);
+
+        // An entry is a second publish path, and a gate that covered only pages
+        // would be a gate an editor routes around by putting the thing in a
+        // collection. The hook already carries the type, so whatever is gating
+        // can tell a post from a page and decide accordingly.
+        $refusal = $this->publishGate()->refusalFor($key, $user);
+        if ($refusal !== null) {
+            // 409, not 403 — see PageService::publish(): the caller is entitled,
+            // the entry's state is what is not ready.
+            return $this->failure($refusal, 409);
+        }
+
+        $published = $this->content->publish($key);
         if ($published === null) {
             return $this->failure('This entry could not be published.', 500);
         }
+
+        $this->publishGate()->announcePublished($key, $user);
 
         return ['entry' => $published, 'error' => null, 'status' => 200, 'errors' => []];
     }

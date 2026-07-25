@@ -264,12 +264,35 @@ class PluginManager
 
     public function executeHook(string $hookName, array $params = []): array
     {
+        return $this->dispatch($hookName, $params, false);
+    }
+
+    /**
+     * The same dispatch, except that one plugin throwing does not stop the rest.
+     *
+     * For hooks whose whole purpose is to collect an opinion — chiefly
+     * {@see PublishGate::HOOK} — where letting one broken plugin swallow every
+     * other plugin's answer would turn a bug in an unrelated extension into a
+     * silently disabled review gate. The throw is logged rather than dropped,
+     * because a plugin that fails on every publish must be findable.
+     *
+     * Not the default for `api.routes` or `web.render`: a plugin that cannot
+     * register its routes should fail loudly at boot rather than serve a site
+     * that is quietly missing endpoints.
+     */
+    public function executeHookIsolated(string $hookName, array $params = []): array
+    {
+        return $this->dispatch($hookName, $params, true);
+    }
+
+    private function dispatch(string $hookName, array $params, bool $isolate): array
+    {
         $results = [];
         $normalizedHook = str_replace('_', '.', $hookName);
-        
+
         foreach ($this->getActive() as $plugin) {
             $pluginHasHook = in_array($hookName, $plugin->hooks) || in_array($normalizedHook, $plugin->hooks);
-            
+
             if (!$pluginHasHook) {
                 continue;
             }
@@ -280,8 +303,24 @@ class PluginManager
             }
 
             $methodName = str_replace('.', '_', 'hook_' . $hookName);
-            if (method_exists($bootstrap, $methodName)) {
+            if (!method_exists($bootstrap, $methodName)) {
+                continue;
+            }
+
+            if (!$isolate) {
                 $results[$plugin->name] = $bootstrap->$methodName($params);
+                continue;
+            }
+
+            try {
+                $results[$plugin->name] = $bootstrap->$methodName($params);
+            } catch (\Throwable $e) {
+                error_log(sprintf(
+                    '[%s] plugin "%s" threw: %s',
+                    $hookName,
+                    $plugin->name,
+                    $e->getMessage()
+                ));
             }
         }
 
