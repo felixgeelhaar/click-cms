@@ -1,0 +1,35 @@
+{
+  "label": "Collection list",
+  "description": "Lists the published entries of a collection — each entry's title, summary and picture, linked to its own address when the collection has one.",
+  "icon": "list",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading" },
+    { "name": "intro", "type": "richtext", "label": "Introduction" },
+    {
+      "name": "collection",
+      "type": "select",
+      "label": "Collection",
+      "options": ["post", "team-member"],
+      "default": "post",
+      "required": true,
+      "help": "Which collection to list. Add your own collection ids to this section type's options as you declare them."
+    },
+    {
+      "name": "limit",
+      "type": "number",
+      "label": "How many entries",
+      "default": 6,
+      "min": 1,
+      "max": 50,
+      "help": "The newest entries up to this many. At most 50."
+    },
+    {
+      "name": "sort",
+      "type": "select",
+      "label": "Order",
+      "options": ["collection", "newest", "oldest", "title"],
+      "default": "collection",
+      "help": "\"collection\" uses the order the collection itself declares (a blog's own date order); \"newest\" and \"oldest\" use when each entry was last edited."
+    }
+  ]
+}

@@ -14,6 +14,8 @@ use Click\Cms\Application\Config\Settings;
 use Click\Cms\Application\Event\EventBus;
 use Click\Cms\Application\Audit\AuditService;
 use Click\Cms\Application\History\HistoryService;
+use Click\Cms\Application\Plugin\ContentGate;
+use Click\Cms\Application\Plugin\ContentRefusedException;
 use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Application\Plugin\PublishGate;
 use Click\Cms\Domain\Content\Content;
@@ -33,7 +35,10 @@ use Click\Cms\Http\ThemesController;
 use Click\Cms\Http\UpdatesController;
 use Click\Cms\Application\Collection\BackReferenceService;
 use Click\Cms\Application\Collection\CollectionService;
+use Click\Cms\Application\Collection\EntryListings;
+use Click\Cms\Application\Collection\EntryRouter;
 use Click\Cms\Application\Collection\ReferenceResolver;
+use Click\Cms\Domain\Collection\CollectionType;
 use Click\Cms\Domain\Publishing\Publishable;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository;
@@ -55,6 +60,8 @@ use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 use Click\Cms\Infrastructure\Storage\AuthorizingStorage;
 use Click\Cms\Application\Cache\RenderCache;
 use Click\Cms\Infrastructure\Cache\CacheInvalidatingStorage;
+use Click\Cms\Infrastructure\Plugin\ContentEventStorage;
+use Click\Cms\Infrastructure\Storage\StorageAuthorizationException;
 use Click\Cms\Infrastructure\Storage\StorageFactory;
 use Click\Cms\Infrastructure\Storage\VersioningStorage;
 
@@ -90,6 +97,8 @@ class Application
     private ?ThemeRepository $themes = null;
     private ?RenderCache $renderCache = null;
     private ?CollectionsController $collectionsController = null;
+    private ?EntryRouter $entryRouter = null;
+    private ?EntryListings $entryListings = null;
     private ?NavigationRenderer $navigationRenderer = null;
     private ?HistoryService $history = null;
     private ?\Click\Cms\Application\Audit\AuditService $auditService = null;
@@ -269,6 +278,31 @@ class Application
                 $storage = new CacheInvalidatingStorage($storage, $this->renderCache);
             }
 
+            // The content lifecycle, offered to plugins. Outermost of the write
+            // decorators, so an announcement means the write was authorised,
+            // versioned, audited, on disk *and* the stale render cache dropped —
+            // a listener that re-renders what it was just told about cannot warm
+            // from content it has been told is old.
+            //
+            // Here rather than in each handler for the reason the cache
+            // decorator is: "also fire the event" is the instruction that gets
+            // forgotten, and events that fire on some write paths and not others
+            // are worse than none. Both closures are late-bound because the
+            // plugin manager is built further down and nothing writes during
+            // boot. Isolated dispatch, so one broken plugin cannot swallow
+            // another's refusal — see `Application\Plugin\ContentGate`.
+            $storage = new ContentEventStorage(
+                $storage,
+                new ContentGate(
+                    fn (string $hook, array $payload): array
+                        => $this->pluginManager?->executeHookIsolated($hook, $payload) ?? [],
+                    // Asked before any payload is built, so a site listening to
+                    // none of these events pays one array lookup per write.
+                    fn (string $hook): bool => $this->pluginManager?->hasHookListeners($hook) ?? false,
+                ),
+                fn (): array => $this->getSessionUser() ?? [],
+            );
+
             $this->contentService = new ContentService($storage, $this->config->defaultLocale());
 
         $this->history = new HistoryService($storage, $versions);
@@ -309,8 +343,21 @@ class Application
             static fn ($type): string => $type->id,
             $collectionTypes->all()
         ));
+        $collections = new CollectionService($this->contentService, $collectionTypes, new SectionValidator());
+
+        // Where a collection's entries live on the public site, and the listing
+        // that shows them there. Both read the same definitions the admin does, so
+        // a route an editor sees in the admin is the route a visitor gets, and a
+        // listing's links cannot point somewhere the router does not answer.
+        $this->entryRouter = new EntryRouter($collectionTypes);
+        $this->entryListings = new EntryListings(
+            $collections,
+            $this->entryRouter,
+            $this->config->defaultLocale(),
+        );
+
         $this->collectionsController = new CollectionsController(
-            new CollectionService($this->contentService, $collectionTypes, new SectionValidator()),
+            $collections,
             new ReferenceResolver($this->contentService, $collectionTypes),
             fn (): array => $this->getSessionUser() ?? [],
             // The same history service the page endpoints use; an entry's key is
@@ -528,14 +575,36 @@ class Application
         return ['raw' => true];
     }
 
+    /**
+     * The public site: a page, a collection entry, a redirect, or a 404 — decided
+     * in that order.
+     *
+     * ## The precedence rule, stated once so it cannot drift
+     *
+     * 1. `/health/…`, `/api/…`, `/admin…` and `/preview/…` never reach here at all;
+     *    {@see handleRequest()} claims them first, and a collection is refused a
+     *    route under any of them ({@see CollectionType}) rather than being given
+     *    addresses that silently never answer.
+     * 2. **A page at exactly this path wins.** Adding a route to a collection must
+     *    not be able to take a URL away from a page that already exists — an
+     *    editor who publishes a `blog` page and a developer who routes posts at
+     *    `blog` have not made the page disappear, and `/blog` is still the page.
+     * 3. **Then a published collection entry**, when a declared route is a prefix of
+     *    the path and exactly one slug segment follows it. Entry addresses are
+     *    therefore always two segments or more and page slugs are always one — the
+     *    two cannot collide today, and the ordering is what keeps that true if page
+     *    slugs ever gain a slash.
+     * 4. **Then a redirect rule**, so a bookmark for content that has moved still
+     *    lands. Deliberately after the entry: content that is actually here beats a
+     *    rule saying where it used to be, exactly as it does for a page.
+     * 5. Otherwise the 404, identical for "never existed" and "not published".
+     */
     private function handlePublicPage(string $uri): array
     {
         $path = trim($uri, '/');
-        [$locale, $slug] = $this->splitLocaleFromPath($path);
+        [$locale, $withinLocale] = $this->splitLocaleFromPath($path);
 
-        if ($slug === '') {
-            $slug = 'home';
-        }
+        $slug = $withinLocale === '' ? 'home' : $withinLocale;
 
         $resolved = $this->contentService?->resolve(ContentKey::page($slug, $locale));
 
@@ -550,6 +619,13 @@ class Application
         // early is what preview is for, and that requires a signed link or a
         // session.
         if ($resolved === null) {
+            // No page here. Before anything else, the collection entries: step 3 of
+            // the rule above.
+            $entry = $this->handleEntryAddress($withinLocale, $locale);
+            if ($entry !== null) {
+                return $entry;
+            }
+
             // Before giving up on a path, see if it was moved. A redirect rule
             // sends an old address to a new one, so a bookmark or an inbound
             // link that predates a slug change still lands somewhere.
@@ -572,6 +648,129 @@ class Application
         }
         echo $rendered;
         return ['raw' => true];
+    }
+
+    /**
+     * Serve a published collection entry at its own address, or decline.
+     *
+     * Null means "not an entry here", and the caller carries on to redirects and
+     * the 404. It is the answer for three different situations on purpose:
+     *
+     * - the path is under no declared route, so no collection claims it;
+     * - the entry does not exist;
+     * - the entry exists **only as a working copy**, i.e. it is a draft, or it has
+     *   been taken down.
+     *
+     * The third is the one that matters, and it is true by construction rather than
+     * by a check that could be forgotten in a later edit: the read is
+     * {@see ContentService::resolve()}, which reads `content/`, and `content/` holds
+     * published documents only. There is no draft here to filter out — exactly as
+     * {@see handlePublicPage()} has no unpublished page to filter out — so a draft
+     * entry and a slug nobody ever used produce the identical 404, and neither
+     * discloses that the other kind of nothing is there. Seeing an entry early is
+     * what preview is for, and that needs a signed link or a session.
+     *
+     * @param string $withinLocale The request path with any language prefix already
+     *        removed, so `/de/blog/x` and `/blog/x` arrive here identically and the
+     *        language rides along in $locale — the same scheme pages use, not a
+     *        second one.
+     * @return array<string, mixed>|null
+     */
+    private function handleEntryAddress(string $withinLocale, Locale $locale): ?array
+    {
+        $address = $this->entryRouter?->match($withinLocale);
+        if ($address === null) {
+            return null;
+        }
+
+        // The same fallback a page gets: a missing German entry is served in the
+        // site's default language rather than 404ing, and the response says which
+        // language the visitor actually got.
+        $resolved = $this->contentService?->resolve(
+            ContentKey::for($address->type->id, $address->slug, $locale)
+        );
+        if ($resolved === null) {
+            return null;
+        }
+
+        $html = $this->renderCachedHtml(
+            $resolved->content,
+            $resolved->served,
+            fn (): string => $this->renderEntryHtml($address->type, $resolved->content, $resolved->served),
+        );
+
+        header('Content-Type: text/html');
+        header('Content-Language: ' . $resolved->served->code);
+        if ($resolved->isFallback()) {
+            header('Vary: Accept-Language');
+        }
+
+        echo $html;
+
+        return ['raw' => true];
+    }
+
+    /**
+     * One collection entry as a public HTML document.
+     *
+     * The entry's fields are rendered by the *same* {@see SectionRenderer} a page's
+     * sections go through — a collection type's field set is a section type, so an
+     * entry inherits that renderer's escaping, its rich-text sanitising and its
+     * responsive images rather than getting a second implementation of all three to
+     * keep in step. Around them goes the same {@see PageShell} a page gets, so an
+     * entry has the site's header, navigation and active theme and does not read as
+     * a different website.
+     *
+     * The `web.render` hook is deliberately not fired here. Its payload is a
+     * `page`, and handing a plugin an entry under that name would have every
+     * existing listener treat a post as a page — a lie about the request that a
+     * theme cannot detect. Entries are rendered by the shell until that hook is
+     * given a shape that can say what it is being handed.
+     */
+    private function renderEntryHtml(CollectionType $type, Content $entry, ?Locale $locale): string
+    {
+        $title = $type->titleOf($entry->data);
+        $served = $locale ?? $entry->locale();
+
+        $media = new \Click\Cms\Application\Media\MediaService($this->basePath . '/content/media');
+
+        $head = \Click\Cms\Http\SeoMeta::forPage(
+            $entry->data,
+            $title,
+            static function (string $ref) use ($media): string {
+                $item = $media->find($ref);
+                return $item?->urls('/api/media/file')['original'] ?? '';
+            }
+        );
+
+        $theme = $this->themes?->active();
+        $stylesheet = $theme !== null && $this->themes !== null
+            ? $this->themes->stylesheetUrl($theme)
+            : '/theme.css';
+
+        // The entry's own address, so a menu item pointing at it is marked current
+        // — built by the router rather than assembled here, so there is one answer
+        // to "where does this entry live".
+        $href = $this->entryRouter?->hrefFor(
+            $type,
+            $entry->slug(),
+            $served,
+            $this->contentService?->defaultLocale() ?? $served,
+        ) ?? '/';
+
+        $shell = new \Click\Cms\Http\PageShell(
+            htmlspecialchars($served->code, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
+            $head,
+            $this->renderSiteHeader($href, $served),
+            $stylesheet,
+        );
+
+        $renderer = new SectionRenderer(
+            new JsonSectionTypeRepository($this->basePath . '/config/sections'),
+            $media,
+        );
+
+        return $shell->render($renderer->renderFields($type->schema, $entry->data));
     }
 
     /**
@@ -745,19 +944,42 @@ class Application
      */
     private function renderCachedPageHtml(Content $page, ?Locale $locale): string
     {
+        return $this->renderCachedHtml(
+            $page,
+            $locale,
+            fn (): string => $this->renderPageHtml($page, $locale),
+        );
+    }
+
+    /**
+     * Any public document — a page or a collection entry — from the render cache
+     * when it is there and cacheable, otherwise rendered and stored.
+     *
+     * There is exactly one place in this application that builds a render-cache key,
+     * and this is it. That is the point: a second call site is a second chance to
+     * omit a component of the key, and the failure mode of an incomplete key is one
+     * document's HTML served at another document's address — visible only to
+     * visitors, and only for the people who are not looking. The type in the key is
+     * taken from the document's own {@see Content::type()} rather than passed in, so
+     * a caller cannot label a post as a page even by accident.
+     *
+     * @param callable(): string $render Produces the document when the cache cannot.
+     */
+    private function renderCachedHtml(Content $document, ?Locale $locale, callable $render): string
+    {
         $cache = $this->renderCache;
         $cacheable = $cache !== null
             && $cache->isCacheable(preview: false, authenticated: $this->getSessionUser() !== null);
 
         if (!$cacheable) {
-            return $this->renderPageHtml($page, $locale);
+            return $render();
         }
 
         $theme = $this->themes?->active();
 
         $key = $cache->keyFor(
-            $page->slug(),
-            ($locale ?? $page->locale())->code,
+            $document->slug(),
+            ($locale ?? $document->locale())->code,
             $theme?->id ?? '',
             // The stylesheet URL rather than a version number of its own: it
             // already carries the cache-busting token, which is the stylesheet's
@@ -766,6 +988,10 @@ class Application
             // would go on linking the stale `?v=`. Folding the URL into the key
             // makes that edit heal the cache by itself.
             $theme !== null && $this->themes !== null ? $this->themes->stylesheetUrl($theme) : '',
+            // Which kind of document this is. A page `notes` and a post `notes` are
+            // two documents at two addresses; without this they are one cache entry,
+            // and whoever rendered first decides what everybody sees at both.
+            $document->type(),
         );
 
         $cached = $cache->get($key);
@@ -773,7 +999,7 @@ class Application
             return $cached;
         }
 
-        $rendered = $this->renderPageHtml($page, $locale);
+        $rendered = $render();
         $cache->put($key, $rendered);
 
         return $rendered;
@@ -831,7 +1057,14 @@ class Application
         // edits, resolves each item to a safe href, marks the current page, and is
         // empty markup when there is neither menu nor site name — so a site that
         // built neither simply has no header, not a broken one.
-        $nav = $this->renderSiteHeader($page, $locale ?? $page->locale());
+        $served = $locale ?? $page->locale();
+        $defaultLocale = $this->contentService?->defaultLocale()->code ?? $served->code;
+        $nav = $this->renderSiteHeader(
+            $served->code === $defaultLocale
+                ? '/' . $page->slug()
+                : '/' . $served->code . '/' . $page->slug(),
+            $served,
+        );
 
         // The shared document chrome — head, header, theme link — that every page
         // gets regardless of how its body is produced. Handed to the render hook
@@ -864,7 +1097,13 @@ class Application
         // Without this a site could store a page but not show it.
         $renderer = new SectionRenderer(
             new JsonSectionTypeRepository($this->basePath . '/config/sections'),
-            $media
+            $media,
+            // Defaults repeated because the listing service is the fifth argument;
+            // a page carrying a listing section is how a collection becomes visible
+            // at all, so this is not an optional extra on the public render path.
+            '/api/media/file',
+            null,
+            $this->entryListings,
         );
         $body = $renderer->render($page);
 
@@ -881,23 +1120,23 @@ class Application
     }
 
     /**
-     * The site header — brand plus the "main" menu — for the page being rendered.
+     * The site header — brand plus the "main" menu — for the document being
+     * rendered.
      *
      * The menu items and the site name are gathered here (a kernel concern:
      * reading storage and settings), and the actual markup is left to
-     * {@see NavigationRenderer}. The current page's href is computed the same way
-     * the menu builds its own hrefs — no locale prefix for the default locale,
-     * `/locale/slug` otherwise — so the item pointing at this page matches and is
-     * marked current.
+     * {@see NavigationRenderer}.
+     *
+     * @param string $currentHref Where the document being rendered lives, spelt the
+     *        same way the menu spells its own hrefs — no locale prefix for the
+     *        default locale, `/locale/…` otherwise — so the item pointing at it
+     *        matches and is marked current. Taken as a parameter because a page's
+     *        address is its slug while an entry's comes from its collection's route,
+     *        and the caller is the one that knows which it is holding.
      */
-    private function renderSiteHeader(Content $page, Locale $locale): string
+    private function renderSiteHeader(string $currentHref, Locale $locale): string
     {
         $items = $this->menusController?->resolvedItems('main', $locale->code) ?? [];
-
-        $defaultLocale = $this->contentService?->defaultLocale()->code ?? $locale->code;
-        $currentHref = $locale->code === $defaultLocale
-            ? '/' . $page->slug()
-            : '/' . $locale->code . '/' . $page->slug();
 
         $brand = ($this->settings ?? Settings::load($this->basePath . '/data/settings.json'))->siteName();
 
@@ -1445,7 +1684,28 @@ class Application
             }
         }
         
-        return $object->$method(...$args);
+        try {
+            return $object->$method(...$args);
+        } catch (ContentRefusedException $refused) {
+            // A plugin said no. That is an answer, not a fault — and until this
+            // caught it, a plugin refusing a save produced a 500 and a stack
+            // trace, which reads as "the CMS is broken" rather than "your
+            // content was not accepted".
+            //
+            // 409, matching how PageService reports a publish the gate refused:
+            // the request is well formed and the caller is entitled to make it;
+            // what is wrong is the state of the thing being written.
+            return [
+                'status' => 409,
+                'error' => $refused->reason,
+                'refusedBy' => $refused->hook,
+            ];
+        } catch (StorageAuthorizationException $denied) {
+            // The storage layer's own last line of defence, which had the same
+            // gap: an authenticated account whose role may not write reached a
+            // handler that forgot to check, and got a 500 instead of being told.
+            return ['status' => 403, 'error' => $denied->getMessage()];
+        }
     }
 
     public function log(string $level, string $message): void

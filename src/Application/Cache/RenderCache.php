@@ -114,7 +114,16 @@ final class RenderCache
      * What is in it is exactly what changes the bytes of the document for an
      * anonymous visitor:
      *
-     * - **slug** — which page. Obvious, and alone it is not enough.
+     * - **slug** — which document. Obvious, and alone it is not enough.
+     * - **type** — `page`, or the id of the collection an entry belongs to. A page
+     *   and an entry can hold the same slug: a page `notes` and a post `notes` are
+     *   two unrelated documents at `/notes` and `/blog/notes`. Keyed on slug alone
+     *   they are one cache entry, and whichever was rendered first is served to
+     *   everyone asking for either — one document's HTML delivered at the other's
+     *   address, silently, to visitors only. This is the component that makes that
+     *   impossible, and the reason a caller should never pass a type it invented:
+     *   it is the document's own `type()`, which cannot disagree with what was
+     *   rendered.
      * - **locale** — the language *actually served*, not the one requested. When
      *   German falls back to English the document says `lang="en"` and contains
      *   English prose, and the header's hrefs are built from the served locale
@@ -147,8 +156,14 @@ final class RenderCache
         string $locale,
         string $themeId,
         string $themeVersion = '',
+        /**
+         * Last and defaulted so that every call written before collection entries
+         * had addresses still means what it said — those callers were keying pages
+         * and nothing else. New callers pass the document's own type.
+         */
+        string $type = 'page',
     ): string {
-        return hash('sha256', implode("\0", [$slug, $locale, $themeId, $themeVersion]));
+        return hash('sha256', implode("\0", [$type, $slug, $locale, $themeId, $themeVersion]));
     }
 
     /* -------------------------------------------------------------- lookup -- */
@@ -265,8 +280,10 @@ final class RenderCache
      * one of these changes the bytes of at least one public document without
      * changing any key:
      *
-     * - **Content** — a page published, unpublished, created, updated/saved,
-     *   deleted, or restored from history. Publish and unpublish are the obvious
+     * - **Content** — a page *or a collection entry* published, unpublished,
+     *   created, updated/saved, deleted, or restored from history. An entry reaches
+     *   two documents: its own, and every page whose listing section names its
+     *   collection. Publish and unpublish are the obvious
      *   two; save matters because an already-published page can be edited in
      *   place, and restore matters because it is a write that does not look like
      *   one from the editor's side.
