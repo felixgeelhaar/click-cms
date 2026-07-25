@@ -1,0 +1,13 @@
+{
+  "name": "click-cms-screenshots",
+  "private": true,
+  "type": "module",
+  "description": "Recaptures the documentation screenshots from a running instance.",
+  "scripts": {
+    "capture": "node capture.mjs"
+  },
+  "comment": "Its own package rather than a dependency of admin-ui: this is a documentation tool, run by hand when the admin UI changes, and the shipped application must not grow a browser automation dependency to build. Playwright drives the Chrome already installed (channel: 'chrome'), so no browser is downloaded.",
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}
