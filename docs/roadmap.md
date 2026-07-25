@@ -123,9 +123,10 @@ Every item here holds the lines v1 was built on, because they are the product:
    shared-hosting constraint. Polling presence is the deliberate ceiling, not a
    stepping stone.
 
-10. **Adoption and DX.** *(varies)* A second theme beyond the default, a
-    documentation site, an installation/quick-start guide, an example content
-    seeder, and a published Docker image.
+10. **Adoption and DX.** *(varies)* ~~A second theme beyond the default~~ (done —
+    `themes/dark`, alongside a real theme system), a documentation site, an
+    installation/quick-start guide, an example content seeder, and a published
+    Docker image.
 
 11. **A render cache.** *(medium)* Under load, every request reads files. A
     page/render cache invalidated on publish keeps a flat-file site fast without
@@ -133,6 +134,26 @@ Every item here holds the lines v1 was built on, because they are the product:
 
 12. **Accessibility audit.** *(small–medium)* An automated a11y pass over the
     admin UI and the default public theme, fixing what it finds.
+
+## Shipped since this list was written
+
+Not on the original roadmap, but done — recorded so the list stays an honest
+picture of where the project is rather than only where it was going:
+
+- **Storage backends.** MySQL/MariaDB and PostgreSQL joined JSON and SQLite, all
+  four behind one shared contract test, so switching is a config change.
+- **A theme system.** Themes as packages in `themes/`, discovered, switchable
+  from the admin, with cache-busted stylesheet URLs. Closes most of the Theming
+  section in `backlog.md`.
+- **Self-update.** A signed release feed with freeze and rollback defences and
+  key rotation, a policy dial (`security` by default: security fixes install
+  themselves, everything else waits for an administrator), an installer that
+  verifies before touching anything and can roll back, and a cron entry point.
+  Published from GitHub Actions; documented in `docs/updates.md`.
+- **Media.** Art-directed crops, and video (MP4/WebM, byte-range served).
+- **Marketplace hardening.** A Zip Slip vulnerability and a missing
+  authorization gate, both found by exercising the install path rather than
+  reading it.
 
 ## Choosing what is next
 

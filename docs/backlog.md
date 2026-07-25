@@ -208,9 +208,13 @@ Known gaps:
 - ~~Sidebar navigation uses `<a>` elements with no `href`.~~ Fixed: the links
   carry their destination and mark the current page, so they are keyboard
   reachable, announced as links, and open in a new tab on Cmd/Ctrl-click.
-- Section and repeater reordering is arrow buttons rather than drag and drop.
-  Accessible and dependency-free, but not what people expect.
-- No preview of what a page will look like once rendered.
+- ~~Section and repeater reordering is arrow buttons rather than drag and drop.~~
+  Done: rows drag, and the arrow buttons stayed — dragging is what people expect,
+  but it is unusable by keyboard and hostile on touch, so removing the buttons
+  would have traded one group of users for another.
+- ~~No preview of what a page will look like once rendered.~~ Done: an editor
+  previews the working copy, and can mint a signed link that shows it to somebody
+  with no account at all — which is what preview is actually for.
 
 ---
 
@@ -233,8 +237,16 @@ Outstanding:
   expressible as CSS `object-position`, so a front end honours it for free. Still
   open: actual server-side cropping to fixed boxes (deliberately deferred — a
   crop is an editorial decision, and object-position covers the common case).
-- No bulk operations, folders, or search. Fine for tens of images, painful at
-  hundreds.
+- ~~No bulk operations, folders, or search.~~ Done: the library searches by name,
+  groups into folders and deletes in bulk, so it stays usable past a few hundred
+  images.
+- ~~No server-side cropping to fixed boxes.~~ Done: a site declares named
+  art-directed crops under `core.media.crops` and each is cut focal-point-aware
+  at upload and recut when the point moves, alongside the responsive ladder.
+- ~~Video is refused.~~ Done: MP4 and WebM are accepted (their own 64 MB ceiling,
+  stored verbatim — the CMS does not transcode) and served with byte-range
+  support, so a site can host its own hero clip rather than depending on a front
+  end's bundled assets.
 
 ---
 
@@ -257,9 +269,15 @@ Done since:
 Outstanding:
 
 - No rate limiting on login beyond the existing lockout.
-- Capabilities are enforced only where a handler remembers to ask for them.
-  Nothing structural stops a new endpoint from skipping the check.
-- No audit trail: nothing records who changed what.
+- ~~Capabilities are enforced only where a handler remembers to ask for them.~~
+  Mitigated: `AuthorizingStorage` asks the type-blind question — may this account
+  mutate content at all — at the storage boundary, so a handler that forgets its
+  check is caught by something structural rather than by review. The specific
+  capability still belongs to the handler, which alone knows ownership and intent.
+- ~~No audit trail: nothing records who changed what.~~ Done: `AuditingStorage`
+  wraps versioning as the outermost decorator, so every write — save, delete,
+  publish, unpublish, restore — records who did it on top of the record of what
+  changed.
 
 ---
 
@@ -280,20 +298,30 @@ only semantic markup with stable class names (`cms-section--<type>`,
 `cms-field--<name>`, presentation modifiers such as `cms-section--columns-4`)
 that the stylesheet targets. That separation is right and should stay.
 
-What is missing is a way to *supply* a theme:
+**Built.** A theme is now an installable package rather than a file the
+application owns:
 
-- The path is hardcoded in core. A site cannot point at its own stylesheet
-  without editing the renderer.
-- `public/theme.css` lives inside the application, so replacing it means editing
-  a file the CMS owns and a deploy overwrites it. A theme should be site-owned
-  and live outside the image.
-- There is no notion of more than one theme, or of choosing between them, or of
-  a plugin shipping one.
-- No cache-busting: an edited `theme.css` sits in browser caches with no version
-  in the URL.
+- Themes live in `themes/` at the installation root — outside the application, so
+  a deploy that replaces the code leaves the design alone.
+- Each is a directory with a `theme.json` manifest and a stylesheet.
+  `ThemeRepository` discovers them, and the active one is remembered in
+  `data/theme.json`; `ThemesController` lists them and activates one (gated on
+  ManageSettings).
+- `PageShell` links the active theme's stylesheet instead of a hardcoded path,
+  and the URL carries an mtime version, so an edited theme is not served from a
+  browser cache.
+- Two ship: `default` (the previous stylesheet, moved out intact) and `dark`,
+  which exists to prove the system works with more than one.
+- The vhost aliases `/themes` read-only and refuses to execute anything in it —
+  a theme is someone else's package, so a stray `.php` inside one must never
+  become a way to run code.
 
-The current file exists to make a fresh install render something presentable. It
-is a default, not a theming system, and should not be mistaken for one.
+`public/theme.css` is still shipped so nothing breaks mid-upgrade, and
+`PageShell` falls back to it when a site has no themes directory at all. It is
+dead once a site has themes and can be removed in a later release.
+
+Still open: no way to *install* a theme from the admin (they are placed on disk),
+and no plugin-supplied themes.
 
 ---
 
