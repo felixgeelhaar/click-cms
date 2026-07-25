@@ -7,6 +7,7 @@ namespace Click\Cms\Tests\Unit\Infrastructure;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Storage\StorageInterface;
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Domain\ValueObjects\Locale;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
@@ -88,6 +89,95 @@ abstract class StorageContractTestCase extends TestCase
         $found = $this->storage->findByType('page');
 
         $this->assertSame([0, 1], array_keys($found));
+    }
+
+    /* ------------------------------------------------------------- types -- */
+
+    /**
+     * Every backend must be able to say what it holds.
+     *
+     * This is the question the backup plugin could not ask, so it walked the
+     * content directory instead — which holds documents only on the flat-file
+     * backend. A site on SQLite, MySQL or Postgres therefore produced an archive
+     * with its media in it and not one document, and reported success. Holding
+     * every backend to this here is what makes "back up the whole site" a thing
+     * that can be written once and be true everywhere.
+     */
+    public function testTypesReportsEveryTypeThatHoldsSomething(): void
+    {
+        $this->storage->save(Content::create(ContentKey::page('home')));
+        $this->storage->save(Content::create(ContentKey::user('admin')));
+        $this->storage->save(Content::create(ContentKey::for('menu', 'main')));
+
+        $this->assertSame(['menu', 'page', 'user'], $this->storage->types());
+    }
+
+    public function testTypesIsEmptyOnAnEmptyStore(): void
+    {
+        $this->assertSame([], $this->storage->types());
+    }
+
+    /** One entry per type, however many documents of it there are. */
+    public function testATypeIsReportedOnceNotOncePerDocument(): void
+    {
+        foreach (['a', 'b', 'c'] as $slug) {
+            $this->storage->save(Content::create(ContentKey::page($slug)));
+        }
+
+        $this->assertSame(['page'], $this->storage->types());
+    }
+
+    /** Types are found across languages, not only the default one. */
+    public function testATypeThatExistsOnlyInAnotherLanguageIsStillReported(): void
+    {
+        $this->storage->save(Content::create(ContentKey::for('post', 'hallo', Locale::fromString('de'))));
+
+        $this->assertSame(['post'], $this->storage->types());
+    }
+
+    /**
+     * A type whose last document was deleted is no longer a type the site has.
+     * Reporting it would make a backup iterate an empty type forever, and would
+     * make "what is in this site?" answer with history rather than fact.
+     */
+    public function testATypeDisappearsWhenItsLastDocumentGoes(): void
+    {
+        $this->storage->save(Content::create(ContentKey::page('home')));
+        $this->storage->save(Content::create(ContentKey::user('admin')));
+
+        $this->storage->delete(ContentKey::page('home'));
+
+        $this->assertSame(['user'], $this->storage->types());
+    }
+
+    /**
+     * The whole point, stated as one assertion: every document in the store is
+     * reachable from types() alone, with nothing known in advance.
+     */
+    public function testEveryStoredDocumentIsReachableFromTypesAlone(): void
+    {
+        $written = [];
+        foreach ([
+            ContentKey::page('home'),
+            ContentKey::page('about'),
+            ContentKey::user('admin'),
+            ContentKey::for('menu', 'main'),
+            ContentKey::for('post', 'hallo', Locale::fromString('de')),
+        ] as $key) {
+            $this->storage->save(Content::create($key));
+            $written[] = $key->toString();
+        }
+
+        $reached = [];
+        foreach ($this->storage->types() as $type) {
+            foreach ($this->storage->findByType($type) as $document) {
+                $reached[] = $document->key->toString();
+            }
+        }
+
+        sort($written);
+        sort($reached);
+        $this->assertSame($written, $reached);
     }
 
     public function testDeleteRemovesAndReportsWhetherAnythingWasRemoved(): void

@@ -33,6 +33,27 @@ interface StorageInterface
      */
     public function findByType(string $type, ?Locale $locale = null): array;
 
+    /**
+     * Every type that currently holds at least one document, sorted.
+     *
+     * Without this the port can be read only by a caller that already knows what
+     * to ask for, and "everything in this site" is not expressible at all. That
+     * gap is not academic: the backup plugin walked the `content/` directory
+     * instead, which holds documents only on the flat-file backend, so a site on
+     * SQLite, MySQL or Postgres produced an archive containing its media and not
+     * one single document — a backup that looked complete and restored nothing.
+     * `bin/click-migrate-storage.php` hit the same wall and worked around it by
+     * scanning the content directory and unioning a hardcoded list, which is a
+     * workaround unavailable to anything running on a database.
+     *
+     * A type with no documents is not reported. There is no registry of types
+     * here to consult — a type exists, as far as storage is concerned, because
+     * something of that type was written.
+     *
+     * @return list<string>
+     */
+    public function types(): array;
+
     public function save(Content $content): void;
 
     /** @return bool True when something was actually removed. */

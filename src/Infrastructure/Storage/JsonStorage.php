@@ -66,6 +66,39 @@ final class JsonStorage implements StorageInterface
         return null;
     }
 
+    /**
+     * The top-level directories of the content root, each of which is a type.
+     *
+     * A directory holding no readable document is not reported — an empty
+     * `page/` left behind by deleting the last page is not a type the site has.
+     */
+    public function types(): array
+    {
+        if (!is_dir($this->contentDir)) {
+            return [];
+        }
+
+        $types = [];
+
+        foreach (scandir($this->contentDir) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..' || !is_dir($this->contentDir . '/' . $entry)) {
+                continue;
+            }
+            // Anything not a legal type segment was not written by this backend
+            // and is not something `findByType()` could read back.
+            if (!ContentKeyRules::isSafeSegment($entry)) {
+                continue;
+            }
+            if ($this->findByType($entry) !== []) {
+                $types[] = $entry;
+            }
+        }
+
+        sort($types);
+
+        return $types;
+    }
+
     public function findByType(string $type, ?Locale $locale = null): array
     {
         if (!ContentKeyRules::isSafeSegment($type)) {

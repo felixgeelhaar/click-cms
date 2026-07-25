@@ -205,6 +205,12 @@ final class RecordingStorage implements PublishingStorage
         return [];
     }
 
+    public function types(): array
+    {
+        $this->reads[] = 'types';
+        return [];
+    }
+
     public function save(Content $content): void
     {
         $this->saved[] = $content->key->toString();
