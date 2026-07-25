@@ -314,7 +314,7 @@ class Application
         $this->updatesController = new UpdatesController(
             new UpdateService(
                 $this->basePath,
-                new ReleaseFeed(),
+                new ReleaseFeed($this->basePath . '/data/updates'),
                 new UpdateInstaller($this->basePath),
                 self::VERSION,
             ),

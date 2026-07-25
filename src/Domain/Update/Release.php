@@ -43,10 +43,21 @@ final class Release
             return null;
         }
 
-        // Only http(s). A feed naming a file:// or php:// package would otherwise
-        // make the updater read whatever the URL pointed at.
+        // HTTPS, and nothing else. A `file://` or `php://` package would make the
+        // updater read whatever the URL pointed at; plain `http://` would let
+        // anyone on the path decide which bytes arrive. The checksum in the
+        // signed feed would still catch tampering, but transport security is not
+        // only about tampering — it also denies an observer the ability to see,
+        // block or delay precisely the security release a site is fetching.
+        //
+        // Loopback is the one exception, so a release channel can be exercised
+        // locally without a certificate. It is not reachable from off the box,
+        // so it grants an attacker nothing.
         $scheme = strtolower((string) parse_url($packageUrl, PHP_URL_SCHEME));
-        if ($scheme !== 'https' && $scheme !== 'http') {
+        $host = strtolower((string) parse_url($packageUrl, PHP_URL_HOST));
+        $isLoopback = in_array($host, ['127.0.0.1', 'localhost', '::1'], true);
+
+        if ($scheme !== 'https' && !($scheme === 'http' && $isLoopback)) {
             return null;
         }
 
