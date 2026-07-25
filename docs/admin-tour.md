@@ -81,6 +81,8 @@ Uploading, descriptions, file sizes and what makes a good picture are covered in
 A freer way of laying out a page, by arranging blocks rather than filling in a
 design's fields.
 
+![The Visual Builder screen, headed "Compose a page from sections, grids and content blocks", with a Page dropdown listing the site's pages and the prompt "Select a page above to start building."](images/builder.png)
+
 **This item appears only on some sites.** It shows up when the visual builder has
 been installed and your account is allowed to use it, which in practice means an
 administrator. If you cannot see it, nothing is wrong.
@@ -92,6 +94,8 @@ You do not need it to change text or swap a photo. Everything in
 
 Headed **Form submissions** once you open it: *messages visitors have sent
 through a contact form*.
+
+![The Form submissions screen, headed "Messages visitors have sent through a contact form", with a Refresh button and the message "No submissions yet. When a visitor sends a contact form, it appears here."](images/submissions.png)
 
 Each message is a card showing who sent it, the address of the page they sent it
 from, the date and time, and then their **Name**, **Email** and **Message**. The
@@ -116,6 +120,8 @@ form, it appears here.*
 
 Under the **ACCOUNT** heading, at the bottom. It shows your **Display Name** —
 the name other people in the admin see next to your work — and your **Email**.
+
+![The Profile screen, headed "Manage your account settings", with a Display Name field reading Administrator, an Email field, and a Save Changes button.](images/profile.png)
 
 Two honest notes about this screen:
 
@@ -163,6 +169,8 @@ The extra features installed on this site, each with a switch to turn it on or
 off. Each is a card with a name, a description, and either **Deactivate** or
 **Activate**.
 
+![The Plugins screen, headed "Extend your CMS functionality", listing each bundled plugin with its description and an Activated badge alongside a Deactivate button.](images/plugins.png)
+
 **This is a screen for whoever maintains the site, not for whoever writes it.**
 Turning a plugin off can remove fields from your page editor or change how your
 public pages render, and the effect is not always obvious from the plugin's
@@ -172,6 +180,8 @@ name. If you did not install it, leave it alone.
 
 Where new plugins come from — either from a configured registry or as a file you
 upload. Again: for whoever maintains the site.
+
+![The Marketplace screen, explaining that registry installs are verified against the configured public key while uploads are not, because a plugin runs with the same access as the CMS itself.](images/marketplace.png)
 
 The screen opens with a warning worth repeating, because it is the real risk on
 it: **a plugin runs with the same access as the CMS itself.** Registry installs
@@ -186,6 +196,8 @@ Who can sign in, and what each of them may do. Each row shows a person's display
 name, their username and email, and a pill naming their account type, with
 **Edit** and **Delete** buttons. Your own row is marked *you*, and you cannot
 delete yourself.
+
+![The Users screen showing one account: Administrator, marked YOU, with the username admin, an email address, the role Administrator, and Edit and Delete buttons.](images/users.png)
 
 **+ New user** asks for a username, a display name, an email, a type and a
 starting password of at least eight characters. New accounts start as **Editor**.
@@ -214,6 +226,8 @@ account is the way through.
 
 Sends an old web address to a new one. The site checks this list whenever
 somebody asks for an address that does not exist.
+
+![The Redirects screen, headed "Send an old address to a new one. Checked when a page is not found", with an "Add redirect" button and the message that no redirects exist yet.](images/redirects.png)
 
 Each row has three parts and a **Remove** button:
 
@@ -277,6 +291,8 @@ The design your public pages wear. Each installed theme is a card with its name,
 version, author and description, and either the word **Active** or an
 **Activate** button. One is live at a time.
 
+![The Themes screen, headed "The design your public pages wear. One is live at a time", listing the Dark and Default themes with a description and an Activate button for each.](images/themes.png)
+
 Two ship with the CMS: **Default**, a light and quiet design, and **Dark**, the
 same design on a dark ground. There are no colours or fonts to set here —
 choosing which theme is active is the only thing this screen does.
@@ -288,6 +304,8 @@ afterwards and look.
 ### Settings
 
 Two settings, each in its own panel.
+
+![The Settings screen, headed "How this instance behaves. Changes take effect immediately", with a Site name field described as the brand shown in the header, and a Headless mode switch.](images/settings.png)
 
 **Site name** — *shown as the brand in your site's header. Leave it empty for no
 brand.* This is also the name shown at the top of the admin. Type it, click
@@ -310,6 +328,8 @@ the policy that decides whether updates install on their own, and a **Check now*
 button. If a new version is offered, you get its number, its release notes, a
 **Security** badge where it applies, and **Install this update**. Below that is a
 history of what has been installed and when.
+
+![The Updates screen showing the running version 1.0.0, a policy of "Security — installs security releases automatically", a "Check now" button reporting "Already up to date", and an empty History list.](images/updates.png)
 
 **This is a screen for whoever maintains the site.** Updates are worth keeping up
 with, particularly the ones marked as security releases, but installing one
