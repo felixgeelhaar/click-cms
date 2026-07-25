@@ -46,6 +46,16 @@ jobs:
       - name: Run test suite
         run: vendor/bin/phpunit --no-progress
 
+      # The documentation site is generated at deploy time, so a generator that
+      # stopped working would be discovered by GitHub Pages rather than by CI —
+      # and the run that discovers it is the one that publishes the update feed.
+      # Building it here means a broken generator fails the pull request instead.
+      - name: Build the documentation site
+        run: |
+          php scripts/docs/build-site.php /tmp/docs-site
+          test -f /tmp/docs-site/index.html
+          echo "built $(find /tmp/docs-site -type f | wc -l) files"
+
   admin:
     name: Admin UI tests
     runs-on: ubuntu-latest

@@ -112,82 +112,15 @@ jobs:
             click-cms-${{ steps.meta.outputs.version }}.zip
             click-cms-${{ steps.meta.outputs.version }}-install.zip
 
-  feed:
-    name: Publish the signed feed
+  # The feed is published by the one workflow that owns GitHub Pages. It used to
+  # be duplicated here, and that duplication is exactly what made adding a
+  # documentation site dangerous: `deploy-pages` replaces the whole site, so
+  # every publisher has to assemble all of it, and three publishers meant three
+  # places to get that wrong. Now there is one, and this calls it.
+  site:
+    name: Publish the site and feed
     needs: package
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          coverage: none
-
-      - name: Assemble the release list from GitHub Releases
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # The feed is rebuilt from the published releases each time rather than
-          # accumulated in a file, so it cannot drift from what actually exists.
-          gh release list --limit 100 --json tagName,isDraft,isPrerelease,body \
-            --jq '[ .[] | select(.isDraft | not) | {
-                  version: (.tagName | ltrimstr("v")),
-                  packageUrl: ("https://github.com/${{ github.repository }}/releases/download/" + .tagName + "/click-cms-" + (.tagName | ltrimstr("v")) + ".zip"),
-                  security: (.body // "" | test("\\[security\\]"; "i")),
-                  notes: (.body // "" | split("\n")[0]),
-                  requiresPhp: "8.1"
-                } ]' > releases-raw.json
-
-      - name: Add each package's checksum
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # A feed entry without the right sha256 is a release no site will
-          # install, so the hashes are taken from the artefacts themselves.
-          php -r '
-            $rows = json_decode(file_get_contents("releases-raw.json"), true) ?: [];
-            $out = [];
-            foreach ($rows as $row) {
-              $tmp = tempnam(sys_get_temp_dir(), "pkg");
-              $ok = @copy($row["packageUrl"], $tmp);
-              if ($ok && filesize($tmp) > 0) {
-                $row["sha256"] = hash_file("sha256", $tmp);
-                $out[] = $row;
-              } else {
-                fwrite(STDERR, "skipping {$row["version"]}: package not downloadable\n");
-              }
-              @unlink($tmp);
-            }
-            file_put_contents("releases.json", json_encode($out, JSON_PRETTY_PRINT));
-            fwrite(STDERR, count($out) . " release(s) in the feed\n");
-          '
-
-      - name: Sign the feed
-        env:
-          UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
-        run: |
-          if [ -z "$UPDATE_PRIVATE_KEY" ]; then
-            echo "::error::UPDATE_PRIVATE_KEY is not set; the feed cannot be signed." >&2
-            exit 1
-          fi
-          # The sequence must be monotonic ACROSS both workflows, so it cannot be
-          # github.run_number: each workflow has its own counter, and the release
-          # job (run 3) publishing after the re-sign job (run 20) would send the
-          # feed backwards — which every site would then refuse, turning the
-          # rollback defence into a self-inflicted outage. Seconds since the
-          # epoch is shared, always increasing, and never resets.
-          SEQUENCE=$(date +%s)
-          printf '%s' "$UPDATE_PRIVATE_KEY" > /tmp/update-key.pem
-          php scripts/updates/build-feed.php releases.json /tmp/update-key.pem _site \
-            --sequence="$SEQUENCE" --ttl-days=30
-          rm -f /tmp/update-key.pem
-
-      - name: Publish to Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
+    uses: ./.github/workflows/pages.yml
+    # The called workflow declares its own permissions; secrets have to be
+    # passed down explicitly or UPDATE_PRIVATE_KEY is not visible to it.
+    secrets: inherit
