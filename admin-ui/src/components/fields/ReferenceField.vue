@@ -7,7 +7,7 @@
          and removed. Order is meaningful — "featured posts" render in the order
          set here — so the chips carry move controls, not just a remove. -->
     <div v-if="field.multiple" class="ref-multi">
-      <ul v-if="selected.length" class="ref-chips">
+      <ul v-if="selected.length" class="ref-chips" :aria-label="`Chosen ${label}`">
         <li v-for="(slug, index) in selected" :key="slug" class="ref-chip">
           <span class="ref-chip-order">
             <button
@@ -29,7 +29,17 @@
           <button type="button" class="ref-chip-remove" :aria-label="`Remove ${titleFor(slug)}`" @click="remove(slug)">×</button>
         </li>
       </ul>
-      <select class="reference-select" :aria-describedby="describedBy" :disabled="loading" @change="addFromEvent($event)">
+      <!-- The wrapper's <label for> points at `inputId`, which in multiple mode
+           belongs to nothing — the chips are the value and this dropdown only
+           adds to them. Naming it explicitly says what it does ("Add Related")
+           rather than leaving a nameless combo box. -->
+      <select
+        class="reference-select"
+        :aria-label="`Add ${label}`"
+        :aria-describedby="describedBy"
+        :disabled="loading"
+        @change="addFromEvent($event)"
+      >
         <option value="">{{ loading ? 'Loading…' : (available.length ? '+ Add…' : emptyLabel) }}</option>
         <option v-for="opt in available" :key="opt.slug" :value="opt.slug">{{ opt.title }}</option>
       </select>
@@ -66,6 +76,9 @@ const options = ref([]);
 const loading = ref(true);
 
 const target = computed(() => props.field.references || '');
+// What to call this field when a control needs its own name. Falls back to the
+// referenced type so a field declared without a label is still announced.
+const label = computed(() => props.field.label || target.value || 'items');
 const emptyLabel = computed(() =>
   target.value === 'page' ? 'No pages yet' : `No ${target.value} entries yet`
 );
@@ -125,14 +138,18 @@ onMounted(load);
 </script>
 
 <style scoped>
-.reference-select { width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
-.reference-select:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; border-color: var(--color-primary-600); }
+.reference-select { width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.reference-select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--focus-ring); }
 .ref-chips { list-style: none; margin: 0 0 0.5rem; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.ref-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.35rem 0.25rem 0.4rem; border: 1px solid var(--app-border); border-radius: 999px; background: var(--app-surface-strong); font-size: 0.8125rem; }
+.ref-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.35rem 0.25rem 0.4rem; border: 1px solid var(--control-border); border-radius: 999px; background: var(--app-surface-strong); font-size: 0.8125rem; }
 .ref-chip-order { display: inline-flex; }
 .ref-chip-move { border: 0; background: none; cursor: pointer; color: var(--app-text-muted); font-size: 0.8125rem; line-height: 1; padding: 0 0.1rem; }
 .ref-chip-move:disabled { opacity: 0.35; cursor: not-allowed; }
 .ref-chip-move:not(:disabled):hover { color: var(--color-primary-600); }
 .ref-chip-remove { border: 0; background: none; cursor: pointer; color: var(--app-text-muted); font-size: 1rem; line-height: 1; padding: 0 0.2rem; }
 .ref-chip-remove:hover { color: var(--color-danger-600, #dc2626); }
+/* The chip controls are 12px glyphs with no border of their own; without a ring
+   there is nothing on screen to say which one the keyboard is on. */
+.ref-chip-move:focus-visible,
+.ref-chip-remove:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-radius: 4px; }
 </style>

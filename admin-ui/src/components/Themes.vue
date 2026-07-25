@@ -12,7 +12,8 @@
     <div v-else class="theme-grid">
       <div v-for="theme in themes" :key="theme.id" :class="['theme-card', { active: theme.active }]">
         <div class="theme-info">
-          <h3>{{ theme.name }}</h3>
+          <!-- h2: "Themes" is the h1, so a card heading at level 3 skips one. -->
+          <h2>{{ theme.name }}</h2>
           <p class="theme-meta">
             <span v-if="theme.version">v{{ theme.version }}</span>
             <span v-if="theme.author">{{ theme.author }}</span>
@@ -93,13 +94,30 @@ onMounted(load);
 .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
 .theme-card { padding: 1.5rem; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); }
 .theme-card.active { border-color: var(--color-primary-600); }
-.theme-info h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
+.theme-info h2 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
 .theme-info p { color: var(--app-text-muted); font-size: 0.875rem; }
 .theme-meta { display: flex; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.75rem; }
 .theme-actions { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
 .status { font-size: 0.75rem; text-transform: uppercase; font-weight: 500; }
-.status.active { color: var(--color-success-500); }
+.status.active { color: var(--color-success-text, #15803d); }
 .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem; border-radius: 6px; cursor: pointer; }
 .btn-primary { background: var(--color-primary-600); color: white; border: none; }
 .btn-sm:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

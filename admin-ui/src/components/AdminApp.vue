@@ -7,6 +7,11 @@
       <ChangePassword forced @changed="handlePasswordChanged" />
     </div>
     <div v-else class="admin-layout">
+      <!-- Every screen begins with the same twenty-odd navigation links. Without
+           a way past them, reaching the content by keyboard means tabbing
+           through the lot on every page. The link is off-screen until focused,
+           which is the first thing Tab reaches. -->
+      <a class="skip-link" href="#admin-main" @click="focusMain">Skip to main content</a>
       <header class="topbar">
         <button
           class="icon-button"
@@ -22,9 +27,24 @@
           <span class="brand-name">{{ brandLabel }}</span>
         </button>
         <div class="topbar-right">
-          <button class="chip-button" @click="toggleTheme">{{ theme === 'dark' ? 'Dark' : 'Light' }}</button>
-          <button class="profile-button" @click="handleNavigate('/admin/profile')">
-            {{ (currentUser?.displayName || currentUser?.username || 'U').slice(0, 1).toUpperCase() }}
+          <!-- The visible word names the current theme; on its own that reads as
+               a label, not a control. The accessible name says what pressing it
+               does, and aria-pressed carries the state. -->
+          <button
+            class="chip-button"
+            :aria-pressed="theme === 'dark'"
+            :aria-label="`Dark theme${theme === 'dark' ? ' (on)' : ' (off)'}`"
+            @click="toggleTheme"
+          >{{ theme === 'dark' ? 'Dark' : 'Light' }}</button>
+          <!-- A single initial in a coloured square. The letter is decoration;
+               what the control does is open the profile, and that is what it
+               has to announce. -->
+          <button
+            class="profile-button"
+            :aria-label="`Profile — ${currentUser?.displayName || currentUser?.username || 'account'}`"
+            @click="handleNavigate('/admin/profile')"
+          >
+            <span aria-hidden="true">{{ (currentUser?.displayName || currentUser?.username || 'U').slice(0, 1).toUpperCase() }}</span>
           </button>
           <button class="text-button" @click="handleLogout">Logout</button>
         </div>
@@ -33,11 +53,11 @@
         <!-- On a narrow screen the sidebar is a drawer over the content; the
              backdrop dismisses it, matching the expectation every mobile menu
              sets. It is only in the tree while open. -->
-        <div v-if="mobileNavOpen" class="sidebar-backdrop" @click="mobileNavOpen = false"></div>
+        <div v-if="mobileNavOpen" class="sidebar-backdrop" aria-hidden="true" @click="mobileNavOpen = false"></div>
         <aside id="admin-sidebar" class="sidebar-shell" :class="{ collapsed: isCollapsed, 'is-open': mobileNavOpen }">
           <Sidebar :active-route="currentRoute" :user-role="currentUser?.role" :collapsed="isCollapsed" :show-builder="hasBuilder" @navigate="handleNavigate" />
         </aside>
-        <main class="main-content" :class="{ collapsed: isCollapsed }">
+        <main id="admin-main" ref="mainEl" tabindex="-1" class="main-content" :class="{ collapsed: isCollapsed }">
           <component :is="currentComponent" v-bind="currentProps" @navigate="handleNavigate" @saved="handleNavigate('/admin/pages')" @cancel="handleNavigate('/admin/pages')" @back="handleNavigate('/admin/plugins')" @branding-updated="handleBrandingUpdate" />
         </main>
       </div>
@@ -46,7 +66,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import Sidebar from './Sidebar.vue';
 import Login from './Login.vue';
 import Dashboard from './Dashboard.vue';
@@ -76,6 +96,7 @@ const installedPluginIds = ref([]);
 const theme = ref('light');
 const isCollapsed = ref(false);
 const mobileNavOpen = ref(false);
+const mainEl = ref(null);
 
 // The same control does two jobs by width: on a phone it opens the drawer, on a
 // desktop it collapses the rail to icons. matchMedia is optional-chained so a
@@ -129,6 +150,28 @@ const toggleSidebar = () => {
   else { isCollapsed.value = !isCollapsed.value; }
 };
 const toggleTheme = () => { theme.value = theme.value === 'light' ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', theme.value); };
+
+/**
+ * Move focus, not just the viewport.
+ *
+ * A plain `#hash` jump scrolls but leaves focus where it was, so the next Tab
+ * carries on through the navigation the reader just skipped. `<main>` carries
+ * tabindex="-1" so it can receive focus programmatically without joining the
+ * tab order.
+ */
+const focusMain = (event) => {
+  event.preventDefault();
+  mainEl.value?.focus();
+};
+
+/**
+ * Escape closes the mobile drawer. It covers the screen and swallows clicks, so
+ * without a key that dismisses it a keyboard reader who opens it is stuck
+ * behind it.
+ */
+const onKeydown = (event) => {
+  if (event.key === 'Escape' && mobileNavOpen.value) mobileNavOpen.value = false;
+};
 const handleBrandingUpdate = (nextBranding) => { branding.value = nextBranding; };
 
 const getRouteComponent = () => {
@@ -191,21 +234,33 @@ onMounted(async () => {
   currentRoute.value = window.location.pathname + window.location.search;
   await checkAuth();
   window.addEventListener('popstate', () => { currentRoute.value = window.location.pathname + window.location.search; });
+  window.addEventListener('keydown', onKeydown);
 });
+
+onUnmounted(() => { window.removeEventListener('keydown', onKeydown); });
 </script>
 
 <style scoped>
 .admin-app { min-height: 100vh; }
+/* Off-screen until focused, then a real, visible target at the top left. */
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  padding: 0.6rem 1rem; border-radius: 0 0 8px 0;
+  background: var(--color-primary-600); color: #fff; text-decoration: none; font-weight: 600;
+}
+.skip-link:focus { left: 0; outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.main-content:focus { outline: none; }
+.main-content:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--app-surface-strong); }
 .admin-layout { display: flex; flex-direction: column; min-height: 100vh; }
 .topbar { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 1rem; padding: 1rem 1.5rem; background: var(--app-surface); border-bottom: 1px solid var(--app-border); }
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; }
-.icon-button { padding: 0.5rem; border: 1px solid var(--app-border); background: var(--app-surface-strong); border-radius: 8px; cursor: pointer; color: var(--app-text); }
+.icon-button { padding: 0.5rem; border: 1px solid var(--control-border); background: var(--app-surface-strong); border-radius: 8px; cursor: pointer; color: var(--app-text); }
 .icon-button svg { width: 20px; height: 20px; }
 .topbar button:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .brand { display: flex; align-items: center; gap: 0.5rem; background: none; border: none; cursor: pointer; font-weight: 700; color: var(--app-text); }
 .brand-mark { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(140deg, var(--color-primary-500), var(--color-primary-700)); color: white; display: grid; place-items: center; }
-.chip-button { padding: 0.4rem 0.75rem; border: 1px solid var(--app-border); background: var(--app-surface-strong); border-radius: 999px; font-size: 0.75rem; cursor: pointer; }
+.chip-button { padding: 0.4rem 0.75rem; border: 1px solid var(--control-border); background: var(--app-surface-strong); border-radius: 999px; font-size: 0.75rem; color: var(--app-text); cursor: pointer; }
 .profile-button { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700)); color: white; display: grid; place-items: center; font-weight: 600; border: none; cursor: pointer; }
 .text-button { background: none; border: none; color: var(--app-text-muted); cursor: pointer; }
 .layout-body { display: flex; flex: 1; align-items: flex-start; }

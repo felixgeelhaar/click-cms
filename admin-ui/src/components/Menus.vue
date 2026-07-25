@@ -287,7 +287,7 @@ onMounted(async () => {
 .menu-picker, .new-menu { display: flex; align-items: flex-end; gap: 0.5rem; }
 .new-menu { flex-wrap: wrap; }
 .picker-label, .field-label { display: block; color: var(--app-text-muted); font-size: 0.875rem; font-weight: 500; margin-bottom: 0.35rem; }
-.picker-select, .picker-input, .text-input { padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--app-border); background: var(--app-surface); color: var(--app-text); font: inherit; }
+.picker-select, .picker-input, .text-input { padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--control-border); background: var(--app-surface); color: var(--app-text); font: inherit; }
 .picker-input { min-width: 10rem; }
 
 .loading, .empty-state { text-align: center; padding: 2rem; color: var(--app-text-muted); }
@@ -305,7 +305,7 @@ onMounted(async () => {
 .field .text-input { width: 100%; }
 .field-hint { margin-top: 0.25rem; font-size: 0.75rem; color: var(--app-text-muted); }
 .item-controls { display: flex; gap: 0.25rem; margin-top: 1.75rem; flex-shrink: 0; }
-.icon-btn { width: 28px; height: 28px; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; line-height: 1; color: var(--app-text); }
+.icon-btn { width: 28px; height: 28px; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; line-height: 1; color: var(--app-text); }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .icon-btn.danger { color: var(--color-danger-600, #dc2626); }
 
@@ -317,7 +317,7 @@ onMounted(async () => {
 .actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
 .btn-primary { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-secondary { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--app-border); }
+.btn-secondary { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--control-border); }
 .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .banner { margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; }
@@ -330,4 +330,21 @@ onMounted(async () => {
   .item-fields { grid-template-columns: 1fr; }
 }
 [data-theme="dark"] .banner.ok { color: #86efac; }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

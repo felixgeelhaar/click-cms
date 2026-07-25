@@ -13,6 +13,12 @@
   --ink: #e8eaef;
   --muted: #a3adbb;
   --rule: #262b34;
+  /*
+   * A form control's boundary has to clear 3:1 against what is behind it —
+   * --rule manages 1.2:1, which is a divider, not a field. Same neutral,
+   * lifted to 3.2:1 on --surface, and used on controls only.
+   */
+  --field-rule: #5f6b7d;
   --surface: #161a21;
   --ground: #0e1116;
   --accent: #7aa7ff;
@@ -83,7 +89,16 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
 .cms-nav a:focus-visible,
 .cms-nav-toggle:focus-visible,
 .cms-nav-subtoggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/*
+ * The current page. Colour and a tint were the whole signal, and colour alone
+ * is not a signal — the default theme already underlines it, so this does too:
+ * the same mark, so the two themes say "you are here" the same way.
+ */
 .cms-nav-item--current > a { color: var(--accent); background: rgba(122, 167, 255, 0.12); }
+.cms-nav-item--current > a::after {
+  content: ""; display: block; height: 2px; margin-top: 2px;
+  border-radius: 2px; background: var(--accent);
+}
 
 .cms-nav-subtoggle {
   border: 0; background: none; padding: 0.35rem; margin-left: -0.2rem;
@@ -126,6 +141,9 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
   .cms-js .cms-nav-open .cms-nav { display: block; }
   .cms-js .cms-nav-list { flex-direction: column; align-items: stretch; gap: 0.15rem; padding: 0.6rem; }
   .cms-js .cms-nav a { padding: 0.7rem 0.75rem; }
+  /* Stacked, the tint already sets the row apart; the underline would run the
+     full width and read as a divider. Same call the default theme makes. */
+  .cms-js .cms-nav-item--current > a::after { display: none; }
   .cms-js .cms-nav-children {
     position: static; opacity: 1; visibility: visible; transform: none;
     box-shadow: none; border: 0; border-radius: 0; padding: 0 0 0 0.75rem;
@@ -173,7 +191,7 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
 .cms-form input,
 .cms-form textarea {
   font: inherit; color: var(--ink); width: 100%;
-  padding: 0.6rem 0.75rem; border: 1px solid var(--rule); border-radius: 6px;
+  padding: 0.6rem 0.75rem; border: 1px solid var(--field-rule); border-radius: 6px;
   background: var(--surface);
 }
 .cms-form input:focus,
@@ -185,6 +203,14 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
   background: var(--accent); color: var(--ground);
 }
 .cms-form button[type="submit"]:disabled { opacity: 0.6; cursor: default; }
+/* Same ring as the navigation, on the controls that were relying on whatever
+   the browser happened to draw. */
+.cms-form button[type="submit"]:focus-visible,
+.cms-brand:focus-visible,
+.cms-section a:focus-visible,
+.cms-section--call-to-action .cms-field--buttonUrl a:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+}
 .cms-form-status:not(:empty) { margin-top: 0.75rem; color: var(--muted); }
 .cms-form-thanks { color: var(--ink); font-weight: 500; }
 

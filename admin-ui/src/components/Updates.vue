@@ -4,7 +4,7 @@
     <p class="page-subtitle">Keep the CMS itself current.</p>
 
     <p v-if="error" class="banner error" role="alert">{{ error }}</p>
-    <p v-if="notice" class="banner success">{{ notice }}</p>
+    <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
 
     <!-- A non-administrator gets the reason rather than an empty page: updating
          is the same privilege as installing a plugin, and saying so is more use
@@ -213,12 +213,29 @@ onMounted(async () => {
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .entry { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; font-size: 0.875rem; padding: 0.6rem 0.75rem; border: 1px solid var(--app-border); border-radius: 8px; }
 .result { font-size: 0.75rem; text-transform: uppercase; font-weight: 600; }
-.result.ok { color: var(--color-success-500); }
+.result.ok { color: var(--color-success-text, #15803d); }
 .result.failed { color: var(--color-danger-600, #dc2626); }
 .entry-version { font-weight: 500; }
 .entry-at, .entry-error { color: var(--app-text-muted); font-size: 0.8125rem; }
 .btn-primary { padding: 0.55rem 1.1rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
-.btn-secondary { padding: 0.55rem 1.1rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--app-border); }
+.btn-secondary { padding: 0.55rem 1.1rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--control-border); }
 .btn-secondary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

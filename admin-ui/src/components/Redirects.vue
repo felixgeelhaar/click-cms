@@ -128,11 +128,28 @@ onMounted(load);
 .rule-field { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; min-width: 0; }
 .rule-field.kind { flex: 0 0 11rem; }
 .rule-field label { font-size: 0.75rem; font-weight: 600; color: var(--app-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
-.rule-field input, .rule-field select { padding: 0.55rem 0.65rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.rule-field input, .rule-field select { padding: 0.55rem 0.65rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .arrow { padding-bottom: 0.6rem; color: var(--app-text-muted); }
 .actions { margin-top: 1.25rem; }
 .btn-primary { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-sm { padding: 0.5rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); }
+.btn-sm { padding: 0.5rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); }
 .btn-sm.danger { color: var(--color-danger-600, #dc2626); }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

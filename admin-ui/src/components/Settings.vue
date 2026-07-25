@@ -176,16 +176,16 @@ onMounted(load);
 .setting-title { margin: 0 0 0.4rem; font-size: 1.0625rem; }
 .setting-desc { margin: 0 0 0.6rem; font-size: 0.875rem; line-height: 1.5; color: var(--app-text-muted); }
 .setting-state { margin: 0; font-size: 0.8125rem; color: var(--app-text-muted); }
-.setting-state.warn { color: var(--color-warning-500, #b45309); }
+.setting-state.warn { color: var(--color-warning-text, #b45309); }
 .inline-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; max-width: 26rem; }
-.text-input { flex: 1; min-width: 0; padding: 0.55rem 0.7rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.text-input { flex: 1; min-width: 0; padding: 0.55rem 0.7rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .text-input:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; border-color: var(--color-primary-600); }
 .btn-primary { padding: 0.55rem 1.1rem; border: 0; border-radius: 8px; background: var(--color-primary-600); color: #fff; font-weight: 500; cursor: pointer; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .switch { display: inline-flex; flex-direction: column; align-items: center; gap: 0.35rem; cursor: pointer; }
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
-.switch-track { position: relative; width: 46px; height: 26px; border-radius: 999px; background: var(--app-surface-strong); border: 1px solid var(--app-border); transition: background 0.15s; }
+.switch-track { position: relative; width: 46px; height: 26px; border-radius: 999px; background: var(--app-surface-strong); border: 1px solid var(--control-border); transition: background 0.15s; }
 .switch-track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.25); transition: transform 0.15s; }
 .switch input:checked + .switch-track { background: var(--color-primary-600); border-color: var(--color-primary-600); }
 .switch input:checked + .switch-track::after { transform: translateX(20px); }
