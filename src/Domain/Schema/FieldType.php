@@ -25,6 +25,19 @@ enum FieldType: string
     case Url = 'url';
     case Email = 'email';
     case Date = 'date';
+    /**
+     * A flat list of short lines — the features of a plan, what a service
+     * includes.
+     *
+     * Distinct from a repeater on purpose, and not merely a convenience. A
+     * repeater cannot nest, so a plan inside a `pricing` repeater could not
+     * itself hold a repeating list; the only way to express "what's included"
+     * was a textarea, which renders as one paragraph of `<br>`-separated lines
+     * — a list to look at and not a list to anything reading the document.
+     * A list is not a repeater, so it can live inside one.
+     */
+    case StringList = 'list';
+
     /** A repeating group of sub-fields, e.g. rows in a table or cards in a grid. */
     case Repeater = 'repeater';
 

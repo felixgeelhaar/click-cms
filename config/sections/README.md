@@ -54,6 +54,7 @@ working to these rules rather than to the field list above.
 | any other `text`, `number`, `date` | `<p>` |
 | `textarea` | `<div>` of `<p>`, blank lines splitting paragraphs and single newlines becoming `<br>` |
 | `richtext` | `<div>` of the editor's own markup, sanitised to an allowlist |
+| `list` | `<ul class="cms-lines">` of `<li>` — a flat list of short lines. Honours `as: ordered`. **Not a repeater**, so it may live inside one |
 | `file` | `<video controls preload="none" playsinline>` when the upload is an MP4 or WebM, otherwise `<p><a download>` named by the file the editor uploaded. A `labelField` on it names the image to use as the poster frame. Never autoplays |
 | `url` | `<p><a href>` — its wording comes from `labelField`; failing that, from the row's `title` inside a repeater, and only then from the address itself |
 | `email` | `<p><a href="mailto:">` |
@@ -138,3 +139,13 @@ Declaring nothing renders exactly as it did before this existed.
 
 A row in a `definitions` repeater needs both a term and at least one value; a
 half-filled row is skipped, the same way an empty list item already is.
+
+## A choice about presentation, inside a row
+
+A `select` at the top level of a section becomes a modifier class on the
+`<section>` rather than printed text. Inside a repeater row it does the same
+thing to the `<li>`: `cms-item--emphasis-featured`.
+
+That is the only way a per-row flag — "most popular", "open now" — can reach the
+markup at all. Before it, the choice printed as a literal word underneath the
+row, which is why `pricing` could not mark the plan a site recommends.

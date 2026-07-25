@@ -82,6 +82,17 @@
 
     <!-- Images and files carry a reference the site resolves, so this is a text
          input until a media library exists to pick from. -->
+    <!-- A flat list of lines, edited as lines. Without this it would fall to the
+         generic input below and bind an array to a text box. -->
+    <LinesField
+      v-else-if="field.type === 'list'"
+      :model-value="modelValue ?? []"
+      :input-id="inputId"
+      :describedby="describedBy"
+      :invalid="Boolean(error)"
+      @update:model-value="$emit('update:modelValue', $event)"
+    />
+
     <input
       v-else
       :id="inputId"
@@ -102,6 +113,7 @@
 <script setup>
 import { computed, useId } from 'vue';
 import RichTextField from './RichTextField.vue';
+import LinesField from './LinesField.vue';
 import ReferenceField from './ReferenceField.vue';
 import LinkField from './LinkField.vue';
 

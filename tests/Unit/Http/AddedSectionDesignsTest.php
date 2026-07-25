@@ -416,14 +416,22 @@ final class AddedSectionDesignsTest extends TestCase
     }
 
     /**
-     * A plan's included items are one field with a line each, because a repeater
-     * cannot hold a repeater. They must at least survive as separate lines.
+     * A plan's included items are a real list.
+     *
+     * This test used to assert `Collection and return<br` — the workaround, kept
+     * as the expected behaviour because a repeater could not hold a repeater and
+     * a textarea rendering `<br>`-separated lines was the closest thing
+     * available. That is a list to look at and not a list to anything reading
+     * the document. A `list` field type is not a repeater, so it can live inside
+     * one, and the markup is now what it always should have been.
      */
-    public function testAPlansIncludedItemsKeepTheirLineBreaks(): void
+    public function testAPlansIncludedItemsAreARealList(): void
     {
         $html = $this->render('pricing');
 
-        $this->assertStringContainsString('Collection and return<br', $html);
+        $this->assertStringContainsString('<ul class="cms-field cms-field--features cms-lines">', $html);
+        $this->assertStringContainsString('<li>Collection and return</li>', $html);
+        $this->assertStringNotContainsString('<br', $html);
     }
 
     /**
