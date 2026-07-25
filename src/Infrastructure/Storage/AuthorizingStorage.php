@@ -56,6 +56,11 @@ final class AuthorizingStorage implements PublishingStorage
     /** @var Closure(string, ContentKey): bool */
     private readonly Closure $authorizer;
 
+    public function types(): array
+    {
+        return $this->inner->types();
+    }
+
     /**
      * @param callable(string, ContentKey): bool $authorizer Answers whether the
      *        operation is permitted for the key. It is the sole policy: this

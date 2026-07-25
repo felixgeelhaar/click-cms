@@ -57,6 +57,11 @@ final class AuditingStorage implements PublishingStorage
     /** @var Closure(): DateTimeImmutable */
     private readonly Closure $clock;
 
+    public function types(): array
+    {
+        return $this->inner->types();
+    }
+
     /**
      * @param ?callable(): ?string          $author Resolves whoever is writing, if anyone is.
      * @param ?callable(): DateTimeImmutable $clock  Supplies the moment; defaults to now.

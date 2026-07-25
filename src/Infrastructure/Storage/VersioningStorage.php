@@ -50,6 +50,11 @@ final class VersioningStorage implements PublishingStorage
     /** @var (Closure(): ?string)|null */
     private readonly ?Closure $author;
 
+    public function types(): array
+    {
+        return $this->inner->types();
+    }
+
     /**
      * @param ?callable(): ?string $author Resolves whoever is writing, if anyone is.
      */

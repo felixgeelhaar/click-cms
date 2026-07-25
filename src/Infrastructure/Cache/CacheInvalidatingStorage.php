@@ -64,6 +64,11 @@ final class CacheInvalidatingStorage implements PublishingStorage
         return $this->inner->find($key);
     }
 
+    public function types(): array
+    {
+        return $this->inner->types();
+    }
+
     public function findByType(string $type, ?Locale $locale = null): array
     {
         return $this->inner->findByType($type, $locale);

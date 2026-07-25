@@ -30,6 +30,21 @@ final class SqliteStorage implements StorageInterface
     private readonly Locale $defaultLocale;
 
     /**
+     * `SELECT DISTINCT` over the type column — the whole reason a relational
+     * backend can answer "what is in this site?" that a directory walk cannot
+     * answer for it.
+     */
+    public function types(): array
+    {
+        $stmt = $this->pdo()->query('SELECT DISTINCT type FROM content ORDER BY type ASC');
+
+        return $stmt === false ? [] : array_values(array_map(
+            static fn ($row): string => (string) $row,
+            $stmt->fetchAll(PDO::FETCH_COLUMN)
+        ));
+    }
+
+    /**
      * @param ?Locale $defaultLocale Which language rows written before the
      *        locale column existed are taken to hold.
      */
