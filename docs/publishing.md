@@ -19,6 +19,29 @@ Pages list has a tab for exactly those pages: **Edits pending**.
 It also means you can save an unfinished sentence, close your laptop, and come
 back tomorrow without anyone seeing a half-written page.
 
+The same is true of **collection entries** — a blog post, a team member. Each one
+publishes on its own, quite separately from every page and from every other entry.
+See [Publishing an entry](collections.md#publishing-an-entry).
+
+## Whether publishing is yours to do
+
+Not every account may publish, and it is worth knowing which yours is before you
+need to.
+
+- **An administrator or an editor** can publish and take down, and the buttons are
+  in the banner at the top of the editor.
+- **An author** cannot, and the buttons are not shown. In their place the banner
+  reads *"Your account cannot publish. Ask an editor to put these changes live."*
+  This is the site working as designed, not a fault: an author drafts, and
+  somebody else decides it goes live.
+- **A viewer** cannot save at all, let alone publish.
+
+If you are an author, the rest of this page is still worth reading — the states,
+the version history and the notes all apply to you. What differs is the last step,
+and [Leaving a note](#leaving-a-note) is how you hand it over.
+
+[What your account can do](roles.md) has the full picture.
+
 ## Preview before you publish
 
 At the bottom of the editor are **Cancel**, **Preview** and **Save**.

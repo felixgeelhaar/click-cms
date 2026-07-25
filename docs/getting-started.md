@@ -30,6 +30,12 @@ Open the admin address. You will see a small box with two fields.
 If the details are wrong, the screen stays where it is and tells you so. Try
 again — nothing is locked or broken by a mistyped password.
 
+If you cannot get in at all, the two usual causes are an address without the
+`/admin/` on the end, and a username that is not what you assumed — it is a
+username, not your email address. Whoever built the site can look up the first
+and confirm the second. Nobody can look up your password, so if it is genuinely
+lost, the answer is a new account rather than a reminder.
+
 ## Choose your own password
 
 The very first time you sign in, you are asked to set a new password. This step
@@ -44,8 +50,15 @@ it is not a secret from anyone.
 3. Type the same new one into **Repeat new password**.
 4. Click **Set password**.
 
-You are then taken to the dashboard. Use your new password from now on. You can
-change it again later from **Profile**, at the bottom of the left-hand menu.
+You are then taken to the dashboard. Use your new password from now on.
+
+Until you have done this, the admin will let you reach nothing else — not because
+you have done anything wrong, but because an account still using its installed
+password is not really protected at all.
+
+To change it again later, put `/admin/password` on the end of your site's address
+— so `https://your-site.com/admin/password`. It is the same screen, and it is not
+listed in the menu, so it is worth noting down.
 
 ## The dashboard
 
@@ -65,66 +78,36 @@ The counts mean:
 
 ## The menu down the left
 
-The menu is grouped. Most days you will only use the **Content** group.
-
-**Dashboard** — the summary screen above.
-
-### Content
+The menu is grouped, and the groups are audiences rather than topics. Most days
+you will only use the **CONTENT** group:
 
 - **Pages** — the pages of your site: your home page, About, Contact. This is
-  where you go to change wording or a picture.
+  where you go to change wording or a picture, and where you will spend nearly
+  all your time.
 - **Collections** — things you have lots of that all look alike, such as blog
   posts or team members.
-- **Media** — your pictures. Everything you upload lands here, and sections pick
-  from it.
-- **Builder** — a freer way of laying out a page. You do not need it to change
-  text or swap a photo.
-- **Submissions** — where things people send through a form on your site arrive.
+- **Media** — your pictures and video. Everything you upload lands here, and
+  pages pick from it.
+- **Submissions** — where messages people send through a form on your site
+  arrive.
 
-### Manage
+Above them is **Dashboard**, the screen described above. Below them, under
+**ACCOUNT**, is **Profile**. You may also see **Builder** in the Content group,
+and a whole **MANAGE** group of eight further items — whether you do depends on
+what kind of account you have.
 
-You can leave this whole group alone unless you know you need it.
+Every item, in order, with what it is for and whether you are ever likely to
+need it, is in [What everything in the menu does](admin-tour.md). Read it once
+and the menu stops being a row of unknowns.
 
-- **Plugins** and **Marketplace** — extra features, and the list you can add
-  more from.
-- **Users** — who else is allowed to sign in.
-- **Redirects** — sends an old web address to a new one, so an old link still
-  works.
-- **Menus** — the row of links across the top of your public site.
-- **Themes** — the overall look: colours, fonts, spacing.
-- **Settings** — settings that apply to the whole site.
-- **Updates** — keeps the software itself current. Usually the job of whoever
-  built the site.
-
-### Account
-
-- **Profile** — your own account, including your password.
+**If a colleague's screen has a MANAGE heading and yours does not**, nothing is
+broken: your account is a different kind from theirs.
+[What your account can do](roles.md) explains the four kinds, how to tell which
+is yours, and what each one may and may not do. It is the fastest way to make
+sense of a missing button.
 
 At the top right there is a **Light** / **Dark** switch, which changes how the
 admin looks to you and nothing else, and **Logout**.
-
-## Collections, in plain terms
-
-A collection is a set of items that share a shape. Every blog post has a title,
-a date and a body; every team member has a name, a role and a photo. Rather than
-building each one as its own page, you fill in the same handful of fields each
-time and the site lays them out for you.
-
-![The Collections screen showing two cards: "Blog posts — Articles and news, each published on its own", with 2 entries, and "Team members — People to show on an About or Team page", with 3 entries.](images/collections.png)
-
-Which collections you have depends on how your site was built. If you only ever
-need to change wording on an existing page, you may never open this screen.
-
-## Menus, in plain terms
-
-The menu is the row of links across the top of your public site. Each item has a
-**Label** — the words a visitor reads — and a **Target**, which is where the
-link goes.
-
-![The Menus editor, showing the Main menu with numbered items: Home pointing at "home", About pointing at "about", and Journal pointing at "journal", each with buttons to move it up or down, add another, or remove it.](images/menus.png)
-
-Adding a page to your site does not add it to the menu. If you want a new page
-to appear up there, add an item here as well.
 
 ## Before you change anything
 
@@ -144,4 +127,13 @@ page off the public site but kept, take it down instead — that is covered in
 
 ## Next
 
-Go to [Editing a page](editing.md) to change your first piece of text.
+In the order most people want them:
+
+1. [What your account can do](roles.md) — which of the four kinds of account you
+   have, and what that means. Short, and it explains most surprises.
+2. [What everything in the menu does](admin-tour.md) — every item in the
+   left-hand menu, named and explained.
+3. [Editing a page](editing.md) — change your first piece of text.
+
+Or go straight to [Editing a page](editing.md) if you would rather learn by
+doing. Nothing you can do there is unrecoverable.
