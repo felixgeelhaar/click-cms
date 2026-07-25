@@ -15,6 +15,7 @@ use Click\Cms\Application\Event\EventBus;
 use Click\Cms\Application\Audit\AuditService;
 use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Application\Plugin\PluginManager;
+use Click\Cms\Application\Plugin\PublishGate;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Event\EventDispatcher;
 use Click\Cms\Domain\History\RetentionPolicy;
@@ -382,6 +383,22 @@ class Application
                 $this->pluginManager->activate($plugin->id);
             }
         }
+
+        // The one extension point that can say no. Publishing is the first act
+        // core lets a plugin refuse, and the refusal has to reach `PageService`,
+        // which several handlers build for themselves and none of them have a
+        // plugin manager to hand it — so the gate is installed process-wide
+        // here, once the plugins that might veto are loaded. The closure is
+        // deliberately late-bound: nothing publishes during boot, and reading
+        // the manager on demand keeps this line independent of the order the
+        // rest of this method happens to be in.
+        //
+        // Isolated dispatch, because one plugin throwing must not decide
+        // publication for every other plugin. See `PublishGate` for the contract.
+        PublishGate::useAmbient(new PublishGate(
+            fn (string $hook, array $payload): array
+                => $this->pluginManager?->executeHookIsolated($hook, $payload) ?? []
+        ));
 
         // Plugin management is core — the admin UI's Plugins page depends on it —
         // so it is wired here rather than in a plugin that could be disabled.
