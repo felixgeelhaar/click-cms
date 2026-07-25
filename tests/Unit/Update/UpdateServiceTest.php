@@ -92,7 +92,10 @@ final class UpdateServiceTest extends TestCase
     {
         [$url, $realHash] = $this->publishPackage($version);
 
-        $body = (string) json_encode(['releases' => [[
+        $body = (string) json_encode([
+            'sequence' => 1,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [[
             'version' => $version,
             'packageUrl' => $url,
             'sha256' => $sha256 ?? $realHash,

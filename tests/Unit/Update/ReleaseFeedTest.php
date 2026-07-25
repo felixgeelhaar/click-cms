@@ -67,7 +67,13 @@ final class ReleaseFeedTest extends TestCase
     /** @param list<array<string, mixed>> $releases */
     private function feedJson(array $releases): string
     {
-        return (string) json_encode(['releases' => $releases]);
+        // A believable feed says when it expires and carries a sequence, so the
+        // freeze and rollback checks have something to accept.
+        return (string) json_encode([
+            'sequence' => 1,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => $releases,
+        ]);
     }
 
     /** @return array<string, mixed> */
@@ -162,7 +168,13 @@ final class ReleaseFeedTest extends TestCase
 
     public function testAValidJsonFeedWithNoReleasesListIsReportedNotAssumedEmpty(): void
     {
-        [$url] = $this->publish((string) json_encode(['something' => 'else']));
+        // Otherwise believable — signed, in date, sequenced — but with no
+        // releases list at all, so the omission is what is reported.
+        [$url] = $this->publish((string) json_encode([
+            'sequence' => 1,
+            'expires' => gmdate('c', time() + 86400),
+            'something' => 'else',
+        ]));
 
         $result = (new ReleaseFeed())->fetch($url, $this->publicKey);
 
@@ -227,5 +239,117 @@ final class ReleaseFeedTest extends TestCase
             is_dir($p) ? $this->rrmdir($p) : @unlink($p);
         }
         @rmdir($dir);
+    }
+
+    /* ------------------------------------- replay defences (TUF-style) -- */
+
+    /**
+     * The freeze attack. Yesterday's feed is still perfectly signed, so an
+     * attacker who can keep serving it leaves the site reporting itself up to
+     * date while a published security release goes untaken — the most
+     * comfortable possible way to stay vulnerable.
+     */
+    public function testAnExpiredFeedIsRefusedEvenThoughItsSignatureIsValid(): void
+    {
+        $body = (string) json_encode([
+            'sequence' => 1,
+            'expires' => gmdate('c', time() - 60),
+            'releases' => [$this->release('9.9.9')],
+        ]);
+        [$url] = $this->publish($body);
+
+        $result = (new ReleaseFeed())->fetch($url, $this->publicKey);
+
+        $this->assertSame([], $result['releases']);
+        $this->assertStringContainsString('expired', (string) $result['error']);
+    }
+
+    public function testAFeedWithNoExpiryIsNotTrusted(): void
+    {
+        [$url] = $this->publish((string) json_encode([
+            'sequence' => 1,
+            'releases' => [$this->release('9.9.9')],
+        ]));
+
+        $result = (new ReleaseFeed())->fetch($url, $this->publicKey);
+
+        $this->assertSame([], $result['releases']);
+        $this->assertStringContainsString('expires', (string) $result['error']);
+    }
+
+    /**
+     * The rollback attack. Replaying an older, genuinely signed feed pins the
+     * site to a release whose vulnerability is public. Remembering the highest
+     * sequence seen is what makes a valid old document unbelievable.
+     */
+    public function testAFeedThatGoesBackwardsIsRefused(): void
+    {
+        $state = $this->dir . '/state';
+        $feed = new ReleaseFeed($state);
+
+        // Sequence 5 is seen and believed.
+        [$newer] = $this->publish((string) json_encode([
+            'sequence' => 5,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [$this->release('2.0.0')],
+        ]));
+        $this->assertCount(1, $feed->fetch($newer, $this->publicKey)['releases']);
+
+        // Then an older one is replayed at the same URL.
+        [$older] = $this->publish((string) json_encode([
+            'sequence' => 4,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [$this->release('1.0.0')],
+        ]));
+
+        $result = (new ReleaseFeed($state))->fetch($older, $this->publicKey);
+
+        $this->assertSame([], $result['releases']);
+        $this->assertStringContainsString('backwards', (string) $result['error']);
+    }
+
+    public function testTheSameSequenceIsStillAcceptedSoARepublishIsNotBroken(): void
+    {
+        $state = $this->dir . '/state';
+        $body = (string) json_encode([
+            'sequence' => 5,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [$this->release('2.0.0')],
+        ]);
+        [$url] = $this->publish($body);
+
+        $this->assertCount(1, (new ReleaseFeed($state))->fetch($url, $this->publicKey)['releases']);
+        $this->assertCount(1, (new ReleaseFeed($state))->fetch($url, $this->publicKey)['releases']);
+    }
+
+    /**
+     * A refused feed must not raise the bar: recording its sequence would let a
+     * forged high number lock out every legitimate feed that follows.
+     */
+    public function testARefusedFeedDoesNotRaiseTheRollbackFloor(): void
+    {
+        $state = $this->dir . '/state';
+
+        // Signed by the wrong key, but claiming a very high sequence.
+        [$forged] = $this->publish((string) json_encode([
+            'sequence' => 999,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [$this->release('9.9.9')],
+        ]), signWith: $this->otherKeypair());
+        $this->assertSame([], (new ReleaseFeed($state))->fetch($forged, $this->publicKey)['releases']);
+
+        // The legitimate feed at a normal sequence must still be believed.
+        [$real] = $this->publish((string) json_encode([
+            'sequence' => 2,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [$this->release('1.1.0')],
+        ]));
+
+        $this->assertCount(1, (new ReleaseFeed($state))->fetch($real, $this->publicKey)['releases']);
+    }
+
+    private function otherKeypair(): \OpenSSLAsymmetricKey
+    {
+        return openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
     }
 }

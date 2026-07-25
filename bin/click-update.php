@@ -77,7 +77,9 @@ if (!$force && !$scheduler->isDue(time())) {
 
 $service = new UpdateService(
     $root,
-    new ReleaseFeed(),
+    // The state directory switches on rollback protection: without it a
+    // replayed older feed would be believed.
+    new ReleaseFeed($root . '/data/updates'),
     new UpdateInstaller($root),
     Application::VERSION,
 );
