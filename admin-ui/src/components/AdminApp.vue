@@ -183,13 +183,24 @@ const getRouteComponent = () => {
   if (path === '/admin/users') return can('users.manage') ? Users : Dashboard;
   if (path === '/admin/profile') return Profile;
   if (path === '/admin/password') return ChangePassword;
-  if (path === '/admin/plugins') return Plugins;
+  if (path === '/admin/plugins') return can('plugins.manage') ? Plugins : Dashboard;
   if (path === '/admin/marketplace') return can('plugins.install') ? Marketplace : Dashboard;
   if (path === '/admin/settings') return can('settings.manage') ? Settings : Dashboard;
   if (path === '/admin/themes') return can('settings.manage') ? Themes : Dashboard;
   if (path === '/admin/updates') return can('plugins.install') ? Updates : Dashboard;
-  if (path === '/admin/redirects') return Redirects;
-  if (path === '/admin/menus') return Menus;
+  // Menus and redirects were the two routes with no check at all, so an account
+  // the sidebar deliberately hides them from could still open them by address
+  // and only discover the refusal when Save failed. Gated on the capability the
+  // sidebar's own Manage group is gated on, so the screen an account can reach
+  // and the screen it is offered are the same set.
+  //
+  // Note this is deliberately stricter than the API, which treats a menu and a
+  // redirect as ordinary content documents and so permits any account with
+  // content-edit rights. Whether restructuring navigation should be editorial
+  // rather than administrative is a product question, not one to settle by
+  // leaving a route unguarded.
+  if (path === '/admin/redirects') return can('settings.manage') ? Redirects : Dashboard;
+  if (path === '/admin/menus') return can('settings.manage') ? Menus : Dashboard;
   if (path === '/admin/submissions') return FormSubmissions;
   if (path === '/admin/builder') return hasBuilder.value ? Builder : Dashboard;
   if (path.startsWith('/admin/pages/edit/')) return PageEdit;
