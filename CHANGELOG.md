@@ -3,6 +3,35 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-07-25
+
+No change to any shipped PHP file. A minor release rather than a patch because
+the environment plugins execute in moves two versions, which is worth a visible
+signal even though nothing in this project's own API changed.
+
+### The container runs the current PHP
+- The runtime image moves from `php:8.3-apache` to `php:8.5-apache`, and CI, the
+  release and Pages tooling, and the marketplace registry workflow move with it.
+  Both images are Debian 13, so the runtime stage's library pins are unchanged.
+- Verified by building and exercising the image rather than by reading a version
+  string: every extension loads, the seeded site serves, and signing in,
+  uploading, publishing and rendering produced no deprecation, warning or fatal.
+- **If you run custom plugins, this is the change to read.** They now execute on
+  8.5. Anything relying on behaviour removed in 8.4 or 8.5 will fail there and
+  did not before.
+
+### The oldest PHP we promise is now tested
+- `composer.json` says `php: >=8.1`, the README badge says 8.1+, and every entry
+  in the signed update feed advertises `requiresPhp: "8.1"` — which is what an
+  installation checks before it will accept an upgrade. Nothing tested any of
+  it, and with the suite running on the latest PHP a feature from a later
+  version could have shipped, with the first person to find out being someone on
+  8.1 whose site stopped booting.
+- A CI job parses every shipped file on 8.1 and then boots the application and
+  asks for a rendered page. Both halves earn their place: `json_validate()`,
+  added in 8.3, is valid 8.1 syntax and passes the parse step, and fails the
+  boot step. The floor holds — 8.1.34 serves the seeded site.
+
 ## [1.2.1] — 2026-07-25
 
 Nothing a site runs changes. This exists because 1.2.0 could not publish a
