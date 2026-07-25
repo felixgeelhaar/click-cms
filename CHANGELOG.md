@@ -3,6 +3,105 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-07-25
+
+A minor release whose most consequential change is a bug fix. Sites running any
+earlier version should upgrade: the session store could hand a signed-in person
+a 401 under ordinary concurrent use, and everything else here is smaller than
+that.
+
+### Sessions no longer tear under concurrency
+- The store wrote with `file_put_contents(..., LOCK_EX)`, which truncates the
+  target when it opens it and only then takes the lock — while reads took no
+  lock at all. A reader landing in that window decoded an empty file and was
+  told nobody was signed in. Every authenticated request records activity, so a
+  single admin page load raced itself.
+- Measured before the fix: **12 of 160 concurrent requests returned 401 on a
+  session that was valid throughout**. It never looked like an auth bug. It
+  looked like the media picker reporting an empty library, the comments panel
+  refusing permission, and the section list failing to load — a CMS that is
+  intermittently and inexplicably flaky.
+- Writes are now staged next to the target and renamed into place, which is
+  atomic within a directory on POSIX. Re-measured over HTTP afterwards: 630
+  concurrent requests, no spurious 401s.
+
+### Video, and picking files without knowing their names
+- `FieldType::File` had no case in the renderer, so a file field printed its own
+  stored reference as prose — a page showing `clip-4f2a91c0` where a film
+  belonged. The media library had accepted MP4 and WebM for some time, so an
+  editor could upload a film, see it in the library, and had no way at all to
+  put it on a page. A **`video`** section design now ships and a file field
+  renders a player: controls, `preload="none"`, never autoplay, and a poster
+  named by a sibling field so the page does not open on a black rectangle.
+- A file field is **chosen from the library** rather than typed. It had no
+  editor of its own and fell through to the generic text input, so adding a clip
+  meant copying an opaque id from the Media page and pasting it in, with a typo
+  producing a silently empty section.
+- `GET /api/media` accepts **`?kind=image|video`**. Without it every picker
+  listed the whole library, so a film appeared in the image chooser as a broken
+  thumbnail and could be selected into a slot that renders an `<img>`.
+
+### Structure the markup could not previously express
+- A field may declare **what it is** — `heading`, `subheading`, `quote`, `note`
+  on prose, `ordered` or `definitions` on a repeater. Element choice used to
+  come entirely from a field's name and type, which is why a testimonial could
+  not be a `<blockquote>` and opening hours could not be a `<dl>`. Declaring
+  nothing renders byte-identically to before.
+- A **`list`** field type, which a repeater cannot contain a repeater to
+  express. A plan's "what's included" was a textarea rendering one paragraph of
+  `<br>`-separated lines: a list to look at, and not a list to anything reading
+  the document.
+- A select **inside a row** now marks that row, as one at section level marks
+  the section — the only way "the plan we recommend" can reach the markup.
+
+### Every public page has a document outline
+- No page had an `<h1>`. The title existed only in `<title>`, so every page
+  opened at level two with nothing above it.
+- A row title inside a repeater was an `<h2>`, making each card a sibling of the
+  heading that introduced it rather than a child. Pages now read H1 → H2 → H3
+  with no skipped levels.
+
+### Collections and review
+- **A collection entry can be previewed before it is published.** The preview
+  route matched only a single-segment page slug, so an author could draft a post
+  and nobody — the author included, and more to the point whoever had to approve
+  it — could see it rendered. For a CMS whose author role exists to draft work
+  for someone else to release, that was the review step missing its subject.
+- A token minted for one entry does not open another, so a shared review link
+  cannot expose every draft on the site.
+
+### Plugins
+- **Five authentication hooks.** `auth.before_login` is vetoable, which is what
+  makes a second factor possible; it fires behind both the spray ceiling and the
+  lockout, after the password check and before any session exists. No password,
+  hash, email, CSRF token or session id reaches a listener.
+- A failed sign-in reports one reason for a wrong password, an unknown account
+  and an account with no usable hash, because the caller gets one 401 for all
+  three. Handing a plugin the difference would make every listener an
+  enumeration oracle.
+
+### Fixed
+- A link inside a repeater row showed its own address: a card rendered
+  `<a href="/tables">/tables</a>`, offering a visitor the raw path as the words
+  to click. Rows honour `labelField` now, falling back to the row's title rather
+  than to the address.
+- The two Pages workflows declared different concurrency groups while a comment
+  claimed they shared one. On the first real release a documentation push and
+  the release deployed concurrently, the earlier one landed last, and a feed
+  built before the tag existed — offering zero releases — replaced the correct
+  one. Nothing went red; the feed was valid, signed, and advertised no upgrade.
+- The media library rendered a video through the image card: a broken `<img>`,
+  an "×" where the dimensions belong, a focal point with no crop to set, and "no
+  resized versions" reading as a failure rather than as how video works here.
+- Both media pickers reported a *failed request* as an empty library, sending
+  someone to upload files they already had.
+- `admin-ui/src/components/Media.vue` contained a raw NUL byte inside a string
+  constant. Legal JavaScript, invisible in an editor, and it made the file binary
+  to `grep`, `diff` and every other text tool — searches for anything in it
+  silently returned nothing.
+- The section catalogue in `config/sections/README.md` omitted a design that
+  ships. A test now compares the table against `config/sections` both ways.
+
 ## [1.1.0] — 2026-07-25
 
 A minor release, not a major one, despite `StorageInterface` gaining a method:
