@@ -15,6 +15,11 @@ namespace Click\Cms\Application\Authentication;
  *
  * The trade-off is that an attacker can lock a known account out on purpose.
  * That is why the lock expires on its own rather than needing an administrator.
+ *
+ * Counting per username leaves one gap on purpose: a password sprayed across
+ * many accounts never reaches any single account's threshold. That case belongs
+ * to {@see LoginSprayGuard}, which this class can hand out over its own state
+ * directory — see {@see self::sprayGuard()}.
  */
 final class LoginThrottle
 {
@@ -68,6 +73,25 @@ final class LoginThrottle
 
         $all[$key] = $entry;
         $this->save($all);
+    }
+
+    /**
+     * The site-wide companion to this throttle, over the same state directory.
+     *
+     * Built here rather than wired separately because this class is the one
+     * thing that already knows where login-failure state is kept on a given
+     * installation; a caller that had to name the file again could name a
+     * different one, and the two counters would drift apart. The limits come
+     * from the caller because they are configuration, and configuration is not
+     * this class's business.
+     */
+    public function sprayGuard(int $maxFailures, int $windowSeconds): LoginSprayGuard
+    {
+        return new LoginSprayGuard(
+            dirname($this->path) . '/login-spray.json',
+            $maxFailures,
+            $windowSeconds
+        );
     }
 
     public function clear(string $username): void
