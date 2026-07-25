@@ -52,6 +52,8 @@ use Click\Cms\Infrastructure\Audit\JsonAuditLog;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 use Click\Cms\Infrastructure\Storage\AuthorizingStorage;
+use Click\Cms\Application\Cache\RenderCache;
+use Click\Cms\Infrastructure\Cache\CacheInvalidatingStorage;
 use Click\Cms\Infrastructure\Storage\StorageFactory;
 use Click\Cms\Infrastructure\Storage\VersioningStorage;
 
@@ -85,6 +87,7 @@ class Application
     private ?ThemesController $themesController = null;
     private ?UpdatesController $updatesController = null;
     private ?ThemeRepository $themes = null;
+    private ?RenderCache $renderCache = null;
     private ?CollectionsController $collectionsController = null;
     private ?NavigationRenderer $navigationRenderer = null;
     private ?HistoryService $history = null;
@@ -246,6 +249,25 @@ class Application
             };
 
             $storage = new AuthorizingStorage($storage, $authorizer);
+
+            // The render cache and the decorator that clears it. Outermost of
+            // the write decorators on purpose: it fires only after a write has
+            // been authorised, versioned, audited and actually landed.
+            //
+            // Wiring invalidation into storage rather than into each handler is
+            // what makes "the cache went stale" structurally impossible for
+            // content. There is no path that changes a document without going
+            // through here, so there is no handler that can forget.
+            $this->renderCache = new RenderCache(
+                $this->basePath . '/data/cache/pages',
+                $this->config->cacheEnabled(),
+            );
+            if ($this->renderCache->isEnabled()) {
+                // Wrapped only when the cache is on, so a site with it off pays
+                // nothing — not even a delegating call per read.
+                $storage = new CacheInvalidatingStorage($storage, $this->renderCache);
+            }
+
             $this->contentService = new ContentService($storage, $this->config->defaultLocale());
 
         $this->history = new HistoryService($storage, $versions);
@@ -522,7 +544,7 @@ class Application
             return $this->notFoundPage($locale);
         }
 
-        $rendered = $this->renderPageHtml($resolved->content, $resolved->served);
+        $rendered = $this->renderCachedPageHtml($resolved->content, $resolved->served);
 
         header('Content-Type: text/html');
         // So a cache, and anyone debugging why they are reading English, can see
@@ -689,6 +711,55 @@ class Application
             . '<body><h1>Page not found</h1></body></html>';
 
         return ['raw' => true];
+    }
+
+    /**
+     * A published page, from the render cache when it is there and cacheable.
+     *
+     * Only the public path calls this. Previews go straight to
+     * {@see renderPageHtml()} — a preview must never be read from the cache
+     * either, because a preview showing the last published render would tell an
+     * editor their unsaved work looks fine.
+     *
+     * A signed-in visitor is served a fresh render and writes nothing back. The
+     * public shell happens to be identical today, but a `web.render` plugin is
+     * handed the request and may key something to whoever is looking; a cache a
+     * signed-in request can write into is a cache the public reads out of.
+     */
+    private function renderCachedPageHtml(Content $page, ?Locale $locale): string
+    {
+        $cache = $this->renderCache;
+        $cacheable = $cache !== null
+            && $cache->isCacheable(preview: false, authenticated: $this->getSessionUser() !== null);
+
+        if (!$cacheable) {
+            return $this->renderPageHtml($page, $locale);
+        }
+
+        $theme = $this->themes?->active();
+
+        $key = $cache->keyFor(
+            $page->slug(),
+            ($locale ?? $page->locale())->code,
+            $theme?->id ?? '',
+            // The stylesheet URL rather than a version number of its own: it
+            // already carries the cache-busting token, which is the stylesheet's
+            // mtime. A designer editing theme CSS in place activates nothing and
+            // bumps nothing, so no invalidation fires — but every cached document
+            // would go on linking the stale `?v=`. Folding the URL into the key
+            // makes that edit heal the cache by itself.
+            $theme !== null && $this->themes !== null ? $this->themes->stylesheetUrl($theme) : '',
+        );
+
+        $cached = $cache->get($key);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $rendered = $this->renderPageHtml($page, $locale);
+        $cache->put($key, $rendered);
+
+        return $rendered;
     }
 
     /**
@@ -984,7 +1055,21 @@ class Application
         foreach ($coreTables as $table) {
             $match = $this->matchRouteTable($table, $path, $method);
             if ($match !== null) {
-                return $this->executeHandler($match['handler'], $match['params']);
+                $response = $this->executeHandler($match['handler'], $match['params']);
+
+                // Anything an administrator changes that is not a content
+                // document — the plugin set, a theme, a redirect rule — is
+                // invisible to the storage decorator that normally invalidates.
+                // Rather than enumerate which of these endpoints can reach a
+                // rendered page and be wrong about one of them, every admin write
+                // clears the cache. Admin writes are rare and public reads are
+                // not, so the cost is a refill nobody times; the cost of missing
+                // one is a visitor served a page that is no longer true.
+                if ($method !== 'GET' && $method !== 'HEAD') {
+                    $this->renderCache?->flush();
+                }
+
+                return $response;
             }
         }
 
@@ -1120,6 +1205,12 @@ class Application
         if (array_key_exists('siteName', $data) && is_string($data['siteName'])) {
             $settings->setSiteName($data['siteName']);
         }
+
+        // Settings are not content documents, so the storage decorator that
+        // invalidates the render cache never sees this write. The site name is
+        // the brand in every page's header, and headless mode changes whether
+        // there is a public page at all, so both reach every cached document.
+        $this->renderCache?->flush();
 
         return ['data' => $settings->toArray()];
     }
