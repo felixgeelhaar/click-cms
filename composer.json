@@ -23,5 +23,17 @@
     "prefer-stable": true,
     "require-dev": {
         "phpunit/phpunit": "^13.2"
+    },
+    "scripts": {
+        "test": "phpunit --no-progress",
+        "test:admin": "cd admin-ui && npm test",
+        "lint": "find src plugins bin -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null",
+        "seed": "php bin/click-seed.php"
+    },
+    "scripts-descriptions": {
+        "test": "Run the PHP test suite.",
+        "test:admin": "Run the admin UI test suite.",
+        "lint": "Syntax-check every PHP file in src, plugins and bin.",
+        "seed": "Fill a fresh install with the example site. Never overwrites."
     }
 }
