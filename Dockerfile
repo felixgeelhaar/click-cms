@@ -56,7 +56,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 3 — Runtime
 # ---------------------------------------------------------------------------
-FROM php:8.3-apache AS runtime
+FROM php:8.5-apache AS runtime
 
 # gd is required to generate responsive image variants; without it the media
 # library can store an upload but not resize it.
