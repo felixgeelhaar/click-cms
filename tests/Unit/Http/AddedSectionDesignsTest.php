@@ -371,7 +371,12 @@ final class AddedSectionDesignsTest extends TestCase
     {
         $html = $this->render('section-heading');
 
-        $this->assertStringContainsString('<h2 class="cms-field cms-field--heading">What it costs</h2>', $html);
+        // An h3, not an h2. This design exists to break a page into parts, and a
+        // part heading at the same level as the sections around it gives a screen
+        // reader a flat outline. It could not be anything but an h2 until a field
+        // could declare its role.
+        $this->assertStringContainsString('<h3 class="cms-field cms-field--heading">What it costs</h3>', $html);
+        $this->assertStringNotContainsString('<h2', $html);
         // A blank line in the lead-in becomes a second paragraph, not a <br>.
         $this->assertSame(2, preg_match_all('#<p>#', $html));
     }
@@ -478,11 +483,13 @@ final class AddedSectionDesignsTest extends TestCase
     {
         $html = $this->render('details');
 
+        // A description list, which is the correct markup for label/value pairs
+        // and was unreachable while every repeater had to be a <ul> of <li>. As
+        // two sibling paragraphs, nothing said the label and the value belonged
+        // together — a screen reader read a list of unrelated sentences.
         $this->assertStringContainsString(
-            '<li class="cms-item">'
-                . '<p class="cms-field cms-field--label">Monday</p>'
-                . '<p class="cms-field cms-field--value">Closed</p>'
-                . '</li>',
+            '<dt class="cms-field cms-field--label">Monday</dt>'
+                . '<dd class="cms-field cms-field--value">Closed</dd>',
             $html
         );
     }

@@ -377,6 +377,14 @@ final class SectionRenderer
         $text = $this->escape((string) $value);
         $class = $this->fieldClass($field);
 
+        // A declared role wins over the reading taken from the field's name. The
+        // vocabulary is closed and validated in the schema, so this is a lookup
+        // rather than a decision — and an unknown role never arrives.
+        $byRole = $this->scalarByRole($field->as, $text, $class);
+        if ($byRole !== null) {
+            return $byRole;
+        }
+
         // The first text field of a section reads as its heading.
         if ($field->name === 'heading' || $field->name === 'title') {
             return '<h2 class="' . $class . '">' . $text . '</h2>';
@@ -409,9 +417,24 @@ final class SectionRenderer
      */
     private function renderRichText(FieldDefinition $field, mixed $value): string
     {
-        return is_string($value)
-            ? $this->renderRichTextValue($this->fieldClass($field), $value)
-            : '';
+        if (!is_string($value)) {
+            return '';
+        }
+
+        // Sanitised by the one method that does that, then wrapped according to
+        // the field's declared role. The role is applied here rather than in
+        // `renderRichTextValue()` because that method deliberately takes a class
+        // name and no field — it exists for callers that have no
+        // FieldDefinition, and reaching for one there is how a null crept in.
+        $inner = $this->renderRichTextValue($this->fieldClass($field), $value);
+        if ($inner === '' || $field->as === null) {
+            return $inner;
+        }
+
+        // Re-wrap the sanitised inner markup, never the raw value.
+        $safe = substr($inner, strpos($inner, '>') + 1, -strlen('</div>'));
+
+        return $this->wrapProse($field, $safe);
     }
 
     /**
@@ -448,7 +471,7 @@ final class SectionRenderer
             $html .= '<p>' . nl2br($this->escape(trim($paragraph))) . '</p>';
         }
 
-        return '<div class="' . $this->fieldClass($field) . '">' . $html . '</div>';
+        return $this->wrapProse($field, $html);
     }
 
     private function renderImage(FieldDefinition $field, mixed $value, string $alt = ''): string
@@ -503,10 +526,56 @@ final class SectionRenderer
         return $tag . ' alt="' . $this->escape($description) . '" loading="lazy">';
     }
 
+    /**
+     * The element a block of prose sits in.
+     *
+     * A `div` unless the design said otherwise. `quote` is the one that matters:
+     * a multi-paragraph testimonial belongs in a `<blockquote>`, and until a
+     * design could say so there was no way to produce one anywhere in the CMS.
+     */
+    private function wrapProse(FieldDefinition $field, string $inner): string
+    {
+        $class = $this->fieldClass($field);
+
+        return match ($field->as) {
+            'quote' => '<blockquote class="' . $class . '">' . $inner . '</blockquote>',
+            'note' => '<div class="' . $class . ' cms-note">' . $inner . '</div>',
+            default => '<div class="' . $class . '">' . $inner . '</div>',
+        };
+    }
+
+    /**
+     * A scalar's markup when its design declared a role for it.
+     *
+     * Returns null when there is no role, so the historic reading — a field
+     * named `heading` or `title` becomes an `<h2>`, everything else a `<p>` —
+     * still applies to every design that declares nothing.
+     */
+    private function scalarByRole(?string $role, string $escapedText, string $class): ?string
+    {
+        return match ($role) {
+            // `subheading` exists so a long page can have an outline. Nothing
+            // could previously be anything but an h2, so a page with sections
+            // inside sections read as a flat list to a screen reader.
+            'heading' => '<h2 class="' . $class . '">' . $escapedText . '</h2>',
+            'subheading' => '<h3 class="' . $class . '">' . $escapedText . '</h3>',
+            // A quotation, marked as one. A testimonial rendered as a paragraph
+            // is not wrong to look at and is wrong to anything reading the
+            // document's structure.
+            'quote' => '<blockquote class="' . $class . '"><p>' . $escapedText . '</p></blockquote>',
+            'note' => '<p class="' . $class . ' cms-note">' . $escapedText . '</p>',
+            default => null,
+        };
+    }
+
     private function renderRepeater(FieldDefinition $field, mixed $value): string
     {
         if (!is_array($value) || $value === []) {
             return '';
+        }
+
+        if ($field->as === 'definitions') {
+            return $this->renderDefinitions($field, $value);
         }
 
         $items = '';
@@ -585,7 +654,74 @@ final class SectionRenderer
             return '';
         }
 
-        return '<ul class="' . $this->fieldClass($field) . ' cms-items">' . $items . '</ul>';
+        // A numbered list when the design says the order is the meaning — a
+        // procedure, a ranking — rather than merely the sequence rows happen to
+        // be in. Previously every repeater was a `<ul>`, so a set of steps was
+        // indistinguishable from a set of cards.
+        $tag = $field->as === 'ordered' ? 'ol' : 'ul';
+
+        return '<' . $tag . ' class="' . $this->fieldClass($field) . ' cms-items">'
+            . $items . '</' . $tag . '>';
+    }
+
+    /**
+     * A repeater of term-and-definition pairs, as a description list.
+     *
+     * `<dl>` is the correct markup for opening hours, a specification table or a
+     * glossary, and it was unreachable: every repeater became a `<ul>` of `<li>`,
+     * so a label and its value were two sibling paragraphs with nothing saying
+     * they belonged together. Anything reading the document — a screen reader, a
+     * search engine — saw a list of unrelated sentences.
+     *
+     * The first sub-field present in a row is the term; everything after it
+     * describes that term. Positional rather than declared, because a design
+     * whose first field is not the term is a design that has mislabelled itself,
+     * and one more setting to get wrong buys nothing here.
+     */
+    private function renderDefinitions(FieldDefinition $field, array $rows): string
+    {
+        $body = '';
+
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $term = null;
+            $details = '';
+
+            foreach ($field->fields as $sub) {
+                if (!array_key_exists($sub->name, $row) || !is_scalar($row[$sub->name])) {
+                    continue;
+                }
+                $text = (string) $row[$sub->name];
+                if ($text === '') {
+                    continue;
+                }
+
+                if ($term === null) {
+                    $term = '<dt class="' . $this->fieldClass($sub) . '">'
+                        . $this->escape($text) . '</dt>';
+                    continue;
+                }
+
+                $details .= '<dd class="' . $this->fieldClass($sub) . '">'
+                    . $this->escape($text) . '</dd>';
+            }
+
+            // A term with nothing to define, or a definition with no term, is a
+            // half-filled row rather than content. Skipped, exactly as an empty
+            // list item is.
+            if ($term !== null && $details !== '') {
+                $body .= $term . $details;
+            }
+        }
+
+        if ($body === '') {
+            return '';
+        }
+
+        return '<dl class="' . $this->fieldClass($field) . ' cms-definitions">' . $body . '</dl>';
     }
 
     private function fieldClass(FieldDefinition $field): string

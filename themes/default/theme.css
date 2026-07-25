@@ -296,16 +296,34 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
 
 /* Opening hours and similar pairs. Without this the label and the value stack
  * as two muted paragraphs and nothing shows they belong together. */
-.cms-section--details .cms-items { gap: 0; }
-.cms-section--details .cms-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 1.5rem;
+/* A description list, since `details` declares `as: definitions`. Laid out as
+ * rows of term and value with a rule between — the pairing has to be visible,
+ * which is the whole reason it is a <dl> and not two stacked paragraphs. */
+.cms-definitions { margin: 0; display: grid; grid-template-columns: auto 1fr; }
+.cms-definitions dt,
+.cms-definitions dd {
+  margin: 0;
   padding: 0.6rem 0;
   border-bottom: 1px solid var(--rule);
 }
-.cms-section--details .cms-item p { margin: 0; }
-.cms-section--details .cms-field--label { color: var(--ink); font-weight: 500; }
+.cms-definitions dt { color: var(--ink); font-weight: 500; padding-right: 1.5rem; }
+.cms-definitions dd { text-align: right; }
+
+/* A real quotation. The browser default is a pair of large side margins, which
+ * reads as an accident rather than as emphasis. */
+.cms-section blockquote {
+  margin: 0;
+  padding-left: 1.25rem;
+  border-left: 3px solid var(--rule);
+}
+.cms-section blockquote p:first-child { margin-top: 0; }
+.cms-section blockquote p:last-child { margin-bottom: 0; }
+
+/* A subsection heading, below the section headings around it. */
+.cms-section h3 { font-size: 1.25rem; margin: 2rem 0 0.5rem; }
+
+/* Prose a design marked as an aside rather than as the main text. */
+.cms-note { color: var(--muted); font-size: 0.9375rem; }
 
 /* Questions and answers: a rule between them, so a long list can be scanned. */
 .cms-section--faq .cms-item + .cms-item {
