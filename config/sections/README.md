@@ -54,6 +54,7 @@ working to these rules rather than to the field list above.
 | any other `text`, `number`, `date` | `<p>` |
 | `textarea` | `<div>` of `<p>`, blank lines splitting paragraphs and single newlines becoming `<br>` |
 | `richtext` | `<div>` of the editor's own markup, sanitised to an allowlist |
+| `file` | `<video controls preload="none" playsinline>` when the upload is an MP4 or WebM, otherwise `<p><a download>` named by the file the editor uploaded. A `labelField` on it names the image to use as the poster frame. Never autoplays |
 | `url` | `<p><a href>` — its wording comes from `labelField`; failing that, from the row's `title` inside a repeater, and only then from the address itself |
 | `email` | `<p><a href="mailto:">` |
 | `image` | `<div><img loading="lazy">`, with a `srcset` of the variants that exist |
