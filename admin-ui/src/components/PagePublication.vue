@@ -8,7 +8,7 @@
     state gets a full-width strip with a sentence in it that says what the public
     can currently see.
   -->
-  <section class="pub" :class="tone" role="status" aria-live="polite">
+  <section class="pub" :class="tone" role="status" aria-live="polite" :aria-busy="loading">
     <div class="pub-body">
       <p class="pub-headline">
         <span class="pub-dot" aria-hidden="true"></span>{{ headline }}
@@ -49,7 +49,7 @@
       a button that can only ever answer 403 teaches them the product is broken;
       saying who can do it tells them what to do next.
     -->
-    <p v-else class="pub-no-permission">
+    <p v-else-if="!loading" class="pub-no-permission">
       Your account cannot publish. Ask an editor to put these changes live.
     </p>
   </section>
@@ -103,9 +103,23 @@ const livePath = computed(() => {
     : base;
 });
 
+/**
+ * Whether the answer is simply not back yet.
+ *
+ * An existing page arrives with `publication` null and fills in once the API
+ * answers. Treating that as "not saved" — which this did — meant opening a
+ * published page flashed a red banner reading *"this page has not been saved
+ * yet"* over work that was saved and live, next to a note telling an
+ * administrator their account could not publish. Both statements were false,
+ * and both were announced by the `aria-live` region to anyone listening.
+ *
+ * A new page is genuinely unsaved from the first frame, so it is not loading.
+ */
+const loading = computed(() => !props.isNew && props.publication === null);
+
 const tone = computed(() => {
+  if (loading.value) return 'loading';
   if (props.isNew) return 'unsaved';
-  if (!props.publication) return 'unsaved';
   if (never.value) return 'never';
   if (!published.value) return 'down';
   return pending.value ? 'pending' : 'live';
@@ -118,6 +132,7 @@ const changes = computed(() => {
 });
 
 const headline = computed(() => ({
+  loading: 'Checking whether this page is live…',
   unsaved: 'Not published — this page has not been saved yet',
   never: 'Not published — no visitor can see this page',
   down: 'Taken down — this page is no longer on the public site',
@@ -127,6 +142,10 @@ const headline = computed(() => ({
 
 const detail = computed(() => {
   switch (tone.value) {
+    case 'loading':
+      // Says nothing about publication or permission, because neither is known.
+      // Guessing here is what produced a banner that was confidently wrong.
+      return 'One moment.';
     case 'unsaved':
       return 'Save it first. Saving is not publishing: nothing appears on the public '
         + 'site until you publish.';
@@ -176,6 +195,8 @@ const publishLabel = computed(() => {
 .pub-no-permission { margin: 0; flex-shrink: 0; font-size: 0.8125rem; color: var(--app-text-muted); max-width: 16rem; }
 .pub-dot { width: 10px; height: 10px; border-radius: 999px; flex-shrink: 0; background: currentColor; }
 
+.pub.loading { border-left-color: var(--app-border); }
+.pub.loading .pub-dot { color: var(--app-text-muted); }
 .pub.never, .pub.down, .pub.unsaved { border-left-color: var(--color-danger-500); background: color-mix(in srgb, var(--color-danger-500) 8%, var(--app-surface-strong)); }
 .pub.never .pub-dot, .pub.down .pub-dot, .pub.unsaved .pub-dot { color: var(--color-danger-500); }
 .pub.pending { border-left-color: var(--color-warning-500); background: color-mix(in srgb, var(--color-warning-500) 10%, var(--app-surface-strong)); }
