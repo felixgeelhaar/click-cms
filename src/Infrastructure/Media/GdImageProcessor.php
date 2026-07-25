@@ -136,6 +136,51 @@ final class GdImageProcessor
     }
 
     /**
+     * Render one image at a single width, preserving aspect ratio.
+     *
+     * The variant ladder writes the sizes a site knows about at upload; this
+     * writes one it did not, on demand. Never upscales — a request for a width
+     * larger than the source returns null rather than inventing pixels, and the
+     * caller serves the original instead, which is already the best available.
+     *
+     * @return array{width: int, height: int}|null
+     */
+    public function renderWidth(string $sourcePath, string $targetPath, int $width): ?array
+    {
+        if (!self::isAvailable() || $width < 1) {
+            return null;
+        }
+
+        $info = $this->inspect($sourcePath);
+        if ($info === null || !self::supports($info['mimeType'])) {
+            return null;
+        }
+        if ($width >= $info['width']) {
+            return null;
+        }
+
+        $source = $this->load($sourcePath, $info['mimeType']);
+        if ($source === null) {
+            return null;
+        }
+
+        $height = max(1, (int) round($info['height'] * ($width / $info['width'])));
+        $resized = $this->resize($source, $width, $height, $info['mimeType']);
+        if ($resized === null) {
+            return null;
+        }
+
+        $dir = dirname($targetPath);
+        if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) {
+            return null;
+        }
+
+        return $this->write($resized, $targetPath, $info['mimeType'])
+            ? ['width' => $width, 'height' => $height]
+            : null;
+    }
+
+    /**
      * Write a square crop centred on a focal point.
      *
      * The variant ladder deliberately preserves the source aspect ratio, which

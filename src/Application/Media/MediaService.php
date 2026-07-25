@@ -8,6 +8,7 @@ use Click\Cms\Domain\Media\CropBox;
 use Click\Cms\Domain\Media\FocalPoint;
 use Click\Cms\Domain\Media\MediaItem;
 use Click\Cms\Domain\Media\SvgSanitizer;
+use Click\Cms\Domain\Media\TransformRequest;
 use Click\Cms\Domain\Media\UploadPolicy;
 use Click\Cms\Infrastructure\Media\GdImageProcessor;
 use RuntimeException;
@@ -405,6 +406,54 @@ final class MediaService
      * Only names this service could itself have generated are resolvable, so a
      * crafted name cannot reach anything outside the media directory.
      */
+    /**
+     * The path to serve for a file at a requested width, rendering it once and
+     * caching it if it does not exist yet.
+     *
+     * Returns the original's path when no width was asked for, when the source is
+     * already no larger than the request, or when the rendition cannot be made —
+     * so a caller can always serve what comes back, and a failed transform
+     * degrades to a correct-but-larger image rather than a broken one.
+     *
+     * Renditions live in a `derived/` subdirectory so the media library's
+     * listing, which reads the upload directory, is not polluted with cache
+     * entries an editor never created and cannot manage.
+     */
+    public function pathForFileAtWidth(string $filename, ?TransformRequest $transform): ?string
+    {
+        $original = $this->pathForFile($filename);
+        if ($original === null || $transform === null) {
+            return $original;
+        }
+
+        // An SVG scales by itself and a video is not an image; neither has a
+        // width to render, and both are served as they are.
+        $extension = strtolower((string) pathinfo($original, PATHINFO_EXTENSION));
+        if ($extension === 'svg' || UploadPolicy::isVideoExtension($extension)) {
+            return $original;
+        }
+
+        $id = pathinfo($original, PATHINFO_FILENAME);
+        $cachePath = $this->derivedDir() . '/' . $transform->cacheName($id, $extension);
+
+        // Served straight from cache on every request after the first. A
+        // rendition is immutable — its name contains the width, and the stored
+        // original never changes under a given name — so a stale hit is not
+        // possible without someone deleting the source.
+        if (is_file($cachePath)) {
+            return $cachePath;
+        }
+
+        $rendered = $this->processor->renderWidth($original, $cachePath, $transform->width);
+
+        return $rendered === null ? $original : $cachePath;
+    }
+
+    private function derivedDir(): string
+    {
+        return $this->mediaDir . '/derived';
+    }
+
     public function pathForFile(string $filename): ?string
     {
         $pattern = '/^(?<id>[a-z0-9][a-z0-9-]*?)(?:-(?:sm|md|lg|xl|square))?\.(?<ext>[a-z0-9]{1,5})$/';
