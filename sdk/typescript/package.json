@@ -1,0 +1,38 @@
+{
+  "name": "@click-cms/client",
+  "version": "0.1.0",
+  "description": "Typed TypeScript client for the click-cms delivery API, with types generated from your site's own schemas.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "generate": "php ../../scripts/generate-ts-client.php --config=../../config --out=src",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "click-cms",
+    "headless-cms",
+    "cms",
+    "typescript",
+    "codegen"
+  ],
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
