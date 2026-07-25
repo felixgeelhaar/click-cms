@@ -332,6 +332,16 @@ class PluginManager
 
     private function dispatch(string $hookName, array $params, bool $isolate): array
     {
+        // A hook no active plugin declares cannot produce a result — the loop
+        // below skips every plugin on exactly the same test — so answering from
+        // the memo instead of walking the active set makes an unlistened hook
+        // cost one array lookup. That matters for hooks fired on hot paths
+        // (every write, every sign-in) by callers who cannot always know in
+        // advance whether anyone is listening.
+        if (!$this->hasHookListeners($hookName)) {
+            return [];
+        }
+
         $results = [];
         $normalizedHook = str_replace('_', '.', $hookName);
 

@@ -14,6 +14,7 @@ use Click\Cms\Application\Config\Settings;
 use Click\Cms\Application\Event\EventBus;
 use Click\Cms\Application\Audit\AuditService;
 use Click\Cms\Application\History\HistoryService;
+use Click\Cms\Application\Plugin\AuthGate;
 use Click\Cms\Application\Plugin\ContentGate;
 use Click\Cms\Application\Plugin\ContentRefusedException;
 use Click\Cms\Application\Plugin\PluginManager;
@@ -461,6 +462,17 @@ class Application
             $this->contentService,
             $this->config,
             self::INITIAL_PASSWORD,
+            // Built here rather than reached for ambiently, so the one place that
+            // constructs this controller is the one place that decides what its
+            // hooks dispatch through. The listens-closure is what keeps a site
+            // that subscribes to no auth event from building a payload — or
+            // reading the lockout file twice to detect a transition nobody is
+            // listening for.
+            new AuthGate(
+                fn (string $hook, array $payload): array
+                    => $this->pluginManager?->executeHookIsolated($hook, $payload) ?? [],
+                fn (string $hook): bool => $this->pluginManager?->hasHookListeners($hook) ?? false,
+            ),
         );
         $this->authController->ensureDefaultAdminUser();
         $this->registerApiRoutes();

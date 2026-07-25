@@ -10,6 +10,7 @@ use Click\Cms\Application\Authentication\LoginThrottle;
 use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Content\ContentService;
+use Click\Cms\Application\Plugin\AuthGate;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
@@ -30,6 +31,14 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
  * through the store — the controller speaks the same shape the rest of the API
  * does and nothing here touches the wire directly except reading the request
  * body, which is what an HTTP controller is for.
+ *
+ * It is also where the authentication hooks fire, through {@see AuthGate}. That
+ * makes this the one part of the plugin surface with explicit call sites rather
+ * than a storage decorator behind it, and the reason is in the gate's docblock:
+ * a session is not a content document, so there is nothing to decorate. What
+ * makes the call sites trustworthy instead is that there is only one of them —
+ * one password check, one place a session is created, one place a failure is
+ * counted — and they are all in this file.
  */
 final class AuthController
 {
@@ -43,13 +52,33 @@ final class AuthController
      */
     private ?LoginSprayGuard $sprayGuard = null;
 
+    /**
+     * The plugins' view of authentication.
+     *
+     * Never null, so no call site has to remember to check: an installation with
+     * no plugin system gets a gate with nothing behind it, which permits
+     * everything and announces nothing.
+     */
+    private readonly AuthGate $gate;
+
+    /**
+     * @param AuthGate|null $gate Injected by tests. The kernel builds this
+     *        controller with no plugin manager in reach, so the default is the
+     *        process-wide gate installed at boot.
+     */
     public function __construct(
         private readonly SessionStore $sessions,
         private readonly LoginThrottle $throttle,
         private readonly ContentService $contentService,
         private readonly CoreConfig $config,
         private readonly string $initialPassword,
-    ) {}
+        ?AuthGate $gate = null,
+    ) {
+        // An inert gate when none was given: it permits everything and announces
+        // nothing, which is exactly right for a CMS constructed without a plugin
+        // system in reach. The kernel injects a real one.
+        $this->gate = $gate ?? new AuthGate();
+    }
 
     /**
      * Route an `auth/*` request to the operation it names.
@@ -122,6 +151,9 @@ final class AuthController
         $remember = (bool) ($data['remember'] ?? false);
 
         if ($username === '' || $password === '') {
+            // Not announced as a failed sign-in: nothing was attempted against
+            // any account, and an event with no username in it is noise an
+            // alerting plugin would have to learn to ignore.
             return ['status' => 400, 'error' => 'Username and password required'];
         }
 
@@ -136,6 +168,14 @@ final class AuthController
             return $spray;
         }
 
+        // Neither this refusal nor the one above announces anything to a plugin.
+        // Both are re-refusals of attempts already counted, and a hook fired
+        // here would be one plugin dispatch per request for as long as an
+        // attacker cares to keep knocking — a webhook or an SMS per attempt,
+        // driven by whoever is attacking, through the very limit that exists to
+        // stop them. The moment worth telling a plugin about is the one where
+        // the lockout was established, which `recordFailedLogin()` announces
+        // once.
         $lockout = $this->checkLockout($username);
         if ($lockout !== null) {
             return $lockout;
@@ -147,8 +187,7 @@ final class AuthController
         // failed — including the default admin the installer creates.
         $account = $this->contentService->user($username);
         if ($account === null) {
-            $this->recordFailedLogin($username);
-            return ['status' => 401, 'error' => 'Invalid credentials'];
+            return $this->rejectCredentials($username);
         }
 
         // Content nests its payload under `data`; the password lives there, not
@@ -160,17 +199,56 @@ final class AuthController
             // No usable hash means the account cannot be authenticated. There is
             // deliberately no fallback: a hardcoded admin/admin escape hatch here
             // would let anyone in whenever a user document lost its password.
-            $this->recordFailedLogin($username);
-            return ['status' => 401, 'error' => 'Invalid credentials'];
+            return $this->rejectCredentials($username);
         }
 
         if (!password_verify($password, $hash)) {
-            $this->recordFailedLogin($username);
-            return ['status' => 401, 'error' => 'Invalid credentials'];
+            return $this->rejectCredentials($username);
         }
 
         if (($userData['status'] ?? 'active') !== 'active') {
+            // Announced with its own reason, unlike the three above: the caller
+            // is already told this apart from a bad password — it is a `403`,
+            // not a `401` — so a plugin learning it learns nothing the person
+            // holding the credentials does not already know. No failure is
+            // counted here, which is the behaviour that was already in place: a
+            // disabled account is refused by being disabled, and counting it
+            // would let anyone lock a suspended colleague's name out of the
+            // throttle as well.
+            $this->gate->announceLoginFailed($username, AuthGate::FAILED_INACTIVE);
+
             return ['status' => 403, 'error' => 'Account is not active'];
+        }
+
+        // The one place a plugin can stop a sign-in. Everything an attacker
+        // controls has already been checked — the ceiling, the lockout, the
+        // password, the account's status — so a plugin is only asked about an
+        // attempt that would otherwise have succeeded, and cannot be used to
+        // reach past any of those limits. See `AuthGate` for why the answer is
+        // read fail-open.
+        $refusal = $this->gate->refusalForLogin($username, $userData, $remember);
+        if ($refusal !== null) {
+            $this->gate->announceLoginFailed($username, AuthGate::FAILED_REFUSED);
+
+            // Counted against this account's own threshold but not against the
+            // site-wide ceiling, on the same distinction `recordFailedLogin()`
+            // already draws: whoever got here proved the password, so this is
+            // not evidence of credential stuffing and must not push a site with
+            // a second factor towards refusing logins for everybody. It is
+            // still evidence of an unfinished authentication, and leaving it
+            // uncounted would make the gate an unmetered surface to retry
+            // against — a plugin's own limit is not something core can assume.
+            $this->recordFailedLogin($username, false);
+
+            // The reason reaches the caller verbatim. A second factor cannot be
+            // asked for without admitting the first one was accepted, and a
+            // plugin's reason is the only thing that tells the legitimate user
+            // what to do next — a generic "invalid credentials" here would make
+            // 2FA unusable. `403` rather than `401` is what separates it from a
+            // wrong password: the credentials were right, something else is
+            // outstanding. Which plugin refused, and for whom, is in the error
+            // log and not in the response.
+            return ['status' => 403, 'error' => $refusal];
         }
 
         $session = [
@@ -194,7 +272,30 @@ final class AuthController
         $this->sessions->start($session, $remember);
         $this->clearFailedLogin($username);
 
+        // Last, once the session exists and the failure count is cleared: the
+        // hook says a sign-in happened, so nothing about it may still be pending.
+        $this->gate->announceLoggedIn($username, $userData, $remember);
+
         return ['data' => ['success' => true, 'user' => $session['user']]];
+    }
+
+    /**
+     * Refuse an attempt for a reason the caller is told nothing more about than
+     * "invalid credentials", and tell the plugins exactly that much.
+     *
+     * The three callers are an account that does not exist, an account with no
+     * usable hash, and a wrong password. They are one case here because they are
+     * one case in the response, and {@see AuthGate} explains at length why a
+     * plugin is not given the difference.
+     *
+     * @return array<string, mixed>
+     */
+    private function rejectCredentials(string $username): array
+    {
+        $this->gate->announceLoginFailed($username, AuthGate::FAILED_CREDENTIALS);
+        $this->recordFailedLogin($username);
+
+        return ['status' => 401, 'error' => 'Invalid credentials'];
     }
 
     /**
@@ -282,7 +383,21 @@ final class AuthController
      */
     private function logout(): array
     {
+        // Read before the session is destroyed, announced after: the payload has
+        // to be taken while there is still something to take it from, and the
+        // hook must not fire until the session is really gone.
+        $user = $this->sessions->user() ?? [];
+
         $this->sessions->clear();
+
+        // A logout by somebody who was not signed in is silent. The endpoint
+        // answers success either way — clearing nothing is not an error — but an
+        // audit trail with a sign-out that never had a sign-in in it is worse
+        // than one without the entry.
+        $username = $user['username'] ?? null;
+        if (is_string($username) && $username !== '') {
+            $this->gate->announceLoggedOut($username, $user);
+        }
 
         return ['data' => ['success' => true]];
     }
@@ -386,10 +501,31 @@ final class AuthController
      */
     private function recordFailedLogin(string $username, bool $anonymous = true): void
     {
+        // Whether this failure is the one that tips the account over is only
+        // knowable by asking before and after, and each answer is a read of the
+        // lockout file. Nobody listening, nothing measured — the guard is what
+        // keeps the announcement from making every failed attempt more
+        // expensive than it was.
+        $announce = $this->gate->listensTo(AuthGate::LOCKED_OUT);
+        $wasLocked = $announce && $this->throttle->isLocked($username);
+
         $this->throttle->recordFailure($username);
 
         if ($anonymous) {
             $this->spray()->recordFailure();
+        }
+
+        if (!$announce || $wasLocked) {
+            return;
+        }
+
+        // Only the transition. While a lock holds, every further attempt is
+        // refused before it reaches here, but a password change by a signed-in
+        // account can still count failures against a locked name — announcing
+        // that again would turn one alert into one per attempt.
+        $remaining = $this->throttle->secondsRemaining($username);
+        if ($remaining !== null) {
+            $this->gate->announceLockedOut($username, $remaining);
         }
     }
 

@@ -240,7 +240,7 @@ deploy.
 
 Capability 8. A plugin declares the hooks it wants in its `plugin.json` and
 implements `hook_<name_with_underscores>`; core fires each by name and collects
-what came back. There are nine, in three kinds.
+what came back. There are fourteen, in three kinds.
 
 | Hook | Kind | What it is handed | What it may do |
 |---|---|---|---|
@@ -253,6 +253,11 @@ what came back. There are nine, in three kinds.
 | `content.before_publish` | **veto** | `key`, `type`, `slug`, `locale`, `user` | refuse the publish, with a reason |
 | `content.published` | announce | the same | nothing that changes the outcome |
 | `content.unpublished` | announce | the same | nothing that changes the outcome |
+| `auth.before_login` | **veto** | `username`, `remember`, `role`, `mustChangePassword` | refuse the sign-in, with a reason |
+| `auth.logged_in` | announce | the same | nothing that changes the outcome |
+| `auth.login_failed` | announce | `username`, `reason` | nothing that changes the outcome |
+| `auth.logged_out` | announce | `username`, `role`, `mustChangePassword` | nothing that changes the outcome |
+| `auth.locked_out` | announce | `username`, `retryAfter` | nothing that changes the outcome |
 
 The first two only ever *add*. `content.before_publish` is the first that can
 stop core doing something, which is what an editorial workflow needs: a review
@@ -357,6 +362,91 @@ also by the decorator, which would deliver every publish twice.
 takedown, so it fires from storage and is therefore seen wherever the takedown
 came from.
 
+#### Authentication
+
+The five auth hooks obey the same rules and are stated in
+`Application\Plugin\AuthGate`. They exist for the three things people most want
+to add to a CMS's identity layer and cannot: a second factor, an audit trail
+shipped off the box, and an alert when an account is being ground at.
+
+They are the one part of this surface with **explicit call sites** — in
+`Http\AuthController` — rather than a decorator behind them, because a session is
+not a content document and there is nothing to decorate. What makes the call
+sites trustworthy instead is that there is only one of each: one password check,
+one place a session is created, one place a failure is counted, all in that file.
+
+**Where the veto sits.** `auth.before_login` fires *after* the site-wide spray
+ceiling, *after* the per-account lockout, *after* `password_verify` and *after*
+the account's status check — and before the session exists. Each of those is
+load-bearing:
+
+- **Behind the two limits**, so a plugin can neither weaken them nor be reached by
+  an attempt they have already refused. A hook in front of them would let an
+  attacker drive plugin work — an SMS, a webhook — per attempt, through the very
+  limit that exists to stop that, and hand plugin code the usernames of a spray
+  in progress. A locked-out account never reaches plugin code at all.
+- **After the password check**, so a plugin is only asked about an attempt that
+  has already proved the first factor. "Should this person provide a second
+  factor" is not answerable before the first one is known to be right.
+- **Before the session**, because a refusal that left somebody signed in would
+  not be a refusal.
+
+**Fail-open matters more here than anywhere else.** A second-factor plugin that
+threw on every attempt would, under fail-closed, lock *every* account out of the
+site — and the only way to disable a plugin is the admin UI, which needs a
+sign-in. That failure would need shell access to undo. Against it, the cost of
+failing open is one sign-in that skipped a second factor behind a password that
+was still verified, on the record in the error log. There is likewise no way for
+a plugin to *force* a sign-in: an "allow" return could only override another
+plugin's refusal, and would make a bug in any plugin an authentication bypass.
+
+**A refusal answers `403`, with the plugin's reason verbatim.** A second factor
+cannot be asked for without admitting the first was accepted, so hiding the
+refusal behind *"invalid credentials"* would make 2FA unusable; `403` rather than
+`401` is what distinguishes it from a wrong password. **Which** plugin refused,
+and for which account, goes to the error log and not to the caller. A refusal is
+counted against that account's own lockout — the veto must not be an unmetered
+surface to retry against — but *not* against the site-wide ceiling, on the
+distinction the controller already draws: whoever got there proved the password,
+so it is not evidence of credential stuffing, and counting it would have a site
+using a second factor spray-block itself during ordinary step-ups.
+
+**A failed sign-in tells a plugin exactly what the caller is told, and no more.**
+`invalid_credentials` covers a wrong password, an unknown account *and* an account
+with no usable hash, because all three are answered with the same `401`. Handing
+plugins the difference would make every listener an enumeration oracle for a
+distinction this flow spends real effort hiding — the lockout and the spray
+refusal are worded identically for the same reason, and the throttle hashes
+usernames so the CMS never keeps a list of accounts somebody has been probing. A
+plugin that genuinely needs to know whether an account exists holds a content
+service and can look it up under its own name, which is an attributable act
+rather than a fact core volunteers. `account_inactive` *is* distinguished, because
+the caller already gets a `403` for it; `refused_by_plugin` reports the veto.
+
+**No password, hash or session identifier appears in any payload**, and that is
+enforced rather than remembered: `AuthGate::describe()` reduces an account
+through an allowlist (`role`, `mustChangePassword`), so a field added to a user
+document or to the session is invisible until somebody decides otherwise. Users
+are ordinary content documents here, so forwarding "the user" would hand every
+plugin a bcrypt hash on every sign-in. The request body is not passed either — it
+holds the password; a second-factor plugin reads its own field from the request
+it is already inside. Nor is the source address, which a plugin can read from
+`$_SERVER` itself and which core will not make a spoofable header look vouched
+for.
+
+**Only the transition is announced.** `auth.locked_out` fires on the failure that
+establishes a lockout, not on every attempt refused while it holds, so an alert
+is one alert. Attempts refused by the lockout or the spray ceiling announce
+nothing at all. A sign-out by somebody who was not signed in is silent, and a
+request missing a username never reaches an account and so is not a failed
+sign-in.
+
+**A hook nobody listens to costs nothing.** `PluginManager` answers from the
+memoised `hasHookListeners()` before dispatching anything, and the gate asks
+before it builds a payload — including before the two extra reads of the lockout
+file that establish whether *this* failure was the one that tipped the account
+over.
+
 #### Not offered, deliberately
 
 Not everything worth an event is reachable from a place that cannot be bypassed,
@@ -366,11 +456,10 @@ and a hook that fires on some paths only is a trap:
   JSON directly, not through the content port, so a storage decorator cannot see
   them. Doing this properly means a port for media and a decorator on it, not a
   call bolted into one HTTP handler.
-- **Sign-in, failed sign-in, sign-out.** The natural need (2FA, an audit shipper,
-  lockout alerting), and the natural home is `AuthController` plus a gate class
-  shaped like `PublishGate`. Authentication has no storage seam to hang it on —
-  a session is not a content document — so it wants its own deliberate design
-  rather than a hook wedged into the login handler.
+- **A password change.** `auth.*` covers sessions; the password itself is a write
+  to a user document, so a listener already sees it as `content.saved` with the
+  key of the account — without the new hash, which is the point. A separate hook
+  would deliver the same fact twice and tempt somebody to put the credential in it.
 - **Settings changed.** Settings live in `data/settings.json`, outside the content
   port, and are invalidated by their own handlers.
 - **`content.before_unpublish`.** A takedown is reversible by republishing, and
