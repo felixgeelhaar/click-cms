@@ -1,0 +1,223 @@
+# The one thing that publishes to GitHub Pages.
+#
+# ## Why there is exactly one of these
+#
+# `actions/deploy-pages` replaces the *entire* site every time it runs. Pages
+# already served the signed update feed, so adding a second workflow to publish
+# documentation would not have added pages to a site — it would have deleted
+# `feed.json`, and every installation checking for updates would have started
+# reporting a feed error. Nothing in either workflow would have looked wrong.
+#
+# So the rule is: whatever deploys must assemble the *whole* site. That is this
+# file, and nothing else calls `deploy-pages`.
+#
+# ## What the site is
+#
+#   /                  the documentation, built from README.md and docs/*.md
+#   /feed.json         the signed update feed
+#   /feed.json.sig     its detached signature
+#
+# ## When it runs
+#
+#   push to main   documentation changed
+#   schedule       weekly, because the feed carries a 30-day expiry and has to be
+#                  re-signed more often than it expires — see below
+#   workflow_call  the release workflow calls this once the package is attached,
+#                  so a new release appears in the feed immediately
+#   dispatch       by hand
+#
+# ## The weekly run is load-bearing, not housekeeping
+#
+# The feed carries an expiry so an attacker cannot serve a stale-but-signed copy
+# forever and keep a site from hearing about a security release. The cost of that
+# defence is that the feed goes stale on its own: a project that publishes twice
+# a year and signs a 30-day feed would have every installation reporting a feed
+# error for ten months — and, worse, treating a real outage as normal. Weekly
+# against a 30-day TTL leaves three missed runs of margin before any site
+# notices. This mirrors the timestamp role in The Update Framework, which exists
+# for exactly this reason: something short-lived vouches that the long-lived
+# thing is still current.
+
+name: Publish site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'scripts/docs/**'
+      - '.github/workflows/pages.yml'
+  schedule:
+    - cron: '23 4 * * 1'   # Mondays, 04:23 UTC — off the hour, so not in the stampede
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  # Shared with the release workflow: never two publishes at once, and never
+  # cancelled half-way, because a cancelled deploy leaves the site as whatever
+  # the last complete one wrote.
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      # ------------------------------------------------------------ docs --
+
+      - name: Build the documentation
+        run: php scripts/docs/build-site.php _site
+
+      # ------------------------------------------------------------ feed --
+      #
+      # The feed is rebuilt from the published GitHub Releases every time rather
+      # than carried forward, which is what lets a documentation push publish a
+      # correct feed without knowing anything about releases.
+
+      - name: Assemble the release list from GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 100 --json tagName,isDraft,isPrerelease,body \
+            --jq '[ .[] | select(.isDraft | not) | {
+                  version: (.tagName | ltrimstr("v")),
+                  packageUrl: ("https://github.com/${{ github.repository }}/releases/download/" + .tagName + "/click-cms-" + (.tagName | ltrimstr("v")) + ".zip"),
+                  security: (.body // "" | test("\\[security\\]"; "i")),
+                  notes: (.body // "" | split("\n")[0]),
+                  requiresPhp: "8.1"
+                } ]' > releases-raw.json
+
+      - name: Add each package's checksum
+        run: |
+          php -r '
+            $rows = json_decode(file_get_contents("releases-raw.json"), true) ?: [];
+            $out = [];
+            foreach ($rows as $row) {
+              $tmp = tempnam(sys_get_temp_dir(), "pkg");
+              if (@copy($row["packageUrl"], $tmp) && filesize($tmp) > 0) {
+                $row["sha256"] = hash_file("sha256", $tmp);
+                $out[] = $row;
+              }
+              @unlink($tmp);
+            }
+            file_put_contents("releases.json", json_encode($out, JSON_PRETTY_PRINT));
+            fwrite(STDERR, count($out) . " release(s) in the feed\n");
+          '
+
+      - name: Sign the feed
+        id: feed
+        env:
+          UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${UPDATE_PRIVATE_KEY:-}" ]; then
+            # The sequence must be monotonic ACROSS every run, so it cannot be
+            # github.run_number: a per-workflow counter would let one run publish
+            # a lower sequence than another and send the feed backwards — which
+            # every site then refuses, turning the rollback defence into a
+            # self-inflicted outage. Seconds since the epoch is shared, always
+            # increasing, and never resets.
+            printf '%s' "$UPDATE_PRIVATE_KEY" > /tmp/update-key.pem
+            php scripts/updates/build-feed.php releases.json /tmp/update-key.pem _site \
+              --sequence="$(date +%s)" --ttl-days=30
+            rm -f /tmp/update-key.pem
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "signed=false" >> "$GITHUB_OUTPUT"
+
+          # No signing key. That is expected exactly once — before the key has
+          # been generated — and is an error at every other moment, so it is not
+          # simply shrugged off: whatever feed is already published is carried
+          # forward so that deploying documentation cannot take update delivery
+          # down as a side effect.
+          # Derived from github.repository, which is always "owner/repo" on
+          # every trigger. github.event.repository is not populated on a
+          # scheduled run, and the deploy step's own URL output does not exist
+          # yet — it is produced by the step that has not run.
+          base="https://${{ github.repository_owner }}.github.io/${GITHUB_REPOSITORY#*/}"
+
+          carried=0
+          for name in feed.json feed.json.sig; do
+            # The status is captured separately from curl's own exit code so a
+            # connection failure cannot be mistaken for an HTTP answer. Only an
+            # explicit 404 is treated as "there is nothing there"; everything
+            # else, including not reaching the server at all, is treated as "we
+            # do not know", and not knowing is not grounds for replacing a live
+            # site.
+            code=$(curl -sS --max-time 30 -o "_site/$name.tmp" -w '%{http_code}' "$base/$name") || code="unreachable"
+            case "$code" in
+              200)
+                mv "_site/$name.tmp" "_site/$name"
+                carried=$((carried + 1))
+                ;;
+              404)
+                # Nothing published yet, so there is nothing to preserve and
+                # nothing to break. This is the first-run case.
+                rm -f "_site/$name.tmp"
+                ;;
+              *)
+                # Anything else — a network fault, a 5xx — is NOT proof the feed
+                # is absent. Deploying now would delete a feed that exists.
+                rm -f "_site/$name.tmp"
+                echo "::error::Could not read $base/$name (HTTP $code). Refusing to deploy, because publishing without it could delete a live update feed." >&2
+                exit 1
+                ;;
+            esac
+          done
+
+          if [ "$carried" -eq 0 ]; then
+            echo "::warning::No signing key and no published feed — deploying documentation only. Set UPDATE_PRIVATE_KEY to publish an update feed."
+          else
+            echo "::warning::No signing key; carried the existing feed forward unchanged. It will expire unless UPDATE_PRIVATE_KEY is set."
+          fi
+
+      # Carrying the feed forward unsigned is a safety net for a documentation
+      # push, not an acceptable outcome for the two events whose whole purpose is
+      # the feed. A scheduled run exists *only* to refresh the signature, and a
+      # release exists to be findable — either reporting green without signing
+      # would be the silent failure this project keeps having to remove.
+      #
+      # `github.event_name` is the *caller's* event in a called workflow, so this
+      # covers the release path too, which is why it is not just == 'schedule'.
+      - name: Signing was required for this run
+        if: >-
+          steps.feed.outputs.signed != 'true' &&
+          (github.event_name == 'schedule' || github.event_name == 'release')
+        run: |
+          echo "::error::UPDATE_PRIVATE_KEY is not set, so the feed was not signed. A ${{ github.event_name }} run must sign: otherwise the published feed expires and every installation reports an update error." >&2
+          exit 1
+
+      # ---------------------------------------------------------- deploy --
+
+      - name: Check the site is whole before deploying
+        run: |
+          set -eu
+          test -f _site/index.html || { echo "::error::No index.html was built." >&2; exit 1; }
+          # Jekyll would otherwise process the output and drop anything starting
+          # with an underscore.
+          touch _site/.nojekyll
+          echo "Publishing $(find _site -type f | wc -l) files."
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - uses: actions/deploy-pages@v4

@@ -147,6 +147,22 @@ Release:
    from the artefact itself, signed with `UPDATE_PRIVATE_KEY`, and deployed to
    GitHub Pages.
 
+### One-time setup, for whoever runs the project
+
+Two things, once, before any of the above works:
+
+1. **Generate the signing key and install both halves** — see [Keys](#keys)
+   below. Keep the private half somewhere it will survive: losing it means every
+   installed site refuses every future release until it is handed a new public
+   key by hand.
+
+2. **Enable GitHub Pages with source set to "GitHub Actions"** — not "Deploy
+   from a branch". The workflow deploys an artefact it builds; with the branch
+   source selected there is nothing for it to deploy to, and every run fails at
+   the last step.
+
+Then run **Publish site** once by hand to put the feed and the documentation up.
+
 To sign by hand:
 
 ```bash
@@ -165,14 +181,23 @@ stale on its own. A project that publishes twice a year and signs a 30-day feed
 would have every installation reporting a feed error for ten months — and
 learning to ignore it.
 
-`.github/workflows/update-feed.yml` re-signs weekly against a 30-day TTL, which
-leaves three missed runs of margin. This mirrors TUF's *timestamp* role:
-something short-lived vouches that the long-lived thing is still current.
+`.github/workflows/pages.yml` re-signs weekly against a 30-day TTL, which leaves
+three missed runs of margin. This mirrors TUF's *timestamp* role: something
+short-lived vouches that the long-lived thing is still current. A scheduled run
+that cannot sign — because no key is configured — fails loudly rather than
+reporting green every Monday while the feed quietly expires underneath.
 
-Both workflows derive `sequence` from `date +%s` rather than a workflow run
-number, because each workflow has its own counter — the release job at run 3
-publishing after the re-sign job at run 20 would send the feed backwards and
-every site would refuse it.
+That workflow is also the only thing that publishes to GitHub Pages, and it has
+to be. `deploy-pages` replaces the *entire* site, so a second workflow adding a
+documentation site there would not have added pages — it would have deleted
+`feed.json`, and every installation would have begun reporting a feed error with
+nothing in either workflow looking wrong. Whatever deploys must assemble the
+whole site, so exactly one thing deploys.
+
+`sequence` comes from `date +%s` rather than a workflow run number. A run number
+is per-workflow, so a release at run 3 publishing after a scheduled re-sign at
+run 20 would send the feed backwards and every site would refuse it — turning
+the rollback defence into a self-inflicted outage.
 
 ### Keys
 
