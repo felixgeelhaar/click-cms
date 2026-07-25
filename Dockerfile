@@ -5,8 +5,14 @@
 #
 # Split out so that changing application code does not reinstall dependencies:
 # only composer.json/lock invalidate this layer.
+#
+# Pinned to the platform doing the building, not the platform being built for.
+# What comes out is PHP source and an autoloader — the same bytes whatever the
+# CPU — so building it once natively and copying the result into each runtime
+# is exactly equivalent to building it per architecture, and avoids running
+# Composer under emulation for the non-native half of a multi-arch build.
 # ---------------------------------------------------------------------------
-FROM composer:2 AS vendor
+FROM --platform=$BUILDPLATFORM composer:2 AS vendor
 
 WORKDIR /app
 COPY composer.json composer.lock ./
@@ -27,8 +33,23 @@ RUN composer install \
 # Built here so the image is self-contained. Without this the admin route falls
 # back to proxying an Astro dev server on localhost:4321, which exists only on a
 # developer's machine — a container built without this stage has no admin UI.
+#
+# Pinned to the build platform for the same reason as the vendor stage, and with
+# more to gain: this one runs the whole admin test suite. A release builds for
+# amd64 and arm64, so without this the suite ran twice, and on an amd64 runner
+# the arm64 half ran under QEMU — roughly twenty minutes of emulated work per
+# release to prove something the native run had already proved.
+#
+# It was not only slow. Emulation is slow enough that the accessibility tests
+# exceeded their timeout, which failed the image build for three releases in a
+# row and reported it as nine accessibility violations. The timeout was raised
+# to stop that; this removes the reason it was ever close.
+#
+# Safe because the output is `dist/` — static JavaScript and CSS, identical
+# whatever the CPU. If this stage ever produces a native binary, this line has
+# to go.
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS admin-ui
+FROM --platform=$BUILDPLATFORM node:22-alpine AS admin-ui
 
 # The repository layout is mirrored rather than flattened into /app. The
 # accessibility tests read the CSS they assert about out of the shipped files —
