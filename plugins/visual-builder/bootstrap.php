@@ -14,6 +14,21 @@ class Plugin_visual_builder extends BasePlugin
      * document saved before breakpoints existed would stack forever, which
      * looks broken on a desktop.
      */
+    /**
+     * Every node type this renderer knows how to draw.
+     *
+     * Declared rather than left implicit in the dispatch below because
+     * `schemas/visual-builder.schema.json` lists the same set and nothing
+     * validates against it at runtime — so the schema went stale the first time
+     * a type was added and nobody noticed. A test asserts the two agree, which
+     * is the only thing that keeps a published schema honest when no code path
+     * reads it.
+     */
+    public const NODE_TYPES = [
+        'section', 'text', 'image', 'button', 'grid', 'spacer', 'chart',
+        'columns', 'column', 'video', 'embed', 'list', 'quote', 'divider',
+    ];
+
     private const COLUMNS_FALLBACK_MIN_WIDTH = 640;
 
     /**
