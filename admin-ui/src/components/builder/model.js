@@ -9,12 +9,33 @@
  * directly, and is why the same functions are reused by every editor component.
  */
 
-// Section and grid are the only nodes that hold children; everything else is a
-// leaf. The public renderer draws grid/section as block containers and the rest
-// as their own tags, so "can this accept a drop?" is exactly this predicate.
-const CONTAINER_TYPES = new Set(['section', 'grid']);
+// The nodes that hold children; everything else is a leaf. The public renderer
+// draws these as block containers and the rest as their own tags, so "can this
+// accept a drop?" is exactly this predicate.
+const CONTAINER_TYPES = new Set(['section', 'grid', 'columns', 'column']);
 
-export const NODE_TYPES = ['section', 'grid', 'text', 'image', 'button', 'spacer', 'chart'];
+// What the palette offers. `column` is absent on purpose: a column only exists
+// as part of a `columns` node, which creates and destroys its own, so offering
+// a loose one would let an editor build a column with nothing to sit in.
+export const NODE_TYPES = [
+  'section',
+  'columns',
+  'grid',
+  'text',
+  'image',
+  'video',
+  'embed',
+  'list',
+  'quote',
+  'button',
+  'divider',
+  'spacer',
+  'chart',
+];
+
+// A columns node cannot usefully be split further than this, and the generated
+// media query would produce unreadable slivers past it.
+export const MAX_COLUMNS = 6;
 
 export function isContainer(type) {
   return CONTAINER_TYPES.has(type);
@@ -27,9 +48,20 @@ export function isContainer(type) {
 const NODE_DEFAULTS = {
   section: { props: {}, styles: { padding: '24px' } },
   grid: { props: { columns: 2 }, styles: { display: 'grid', gap: '16px' } },
+  // `stackAt` names the breakpoint at which the columns stop stacking. The
+  // renderer generates that media query itself, so an author gets a layout that
+  // survives a phone without hand-writing a responsive override.
+  columns: { props: { count: 2, stackAt: 'sm' }, styles: { display: 'grid', gap: '24px' } },
+  column: { props: {}, styles: {} },
   text: { props: { text: 'New text' }, styles: {} },
   image: { props: { src: '', alt: '' }, styles: {} },
-  button: { props: { label: 'Button', href: '#' }, styles: {} },
+  // Nothing is fetched and nothing moves until a visitor asks; autoplay is the
+  // author's explicit choice, and the renderer mutes it when they make it.
+  video: { props: { src: '', poster: '', label: '', controls: true, autoplay: false, preload: 'none' }, styles: {} },
+  embed: { props: { url: '', title: '', height: 0 }, styles: {} },
+  list: { props: { ordered: false, items: ['First item', 'Second item'] }, styles: {} },
+  quote: { props: { text: 'Quoted text', attribution: '', source: '', cite: '' }, styles: {} },
+  divider: { props: { lineStyle: 'solid', thickness: 1, color: '' }, styles: { margin: '24px 0' } },
   spacer: { props: {}, styles: { height: '32px' } },
   chart: { props: { chartType: 'bar', title: '', color: '#0ea5a4', width: 640, height: 280, data: [] }, styles: {} },
 };
@@ -140,7 +172,24 @@ export function addNode(builder, type, targetId) {
   const node = createNode(type);
   builder.nodes[node.id] = node;
 
-  const target = targetId ? builder.nodes[targetId] : null;
+  // A columns node is meaningless without its columns, and an editor should not
+  // have to assemble one by hand, so the children come with it.
+  if (type === 'columns') {
+    for (let i = 0; i < (Number(node.props.count) || 2); i += 1) {
+      const column = createNode('column');
+      builder.nodes[column.id] = column;
+      node.children.push(column.id);
+    }
+  }
+
+  let target = targetId ? builder.nodes[targetId] : null;
+  // The columns node itself holds only columns. Selecting it — which is what an
+  // editor clicking the outer box does — and adding content means the first
+  // column, not a stray child sharing the grid with them.
+  if (target && target.type === 'columns' && type !== 'column' && target.children.length > 0) {
+    target = builder.nodes[target.children[0]] ?? target;
+  }
+
   if (target && isContainer(target.type)) {
     target.children.push(node.id);
   } else if (target) {
@@ -216,6 +265,35 @@ export function moveNode(builder, dragId, refId, position) {
   const insertAt = position === 'after' ? refIndex + 1 : refIndex;
   siblings.splice(insertAt, 0, dragId);
   return true;
+}
+
+/**
+ * Change how many columns a `columns` node has, adding or removing them.
+ *
+ * The count and the actual children have to move together: the renderer builds
+ * its media query from `props.count` but lays out whatever children it finds, so
+ * a count of 3 over 2 columns would leave a visible gap in the published page.
+ *
+ * Shrinking drops the trailing columns *with their contents* — the same as
+ * deleting them, which is what the numbers on screen already imply. It is
+ * undoable only by not saving, so the inspector says so next to the field.
+ */
+export function setColumnCount(builder, id, count) {
+  const node = builder.nodes[id];
+  if (!node || node.type !== 'columns') return;
+
+  const parsed = parseInt(count, 10);
+  const next = Number.isNaN(parsed) ? 1 : Math.min(MAX_COLUMNS, Math.max(1, parsed));
+  node.props = { ...node.props, count: next };
+
+  while (node.children.length < next) {
+    const column = createNode('column');
+    builder.nodes[column.id] = column;
+    node.children.push(column.id);
+  }
+  while (node.children.length > next) {
+    removeNode(builder, node.children[node.children.length - 1]);
+  }
 }
 
 export function updateProp(builder, id, key, value) {

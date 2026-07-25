@@ -61,6 +61,7 @@ import {
   moveNode as moveNodeOp,
   updateProp as updatePropOp,
   updateStyle as updateStyleOp,
+  setColumnCount as setColumnCountOp,
 } from './builder/model.js';
 
 // Optional: a test (or a future deep link) can mount straight onto a page. The
@@ -81,6 +82,9 @@ const saveError = ref('');
 const notice = ref('');
 
 const nodes = computed(() => builder.value?.nodes ?? {});
+// The inspector offers these as the breakpoint a columns node un-stacks at, so
+// the choice is limited to breakpoints this document actually declares.
+const breakpoints = computed(() => (builder.value?.breakpoints ?? []).filter((bp) => bp.id !== 'base'));
 
 /* ---------------------------------------------------- controller -- */
 
@@ -92,6 +96,7 @@ const ctx = {
   selectedId,
   dragId,
   nodes,
+  breakpoints,
   select(id) {
     selectedId.value = id;
   },
@@ -117,6 +122,14 @@ const ctx = {
   },
   updateStyle(id, key, value) {
     updateStyleOp(builder.value, id, key, value);
+    touch();
+  },
+  setColumnCount(id, count) {
+    setColumnCountOp(builder.value, id, count);
+    // Shrinking deletes columns, which can take the selection with them.
+    if (selectedId.value && !builder.value.nodes[selectedId.value]) {
+      selectedId.value = id;
+    }
     touch();
   },
 };
