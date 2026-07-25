@@ -52,7 +52,7 @@ tells you so — nothing is harmed by finding out this way.
 
 Click **Edit** on the row you want. The page editor opens.
 
-![The top of the page editor. A banner reads "Not published — this page has not been saved yet", the Title field contains "Rivet & Oak", and the Slug field contains "home" with the note that the slug is part of the page's address and cannot be changed here. Below, a Sections heading and the first section, "Media and text".](images/edit-page.png)
+![The top of the page editor. A green banner reads "Published — the public site matches what is here", with the date of the last publish, a link to open the live page, and a Take down button. The Title field contains "Rivet & Oak" and the Slug field contains "home", with the note that the slug is part of the page's address and cannot be changed here. Below, a Sections heading and the first section, "Media and text".](images/edit-page.png)
 
 At the top of the editor is a **banner** telling you where this page stands: on
 the public site, not saved yet, or saved with changes waiting. It is the first
@@ -336,7 +336,7 @@ version history still has the page as it was — see
 
 Scroll to the bottom of the sections. There is a box headed **Add a section**.
 
-![The bottom of the editor: a "Call to action" section with Heading, Text, Button label and Button link fields — several marked with a red asterisk — and below it a box headed "Add a section" containing a "Choose a design…" dropdown and an Add button, followed by a collapsed "Search & social (SEO)" area.](images/add-section.png)
+![The bottom of the editor: a "Call to action" section with Heading, Text and Button label fields — several marked with a red asterisk — and a Button link dropdown showing "Contact — /contact". Below it a box headed "Add a section" containing a "Choose a design…" dropdown and an Add button, followed by a collapsed "Search & social (SEO)" area.](images/add-section.png)
 
 1. Open the **Choose a design…** dropdown.
 2. Pick a design. Its description appears underneath the dropdown, so you can
