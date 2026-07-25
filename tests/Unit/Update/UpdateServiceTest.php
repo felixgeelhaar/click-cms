@@ -167,7 +167,7 @@ final class UpdateServiceTest extends TestCase
 
         $result = $this->service()->applyIfAutomatic($feed, $this->publicKey, UpdatePolicy::Notify, false);
 
-        $this->assertFalse($result['applied']);
+        $this->assertFalse($result['attempted']);
         $this->assertTrue($result['decision']['hasUpdate'], 'the update is still offered, just not taken');
         $this->assertSame('<?php // version 1.0.0', file_get_contents($this->base . '/src/App.php'));
         $this->assertSame([], $this->historyOnDisk(), 'declining to act is the normal state, not an event');
@@ -183,7 +183,7 @@ final class UpdateServiceTest extends TestCase
 
         $result = $this->service()->applyIfAutomatic($feed, $this->publicKey, UpdatePolicy::Security, false);
 
-        $this->assertTrue($result['applied']);
+        $this->assertTrue($result['attempted']);
         $this->assertTrue($result['success'], (string) $result['error']);
         $this->assertSame('<?php // version 1.0.1', file_get_contents($this->base . '/src/App.php'));
     }
@@ -194,7 +194,7 @@ final class UpdateServiceTest extends TestCase
 
         $result = $this->service()->applyIfAutomatic($feed, $this->publicKey, UpdatePolicy::Security, false);
 
-        $this->assertFalse($result['applied']);
+        $this->assertFalse($result['attempted']);
         $this->assertSame('<?php // version 1.0.0', file_get_contents($this->base . '/src/App.php'));
     }
 
@@ -207,7 +207,7 @@ final class UpdateServiceTest extends TestCase
 
         $result = $this->service()->applyApproved($feed, $this->publicKey, UpdatePolicy::Security, false);
 
-        $this->assertFalse($result['applied']);
+        $this->assertFalse($result['attempted']);
         $this->assertNotNull($result['error']);
         $this->assertSame('<?php // version 1.0.0', file_get_contents($this->base . '/src/App.php'));
         $this->assertSame([], $this->historyOnDisk());
@@ -224,7 +224,7 @@ final class UpdateServiceTest extends TestCase
         $result = $this->service()->applyApproved($feed, $this->publicKey, UpdatePolicy::Security, false);
 
         $this->assertFalse($result['decision']['automatic'], 'this must not have been automatic');
-        $this->assertTrue($result['applied']);
+        $this->assertTrue($result['attempted']);
         $this->assertTrue($result['success'], (string) $result['error']);
         $this->assertSame('<?php // version 2.0.0', file_get_contents($this->base . '/src/App.php'));
     }
@@ -259,7 +259,7 @@ final class UpdateServiceTest extends TestCase
 
         $result = $this->service()->applyIfAutomatic($feed, $this->publicKey, UpdatePolicy::Security, false);
 
-        $this->assertTrue($result['applied'], 'it was attempted');
+        $this->assertTrue($result['attempted'], 'it was attempted');
         $this->assertFalse($result['success']);
         $this->assertSame('<?php // version 1.0.0', file_get_contents($this->base . '/src/App.php'), 'nothing may change');
 

@@ -163,6 +163,17 @@ final class UpdateService
 
     /* -------------------------------------------------------------- internals -- */
 
+    /**
+     * Install a decided-upon release.
+     *
+     * The returned shape separates two questions that are easy to conflate and
+     * dangerous to: `attempted` says whether an install was started at all (it
+     * is false when there was nothing to install, or the policy forbade it), and
+     * `success` says whether the new code is actually running. A refused package
+     * — a checksum that does not match its feed entry — is attempted but not
+     * successful, and reporting that as "applied" is how an operator comes to
+     * believe a security update landed when it did not.
+     */
     private function apply(UpdateDecision $decision): array
     {
         $release = $decision->release;
@@ -179,7 +190,7 @@ final class UpdateService
         );
 
         return [
-            'applied' => true,
+            'attempted' => true,
             'success' => (bool) $result['success'],
             'error' => $result['error'] ?? null,
             'backup' => $result['backup'] ?? null,
@@ -193,7 +204,7 @@ final class UpdateService
     private function notApplied(UpdateDecision $decision, ?string $error): array
     {
         return [
-            'applied' => false,
+            'attempted' => false,
             'success' => false,
             'error' => $error,
             'backup' => null,

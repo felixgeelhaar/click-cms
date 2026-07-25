@@ -108,7 +108,7 @@ final class UpdatesController
             $this->config->updateAllowPreRelease(),
         );
 
-        if (!$result['applied']) {
+        if (!$result['attempted']) {
             return ['status' => 400, 'error' => $result['error'] ?? 'There is no update to install.'];
         }
 
