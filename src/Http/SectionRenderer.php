@@ -355,6 +355,7 @@ final class SectionRenderer
             FieldType::Repeater => $this->renderRepeater($field, $value),
             FieldType::Image => $this->renderImage($field, $value, $wording ?? ''),
             FieldType::File => $this->renderFile($field, $value, $wording),
+            FieldType::StringList => $this->renderStringList($field, $value),
             FieldType::RichText => $this->renderRichText($field, $value),
             FieldType::Textarea => $this->renderProse($field, $value),
             FieldType::Boolean => '',
@@ -630,6 +631,44 @@ final class SectionRenderer
             . $this->escape($label) . '</a></p>';
     }
 
+    /**
+     * A flat list of lines, as an actual list.
+     *
+     * The alternative — and what a plan's "what's included" had to be until this
+     * existed — is a textarea rendering one paragraph of `<br>`-separated lines.
+     * That looks like a list and is not one: nothing reading the document can
+     * count the items or move between them.
+     *
+     * Honours `ordered`, because a list of steps is a different claim from a
+     * list of features.
+     */
+    private function renderStringList(FieldDefinition $field, mixed $value): string
+    {
+        if (!is_array($value)) {
+            return '';
+        }
+
+        $items = '';
+        foreach ($value as $line) {
+            if (!is_scalar($line)) {
+                continue;
+            }
+            $line = trim((string) $line);
+            if ($line !== '') {
+                $items .= '<li>' . $this->escape($line) . '</li>';
+            }
+        }
+
+        if ($items === '') {
+            return '';
+        }
+
+        $tag = $field->as === 'ordered' ? 'ol' : 'ul';
+
+        return '<' . $tag . ' class="' . $this->fieldClass($field) . ' cms-lines">'
+            . $items . '</' . $tag . '>';
+    }
+
     private function renderRepeater(FieldDefinition $field, mixed $value): string
     {
         if (!is_array($value) || $value === []) {
@@ -670,6 +709,7 @@ final class SectionRenderer
             }
 
             $inner = '';
+            $rowModifiers = '';
             foreach ($field->fields as $sub) {
                 if (!array_key_exists($sub->name, $row) || isset($consumed[$sub->name])) {
                     continue;
@@ -681,6 +721,17 @@ final class SectionRenderer
                     if (is_scalar($candidate) && (string) $candidate !== '') {
                         $wording = (string) $candidate;
                     }
+                }
+
+                // A choice about presentation, one level down. At section level a
+                // select already becomes a modifier class rather than printed
+                // text; inside a row it used to print, so "most popular" appeared
+                // as the literal word under a plan. Now it marks the row, which
+                // is the only way a per-row flag can reach the markup at all.
+                if ($sub->type === FieldType::Select && is_scalar($row[$sub->name])) {
+                    $rowModifiers .= ' cms-item--' . $this->escape($sub->name)
+                        . '-' . $this->escape((string) $row[$sub->name]);
+                    continue;
                 }
 
                 // A sibling title is only a fallback description. Letting it win
@@ -708,7 +759,7 @@ final class SectionRenderer
             }
 
             if (trim($inner) !== '') {
-                $items .= '<li class="cms-item">' . $inner . '</li>';
+                $items .= '<li class="cms-item' . $rowModifiers . '">' . $inner . '</li>';
             }
         }
 

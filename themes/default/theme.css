@@ -374,3 +374,15 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
   border-radius: 6px;
   background: #000;
 }
+
+/* A list of lines inside a card — the features of a plan. Tighter than prose,
+ * because it is a list of short items rather than paragraphs. */
+.cms-lines { margin: 0.5rem 0 0; padding-left: 1.15rem; }
+.cms-lines li { margin: 0.2rem 0; }
+
+/* A plan the site recommends. A per-row select could not reach the markup at
+ * all until a select inside a repeater became a modifier on its row. */
+.cms-item--emphasis-featured {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}

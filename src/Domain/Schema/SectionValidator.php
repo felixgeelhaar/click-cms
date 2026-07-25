@@ -79,6 +79,7 @@ final class SectionValidator
             FieldType::Reference => $field->multiple
                 ? $this->coerceReferenceList($field, $raw)
                 : $this->coerceString($field, $raw),
+            FieldType::StringList => $this->coerceStringList($field, $raw),
             FieldType::Repeater => $this->coerceRepeater($field, $raw),
         };
     }
@@ -224,6 +225,48 @@ final class SectionValidator
         }
 
         return ['value' => $raw, 'error' => null];
+    }
+
+    /**
+     * A flat list of lines.
+     *
+     * Blank lines and anything that is not a scalar are dropped rather than
+     * rejected: an editor leaving a trailing empty row is not an error, and
+     * refusing the whole section over it would be the kind of validation that
+     * teaches people to fear the Save button. The result is always a list keyed
+     * from zero.
+     *
+     * @return array{value: mixed, error: ?string}
+     */
+    private function coerceStringList(FieldDefinition $field, mixed $raw): array
+    {
+        // A textarea's worth of lines is accepted too, because that is what an
+        // editor pasting from elsewhere produces and what the previous shape of
+        // this data was.
+        if (is_string($raw)) {
+            $raw = preg_split('/\r\n|\r|\n/', $raw) ?: [];
+        }
+
+        if (!is_array($raw)) {
+            return ['value' => null, 'error' => "{$field->label} must be a list of lines."];
+        }
+
+        $lines = [];
+        foreach ($raw as $line) {
+            if (!is_scalar($line)) {
+                continue;
+            }
+            $line = trim((string) $line);
+            if ($line !== '') {
+                $lines[] = $line;
+            }
+        }
+
+        if ($field->max !== null && count($lines) > $field->max) {
+            return ['value' => null, 'error' => "{$field->label} may have at most {$field->max} lines."];
+        }
+
+        return ['value' => $lines, 'error' => null];
     }
 
     /**
