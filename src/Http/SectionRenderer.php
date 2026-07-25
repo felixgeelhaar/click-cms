@@ -516,10 +516,40 @@ final class SectionRenderer
                 continue;
             }
 
+            // `labelField` is honoured here as well as at section level, and for
+            // the same reason. It was not, and the effect was visible in shipped
+            // content: a card's link rendered as `<a href="/tables">/tables</a>`,
+            // showing a visitor the raw path as the words to click on, while any
+            // paired label printed beneath it as a stray sentence.
+            //
+            // Decided per *row*, not per field definition, which is the one place
+            // this differs from section level. A logo names itself in `title` and
+            // may optionally link; consuming `title` for every row because *some*
+            // row has a link deleted the name from every mark that had none.
+            // A field is only consumed where the field consuming it has a value.
+            $consumed = [];
+            foreach ($field->fields as $sub) {
+                if ($sub->labelField === null) {
+                    continue;
+                }
+                $owner = $row[$sub->name] ?? null;
+                if (is_scalar($owner) && (string) $owner !== '') {
+                    $consumed[$sub->labelField] = true;
+                }
+            }
+
             $inner = '';
             foreach ($field->fields as $sub) {
-                if (!array_key_exists($sub->name, $row)) {
+                if (!array_key_exists($sub->name, $row) || isset($consumed[$sub->name])) {
                     continue;
+                }
+
+                $wording = null;
+                if ($sub->labelField !== null) {
+                    $candidate = $row[$sub->labelField] ?? null;
+                    if (is_scalar($candidate) && (string) $candidate !== '') {
+                        $wording = (string) $candidate;
+                    }
                 }
 
                 // A sibling title is only a fallback description. Letting it win
@@ -528,11 +558,22 @@ final class SectionRenderer
                 // the heading, once as the picture.
                 if ($sub->type === FieldType::Image && is_string($row[$sub->name])) {
                     $fallback = is_string($row['title'] ?? null) ? $row['title'] : '';
-                    $inner .= $this->imageTag($row[$sub->name], '', $fallback);
+                    $inner .= $this->imageTag($row[$sub->name], $wording ?? '', $fallback);
                     continue;
                 }
 
-                $inner .= $this->renderField($sub, $row[$sub->name]);
+                // A link inside a row falls back to that row's title rather than
+                // to its own address. At section level the address is a defensible
+                // last resort, but a row always has a title and "\/tables" is never
+                // the wording anyone wanted.
+                if ($wording === null && $sub->type === FieldType::Url) {
+                    $rowTitle = $row['title'] ?? null;
+                    if (is_scalar($rowTitle) && (string) $rowTitle !== '') {
+                        $wording = (string) $rowTitle;
+                    }
+                }
+
+                $inner .= $this->renderField($sub, $row[$sub->name], $wording);
             }
 
             if (trim($inner) !== '') {
