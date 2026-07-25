@@ -364,3 +364,13 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
 .cms-entry-title a { color: var(--ink); text-decoration: none; }
 .cms-entry-title a:hover { text-decoration: underline; }
 .cms-entry-excerpt { margin: 0; color: var(--muted); }
+
+/* A video section. Constrained like every other block, and given an aspect ratio
+ * so the page does not jump when the poster loads. */
+.cms-section--video video {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+  background: #000;
+}

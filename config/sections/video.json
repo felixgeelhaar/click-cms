@@ -1,0 +1,15 @@
+{
+  "label": "Video",
+  "description": "A film from your media library, with a still frame to show before it plays.",
+  "icon": "video",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading" },
+    { "name": "video", "type": "file", "label": "Video", "required": true,
+      "labelField": "poster",
+      "help": "An MP4 or WebM from the media library. Large films are slow for visitors — under about 20 MB is kind." },
+    { "name": "poster", "type": "image", "label": "Still frame", "displayWidth": 960,
+      "help": "Shown before the video plays. Without one, visitors see a black rectangle." },
+    { "name": "caption", "type": "text", "label": "Caption",
+      "help": "Shown beneath the video." }
+  ]
+}

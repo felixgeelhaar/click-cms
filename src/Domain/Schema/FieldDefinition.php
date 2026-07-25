@@ -180,7 +180,11 @@ final class FieldDefinition
             fields: $fields,
             min: isset($spec['min']) ? (int) $spec['min'] : null,
             max: isset($spec['max']) ? (int) $spec['max'] : null,
-            labelField: in_array($type, [FieldType::Url, FieldType::Image], true)
+            // On a File field it names the image to use as a video's poster
+            // frame — the same idea as an image's description or a link's
+            // wording: a sibling field supplying what this one needs, and
+            // consumed so it is not also printed on its own.
+            labelField: in_array($type, [FieldType::Url, FieldType::Image, FieldType::File], true)
                 && is_string($spec['labelField'] ?? null)
                     ? trim($spec['labelField'])
                     : null,

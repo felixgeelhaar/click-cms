@@ -104,6 +104,24 @@ final class SiteSeederTest extends TestCase
         $this->assertFalse($report->hasFailures());
     }
 
+    /**
+     * Designs the example site cannot demonstrate, each with the reason.
+     *
+     * Deliberately a named list rather than a relaxed rule. The rule is right —
+     * a design nobody can see an example of may as well not ship — so an
+     * exception has to be argued for one design at a time, in writing, here.
+     *
+     * @var array<string, string>
+     */
+    private const CANNOT_BE_SEEDED = [
+        // The seeder writes its own pictures as SVG, which is a few hundred
+        // bytes of text a reviewer can read. There is no equivalent for film:
+        // a valid, playable MP4 cannot be generated without an encoder, and a
+        // synthesised one would put a video player that cannot play anything on
+        // the example site. A broken player is worse than an absent example.
+        'video' => 'no playable film can be generated without an encoder',
+    ];
+
     public function testEverySectionTypeTheProjectShipsAppearsInTheExample(): void
     {
         $used = [];
@@ -118,11 +136,33 @@ final class SiteSeederTest extends TestCase
             glob(dirname(__DIR__, 3) . '/config/sections/*.json') ?: []
         );
 
+        $missing = array_diff($shipped, array_keys($used), array_keys(self::CANNOT_BE_SEEDED));
+
         $this->assertSame(
             [],
-            array_diff($shipped, array_keys($used)),
+            array_values($missing),
             'a section type nobody can see an example of may as well not ship'
         );
+    }
+
+    /**
+     * The exception list must not become a place to hide work.
+     *
+     * Every name in it has to be a design that really ships, so a design deleted
+     * or renamed cannot leave a stale excuse behind — which is how a list like
+     * this quietly grows into a way of never writing an example again.
+     */
+    public function testTheUnseedableListNamesOnlyDesignsThatExist(): void
+    {
+        $shipped = array_map(
+            static fn (string $path): string => basename($path, '.json'),
+            glob(dirname(__DIR__, 3) . '/config/sections/*.json') ?: []
+        );
+
+        foreach (self::CANNOT_BE_SEEDED as $design => $reason) {
+            $this->assertContains($design, $shipped, "\"{$design}\" is excused but does not ship");
+            $this->assertNotSame('', $reason, "\"{$design}\" is excused without a reason");
+        }
     }
 
     public function testThePagesAreLiveRatherThanLeftAsDrafts(): void

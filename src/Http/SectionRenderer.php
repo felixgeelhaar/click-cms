@@ -9,6 +9,7 @@ use Click\Cms\Domain\Content\RichTextSanitizer;
 use Click\Cms\Application\Collection\EntryListings;
 use Click\Cms\Application\Media\MediaService;
 use Click\Cms\Domain\Schema\FieldDefinition;
+use Click\Cms\Domain\Media\UploadPolicy;
 use Click\Cms\Domain\Schema\FieldType;
 use Click\Cms\Domain\Schema\SectionType;
 use Click\Cms\Domain\Schema\SectionTypeRepository;
@@ -353,6 +354,7 @@ final class SectionRenderer
         return match ($field->type) {
             FieldType::Repeater => $this->renderRepeater($field, $value),
             FieldType::Image => $this->renderImage($field, $value, $wording ?? ''),
+            FieldType::File => $this->renderFile($field, $value, $wording),
             FieldType::RichText => $this->renderRichText($field, $value),
             FieldType::Textarea => $this->renderProse($field, $value),
             FieldType::Boolean => '',
@@ -566,6 +568,66 @@ final class SectionRenderer
             'note' => '<p class="' . $class . ' cms-note">' . $escapedText . '</p>',
             default => null,
         };
+    }
+
+    /**
+     * An uploaded file: a video if that is what it is, otherwise something to
+     * download.
+     *
+     * `File` had no case at all here, so it fell through to the scalar path and
+     * printed its own stored reference as a sentence — a page showing
+     * `clip-4f2a91c0` where a video belonged. The media library has accepted MP4
+     * and WebM since video uploads were added, which meant an editor could put a
+     * film into the library and had no way to get it onto a page.
+     *
+     * Deliberately no autoplay. Every current browser refuses to start an
+     * audible video unattended, so the only autoplay that works is a muted one,
+     * and a muted film starting by itself under someone's cursor is a thing
+     * people disable the tab for. A poster and a play control is the version
+     * that respects the reader.
+     */
+    private function renderFile(FieldDefinition $field, mixed $value, ?string $wording): string
+    {
+        if (!is_string($value) || $value === '') {
+            return '';
+        }
+
+        $class = $this->fieldClass($field);
+        $item = $this->media?->find($value);
+        $href = rtrim($this->mediaBaseUrl, '/') . '/' . $this->escape(
+            $item !== null ? $item->filename() : $value
+        );
+
+        // An unresolved reference is a file that has been deleted from the
+        // library. Rendering a dead <video> would show a broken player; a link
+        // at least says what was meant to be here.
+        if ($item !== null && UploadPolicy::isVideo($item->mimeType)) {
+            $tag = '<video class="' . $class . '" controls preload="none" playsinline';
+
+            // A poster is a still frame, supplied by a sibling field, so the page
+            // does not open on a black rectangle.
+            if ($wording !== null && $wording !== '') {
+                $poster = $this->media?->find($wording);
+                if ($poster !== null) {
+                    $tag .= ' poster="' . $this->escape($poster->urls($this->mediaBaseUrl)['original']) . '"';
+                }
+            }
+
+            return $tag . '><source src="' . $href . '" type="' . $this->escape($item->mimeType) . '">'
+                // Shown by a browser that will not play it at all, which is the
+                // only case where a bare link is the useful answer.
+                . '<a href="' . $href . '">Download the video</a>'
+                . '</video>';
+        }
+
+        // Anything else — a PDF, a spreadsheet — is a download. Named by what the
+        // editor uploaded rather than by the stored id, which nobody recognises.
+        $label = $item !== null && $item->originalName !== ''
+            ? $item->originalName
+            : 'Download';
+
+        return '<p class="' . $class . '"><a href="' . $href . '" download>'
+            . $this->escape($label) . '</a></p>';
     }
 
     private function renderRepeater(FieldDefinition $field, mixed $value): string
