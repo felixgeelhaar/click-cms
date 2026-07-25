@@ -32,11 +32,16 @@ export default defineConfig({
      * here takes. Vitest's 5s default is comfortable on a developer's machine
      * and not comfortable anywhere slower.
      *
-     * The release build publishes a linux/arm64 image, which on an amd64 runner
-     * is built under QEMU emulation. Every axe test took between 5.5 and 11
-     * seconds there and nine of them timed out, which failed the image build
-     * for the 1.2.0 release — reported as nine accessibility failures when
-     * nothing was inaccessible.
+     * The number comes from the release build, which used to run this suite
+     * under QEMU emulation while building the linux/arm64 image. Every axe test
+     * took between 5.5 and 11 seconds there and nine of them timed out, failing
+     * the image build for three releases running — reported as nine
+     * accessibility failures when nothing was inaccessible.
+     *
+     * That path is gone: the admin stage is now pinned to the build platform,
+     * so the suite never runs emulated. This stays anyway. The emulated runner
+     * was the slowest machine that happened to be measured, not the slowest
+     * machine that exists, and the next one will not announce itself.
      *
      * Raised rather than removed or scoped to those tests: a timeout is not the
      * property under test, and a suite that passes only on fast hardware tells
