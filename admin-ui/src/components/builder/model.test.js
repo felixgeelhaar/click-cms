@@ -1,14 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
   createEmptyBuilder,
+  createNode,
   normalizeBuilder,
   addNode,
   removeNode,
   moveNode,
   updateProp,
   updateStyle,
+  setColumnCount,
   findParentId,
   isContainer,
+  NODE_TYPES,
+  MAX_COLUMNS,
 } from './model.js';
 
 /**
@@ -54,11 +58,45 @@ describe('normalizeBuilder', () => {
 });
 
 describe('isContainer', () => {
-  it('is true only for section and grid', () => {
+  it('is true for the four types that hold children', () => {
     expect(isContainer('section')).toBe(true);
     expect(isContainer('grid')).toBe(true);
+    expect(isContainer('columns')).toBe(true);
+    expect(isContainer('column')).toBe(true);
     expect(isContainer('text')).toBe(false);
     expect(isContainer('image')).toBe(false);
+    expect(isContainer('quote')).toBe(false);
+    expect(isContainer('divider')).toBe(false);
+  });
+});
+
+describe('NODE_TYPES', () => {
+  it('offers every type the renderer knows', () => {
+    for (const type of ['section', 'columns', 'grid', 'text', 'image', 'video', 'embed', 'list', 'quote', 'button', 'divider', 'spacer', 'chart']) {
+      expect(NODE_TYPES).toContain(type);
+    }
+  });
+
+  it('does not offer a loose column', () => {
+    // A column only exists inside a columns node, which manages its own.
+    expect(NODE_TYPES).not.toContain('column');
+  });
+});
+
+describe('defaults for the new node types', () => {
+  it('gives each type props the server renderer actually reads', () => {
+    // These key names are the contract with plugins/visual-builder/bootstrap.php:
+    // a rename on either side silently stops the node rendering.
+    expect(createNode('columns').props).toMatchObject({ count: 2, stackAt: 'sm' });
+    expect(createNode('video').props).toMatchObject({ src: '', preload: 'none', autoplay: false });
+    expect(createNode('embed').props).toMatchObject({ url: '' });
+    expect(createNode('list').props.items.length).toBeGreaterThan(0);
+    expect(createNode('quote').props).toHaveProperty('attribution');
+    expect(createNode('divider').props).toMatchObject({ lineStyle: 'solid', thickness: 1 });
+  });
+
+  it('does not autoplay a freshly added video', () => {
+    expect(createNode('video').props.autoplay).toBe(false);
   });
 });
 
@@ -82,6 +120,90 @@ describe('addNode', () => {
     const b = createEmptyBuilder();
     const id = addNode(b, 'image', null);
     expect(b.nodes[b.root].children).toContain(id);
+  });
+});
+
+describe('adding a columns node', () => {
+  it('materialises its columns so it is never an empty shell', () => {
+    const b = createEmptyBuilder();
+    const id = addNode(b, 'columns', b.root);
+
+    expect(b.nodes[id].props.count).toBe(2);
+    expect(b.nodes[id].children).toHaveLength(2);
+    for (const childId of b.nodes[id].children) {
+      expect(b.nodes[childId].type).toBe('column');
+    }
+  });
+
+  it('sends content added against the columns node into its first column', () => {
+    const b = createEmptyBuilder();
+    const columnsId = addNode(b, 'columns', b.root);
+    const [first] = b.nodes[columnsId].children;
+
+    const textId = addNode(b, 'text', columnsId);
+
+    expect(b.nodes[first].children).toContain(textId);
+    expect(b.nodes[columnsId].children).not.toContain(textId);
+  });
+
+  it('lets each column hold its own children', () => {
+    const b = createEmptyBuilder();
+    const columnsId = addNode(b, 'columns', b.root);
+    const [left, right] = b.nodes[columnsId].children;
+
+    const leftText = addNode(b, 'text', left);
+    const rightImage = addNode(b, 'image', right);
+
+    expect(b.nodes[left].children).toEqual([leftText]);
+    expect(b.nodes[right].children).toEqual([rightImage]);
+  });
+});
+
+describe('setColumnCount', () => {
+  it('adds columns as the count grows', () => {
+    const b = createEmptyBuilder();
+    const id = addNode(b, 'columns', b.root);
+
+    setColumnCount(b, id, 4);
+
+    expect(b.nodes[id].props.count).toBe(4);
+    expect(b.nodes[id].children).toHaveLength(4);
+  });
+
+  it('drops the trailing columns and their contents as the count shrinks', () => {
+    const b = createEmptyBuilder();
+    const id = addNode(b, 'columns', b.root);
+    const [, right] = b.nodes[id].children;
+    const doomed = addNode(b, 'text', right);
+
+    setColumnCount(b, id, 1);
+
+    expect(b.nodes[id].children).toHaveLength(1);
+    // No orphans left behind in the node map to bloat the saved payload.
+    expect(b.nodes[right]).toBeUndefined();
+    expect(b.nodes[doomed]).toBeUndefined();
+  });
+
+  it('clamps a nonsensical count rather than trusting the input', () => {
+    const b = createEmptyBuilder();
+    const id = addNode(b, 'columns', b.root);
+
+    setColumnCount(b, id, 0);
+    expect(b.nodes[id].props.count).toBe(1);
+
+    setColumnCount(b, id, 999);
+    expect(b.nodes[id].props.count).toBe(MAX_COLUMNS);
+    expect(b.nodes[id].children).toHaveLength(MAX_COLUMNS);
+
+    setColumnCount(b, id, 'nonsense');
+    expect(b.nodes[id].props.count).toBe(1);
+  });
+
+  it('ignores a node that is not a columns node', () => {
+    const b = createEmptyBuilder();
+    const id = addNode(b, 'text', b.root);
+    setColumnCount(b, id, 3);
+    expect(b.nodes[id].props.count).toBeUndefined();
   });
 });
 

@@ -31,6 +31,9 @@ const hint = computed(() => {
   const id = ctx.selectedId.value;
   const node = id ? ctx.nodes.value[id] : null;
   if (!node) return 'Adds to the top of the page. Select a section to nest inside it.';
+  // Adding against a columns node lands in its first column, so say that rather
+  // than let the placement look arbitrary.
+  if (node.type === 'columns') return 'Adds inside the first column. Select a column to add to that one.';
   if (isContainer(node.type)) return `Adds inside the selected ${node.type}.`;
   return `Adds right after the selected ${node.type}.`;
 });

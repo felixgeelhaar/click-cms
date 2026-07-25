@@ -63,6 +63,51 @@
       <span class="leaf-chart-meta">{{ node.props.chartType || 'bar' }} · {{ (node.props.data || []).length }} points</span>
     </div>
 
+    <!-- preload="none" so a canvas full of clips costs nothing to open. -->
+    <template v-else-if="node.type === 'video'">
+      <video
+        v-if="node.props.src"
+        class="leaf-video"
+        :style="node.styles"
+        :src="node.props.src"
+        :poster="node.props.poster || undefined"
+        preload="none"
+        controls
+        muted
+        playsinline
+      ></video>
+      <div v-else class="leaf-placeholder" :style="node.styles">Video — set a source in the inspector</div>
+    </template>
+
+    <!--
+      An embed is previewed as a description, never as a live iframe: loading a
+      third-party frame into the admin would hand it a seat inside an
+      authenticated session for no editorial benefit.
+    -->
+    <div v-else-if="node.type === 'embed'" class="leaf-placeholder" :style="node.styles">
+      <template v-if="node.props.url">Embed — {{ embedProvider }}</template>
+      <template v-else>Embed — paste a YouTube, Vimeo or map link</template>
+    </div>
+
+    <component
+      :is="node.props.ordered ? 'ol' : 'ul'"
+      v-else-if="node.type === 'list'"
+      class="leaf-list"
+      :style="node.styles"
+    >
+      <li v-for="(item, index) in node.props.items || []" :key="index">{{ item }}</li>
+    </component>
+
+    <figure v-else-if="node.type === 'quote'" class="leaf-quote" :style="node.styles">
+      <blockquote><p>{{ node.props.text }}</p></blockquote>
+      <figcaption v-if="node.props.attribution">
+        {{ node.props.attribution }}
+        <cite v-if="node.props.source">{{ node.props.source }}</cite>
+      </figcaption>
+    </figure>
+
+    <hr v-else-if="node.type === 'divider'" class="leaf-divider" :style="dividerStyle" />
+
     <div v-else class="leaf-placeholder">{{ node.type }}</div>
   </div>
 </template>
@@ -87,13 +132,40 @@ const isContainer = computed(() => isContainerType(props.node.type));
 // A grid's column count lives in props (what the server reads) but the canvas
 // has to preview it, so it is projected into gridTemplateColumns here the same
 // way bootstrap.php does when rendering the public page.
+//
+// A columns node is drawn side by side even though the published page stacks it
+// below its breakpoint: the canvas is a desktop-width surface, so showing the
+// stacked form would misrepresent what most visitors see.
 const containerStyle = computed(() => {
   const style = { ...props.node.styles };
   if (props.node.type === 'grid' && props.node.props.columns) {
     style.display = style.display || 'grid';
     style.gridTemplateColumns = `repeat(${Number(props.node.props.columns) || 1}, minmax(0, 1fr))`;
   }
+  if (props.node.type === 'columns') {
+    style.display = style.display || 'grid';
+    const count = Number(props.node.props.count) || props.node.children.length || 1;
+    style.gridTemplateColumns = `repeat(${count}, minmax(0, 1fr))`;
+  }
   return style;
+});
+
+// Mirrors dividerStyles() on the server so the canvas shows the same rule.
+const dividerStyle = computed(() => ({
+  border: 0,
+  borderTop: `${Number(props.node.props.thickness) || 1}px ${props.node.props.lineStyle || 'solid'} ${props.node.props.color || 'currentColor'}`,
+  ...props.node.styles,
+}));
+
+// Named from the URL alone. The editor deliberately does not reimplement the
+// server's allowlist — it only hints, and bootstrap.php remains the one place
+// that decides what actually becomes an iframe.
+const embedProvider = computed(() => {
+  const url = String(props.node.props.url || '');
+  if (/youtube\.com|youtu\.be/.test(url)) return 'YouTube';
+  if (/vimeo\.com/.test(url)) return 'Vimeo';
+  if (/openstreetmap\.org|google\.[a-z.]+\/maps/.test(url)) return 'map';
+  return 'published as a link (unrecognised provider)';
 });
 
 /* ----------------------------------------------------- drag & drop -- */
@@ -159,4 +231,10 @@ function onDrop() {
 .leaf-spacer { display: flex; align-items: center; justify-content: center; color: var(--app-text-muted); background: repeating-linear-gradient(45deg, var(--app-surface-strong), var(--app-surface-strong) 6px, transparent 6px, transparent 12px); border-radius: 6px; font-size: 0.75rem; }
 .leaf-chart { display: flex; flex-direction: column; gap: 0.25rem; padding: 1rem; background: var(--app-surface-strong); border-radius: 6px; }
 .leaf-chart-meta { font-size: 0.75rem; color: var(--app-text-muted); }
+.leaf-video { max-width: 100%; display: block; }
+.leaf-list { margin: 0; padding-left: 1.25rem; }
+.leaf-quote { margin: 0; }
+.leaf-quote blockquote { margin: 0; font-style: italic; }
+.leaf-quote figcaption { font-size: 0.8125rem; color: var(--app-text-muted); margin-top: 0.25rem; }
+.leaf-divider { margin: 0.5rem 0; }
 </style>

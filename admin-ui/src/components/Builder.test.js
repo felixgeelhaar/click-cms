@@ -138,6 +138,100 @@ describe('the palette adding nodes', () => {
   });
 });
 
+/* --------------------------------------------- the newer node types -- */
+
+describe('the richer node types', () => {
+  it('offers every one of them in the palette', async () => {
+    const wrapper = await mountBuilder();
+
+    for (const type of ['columns', 'video', 'embed', 'list', 'quote', 'divider']) {
+      expect(paletteButton(wrapper, type), `${type} should be in the palette`).toBeTruthy();
+    }
+    // A column is only ever created as part of a columns node.
+    expect(paletteButton(wrapper, 'column')).toBeFalsy();
+  });
+
+  it('adds a columns node already carrying its columns', async () => {
+    const wrapper = await mountBuilder();
+
+    await paletteButton(wrapper, 'columns').trigger('click');
+    const columnsId = wrapper.vm.selectedId;
+    const node = wrapper.vm.builder.nodes[columnsId];
+
+    expect(node.type).toBe('columns');
+    expect(node.children).toHaveLength(2);
+    expect(node.children.every((id) => wrapper.vm.builder.nodes[id].type === 'column')).toBe(true);
+    // And both columns are drawn on the canvas, ready to be dropped into.
+    expect(wrapper.findAll('.bnode[data-node-type="column"]')).toHaveLength(2);
+  });
+
+  it('adds and removes columns from the inspector', async () => {
+    const wrapper = await mountBuilder();
+    await paletteButton(wrapper, 'columns').trigger('click');
+    const columnsId = wrapper.vm.selectedId;
+
+    const count = wrapper.find('.inspector .columns-count');
+    await count.setValue('3');
+    expect(wrapper.vm.builder.nodes[columnsId].children).toHaveLength(3);
+
+    await count.setValue('1');
+    expect(wrapper.vm.builder.nodes[columnsId].children).toHaveLength(1);
+    expect(wrapper.vm.builder.nodes[columnsId].props.count).toBe(1);
+  });
+
+  it('edits a list into the items the renderer expects', async () => {
+    const wrapper = await mountBuilder();
+    await paletteButton(wrapper, 'list').trigger('click');
+    const listId = wrapper.vm.selectedId;
+
+    await wrapper.find('.inspector textarea').setValue('Alpha\nBeta\n\n  Gamma  ');
+
+    // Blank lines are dropped and whitespace trimmed, so the published list has
+    // no empty bullets.
+    expect(wrapper.vm.builder.nodes[listId].props.items).toEqual(['Alpha', 'Beta', 'Gamma']);
+    expect(wrapper.findAll('.bnode[data-node-type="list"] .leaf-list li')).toHaveLength(3);
+  });
+
+  it('edits an embed URL without ever rendering a live frame in the admin', async () => {
+    const wrapper = await mountBuilder();
+    await paletteButton(wrapper, 'embed').trigger('click');
+    const embedId = wrapper.vm.selectedId;
+
+    const url = wrapper.findAll('.inspector .field input')
+      .find((i) => i.attributes('placeholder')?.startsWith('https://www.youtube.com'));
+    await url.setValue('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+    expect(wrapper.vm.builder.nodes[embedId].props.url).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    // A third-party iframe inside an authenticated admin session buys nothing
+    // and costs a lot, so the canvas only ever describes the embed.
+    expect(wrapper.find('.bnode[data-node-type="embed"] iframe').exists()).toBe(false);
+    expect(wrapper.find('.bnode[data-node-type="embed"]').text()).toContain('YouTube');
+  });
+
+  it('previews a quote as a figure and a divider as an hr', async () => {
+    const wrapper = await mountBuilder();
+
+    await paletteButton(wrapper, 'quote').trigger('click');
+    expect(wrapper.find('.bnode[data-node-type="quote"] blockquote').exists()).toBe(true);
+
+    await paletteButton(wrapper, 'divider').trigger('click');
+    expect(wrapper.find('.bnode[data-node-type="divider"] hr').exists()).toBe(true);
+  });
+
+  it('never interpolates a prop as markup', async () => {
+    const wrapper = await mountBuilder();
+    await paletteButton(wrapper, 'quote').trigger('click');
+    const quoteId = wrapper.vm.selectedId;
+
+    wrapper.vm.ctx.updateProp(quoteId, 'text', '<img src=x onerror=alert(1)>');
+    await flushPromises();
+
+    const quote = wrapper.find('.bnode[data-node-type="quote"]');
+    expect(quote.find('img').exists()).toBe(false);
+    expect(quote.text()).toContain('<img src=x onerror=alert(1)>');
+  });
+});
+
 /* ------------------------------------------- inspector edits the node -- */
 
 describe('the inspector editing a node', () => {
