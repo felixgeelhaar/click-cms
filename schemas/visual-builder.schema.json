@@ -8,7 +8,7 @@
   "properties": {
     "version": {
       "type": "string",
-      "pattern": "^\d+\.\d+$",
+      "pattern": "^\\d+\\.\\d+$",
       "examples": ["1.0"]
     },
     "root": {
@@ -24,7 +24,10 @@
           "id": { "type": "string" },
           "type": {
             "type": "string",
-            "enum": ["section", "text", "image", "button", "grid", "spacer", "chart"]
+            "enum": [
+              "section", "text", "image", "button", "grid", "spacer", "chart",
+              "columns", "column", "video", "embed", "list", "quote", "divider"
+            ]
           },
           "props": {
             "type": "object",
