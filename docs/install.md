@@ -4,6 +4,35 @@ Three routes, in order of how quickly they get you to a running site. Whichever
 you take, the first two things to do afterwards are the same: **change the admin
 password** and **decide whether to seed the example site**.
 
+## If you are not the one installing this
+
+This page is written for whoever puts the software on a server. If your job is
+to edit a site that already exists, you do not need any of it — go straight to
+[Getting started](getting-started.md), which covers signing in and changing your
+first piece of text.
+
+If you are setting a site up for yourself, here is what the three routes below
+mean in plain terms. All of them end in the same place: a site you sign into at
+`/admin/`.
+
+- **Route 1 — Docker.** For someone comfortable running commands on a server, or
+  who already uses Docker. The quickest route if that describes you.
+- **Route 2 — From a release archive.** The one for ordinary web hosting. You
+  download a zip file, unpack it, and upload the folder to your hosting account
+  the way you would any other website. No database to set up and nothing to
+  install alongside it.
+- **Route 3 — From source.** For developers who want to change the software
+  itself.
+
+Before you start, you need somewhere to put the site — a hosting account, or a
+server — and that host needs **PHP 8.1 or newer**. The Requirements section
+below is the full list; if you are unsure whether your hosting qualifies, that
+list is the thing to send to your host's support.
+
+If none of that sounds like something you want to do, this is a job worth handing
+to a developer for an hour. Once it is running, editing the site needs no
+technical knowledge at all.
+
 ## Requirements
 
 - **PHP 8.1 or newer.** That is the whole list — `composer.json` requires PHP and

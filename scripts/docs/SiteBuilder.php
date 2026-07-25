@@ -11,10 +11,13 @@ use RuntimeException;
  *
  * The input is the repository's own Markdown — `README.md` as the landing page
  * and every file matching `docs/*.md` as a page of its own. The directory is
- * globbed at build time and sorted, never enumerated in code: a doc added on a
- * branch appears on the site without anyone remembering to register it, which is
- * the only arrangement that survives contact with a project where documentation
- * is written by whoever is doing the work.
+ * globbed at build time, never enumerated in code: a doc added on a branch
+ * appears on the site without anyone remembering to register it, which is the
+ * only arrangement that survives contact with a project where documentation is
+ * written by whoever is doing the work. {@see Navigation} then decides what
+ * order those pages come in and which section of the sidebar they sit under —
+ * grouping is a design decision and belongs in a list somebody can read, but it
+ * can only ever *rank* a page, never hide one.
  *
  * ## URLs
  *
@@ -30,33 +33,16 @@ use RuntimeException;
  * ## Determinism
  *
  * Nothing here reads the clock, the environment or a random source. The page
- * order comes from a fixed preference list followed by a sort; heading ids come
- * from the heading text; the footer carries no build date. Two builds of
- * unchanged input are byte-identical, so `git diff` on the published site shows
- * content changes and nothing else. This project has been bitten by generated
- * output that churned on every run, and the fix is to have nothing to churn.
+ * order comes from the navigation manifest followed by a sort; heading ids come
+ * from the heading text; copied images are copied byte for byte in sorted order;
+ * the footer carries no build date. Two builds of unchanged input are
+ * byte-identical, so `git diff` on the published site shows content changes and
+ * nothing else. This project has been bitten by generated output that churned on
+ * every run, and the fix is to have nothing to churn.
  */
 final class SiteBuilder
 {
     public const DEFAULT_REPOSITORY = 'https://github.com/felixgeelhaar/click-cms';
-
-    /**
-     * Navigation order. Pages not listed here follow, sorted by file name, so a
-     * new document is never invisible — it is only ever unranked.
-     *
-     * @var list<string>
-     */
-    private const PREFERRED_ORDER = [
-        'install',
-        'core',
-        'updates',
-        'visual-builder',
-        'collaboration',
-        'backup',
-        'practices',
-        'roadmap',
-        'backlog',
-    ];
 
     private string $repositoryRoot;
 
@@ -88,6 +74,7 @@ final class SiteBuilder
             $pageUrls[$page->source] = $page->url;
         }
         $rewriter = new LinkRewriter($pageUrls, $this->repositoryUrl . '/blob/' . $this->branch . '/');
+        $images = new ImageLibrary($this->repositoryRoot);
 
         $written = [];
 
@@ -99,15 +86,29 @@ final class SiteBuilder
                     $page->sourceDirectory(),
                     $page->depth,
                 ),
+                fn (string $destination): ?ImageAsset => $images->resolve(
+                    $destination,
+                    $page->sourceDirectory(),
+                    $page->depth,
+                ),
             );
             $markdown = (string) file_get_contents($this->repositoryRoot . '/' . $page->source);
-            $rendered[$page->source] = $renderer->render($markdown);
+            try {
+                $rendered[$page->source] = $renderer->render($markdown);
+            } catch (DocumentDefect $defect) {
+                // The renderer knows what is wrong; only the builder knows where.
+                throw new RuntimeException($page->source . ': ' . $defect->getMessage(), 0, $defect);
+            }
         }
 
         foreach ($pages as $page) {
             $document = $rendered[$page->source];
             $html = $this->layout($page, $document, $pages);
             $written[] = $this->write($outputDirectory, $page->outputPath, $html);
+        }
+
+        foreach ($images->assets() as $outputPath => $sourcePath) {
+            $written[] = $this->copy($outputDirectory, $outputPath, $sourcePath);
         }
 
         $written[] = $this->write($outputDirectory, 'style.css', $this->stylesheet());
@@ -121,43 +122,52 @@ final class SiteBuilder
         return $written;
     }
 
-    /** @return list<Page> */
+    /**
+     * Every Markdown file in the repository, in navigation order, each carrying
+     * the group it belongs to.
+     *
+     * @return list<Page>
+     */
     public function discover(): array
     {
-        $pages = [];
+        $sources = [];
 
         if (is_file($this->repositoryRoot . '/README.md')) {
-            $pages[] = new Page('README.md', 'index.html', '', 0, 'Overview');
+            $sources[] = 'README.md';
         }
 
         $docs = glob($this->repositoryRoot . '/docs/*.md') ?: [];
         sort($docs, SORT_STRING);
-
-        $ranked = [];
         foreach ($docs as $absolute) {
-            $name = basename($absolute, '.md');
-            $rank = array_search($name, self::PREFERRED_ORDER, true);
-            $ranked[] = [
-                'rank' => $rank === false ? PHP_INT_MAX : $rank,
-                'name' => $name,
-            ];
+            $sources[] = 'docs/' . basename($absolute);
         }
-        usort($ranked, static function (array $a, array $b): int {
-            return [$a['rank'], $a['name']] <=> [$b['rank'], $b['name']];
-        });
 
-        foreach ($ranked as $entry) {
-            $name = $entry['name'];
-            $pages[] = new Page(
-                'docs/' . $name . '.md',
-                $name . '/index.html',
-                $name . '/',
-                1,
-                $this->label($name),
-            );
+        $pages = [];
+        foreach ((new Navigation())->groups($sources) as $group) {
+            foreach ($group['sources'] as $source) {
+                $pages[] = $this->pageFor($source, $group['label']);
+            }
         }
 
         return $pages;
+    }
+
+    private function pageFor(string $source, string $group): Page
+    {
+        if ($source === 'README.md') {
+            return new Page($source, 'index.html', '', 0, 'Overview', $group);
+        }
+
+        $name = basename($source, '.md');
+
+        return new Page(
+            $source,
+            $name . '/index.html',
+            $name . '/',
+            1,
+            $this->label($name),
+            $group,
+        );
     }
 
     /** `visual-builder` reads as "Visual builder" in a sidebar, not as a file name. */
@@ -177,7 +187,13 @@ final class SiteBuilder
             ? 'Click CMS documentation'
             : $this->escape($title) . ' — Click CMS';
 
-        $navigation = $this->navigation($pages, $page->source, $prefix);
+        $navigation = $this->navigation(
+            $pages,
+            $page->source,
+            static fn (Page $target): string => ($prefix . $target->url) === ''
+                ? './'
+                : $prefix . $target->url,
+        );
         $contents = $this->tableOfContents($document);
         $sourceUrl = $this->repositoryUrl . '/blob/' . $this->branch . '/' . $page->source;
 
@@ -193,34 +209,52 @@ final class SiteBuilder
     }
 
     /**
+     * The sidebar: one labelled list per navigation group, in the order
+     * {@see Navigation} gives them.
+     *
+     * The group labels are paragraphs, not headings. The navigation is already
+     * named for assistive technology by `aria-label`, and promoting a label to
+     * `<h2>` would put a level-2 heading above the page's own `<h1>`, breaking
+     * the document outline the accessibility audit checks. Each list is then
+     * pointed back at its label with `aria-labelledby`, so a screen reader
+     * announces "Running a site, list, 3 items" without a heading existing.
+     *
      * @param list<Page> $pages
+     * @param callable(Page): string $href Link to a page from wherever we are.
      */
-    private function navigation(array $pages, ?string $currentSource, string $prefix): string
+    private function navigation(array $pages, ?string $currentSource, callable $href): string
     {
-        $items = '';
+        $slugger = new Slugger();
+        $html = "<nav class=\"pages\" aria-label=\"Documentation pages\">\n";
+        $group = null;
+
         foreach ($pages as $page) {
-            $isCurrent = $page->source === $currentSource;
-            $href = $prefix . $page->url;
-            if ($href === '') {
-                $href = './';
+            if ($page->group !== $group) {
+                $html .= $group === null ? '' : "</ul>\n</div>\n";
+                $group = $page->group;
+                $id = 'nav-' . $slugger->slug($group);
+                $html .= "<div class=\"nav-group\">\n"
+                    . sprintf(
+                        "<p class=\"nav-heading\" id=\"%s\">%s</p>\n<ul aria-labelledby=\"%s\">\n",
+                        $this->escape($id),
+                        $this->escape($group),
+                        $this->escape($id),
+                    );
             }
+
             // aria-current is the machine-readable half of "you are here"; the
             // class is the visible half. Neither alone is enough.
-            $items .= sprintf(
+            $html .= sprintf(
                 "<li><a%s href=\"%s\">%s</a></li>\n",
-                $isCurrent ? ' class="current" aria-current="page"' : '',
-                $this->escape($href),
+                $page->source === $currentSource ? ' class="current" aria-current="page"' : '',
+                $this->escape($href($page)),
                 $this->escape($page->label),
             );
         }
 
-        // The visible label is a paragraph, not a heading: the navigation is
-        // already named for assistive technology by aria-label, and promoting it
-        // to <h2> would put a level-2 heading above the page's <h1>, breaking the
-        // document outline the accessibility audit checks.
-        return "<nav class=\"pages\" aria-label=\"Documentation pages\">\n"
-            . "<p class=\"nav-heading\">Documentation</p>\n"
-            . "<ul>\n" . $items . "</ul>\n</nav>";
+        $html .= $group === null ? '' : "</ul>\n</div>\n";
+
+        return $html . '</nav>';
     }
 
     private function tableOfContents(RenderedDocument $document): string
@@ -302,18 +336,11 @@ final class SiteBuilder
         $base = '/' . trim($this->basePath, '/');
         $base = $base === '/' ? '/' : $base . '/';
 
-        $items = '';
-        foreach ($pages as $page) {
-            $items .= sprintf(
-                "<li><a href=\"%s\">%s</a></li>\n",
-                $this->escape($base . $page->url),
-                $this->escape($page->label),
-            );
-        }
-
-        $navigation = "<nav class=\"pages\" aria-label=\"Documentation pages\">\n"
-            . "<p class=\"nav-heading\">Documentation</p>\n"
-            . "<ul>\n" . $items . "</ul>\n</nav>";
+        $navigation = $this->navigation(
+            $pages,
+            null,
+            static fn (Page $page): string => $base . $page->url,
+        );
 
         $body = "<h1>Not found</h1>\n"
             . "<p>There is no page at that address. It may have been renamed, or the link "
@@ -340,6 +367,18 @@ final class SiteBuilder
         $this->makeDirectory(dirname($target));
         if (file_put_contents($target, $contents) === false) {
             throw new RuntimeException("Could not write {$target}.");
+        }
+
+        return $relativePath;
+    }
+
+    /** Copies a screenshot in, byte for byte, so the site needs nothing outside itself. */
+    private function copy(string $outputDirectory, string $relativePath, string $sourcePath): string
+    {
+        $target = $outputDirectory . '/' . $relativePath;
+        $this->makeDirectory(dirname($target));
+        if (!copy($sourcePath, $target)) {
+            throw new RuntimeException("Could not copy {$sourcePath} to {$target}.");
         }
 
         return $relativePath;
