@@ -15,8 +15,13 @@ use Click\Cms\Domain\ValueObjects\Locale;
  * the domain rather than the reverse — swapping a backend must never require
  * touching domain or application code.
  *
- * Storage plugins return an implementation of this from their `storage.init`
- * hook, which is how the active backend is chosen at runtime.
+ * Which implementation runs is decided by {@see
+ * \Click\Cms\Infrastructure\Storage\StorageFactory} from `core.storage.backend`
+ * in configuration, not by a plugin. This docblock previously described a
+ * `storage.init` hook that plugins returned a backend from; that hook has never
+ * been fired by anything, so no third-party backend was ever reachable through
+ * it. Said plainly rather than left as an extension point that does not exist —
+ * and it is the reason adding a method to this interface broke nobody.
  */
 interface StorageInterface
 {
