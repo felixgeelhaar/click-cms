@@ -19,28 +19,62 @@ foreach ([
 }
 
 use Click\Cms\Application\Authentication\SessionStore;
+use Click\Cms\Application\Backup\BackupException;
+use Click\Cms\Application\Backup\BackupService;
+use Click\Cms\Application\Backup\BackupStore;
+use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
+use Click\Cms\Domain\Storage\StorageInterface;
+use Click\Cms\Infrastructure\Storage\StorageFactory;
 
 /**
- * Takes a downloadable backup of the whole site: every content document in every
- * language, the media metadata, and the uploaded media files.
+ * Takes a backup of the whole site: every content document in every type and
+ * every language, plus the uploaded media files.
  *
- * Administrator-only, and the reason is the whole point. A backup is not a view
- * of the published site — it is the entire content directory, which includes
- * unpublished drafts and every version an editor has not yet chosen to make
- * public. Handing that to an editor, let alone an anonymous caller, would leak
- * exactly the work draft-and-publish exists to keep private. So the capability
- * asked for is {@see Capability::ManageSettings}: the same administrator-only
- * gate the audit trail uses, for the same reason — it is the entire site, not
- * one editor's own work.
+ * ## What changed, and why it had to
+ *
+ * This plugin used to build its archive by walking the `content/` directory.
+ * That directory holds documents on exactly one of the four supported backends.
+ * On `sqlite`, `mysql`, `mariadb` and `postgres` the documents live in the
+ * database, so the archive contained the site's media, not one single content
+ * document — and wrote a manifest reporting success. A site backed up nightly
+ * for a year had a year of archives that would have restored an empty site.
+ *
+ * The export now goes through {@see StorageInterface::types()} and
+ * `findByType()`, which is the pair that makes "everything in this site"
+ * expressible without knowing what a site contains or which backend holds it.
+ * The archive is therefore backend-independent: one taken from SQLite restores
+ * onto flat files, and that portability is the feature rather than a side
+ * effect. {@see \Click\Cms\Application\Backup\BackupExporter} does the work; this
+ * plugin is the HTTP surface over it.
+ *
+ * ## Administrator-only, and the reason is the whole point
+ *
+ * A backup is not a view of the published site — it is every document the site
+ * holds, which includes unpublished drafts and the `user` records carrying
+ * password hashes. Handing that to an editor, let alone an anonymous caller,
+ * would leak exactly the work draft-and-publish exists to keep private, and the
+ * credentials besides. So the capability asked for is
+ * {@see Capability::ManageSettings}: the same administrator-only gate the audit
+ * trail uses, for the same reason — it is the entire site, not one editor's own
+ * work.
  *
  * The kernel's public allowlist needs no change to make this safe. That list is
- * deny-by-default: `GET /api/backup` is not named in it, so an unauthenticated
- * request is turned away with a 401 before this handler ever runs. The check
- * below is the second, finer gate the coarse guard cannot perform — it does not
+ * deny-by-default: none of these routes is named in it, so an unauthenticated
+ * request is turned away with a 401 before a handler ever runs. The check in each
+ * handler is the second, finer gate the coarse guard cannot perform — it does not
  * know a signed-in editor from a signed-in administrator — and is where
  * administrator-only is actually enforced.
+ *
+ * ## What this plugin deliberately does not do
+ *
+ * It does not restore. A restore writes over a live site and, on a site of any
+ * size, takes long enough that a browser or a proxy will give up in the middle of
+ * it — and "the restore was interrupted halfway" is the one outcome worse than
+ * the data loss it was repairing. `bin/click-backup.php --restore=` is where that
+ * lives, at a console, with a lock, with a verification pass that refuses a bad
+ * archive before touching anything.
  */
 class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
 {
@@ -71,12 +105,16 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
     public function hook_api_routes(array $params): array
     {
         return [
+            // Unchanged, and still the thing an administrator reaches for: a
+            // self-contained archive streamed as a download.
             'GET /api/backup' => [$this, 'handleBackup'],
+            'GET /api/backups' => [$this, 'handleList'],
+            'POST /api/backups' => [$this, 'handleCreate'],
         ];
     }
 
     /**
-     * Build the archive and stream it as a file download.
+     * Build an archive and stream it as a file download.
      *
      * Shaped exactly like core's own file serving ({@see CoreApiRoutes::serveMediaFile}):
      * the headers and bytes are emitted here, and the handler returns
@@ -84,24 +122,30 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
      * change to the plugin route mechanism is needed — a raw/binary download is
      * already expressible through it.
      *
+     * `?archive=<name>` hands back a retained archive instead of a fresh one.
+     * Retained archives keep their media in a shared pool, so they are cheap on
+     * disk and meaningless off this server; asking for one converts it to a
+     * self-contained archive on the way out. Without that, the nightly backups
+     * could never leave the machine they protect against losing.
+     *
      * @return array<string, mixed>
      */
     public function handleBackup(): array
     {
-        // The finer of the two gates. A backup contains unpublished drafts, so it
-        // is administrator-only; the kernel's deny-by-default guard has already
-        // refused an anonymous caller, but it cannot tell a signed-in editor from
-        // a signed-in administrator, and that distinction is the whole point here.
-        $user = $this->currentUser();
-        if ($user === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+        $refusal = $this->refuseUnlessAdministrator();
+        if ($refusal !== null) {
+            return $refusal;
         }
 
-        if (!Role::fromName($user['role'] ?? null)->can(Capability::ManageSettings)) {
-            return ['status' => 403, 'error' => 'You do not have permission to export a backup.'];
-        }
+        $requested = is_string($_GET['archive'] ?? null) ? (string) $_GET['archive'] : '';
 
-        $archivePath = $this->createArchive();
+        try {
+            $archivePath = $requested === ''
+                ? $this->createArchive()
+                : $this->createPortableCopy($requested);
+        } catch (BackupException $e) {
+            return ['status' => 400, 'error' => $e->getMessage()];
+        }
 
         // time()/date() are forbidden in the domain because the domain must have
         // no I/O and no clock; this is a plugin sending a response, not domain
@@ -112,8 +156,8 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
         header('Content-Disposition: attachment; filename="' . $downloadName . '"');
         header('Content-Length: ' . (string) filesize($archivePath));
         header('X-Content-Type-Options: nosniff');
-        // A backup is the whole site including drafts: it must never sit in a
-        // shared cache.
+        // A backup is the whole site including drafts and password hashes: it
+        // must never sit in a shared cache.
         header('Cache-Control: no-store, private');
 
         readfile($archivePath);
@@ -123,95 +167,186 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
     }
 
     /**
-     * Build a ZIP of everything under the content root and return its path.
+     * What backups are retained, newest first.
+     *
+     * An administrator cannot act on backups they cannot see. Each row says how
+     * many documents and media files the archive holds and which backend it came
+     * off — enough to notice that last night's backup contains eleven documents
+     * when the site has four hundred, which is the failure this feature was
+     * rebuilt after.
+     *
+     * @return array<string, mixed>
+     */
+    public function handleList(): array
+    {
+        $refusal = $this->refuseUnlessAdministrator();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
+        $config = $this->coreConfig();
+
+        return ['data' => [
+            'enabled' => $config->backupEnabled(),
+            'intervalHours' => $config->backupIntervalHours(),
+            'keep' => $config->backupKeep(),
+            'includeMedia' => $config->backupIncludeMedia(),
+            'maxMediaBytes' => $config->backupMaxMediaBytes(),
+            'poolBytes' => $this->store()->pool()->bytesUsed(),
+            'backups' => $this->store()->listing(),
+        ]];
+    }
+
+    /**
+     * Take a retained backup now, and apply retention.
+     *
+     * The same act the cron entry performs, so an administrator who has just made
+     * a large change does not have to wait for tonight. It is a POST because it
+     * writes: an archive appears, and older ones may be deleted by retention.
+     *
+     * Deliberately not gated on `core.backup.enabled`. That setting governs the
+     * *unattended* schedule — whether the site takes backups nobody asked for —
+     * and this is an administrator asking for one, in person.
+     *
+     * @return array<string, mixed>
+     */
+    public function handleCreate(): array
+    {
+        $refusal = $this->refuseUnlessAdministrator();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
+        try {
+            $result = $this->service()->takeBackup($this->coreConfig()->backupKeep());
+        } catch (BackupException $e) {
+            return ['status' => 500, 'error' => $e->getMessage()];
+        }
+
+        $manifest = $result['manifest'];
+
+        return ['data' => [
+            'name' => $result['name'],
+            'documents' => $manifest->documentCount(),
+            'media' => $manifest->mediaCount(),
+            // Surfaced rather than buried in the archive: a file the backup does
+            // not hold is the one thing an administrator must not discover for
+            // the first time while restoring.
+            'skippedMedia' => $manifest->skippedMedia,
+            'sourceBackend' => $manifest->sourceBackend,
+            'pruned' => $result['pruned'],
+        ]];
+    }
+
+    /* -------------------------------------------------------------- archives -- */
+
+    /**
+     * Build a self-contained archive of the whole site and return its path.
      *
      * Separated from {@see handleBackup} so it can be opened and inspected
-     * without going through HTTP: the caller streams what this produces.
+     * without going through HTTP: the caller streams what this produces. Media
+     * bytes go inside the ZIP rather than into the shared pool, because a
+     * download that referred to a pool the recipient does not have could not be
+     * restored anywhere — which is the only reason to download one.
      *
-     * @throws \RuntimeException when the archive cannot be created.
+     * @throws BackupException when the archive cannot be created.
      */
     public function createArchive(): string
     {
         $archivePath = tempnam(sys_get_temp_dir(), 'click-cms-backup') . '.zip';
 
-        $zip = new \ZipArchive();
-        if ($zip->open($archivePath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
-            throw new \RuntimeException('Unable to create the backup archive.');
-        }
-
-        $files = $this->collectContentFiles();
-
-        foreach ($files as $absolute => $entry) {
-            $zip->addFile($absolute, $entry);
-        }
-
-        // A manifest is cheap and makes the archive self-describing: what it is,
-        // when it was taken, and exactly which entries it should contain — so a
-        // truncated download is detectable rather than a silent partial backup.
-        $zip->addFromString('manifest.json', (string) json_encode([
-            'generator' => 'click-cms',
-            'generatedAt' => date('c'),
-            'contentRoot' => 'content',
-            'fileCount' => count($files),
-            'entries' => array_values($files),
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
-        $zip->close();
+        $this->service()->exportPortable($archivePath);
 
         return $archivePath;
     }
 
     /**
-     * Every file under the content root, mapped to its entry name in the archive.
+     * A self-contained copy of a retained archive, for downloading.
      *
-     * The list is a directory walk of the content root — never anything a caller
-     * supplied — so a request cannot steer it at another path. Each file's real
-     * location is then checked to sit inside the content root before it is added:
-     * a symlink pointing out of the tree resolves to a real path that is not
-     * under the root and is dropped, so a backup can never copy out whatever such
-     * a link aimed at.
-     *
-     * @return array<string, string> absolute path => archive entry name
+     * @throws BackupException when the name is not a retained archive, or the
+     *         archive fails verification — a corrupt backup faithfully converted
+     *         into a portable corrupt backup would be carried off-site and
+     *         trusted, which is worse than an error.
      */
-    private function collectContentFiles(): array
+    public function createPortableCopy(string $name): string
     {
-        $out = [];
+        $archivePath = tempnam(sys_get_temp_dir(), 'click-cms-backup') . '.zip';
 
-        $root = realpath($this->contentRoot());
-        if ($root === false || !is_dir($root)) {
-            return $out;
-        }
+        $this->service()->exportPortableCopy($name, $archivePath);
 
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::LEAVES_ONLY
-        );
-
-        foreach ($iterator as $file) {
-            if (!$file->isFile()) {
-                continue;
-            }
-
-            $absolute = $file->getRealPath();
-            if ($absolute === false || !str_starts_with($absolute, $root . DIRECTORY_SEPARATOR)) {
-                continue;
-            }
-
-            $relative = substr($absolute, strlen($root) + 1);
-            // Store under `content/` so the archive mirrors the installation
-            // layout and can be unpacked straight back over a content directory.
-            $out[$absolute] = 'content/' . str_replace(DIRECTORY_SEPARATOR, '/', $relative);
-        }
-
-        // A stable order makes two backups of the same content comparable.
-        ksort($out);
-
-        return $out;
+        return $archivePath;
     }
 
-    private function contentRoot(): string
+    /* --------------------------------------------------------------- wiring -- */
+
+    private function basePath(): string
     {
-        return $this->pluginManager->getBasePath() . '/content';
+        return $this->pluginManager->getBasePath();
+    }
+
+    private function coreConfig(): CoreConfig
+    {
+        return CoreConfig::load($this->basePath() . '/config/core.json');
+    }
+
+    private function store(): BackupStore
+    {
+        return new BackupStore($this->basePath() . '/data/backups');
+    }
+
+    /**
+     * The backup service, wired against the *configured* backend.
+     *
+     * Storage is built here from configuration rather than borrowed from the
+     * content service, and that is on purpose: an export must read the live
+     * documents from the backend the site is actually configured for, and the
+     * decorated service the rest of the application uses adds an audit record to
+     * every read path it fronts. A nightly backup is not an editorial act and
+     * should not fill the audit trail as though it were.
+     */
+    private function service(): BackupService
+    {
+        $config = $this->coreConfig();
+
+        return new BackupService(
+            $this->store(),
+            $this->storage($config),
+            $this->basePath() . '/content/media',
+            $config->storageBackend(),
+            $config->backupIncludeMedia(),
+            $config->backupMaxMediaBytes(),
+        );
+    }
+
+    private function storage(CoreConfig $config): StorageInterface
+    {
+        return StorageFactory::create($config, $this->basePath());
+    }
+
+    /* ---------------------------------------------------------- who is asking -- */
+
+    /**
+     * The finer of the two gates, applied identically by every route here.
+     *
+     * A backup contains unpublished drafts and password hashes, so it is
+     * administrator-only; the kernel's deny-by-default guard has already refused
+     * an anonymous caller, but it cannot tell a signed-in editor from a signed-in
+     * administrator, and that distinction is the whole point.
+     *
+     * @return array<string, mixed>|null the refusal, or null to proceed
+     */
+    private function refuseUnlessAdministrator(): ?array
+    {
+        $user = $this->currentUser();
+        if ($user === null) {
+            return ['status' => 401, 'error' => 'Not authenticated'];
+        }
+
+        if (!Role::fromName($user['role'] ?? null)->can(Capability::ManageSettings)) {
+            return ['status' => 403, 'error' => 'You do not have permission to export a backup.'];
+        }
+
+        return null;
     }
 
     /**
@@ -230,6 +365,6 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
             return null;
         }
 
-        return (new SessionStore($this->pluginManager->getBasePath() . '/data/sessions'))->user();
+        return (new SessionStore($this->basePath() . '/data/sessions'))->user();
     }
 }

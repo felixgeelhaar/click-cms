@@ -173,7 +173,13 @@ final class BackupExportTest extends TestCase
         $manifest = json_decode((string) $zip->getFromName('manifest.json'), true);
         $this->assertIsArray($manifest);
         $this->assertSame('click-cms', $manifest['generator'] ?? null);
-        $this->assertGreaterThanOrEqual(1, $manifest['fileCount'] ?? 0);
+        // The manifest used to carry a single `fileCount` over a directory walk.
+        // It now indexes documents and media separately, because they are
+        // restored differently and because a document count is the number that
+        // would have made the storage-independence bug visible: an archive of a
+        // database-backed site reported files and no documents at all.
+        $this->assertGreaterThanOrEqual(1, $manifest['counts']['documents'] ?? 0);
+        $this->assertSame(2, $manifest['formatVersion'] ?? null);
         $zip->close();
     }
 

@@ -1,7 +1,7 @@
 {
   "name": "Backup",
-  "description": "Download a ZIP export of the site's content, media and drafts",
-  "version": "1.0.0",
+  "description": "Back up and restore the whole site: every document on any storage backend, plus media, deduplicated and retained under data/backups",
+  "version": "2.0.0",
   "author": "Click CMS",
   "dependencies": [],
   "hooks": [
