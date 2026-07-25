@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Click\Cms\Tests\Unit\Docs;
 
+use ClickCms\Tools\Docs\DocumentDefect;
+use ClickCms\Tools\Docs\ImageAsset;
 use ClickCms\Tools\Docs\MarkdownRenderer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -231,7 +233,15 @@ final class MarkdownRendererTest extends TestCase
         $this->assertStringContainsString('href="https://example.test/b?style=flat&amp;logo=php"', $html);
     }
 
-    public function testImagesBecomeLinksSoTheSiteMakesNoExternalRequests(): void
+    // ------------------------------------------------------------------
+    // Images
+    //
+    // Two kinds, and the difference is the whole point. A screenshot in the
+    // repository is a picture and must be shown; a shields.io badge is a
+    // request to a third-party host and must never be made.
+    // ------------------------------------------------------------------
+
+    public function testARemoteImageStaysALinkSoTheSiteMakesNoExternalRequests(): void
     {
         $html = $this->render('![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4)');
 
@@ -240,6 +250,86 @@ final class MarkdownRendererTest extends TestCase
             '<a class="badge" href="https://img.shields.io/badge/PHP-8.1+-777BB4">PHP</a>',
             $html,
         );
+    }
+
+    /** Even on a page that does render local images, the badge is still a link. */
+    public function testARemoteImageStaysALinkEvenWhereLocalImagesRender(): void
+    {
+        $html = $this->renderWithImages(
+            "![Admin](images/admin.png)\n\n![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4)",
+        );
+
+        $this->assertSame(1, substr_count($html, '<img'));
+        $this->assertStringContainsString('class="badge" href="https://img.shields.io/', $html);
+    }
+
+    public function testALocalImageBecomesAnImgWithItsIntrinsicSize(): void
+    {
+        $html = $this->renderWithImages('Look at ![the dashboard](images/admin.png) closely.');
+
+        $this->assertStringContainsString(
+            '<img src="../assets/docs/images/admin.png" alt="the dashboard"'
+                . ' width="800" height="600" loading="lazy">',
+            $html,
+        );
+    }
+
+    public function testALocalImageOfUnknownSizeOmitsTheDimensions(): void
+    {
+        $html = $this->renderWithImages('Look at ![a diagram](images/plan.svg) closely.');
+
+        $this->assertStringContainsString('src="../assets/docs/images/plan.svg"', $html);
+        $this->assertStringNotContainsString('width=', $html);
+        $this->assertStringContainsString('loading="lazy"', $html);
+    }
+
+    public function testAnImageAloneInItsParagraphBecomesAFigureCaptionedWithItsAlt(): void
+    {
+        $html = $this->renderWithImages("Before.\n\n![The page list](images/admin.png)\n\nAfter.");
+
+        $this->assertStringContainsString('<figure class="image">', $html);
+        $this->assertStringContainsString('<figcaption>The page list</figcaption>', $html);
+        $this->assertStringNotContainsString('<p><img', $html);
+    }
+
+    public function testAnImageInASentenceIsNotTurnedIntoAFigure(): void
+    {
+        $html = $this->renderWithImages('The ![toolbar](images/admin.png) sits at the top.');
+
+        $this->assertStringNotContainsString('<figure', $html);
+        $this->assertStringContainsString('<p>The <img', $html);
+    }
+
+    /**
+     * An image with no alt text is invisible to a reader using a screen reader,
+     * which on a page whose argument *is* the screenshot means the page says
+     * nothing at all. The build refuses it rather than shipping it.
+     */
+    public function testAnImageWithoutAltTextIsRefused(): void
+    {
+        $this->expectException(DocumentDefect::class);
+        $this->expectExceptionMessageMatches('#images/admin\.png#');
+        $this->renderWithImages('![](images/admin.png)');
+    }
+
+    public function testARemoteImageWithoutAltTextIsRefusedToo(): void
+    {
+        $this->expectException(DocumentDefect::class);
+        $this->render('![](https://img.shields.io/badge/PHP-8.1+-777BB4)');
+    }
+
+    /** A renderer given no image resolver cannot know what is local: link it. */
+    private function renderWithImages(string $markdown): string
+    {
+        $renderer = new MarkdownRenderer(null, static function (string $destination): ?ImageAsset {
+            return match ($destination) {
+                'images/admin.png' => new ImageAsset('../assets/docs/images/admin.png', 800, 600),
+                'images/plan.svg' => new ImageAsset('../assets/docs/images/plan.svg', null, null),
+                default => null,
+            };
+        });
+
+        return $renderer->render($markdown)->html;
     }
 
     public function testBackslashEscapesPunctuation(): void

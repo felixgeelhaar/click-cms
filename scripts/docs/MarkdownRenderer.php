@@ -46,6 +46,9 @@ final class MarkdownRenderer
     /** Callback that turns a Markdown link destination into a site URL. */
     private \Closure $rewriteLink;
 
+    /** Callback that turns an image destination into a local asset, or null. */
+    private \Closure $resolveImage;
+
     private Slugger $slugger;
 
     /** @var list<array{level: int, text: string, id: string}> */
@@ -56,12 +59,20 @@ final class MarkdownRenderer
      *        HTML-escaped) destination of a link or image and returns the href
      *        to emit. Defaults to the identity, which is what the unit tests for
      *        pure Markdown behaviour want.
+     * @param (callable(string): ?ImageAsset)|null $resolveImage Receives an
+     *        image destination and returns the local asset it names, or null if
+     *        it names nothing this site can publish itself. Defaults to null for
+     *        everything: a renderer with no view of the repository cannot tell a
+     *        screenshot from a badge, so it links both rather than guessing.
      */
-    public function __construct(?callable $rewriteLink = null)
+    public function __construct(?callable $rewriteLink = null, ?callable $resolveImage = null)
     {
         $this->rewriteLink = $rewriteLink !== null
             ? \Closure::fromCallable($rewriteLink)
             : static fn (string $destination): string => $destination;
+        $this->resolveImage = $resolveImage !== null
+            ? \Closure::fromCallable($resolveImage)
+            : static fn (string $destination): ?ImageAsset => null;
         $this->slugger = new Slugger();
     }
 
@@ -525,7 +536,25 @@ final class MarkdownRenderer
             return '';
         }
 
-        return '<p>' . $this->renderInline(implode("\n", $buffer)) . '</p>';
+        $inline = $this->renderInline(implode("\n", $buffer));
+
+        return $this->figure($inline) ?? '<p>' . $inline . '</p>';
+    }
+
+    /**
+     * A paragraph that is nothing but an image is a figure, and its alt text is
+     * the caption. That is the difference between a screenshot dropped into a
+     * page and a screenshot the page can refer to — a caption under the picture
+     * is what makes a screenshot-led page readable. An image *inside* a sentence
+     * stays inside the sentence.
+     */
+    private function figure(string $inline): ?string
+    {
+        if (preg_match('/^<img [^>]*alt="([^"]*)"[^>]*>$/', $inline, $m) !== 1) {
+            return null;
+        }
+
+        return "<figure class=\"image\">\n" . $inline . "\n<figcaption>" . $m[1] . "</figcaption>\n</figure>";
     }
 
     /** @param list<string> $lines */
@@ -710,12 +739,13 @@ final class MarkdownRenderer
     /**
      * Links and images share bracket-matching, so they share a parser.
      *
-     * Images are deliberately rendered as links rather than `<img>` when their
-     * source is remote. The built site must make **no external requests of any
-     * kind**, and the only images in these docs are shields.io badges in the
-     * README; embedding them would put a third-party host in the critical path
-     * of a page that is otherwise entirely self-contained. The alt text becomes
-     * the link label, so nothing is hidden and nothing is fetched.
+     * An image that resolves to a file of this repository — a screenshot of the
+     * admin panel — becomes a real `<img>`, because a page written around a
+     * picture is not a page without it. Anything else becomes a labelled link:
+     * the built site must make **no external requests of any kind**, and the
+     * remote images in these docs are shields.io badges, which would otherwise
+     * put a third-party host in the critical path of a page that is entirely
+     * self-contained. Nothing is hidden either way, and nothing is fetched.
      *
      * @return array{0: string, 1: int}|null
      */
@@ -747,13 +777,7 @@ final class MarkdownRenderer
         $titleAttribute = $title !== null && $title !== '' ? ' title="' . $title . '"' : '';
 
         if ($isImage) {
-            $text = $this->plainText($this->inline($label));
-            $text = $text === '' ? $href : $text;
-
-            return [
-                '<a class="badge" href="' . $href . '"' . $titleAttribute . '>' . $this->escape($text) . '</a>',
-                $destEnd + 1,
-            ];
+            return [$this->image($label, $destination, $href, $titleAttribute), $destEnd + 1];
         }
 
         $external = preg_match('#^(?:https?:)?//#i', $href) === 1;
@@ -763,6 +787,42 @@ final class MarkdownRenderer
             '<a' . $class . ' href="' . $href . '"' . $titleAttribute . '>' . $this->inline($label) . '</a>',
             $destEnd + 1,
         ];
+    }
+
+    /**
+     * One image, as a picture if it is one of ours and as a link if it is not.
+     *
+     * The alt text is not optional. An image with none is invisible to a reader
+     * using a screen reader, and on a page whose argument *is* the screenshot
+     * that means the page says nothing at all — so the build stops rather than
+     * publishing it. `loading="lazy"` and the intrinsic size go on every local
+     * image: without the size the page reflows under the reader as each
+     * screenshot decodes.
+     */
+    private function image(string $label, string $destination, string $href, string $titleAttribute): string
+    {
+        $alt = $this->plainText($this->inline($label));
+        if ($alt === '') {
+            throw new DocumentDefect(sprintf(
+                'the image %s has no alt text. Every image on the documentation site needs '
+                    . 'a description; a screenshot without one is a blank space to anyone '
+                    . 'reading with a screen reader.',
+                html_entity_decode($destination, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            ));
+        }
+
+        $asset = ($this->resolveImage)($destination);
+        if ($asset === null) {
+            return '<a class="badge" href="' . $href . '"' . $titleAttribute . '>'
+                . $this->escape($alt) . '</a>';
+        }
+
+        $size = $asset->width !== null && $asset->height !== null
+            ? sprintf(' width="%d" height="%d"', $asset->width, $asset->height)
+            : '';
+
+        return '<img src="' . $this->escape($asset->src) . '" alt="' . $this->escape($alt) . '"'
+            . $size . ' loading="lazy"' . $titleAttribute . '>';
     }
 
     /** @return array{0: string, 1: int}|null */

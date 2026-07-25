@@ -196,6 +196,10 @@ main:focus {
   font-size: var(--step--1);
 }
 
+.nav-group + .nav-group {
+  margin-top: 1.5rem;
+}
+
 .nav-heading {
   margin: 0 0 0.5rem;
   font-size: 0.75rem;
@@ -240,8 +244,10 @@ main:focus {
 
 /*
  * Narrow screens: the page list becomes a single scrolling band under the
- * masthead — it scrolls inside itself, so the body never does — and the table
- * of contents becomes a bordered block above the article rather than falling to
+ * masthead — it scrolls inside itself, so the body never does — with each
+ * audience group a column of its own, so the labels survive the reflow instead
+ * of the nine pages collapsing back into one undifferentiated row. The table of
+ * contents becomes a bordered block above the article rather than falling to
  * the bottom of the document where nobody would find it.
  */
 @media (max-width: 61.999rem) {
@@ -249,13 +255,26 @@ main:focus {
     padding-top: 1.25rem;
   }
 
-  .pages ul {
+  .pages {
     display: flex;
-    gap: 1.1rem;
+    gap: 1.75rem;
     overflow-x: auto;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--rule);
     -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-group {
+    flex: 0 0 auto;
+  }
+
+  .nav-group + .nav-group {
+    margin-top: 0;
+  }
+
+  .pages ul {
+    display: flex;
+    gap: 1.1rem;
   }
 
   .pages a {
@@ -557,10 +576,46 @@ hr {
   margin: 2.5rem 0;
 }
 
+/* --------------------------------------------------------------- images */
+
 /*
- * Images in the source Markdown become links, never <img>: the only ones are
- * remote status badges, and this site makes no external requests. Rendered as a
- * quiet row of chips, which is what a badge row is trying to be anyway.
+ * Screenshots. Two things they must not do: overflow the measure the prose is
+ * set to, and float. A screenshot of the admin panel is a light interface on a
+ * light page and a light interface on a *dark* page, and in both cases the only
+ * thing separating the picture from the page is this border — without it the
+ * white chrome of the UI bleeds into the paper and the reader cannot tell where
+ * the screenshot ends. The border colour is a token, so it inverts with the
+ * theme; the raised background shows through anything transparent.
+ *
+ * `height: auto` is load-bearing next to the intrinsic width and height the
+ * build writes on every local image: the attributes reserve the right box before
+ * the file decodes, and this lets the box scale instead of stretching.
+ */
+.prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--paper-raised);
+}
+
+.prose figure.image {
+  margin: 1.6rem 0;
+}
+
+figure.image figcaption {
+  margin-top: 0.55rem;
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+/*
+ * A *remote* image is never an <img>: this site makes no external requests, and
+ * the only remote images in these docs are status badges. Rendered as a quiet
+ * row of chips, which is what a badge row is trying to be anyway.
  */
 .badge {
   display: inline-block;

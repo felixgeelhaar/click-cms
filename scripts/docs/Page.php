@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace ClickCms\Tools\Docs;
 
 /**
- * One page of the site, and the four facts every other part of the build needs
- * about it: where its Markdown comes from, where its HTML goes, what URL that
- * is, and how deep the URL sits so relative links can be counted back to the
- * site root.
+ * One page of the site, and the facts every other part of the build needs about
+ * it: where its Markdown comes from, where its HTML goes, what URL that is, how
+ * deep the URL sits so relative links can be counted back to the site root, and
+ * which section of the navigation it belongs to.
  */
 final class Page
 {
@@ -19,6 +19,7 @@ final class Page
      *                           landing page, which is the site root itself.
      * @param int    $depth      Directories below the site root the output sits in.
      * @param string $label      Short name for the navigation.
+     * @param string $group      Navigation group label, from {@see Navigation}.
      */
     public function __construct(
         public readonly string $source,
@@ -26,6 +27,7 @@ final class Page
         public readonly string $url,
         public readonly int $depth,
         public readonly string $label,
+        public readonly string $group,
     ) {
     }
 

@@ -52,23 +52,40 @@ final class SiteBuilderTest extends TestCase
 
     /**
      * The docs directory is globbed, never listed in code. A page written on a
-     * branch by somebody else has to appear without this file being touched.
+     * branch by somebody else has to appear without this file being touched —
+     * the navigation manifest sets the order, and a document missing from it is
+     * unranked, never invisible.
      */
     public function testADocumentNobodyRegisteredStillAppears(): void
     {
         $this->fixture();
         file_put_contents(
-            $this->workspace . '/repo/docs/backup.md',
-            "# Backup and restore\n\nA ZIP export of content, media and drafts.\n",
+            $this->workspace . '/repo/docs/telemetry.md',
+            "# Telemetry\n\nA page nobody added to the navigation manifest.\n",
         );
 
         $written = $this->build();
+        $html = $this->read('core/index.html');
 
-        $this->assertContains('backup/index.html', $written);
+        $this->assertContains('telemetry/index.html', $written);
         $this->assertStringContainsString(
-            '<li><a href="../backup/">Backup</a></li>',
-            $this->read('core/index.html'),
+            '<li><a href="../telemetry/">Telemetry</a></li>',
+            $html,
         );
+        $this->assertStringContainsString('>More</p>', $html, 'The fallback heading is missing.');
+    }
+
+    /**
+     * The manifest names the editor-facing pages before they are written. An
+     * entry with no file behind it is a page not written yet, not an error.
+     */
+    public function testAManifestEntryWithNoFileDoesNotBreakTheBuild(): void
+    {
+        $this->fixture();
+        $written = $this->build();
+
+        $this->assertContains('index.html', $written);
+        $this->assertStringNotContainsString('>Pages</a>', $this->read('index.html'));
     }
 
     public function testUrlsAreClean(): void
@@ -122,6 +139,34 @@ final class SiteBuilderTest extends TestCase
         $this->assertStringContainsString('<li><a href="../core/">Core</a></li>', $this->read('install/index.html'));
         $this->assertStringContainsString('href="style.css"', $this->read('index.html'));
         $this->assertStringContainsString('href="../style.css"', $this->read('install/index.html'));
+    }
+
+    public function testNavigationIsGroupedByAudienceInManifestOrder(): void
+    {
+        $this->fixture();
+        $this->build();
+        $html = $this->read('core/index.html');
+
+        preg_match_all('/<p class="nav-heading" id="nav-[a-z-]+">([^<]+)<\/p>/', $html, $matches);
+        $this->assertSame(['Start here', 'Running a site', 'Building on it'], $matches[1]);
+    }
+
+    /**
+     * The group labels name their lists for assistive technology without being
+     * headings — a level-2 heading here would sit above the page's own h1.
+     */
+    public function testGroupLabelsNameTheirListsWithoutBecomingHeadings(): void
+    {
+        $this->fixture();
+        $this->build();
+        $html = $this->read('core/index.html');
+
+        $this->assertStringContainsString(
+            '<p class="nav-heading" id="nav-running-a-site">Running a site</p>',
+            $html,
+        );
+        $this->assertStringContainsString('<ul aria-labelledby="nav-running-a-site">', $html);
+        $this->assertStringNotContainsString('<h2>Running a site</h2>', $html);
     }
 
     public function testEachPageHasATableOfContentsFromItsOwnHeadings(): void
@@ -214,6 +259,100 @@ final class SiteBuilderTest extends TestCase
         $this->assertStringContainsString('--paper', $css);
         $this->assertStringContainsString(':focus-visible', $css);
         $this->assertStringContainsString('overflow-x: auto', $css);
+    }
+
+    // ------------------------------------------------------------------
+    // Screenshots
+    // ------------------------------------------------------------------
+
+    public function testAScreenshotIsCopiedIntoTheSiteAndShownAsAPicture(): void
+    {
+        $this->fixture();
+        $this->screenshot();
+        $written = $this->build();
+
+        $this->assertContains('assets/docs/images/dashboard.png', $written);
+        $this->assertStringContainsString(
+            '<img src="../assets/docs/images/dashboard.png" alt="The page list"'
+                . ' width="640" height="400" loading="lazy">',
+            $this->read('install/index.html'),
+        );
+    }
+
+    public function testACopiedScreenshotIsTheSameFileByteForByte(): void
+    {
+        $this->fixture();
+        $this->screenshot();
+        $this->build();
+
+        $this->assertSame(
+            hash_file('sha256', $this->workspace . '/repo/docs/images/dashboard.png'),
+            hash_file('sha256', $this->out() . '/assets/docs/images/dashboard.png'),
+        );
+    }
+
+    public function testAScreenshotOnItsOwnBecomesACaptionedFigure(): void
+    {
+        $this->fixture();
+        $this->screenshot();
+        $this->build();
+
+        $this->assertStringContainsString('<figure class="image">', $this->read('install/index.html'));
+        $this->assertStringContainsString(
+            '<figcaption>The page list</figcaption>',
+            $this->read('install/index.html'),
+        );
+    }
+
+    /** The badge row in the README must not start fetching anything. */
+    public function testRemoteBadgesStillRenderAsLinksOnASiteThatHasImages(): void
+    {
+        $this->fixture();
+        $this->screenshot();
+        file_put_contents(
+            $this->workspace . '/repo/README.md',
+            "# Click CMS\n\n![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4)\n\nA flat-file CMS.\n",
+        );
+        $this->build();
+        $html = $this->read('index.html');
+
+        $this->assertStringNotContainsString('<img', $html);
+        $this->assertStringContainsString('<a class="badge" href="https://img.shields.io/', $html);
+    }
+
+    public function testAnImageWithoutAltTextFailsTheBuildNamingTheFileAndTheImage(): void
+    {
+        $this->fixture();
+        $this->screenshot('![](images/dashboard.png)');
+
+        $this->expectExceptionMessageMatches('#docs/install\.md.*images/dashboard\.png#s');
+        $this->build();
+    }
+
+    public function testAScreenshotThatIsNotThereFailsTheBuild(): void
+    {
+        $this->fixture();
+        file_put_contents(
+            $this->workspace . '/repo/docs/install.md',
+            "# Installing Click CMS\n\n![The page list](images/absent.png)\n",
+        );
+
+        $this->expectExceptionMessageMatches('#docs/install\.md.*docs/images/absent\.png#s');
+        $this->build();
+    }
+
+    public function testTwoBuildsWithScreenshotsAreByteIdentical(): void
+    {
+        $this->fixture();
+        $this->screenshot();
+
+        $first = $this->workspace . '/out-1';
+        $second = $this->workspace . '/out-2';
+        $builder = new SiteBuilder($this->workspace . '/repo');
+        $builder->build($first);
+        $builder->build($second);
+
+        $this->assertSame($this->fingerprint($first), $this->fingerprint($second));
     }
 
     // ------------------------------------------------------------------
@@ -410,6 +549,23 @@ final class SiteBuilderTest extends TestCase
 
             Rendered pages are stored as flat files.
             MD);
+    }
+
+    /**
+     * Adds a screenshot to the fixture repository and references it from
+     * `docs/install.md`, the way a page written around a picture would.
+     */
+    private function screenshot(string $reference = '![The page list](images/dashboard.png)'): void
+    {
+        mkdir($this->workspace . '/repo/docs/images', 0o755, true);
+        file_put_contents(
+            $this->workspace . '/repo/docs/images/dashboard.png',
+            ImageLibraryTest::pngBytes(640, 400),
+        );
+        file_put_contents(
+            $this->workspace . '/repo/docs/install.md',
+            "# Installing Click CMS\n\n## Requirements\n\nPHP 8.1 or newer.\n\n{$reference}\n",
+        );
     }
 
     /** @return list<string> */
