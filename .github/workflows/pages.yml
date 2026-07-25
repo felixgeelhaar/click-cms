@@ -93,14 +93,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release list --limit 100 --json tagName,isDraft,isPrerelease,body \
-            --jq '[ .[] | select(.isDraft | not) | {
-                  version: (.tagName | ltrimstr("v")),
-                  packageUrl: ("https://github.com/${{ github.repository }}/releases/download/" + .tagName + "/click-cms-" + (.tagName | ltrimstr("v")) + ".zip"),
-                  security: (.body // "" | test("\\[security\\]"; "i")),
-                  notes: (.body // "" | split("\n")[0]),
-                  requiresPhp: "8.1"
-                } ]' > releases-raw.json
+          set -euo pipefail
+          # `gh release list --json` cannot return a release body — the field
+          # does not exist on that command, and asking for it is a hard error.
+          # This went unnoticed because the only thing that ever ran it was a
+          # workflow nobody had triggered yet. The REST endpoint does return
+          # `body`, which is where the [security] marker lives, and without it
+          # no release could ever be flagged as a security release.
+          #
+          # Fetched whole and filtered once rather than with --paginate --jq,
+          # which applies the filter per page and would emit several arrays.
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > releases-api.json
+
+          jq '[ .[] | select(.draft | not) | {
+                version: (.tag_name | ltrimstr("v")),
+                packageUrl: ("https://github.com/${{ github.repository }}/releases/download/" + .tag_name + "/click-cms-" + (.tag_name | ltrimstr("v")) + ".zip"),
+                security: (.body // "" | test("\\[security\\]"; "i")),
+                notes: (.body // "" | split("\n")[0]),
+                requiresPhp: "8.1"
+              } ]' releases-api.json > releases-raw.json
+
+          echo "$(jq 'length' releases-raw.json) published release(s) before checksum filtering"
 
       - name: Add each package's checksum
         run: |
