@@ -40,7 +40,31 @@ final class PageShell
         private string $head,
         private string $header,
         private string $stylesheetUrl = '/theme.css',
+        /**
+         * The page's own name, rendered as the document's one `<h1>`.
+         *
+         * Every public page had none: the title lived only in `<title>`, so a
+         * rendered page opened at heading level two with nothing above it. For
+         * anyone navigating by headings that is a document with no name, and it
+         * is the first thing an accessibility check reports.
+         *
+         * Optional and empty by default so a caller that has no title — the
+         * not-found page — emits no empty heading rather than an anonymous one.
+         */
+        private string $title = '',
     ) {
+    }
+
+    /** The document's one `<h1>`, or nothing when the caller supplied no title. */
+    private function pageHeading(): string
+    {
+        if (trim($this->title) === '') {
+            return '';
+        }
+
+        return '<h1 class="cms-page-title">'
+            . htmlspecialchars($this->title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            . '</h1>';
     }
 
     /**
@@ -63,7 +87,7 @@ final class PageShell
     <link rel="stylesheet" href="' . htmlspecialchars($this->stylesheetUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">
 </head>
 <body>
-    ' . $this->header . '<main>' . $body . '</main>
+    ' . $this->header . '<main>' . $this->pageHeading() . $body . '</main>
 </body>
 </html>';
     }

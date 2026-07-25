@@ -775,6 +775,8 @@ class Application
             $head,
             $this->renderSiteHeader($href, $served),
             $stylesheet,
+            // Escaped by the shell, so the raw title goes in.
+            $title,
         );
 
         $renderer = new SectionRenderer(
@@ -1147,7 +1149,7 @@ class Application
             ? $this->themes->stylesheetUrl($theme)
             : '/theme.css';
 
-        $shell = new \Click\Cms\Http\PageShell($lang, $head, $nav, $stylesheet);
+        $shell = new \Click\Cms\Http\PageShell($lang, $head, $nav, $stylesheet, $page->title());
 
         // A plugin may take over rendering. The builder wraps its node tree in the
         // shell above, so the page keeps nav, SEO and theme; a full theme is free

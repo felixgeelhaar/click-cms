@@ -349,8 +349,12 @@ final class SectionRenderer
      *                         which is a link's text on a Url and a picture's
      *                         description on an Image
      */
-    private function renderField(FieldDefinition $field, mixed $value, ?string $wording = null): string
-    {
+    private function renderField(
+        FieldDefinition $field,
+        mixed $value,
+        ?string $wording = null,
+        bool $inRow = false,
+    ): string {
         return match ($field->type) {
             FieldType::Repeater => $this->renderRepeater($field, $value),
             FieldType::Image => $this->renderImage($field, $value, $wording ?? ''),
@@ -367,12 +371,16 @@ final class SectionRenderer
             // of its own and how deep to follow the chain; until this renderer is
             // given that, saying nothing is the honest output.
             FieldType::Reference => '',
-            default => $this->renderScalar($field, $value, $wording),
+            default => $this->renderScalar($field, $value, $wording, $inRow),
         };
     }
 
-    private function renderScalar(FieldDefinition $field, mixed $value, ?string $linkText = null): string
-    {
+    private function renderScalar(
+        FieldDefinition $field,
+        mixed $value,
+        ?string $linkText = null,
+        bool $inRow = false,
+    ): string {
         if (!is_scalar($value) || (string) $value === '') {
             return '';
         }
@@ -388,9 +396,12 @@ final class SectionRenderer
             return $byRole;
         }
 
-        // The first text field of a section reads as its heading.
+        // The first text field of a section reads as its heading — at level two
+        // in a section, level three inside one of its rows.
         if ($field->name === 'heading' || $field->name === 'title') {
-            return '<h2 class="' . $class . '">' . $text . '</h2>';
+            $level = $inRow ? 'h3' : 'h2';
+
+            return '<' . $level . ' class="' . $class . '">' . $text . '</' . $level . '>';
         }
 
         if ($field->type === FieldType::Url) {
@@ -755,7 +766,11 @@ final class SectionRenderer
                     }
                 }
 
-                $inner .= $this->renderField($sub, $row[$sub->name], $wording);
+                // Inside a row, so a level below the section's own heading. Every
+                // row title used to be an `<h2>` — a sibling of the heading that
+                // introduced it — which made a page of cards read as a flat list
+                // of equal headings to anything following the outline.
+                $inner .= $this->renderField($sub, $row[$sub->name], $wording, inRow: true);
             }
 
             if (trim($inner) !== '') {

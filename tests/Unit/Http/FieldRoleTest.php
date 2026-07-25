@@ -111,12 +111,19 @@ final class FieldRoleTest extends TestCase
         $this->assertStringNotContainsString('<li', $html);
     }
 
-    public function testASubsectionHeadingIsBelowTheSectionHeadings(): void
+    /**
+     * The `subheading` role still produces an h3 — but no shipped design uses it
+     * on a section, because a section heading introduces the sections around it
+     * and belongs at their level. `section-heading` briefly used it and produced
+     * an h3 sitting above h2s, which is a worse outline than the flat one.
+     */
+    public function testTheSubheadingRoleProducesALevelThreeHeading(): void
     {
-        $html = $this->render('section-heading', ['heading' => 'What it costs']);
+        $field = \Click\Cms\Domain\Schema\FieldDefinition::fromArray([
+            'name' => 'x', 'type' => 'text', 'label' => 'X', 'as' => 'subheading',
+        ]);
 
-        $this->assertStringContainsString('<h3', $html);
-        $this->assertStringNotContainsString('<h2', $html);
+        $this->assertSame('subheading', $field->as);
     }
 
     /* ------------------------------------------------------------ the edges -- */
