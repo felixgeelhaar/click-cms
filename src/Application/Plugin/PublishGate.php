@@ -89,6 +89,7 @@ final class PublishGate
         self::$ambient = $gate;
     }
 
+
     /**
      * Why this publish must not happen, or null to let it through.
      *
