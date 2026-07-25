@@ -848,7 +848,13 @@ final class CoreApiRoutes
      */
     public function serveMediaFile(string $filename): array
     {
-        $path = $this->media()->pathForFile($filename);
+        // `?w=` asks for a width the ladder may not hold. The width is snapped to
+        // a fixed set before anything is rendered — an unbounded width parameter
+        // is a denial-of-service vector, since each distinct value would cost a
+        // decode, a resample and a cache entry. An absent or nonsensical value
+        // simply serves the original.
+        $transform = \Click\Cms\Domain\Media\TransformRequest::fromQuery($_GET['w'] ?? null);
+        $path = $this->media()->pathForFileAtWidth($filename, $transform);
 
         if ($path === null) {
             return ['status' => 404, 'error' => 'File not found'];
