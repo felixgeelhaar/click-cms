@@ -39,6 +39,13 @@
     "media": {
       "crops": []
     },
+    "backup": {
+      "enabled": false,
+      "intervalHours": 24,
+      "keep": 7,
+      "includeMedia": true,
+      "maxMediaBytes": 536870912
+    },
     "marketplace": {
       "enabled": true,
       "registryUrl": "https://felixgeelhaar.github.io/click-cms-marketplace/registry.json",
@@ -46,8 +53,8 @@
     },
     "updates": {
       "policy": "security",
-      "feedUrl": "",
-      "publicKey": "",
+      "feedUrl": "https://felixgeelhaar.github.io/click-cms/feed.json",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAqYybtwQuGJda/p6XhkO+\nRVBqVxHbFb4crAHuhmn+YFZZH+y0r2qwsXL5hsilPqvGGbI9jS7Q5gaXtVVCNVyO\nOlgcvOD11dZgK69CjDQdZ7zIK1gaRB30KUMZbC+X6gn0Drhs+v1wtt60gsyERGJ8\nTWu3A5dhXvuMKNWpSDL3ClPRLeXHwfLDYQJwd+pYZ2InTmSfsl5Kb5c9NO0SYoD9\n9IH+37KJqPK167fITIaze3e1riN0JH2Fb2Sw+l0uaKdB8Ze8Mqz7J2nHCn7ZX6k2\nvVJgloYKmiQTnbTj3+zWEOZVkvfcVjjC93M4JPHnaHXHoc+3YFOLnTFKEdRH9Zdo\nsf8iPx4HZtMBwkm0hBB69TF/OZkw5iRqWdBL1EID3AnyL/5fdhxvU7XIhBLB8LJ5\nngyhdC7a5hcZIEXSQNQ3jmJIqwhCgLd7jk4svZBXiHPzk3McEMfAnCrMQ+cFrsNL\nVep84UNbrXcYJoDSoMawb85v+jMMdyou+5B6sPssEjiVx7EVpif/KqRYXSE+C2q8\n4wzxtHcrZz1Yt10I9UzF00r8l/ZJgofswBia4/1Wct/tfLEp4hiPUp/EtUx07FyA\nPM3aNonccFYpzlB3wxeJY+jeXbFUHky8tedfOm8f1EASE9SCGZerDZMza9HqTAWS\nq23J1FgBy9r/widmYD38gfcCAwEAAQ==\n-----END PUBLIC KEY-----",
       "allowPreRelease": false
     },
     "plugins": {

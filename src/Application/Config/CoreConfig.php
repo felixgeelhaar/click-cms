@@ -474,6 +474,69 @@ final class CoreConfig
         return $this->bool('core.updates.allowPreRelease', false);
     }
 
+    /* ------------------------------------------------------------- backup -- */
+
+    /**
+     * Whether the site takes scheduled backups at all, under `core.backup.enabled`.
+     *
+     * Off by default. A backup nobody asked for is a directory that grows every
+     * night on a host whose disk quota the CMS knows nothing about, and the first
+     * anyone hears of it is the site failing to write a page because the volume
+     * is full. Taking backups is a decision with a cost, so it is made on
+     * purpose. Nothing here affects the administrator's on-demand download, which
+     * has always been available and writes nothing to the site.
+     */
+    public function backupEnabled(): bool
+    {
+        return $this->bool('core.backup.enabled', false);
+    }
+
+    /**
+     * How long between scheduled backups. Never below an hour, whatever the file
+     * says: a cron line and an interval of zero would produce archives as fast as
+     * the machine can write them.
+     */
+    public function backupIntervalHours(): int
+    {
+        return max(1, $this->int('core.backup.intervalHours', 24));
+    }
+
+    /**
+     * How many archives are retained.
+     *
+     * Never below one. Zero would mean retention deleting the backup it has just
+     * taken, which is not a configuration anybody wants and is an easy thing to
+     * type. A week by default: long enough that a Friday mistake is still
+     * recoverable on Monday, short enough to be a bounded amount of disk.
+     */
+    public function backupKeep(): int
+    {
+        return max(1, $this->int('core.backup.keep', 7));
+    }
+
+    /** Whether uploaded files are backed up alongside the documents. */
+    public function backupIncludeMedia(): bool
+    {
+        return $this->bool('core.backup.includeMedia', true);
+    }
+
+    /**
+     * The largest single media file a backup will take, in bytes.
+     *
+     * Anything above it is *recorded as skipped in the manifest*, never silently
+     * omitted — a backup that quietly dropped the 2 GB video is the failure this
+     * whole feature was rebuilt to prevent, and a size ceiling is the obvious
+     * place to reintroduce it.
+     *
+     * 512 MB by default, which is above the CMS's own upload ceiling for video
+     * and therefore skips nothing on a site whose media arrived through the CMS.
+     * Zero or less means no ceiling.
+     */
+    public function backupMaxMediaBytes(): int
+    {
+        return $this->int('core.backup.maxMediaBytes', 512 * 1024 * 1024);
+    }
+
     /* ------------------------------------------------------------ plugins -- */
 
     /**
