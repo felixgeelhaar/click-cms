@@ -202,15 +202,29 @@ Everything else you rely on with pages is here too:
 - **Version history**, below the fields, with every save timestamped and a
   **Restore** button on the older ones. Restoring changes your working copy, not
   the live entry — *the live entry is unchanged until you publish*.
-- **Preview**, which mints a link showing the draft, so you can hand it to
-  somebody before it goes live.
 - **Delete**, which is the one that is not easily undone. It asks *Delete this
   entry? This cannot be undone.* If you want an entry off the public site but
   kept, **Unpublish** it instead.
 
+What is *not* here is a comments box. Pages have one for leaving a note to
+whoever reviews them; entries do not.
+
+### Looking at an entry before it is published
+
+Put `/preview/` in front of the address the entry will have, and open it while
+you are signed in. A post destined for `/blog/its-name` is readable now at
+`/preview/blog/its-name`, rendered as a visitor would see it, showing what you
+last saved. Signed out, that address answers *page not found*.
+
+This is the answer for an **author**, who can write an entry and not publish it:
+save, and send that address to whoever approves. The full explanation, including
+what the entry editor's own **Preview** button does instead — it hands back the
+entry as data, for a separate website rather than for reading — is in
+[Showing an unpublished entry to somebody](publishing.md#showing-an-unpublished-entry-to-somebody).
+
 If your account cannot publish — see
-[What your account can do](roles.md#author) — the buttons are not there, and the
-strip tells you to ask. Save, and say it is ready.
+[What your account can do](roles.md#author) — the publishing buttons are not
+there, and the strip tells you to ask. Save, and say it is ready.
 
 ## Where entries appear on the public site
 
@@ -224,14 +238,15 @@ There is a section design called **Collection list**. Put it on a page, choose
 which collection it should show, and it lists the published entries — each one's
 title, its summary, its picture, linked to the entry itself.
 
-It has four settings:
+It has five settings, and only one of them is required:
 
 | | |
 |---|---|
-| **Collection** | Which one to list — *Blog posts* or *Team members* |
-| **Introduction** | Optional words above the list |
-| **How many** | At most this many entries. Six by default |
-| **Order** | Newest first, oldest first, by title, or the collection's own order |
+| **Heading** | Optional words above the list |
+| **Introduction** | Optional, a sentence or two under the heading |
+| **Collection** | **Required.** Which one to list — *Blog posts* or *Team members* |
+| **How many entries** | The newest ones, up to this many. Six by default, fifty at the most |
+| **Order** | The collection's own order, newest first, oldest first, or by title. *Newest* and *oldest* go by when an entry was last edited; the collection's own order is what it declares for itself, which for blog posts is their date |
 
 On the example site the **Journal** page carries one, which is why publishing a
 post makes it appear there without you touching the page.
@@ -260,9 +275,11 @@ a collection that exists to be shown *inside* other pages.
 
 ### What you can rely on
 
-- **A draft is never readable.** An unpublished entry at its own address returns
-  "page not found" — the same response as an address that never existed, so
-  nobody can tell from the outside that a draft is there at all.
+- **A draft is never readable at its own address.** An unpublished entry there
+  returns "page not found" — the same response as an address that never existed,
+  so nobody can tell from the outside that a draft is there at all. The
+  [`/preview/` address](#looking-at-an-entry-before-it-is-published) is the one
+  deliberate exception, and it opens only for somebody signed in.
 - **A page always wins.** If a page and a collection ever want the same address,
   the page keeps it. Turning on an address for a collection can never take a URL
   away from a page you already have.

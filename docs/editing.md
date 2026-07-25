@@ -95,104 +95,138 @@ from an empty section.
 
 ## Which design does what
 
-Choosing a design should not be guesswork, so here is what each of the six that
-ship with the example site is for. Your site may have others, added when it was
-built; the ones below are the common set.
+Sixteen designs ship with the example site. That is more than anybody wants to
+read through, so they are grouped below by **what you are trying to do**. Find
+the group, scan the middle column until something matches the job, and stop.
 
-### Rich text
+Your own site may have fewer of these, or others added when it was built. The
+**Choose a design…** dropdown is the true list; these are what comes in the box.
 
-*A heading and a block of formatted text.* The workhorse. Use it for anything
-that is mostly words — a paragraph of explanation, a list of opening hours, a
-short story about the business.
+Two things about the right-hand column, which lists the fields you will be asked
+for:
 
-- **Heading** — optional. Leave it empty when the text follows on from the
-  section above.
-- **Body** — **required**. Formatted text, with the toolbar described
-  [below](#formatting-text).
-- **Width** — how wide the text runs: **narrow**, **wide** or **full**. Narrow is
-  the default and the right answer for reading; a long line of text is tiring to
-  follow. Reach for wide or full only when the content is not prose.
+- **A field in bold is required.** The section will not save without it — see
+  [Required fields](#required-fields-and-the-red-asterisk).
+- Where a design holds a **repeating list**, the fields of one row are named
+  after the word *each*, with how many rows are allowed in brackets.
 
-### Media and text
+### Say something
 
-*An image beside a block of text.* Use it when a picture and some words explain
-each other — a photograph of a workshop next to a description of what happens in
-it.
+For words on a page.
 
-- **Heading** and **Body** — both optional.
-- **Image** — **required**. This design is about the picture; without one, use
-  Rich text instead.
-- **Image description** — *describes the image for screen readers and when it
-  fails to load.* Worth thirty seconds. See
-  [Pictures and video](pictures.md#write-a-description-this-one-matters).
-- **Image position** — **left** or **right**. If you have several of these
-  sections in a row, alternating left and right stops the page looking like a
-  form.
+| Design | Reach for it when | Fields |
+|---|---|---|
+| **Rich text** | You have a paragraph, an explanation, a story about the business. The workhorse. | Heading, **Body**, Width: narrow, wide or full |
+| **Heading and lead-in** | A long page needs breaking into parts, with a sentence or two introducing what follows. | **Heading**, Lead-in |
+| **Media and text** | A picture and some words explain each other — the workshop floor beside a description of what happens on it. | Heading, Body, **Image**, Image description, Image position: left or right |
+| **Quote** | Somebody said something good about you and you want it in their words. | **The words**, **Said by**, Role or company, Portrait, Portrait description |
 
-### Card grid
+### Show something
 
-*A repeating grid of cards, each with a title, text and optional image.* Use it
-for a set of similar small things: services, product types, frequently-asked
-questions, the people on your team.
+For pictures, film and figures.
 
-- **Heading** and **Introduction** — optional, above the grid.
-- **Columns** — **2**, **3** or **4** cards across. Three is the default. Choose
-  based on how many cards you have: four cards in three columns leaves one alone
-  on the second row.
-- **Cards** — a repeating list, at least one and at most twelve. Each card has a
-  **Title** (**required**), some **Text**, an **Image**, and a **Link**.
+| Design | Reach for it when | Fields |
+|---|---|---|
+| **Gallery** | You have several pictures and little to say about each one — finished work, an event, a place. | Heading, Intro text, Columns: 2, 3 or 4, then each picture: **Picture**, Caption (1 to 24) |
+| **Video** | You have a film to put on the page. | Heading, **Video**, Still frame, Caption |
+| **Logos and accreditations** | You want to show partner, association or certification marks in a strip. | Heading, Columns: 2, 3 or 4, then each mark: **Mark**, **Name**, Link (1 to 24) |
+| **Facts** | There are numbers a visitor should notice: a founding year, a count, a standard you meet. | Heading, then each figure: **Figure**, **Caption** (1 to 6) |
 
-If you find yourself wanting a thirteenth card, or cards that need their own
-addresses, what you actually want is a [collection](collections.md).
+### List something
 
-### Facts
+For a set of things that are all the same shape as each other.
 
-*A row of figures with captions.* Numbers you want a visitor to notice: a
-founding year, a count, a certification.
+| Design | Reach for it when | Fields |
+|---|---|---|
+| **Card grid** | You have a set of similar small things: services, product types, places you work. | Heading, Introduction, Columns: 2, 3 or 4, then each card: **Title**, Text, Image, Link (1 to 12) |
+| **Details list** | You have pairs of label and value: opening hours, contact details, specifications. | Heading, Intro text, then each row: **Label**, **Value** (1 to 24) |
+| **Questions and answers** | You are asked the same questions over and over and would rather answer them once. | Heading, Intro text, then each question: **Question**, **Answer** (1 to 24) |
+| **People** | You want to introduce your team, with photographs and a line each. | Heading, Intro text, Columns: 2, 3 or 4, then each person: Photograph, **Name**, Role, Short biography, Email address (1 to 24) |
+| **Prices and plans** | You want what you offer and what it costs set out side by side. | Heading, Introduction, Columns: 2, 3 or 4, then each plan: **Plan name**, **Price**, Who it is for, What is included, Highlight this plan (1 to 4), then Button label, Button link |
+| **Collection list** | The things you want listed are blog posts or team members — a [collection](collections.md), which the site lists for you. | Heading, Introduction, **Collection**, How many entries, Order |
 
-- **Heading** — optional.
-- **Figures** — a repeating list, at least one and at most six. Each has a
-  **Figure** (**required** — *for example 2013, 50+, ISO 9001*) and a **Caption**
-  (**required**).
+### Ask for something
 
-Keep the figure short. It is set large, and a sentence in that slot looks like a
-mistake. The explanation goes in the caption.
+For getting a visitor to do something next.
 
-### Call to action
+| Design | Reach for it when | Fields |
+|---|---|---|
+| **Call to action** | Somebody has read enough and should now book, buy, ring or visit. | **Heading**, Text, **Button label**, **Button link** |
+| **Contact form** | People should be able to write to you without an email address sitting on a public page. | **Heading**, Intro text, **Name field label**, **Email field label**, **Message field label**, **Submit button label**, Confirmation message, Destination note |
 
-*A short prompt with a button.* One job: get somebody to the next step. Put it at
-the bottom of a page that has convinced somebody of something.
+### Notes on particular designs
 
-- **Heading** — **required**.
-- **Text** — optional, a sentence or two.
-- **Button label** — **required**. The words on the button. Say what happens —
-  "Book a visit" beats "Click here".
-- **Button link** — **required**. Where the button goes; see
-  [Fields that point at a page](#fields-that-point-at-a-page).
+The tables have no room for the handful of things that catch people out.
 
-### Contact form
+**Rich text — Width.** *Narrow* is the default and the right answer for reading;
+a long line of text is tiring to follow. Reach for *wide* or *full* only when
+what you are showing is not prose.
 
-*A form a visitor can fill in. Submissions are stored and read under Form
-submissions.* This is how you let people write to you without publishing an email
-address.
+**Rich text is the wrong home for opening hours.** Anything that is really a set
+of labels and values — Monday against 9:00–17:00, Telephone against a number —
+belongs in a **Details list**, which lines the two columns up for you and keeps
+them lined up when somebody adds a row.
 
-- **Heading** — **required**.
-- **Intro text** — *shown above the form.* A line about what you will do with the
-  message, or how quickly you reply.
-- **Name field label**, **Email field label**, **Message field label** — all
-  **required**, and all filled in for you already (*Your name*, *Email address*,
-  *Message*). Change them only if your site's tone calls for it.
-- **Submit button label** — **required**, and set to *Send message*.
-- **Confirmation message** — *shown to the visitor after a successful
-  submission.* Worth writing. The default behaviour is fine, but "Thank you — we
-  answer within two working days" sets an expectation.
-- **Destination note** — *a private note for editors on where these submissions
-  go. Not shown to visitors.* Use it to record who is meant to be checking. This
-  is the field that stops a form quietly collecting messages nobody reads.
+**Media and text — alternate them.** If you have several of these in a row,
+setting the image position to left, then right, then left stops the page looking
+like a form. Fill in the **Image description** as well; it takes thirty seconds
+and it is what a screen reader reads. See
+[Pictures and video](pictures.md#write-a-description-this-one-matters).
 
-What visitors send arrives under **Submissions** — see
-[Submissions](admin-tour.md#submissions). Nothing is emailed anywhere unless
-somebody set that up separately.
+**Card grid — count before you choose columns.** Four cards in three columns
+leaves one on its own on the second row. And if you find yourself wanting a
+thirteenth card, or cards that need addresses of their own, what you actually
+want is a [collection](collections.md).
+
+**Facts — keep the figure short.** It is set large, and a sentence in that slot
+looks like a mistake. *2013*, *50+*, *ISO 9001*. The explanation goes in the
+caption.
+
+**Prices and plans — *What is included* is a list, not a paragraph.** It looks
+like an ordinary text box, and it is not: **one line becomes one item**. Press
+Enter between them rather than separating them with commas, and do not type
+bullet characters of your own — each line is already becoming one. Blank lines
+are dropped when you save.
+
+**Prices and plans — *Highlight this plan*.** Each plan is either **normal** or
+**featured**, and *featured* marks the one you recommend. Set it on one plan.
+Setting it on all of them recommends nothing.
+
+**Video — the field is a box to paste into, not a picker.** Go to **Media**,
+find the film, click **Copy reference**, and paste it into the **Video** field.
+The **Still frame** field beside it is an ordinary picture field with a Change
+image button. What a visitor sees is covered in
+[Pictures and video](pictures.md#video).
+
+**Quote — the portrait description is not shown on the page.** It is read aloud
+in place of the picture, so write it for somebody who cannot see the photograph.
+
+**Gallery, People and Logos take their descriptions from the media library.**
+There is no image-description field on those rows. The description on the
+picture's card under **Media** is the one that is used — so write it there. (A
+person's name and a mark's name stand in if the library has none.)
+
+**Heading and lead-in is a signpost, not a title.** Its heading sits a level
+below the page's own, which is what makes it work as a divider partway down a
+long page. If what you want is a heading with words under it, that is a **Rich
+text**.
+
+**Contact form — the four labels are filled in for you.** *Your name*, *Email
+address*, *Message* and *Send message* arrive already written. Change them only
+if your site's tone calls for it; they are required, so do not empty them.
+
+**Contact form — two fields worth your time.** The **Confirmation message** is
+what the visitor reads after sending; "Thank you — we answer within two working
+days" sets an expectation that nothing else on the page does. The **Destination
+note** is private to editors and records who is meant to be reading these. It is
+the field that stops a form quietly collecting messages nobody opens. What
+visitors send arrives under [Submissions](admin-tour.md#submissions); nothing is
+emailed anywhere unless somebody set that up separately.
+
+**Collection list — there is nothing to write.** You choose which collection,
+how many and in what order, and the site fills the rest in from the entries you
+have published. If none are published yet it renders nothing at all rather than
+an empty heading. See [Collections](collections.md).
 
 ## Change some text
 
@@ -236,7 +270,8 @@ and that is the design rather than something missing.
 ### Fields that point at a page
 
 Some fields ask for a destination rather than words: a **Button link** on a Call
-to action, a **Link** on a card. You do not type an address into these. You
+to action or under a set of plans, a **Link** on a card or on a logo. You do not
+type an address into these. You
 **choose a page from a list of your pages**, by its title, with its address shown
 alongside so that two similarly-named pages can be told apart.
 
@@ -254,13 +289,15 @@ one is administrator-only. See [Menus](admin-tour.md#menus).
 ### Repeating lists
 
 Some designs hold a list of similar rows: **Cards** on a Card grid, **Figures**
-on a Facts section. Each row is numbered and has its own small buttons to move it
-up, move it down, and remove it.
+on a Facts section, **Plans** on a Prices and plans. Each row is numbered and has
+its own small buttons to move it up, move it down, and remove it.
 
-These lists have limits — a Facts section takes up to six figures, a Card grid up
-to twelve cards — and both need **at least one** row. If you empty a list
-completely, the save is refused rather than leaving you with an empty strip on
-your page. Remove the whole section instead.
+Each list has a limit, given in brackets in
+[the tables above](#which-design-does-what) — six figures on a Facts section,
+twelve cards on a Card grid, four plans on a Prices and plans, twenty-four rows
+on most of the rest. Every one of them needs **at least one** row. If you empty a
+list completely, the save is refused rather than leaving you with an empty strip
+on your page. Remove the whole section instead.
 
 ### Required fields and the red asterisk
 
@@ -349,7 +386,9 @@ At the bottom of the editor are three buttons.
 
 - **Cancel** — throws away everything you have changed since you opened the
   page, and leaves the page as it was.
-- **Preview** — shows you how the page will look, without anyone else seeing it.
+- **Preview** — saves, then gives you a link showing how the page will look,
+  without publishing it. See
+  [Preview before you publish](publishing.md#preview-before-you-publish).
 - **Save** — keeps your changes.
 
 Click **Save**. The banner at the top updates to tell you the new state of the
