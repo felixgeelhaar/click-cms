@@ -119,7 +119,8 @@ Three things worth knowing early, because they take the fear out of the rest:
   every save, and a **Restore** button on the older ones. A mistake you saved an
   hour ago is not lost.
 - **You can look before anyone else does.** The **Preview** button shows you the
-  page as it will be.
+  page as it will be, and gives you a link you can send to somebody else without
+  publishing anything.
 
 The one action that is not easily undone is **Delete** on a page. If you want a
 page off the public site but kept, take it down instead — that is covered in

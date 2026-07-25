@@ -37,8 +37,10 @@ need to.
 - **A viewer** cannot save at all, let alone publish.
 
 If you are an author, the rest of this page is still worth reading — the states,
-the version history and the notes all apply to you. What differs is the last step,
-and [Leaving a note](#leaving-a-note) is how you hand it over.
+the version history and the notes all apply to you. What differs is the last
+step. [Leaving a note](#leaving-a-note) is how you hand a page over, and
+[Showing an unpublished entry to somebody](#showing-an-unpublished-entry-to-somebody)
+is how you hand over a blog post.
 
 [What your account can do](roles.md) has the full picture.
 
@@ -51,6 +53,80 @@ At the bottom of the editor are **Cancel**, **Preview** and **Save**.
 **Preview** shows you the page as it will be, without publishing anything. Use
 it whenever you have changed a layout, added a section, or swapped a picture —
 it costs nothing and it is the cheapest way to catch a mistake.
+
+What the button does, in order:
+
+1. **It saves the page first.** So what you are shown is what is on your screen,
+   not the last version you saved. Worth knowing the other way round too:
+   Preview is not a way to look at a change without keeping it.
+2. **It makes a link**, and puts it in a box headed *Preview link ready*, with a
+   **Copy** button and an **Open** button beside it.
+3. **The link lasts about an hour**, and the box prints the exact time it stops
+   working. After that it is a dead address — press **Preview** again for a
+   fresh one.
+
+The link is the useful part. Anybody who holds it can see the page: no account,
+no password, nothing to explain. That is how a draft goes to a client or a
+proofreader who has never seen the admin.
+
+Two things it is not. It is not publishing — minting a link changes nothing about
+what the public site shows. And it is no more private than the link itself, so
+send it to the people you mean to and treat a forwarded one as forwarded.
+
+While you are signed in you can skip the button altogether: put `/preview/` in
+front of a page's address and you get the same thing. The page at `/about` is at
+`/preview/about`. Signed out, that address answers *page not found*, exactly as
+an address that never existed would.
+
+A **viewer** account cannot make a preview link at all — see
+[What your account can do](roles.md#viewer).
+
+## Showing an unpublished entry to somebody
+
+This section is for an **author**, and it answers the question the role creates:
+if you cannot publish a blog post, how does the person who can ever see it?
+
+The answer is that **a collection entry is readable at the address it will have
+once it is published, with `/preview/` in front**. A post that will live at:
+
+```
+/blog/why-we-stopped-staining
+```
+
+can be read now, exactly as it stands, at:
+
+```
+/preview/blog/why-we-stopped-staining
+```
+
+Open that in a tab while you are signed in to the admin and you see the post
+rendered as a visitor would see it — your saved draft, not whatever is currently
+published. Anybody signed in to the admin can open it. Anybody who is not gets
+*page not found*, the same answer an invented address gives, so the existence of
+a draft is not disclosed to a stranger who guesses.
+
+So the handover is three steps:
+
+1. **Save the entry.** The preview shows what you last saved, so an unsaved
+   sentence will not be in it.
+2. **Send them the address.** The whole thing, as you would any link —
+   `https://your-site.com/preview/blog/why-we-stopped-staining`. Copying it out
+   of your browser's address bar is the way not to mistype it.
+3. **Tell them it is ready.** Entries have no comments box — that is a page
+   feature — so this part happens wherever your team already talks.
+
+Three things to know before you rely on it:
+
+- **Only collections that have an address of their own.** Blog posts do. Team
+  members deliberately do not, so there is nothing to preview at. See
+  [The address](collections.md#the-address).
+- **Your reviewer needs an account.** The `/preview/…` address opens for anybody
+  signed in to the admin, which covers the editor who will publish it. It is not
+  a link to send outside.
+- **The Preview button in the entry editor is a different thing.** It also makes
+  a link, but that link hands back the entry's *content as data*, for a separate
+  website that reads from this one — not a page to look at. If what you want is
+  to see the entry, use the `/preview/…` address above.
 
 ## The banner at the top of the page
 
@@ -154,3 +230,11 @@ anything public by saving.
 
 **Where do I check what is waiting?** The **Edits pending** tab on the Pages
 list, and the *Edits pending* count on the dashboard.
+
+**I cannot publish, and somebody needs to read my post first.** Save it, then
+send them `/preview/` followed by the address the post will have — see
+[Showing an unpublished entry to somebody](#showing-an-unpublished-entry-to-somebody).
+
+**Somebody outside the company needs to see a page before it goes live.** Use
+the **Preview** button on the page and send them the link it makes. It works
+without an account and stops working after about an hour.

@@ -1,8 +1,12 @@
 # Pictures and video
 
-Every picture on your site lives in one place — the **Media** library — and
-pages borrow from it. So swapping a photo is two steps: put the new picture in
-the library, then point the section at it.
+Every picture and every film on your site lives in one place — the **Media**
+library — and pages borrow from it. So swapping a photo is two steps: put the new
+picture in the library, then point the section at it.
+
+Most of this page is about pictures, because most of what you will upload is
+pictures. Video works differently in enough ways to need
+[a section of its own](#video).
 
 ## The Media library
 
@@ -20,14 +24,18 @@ Each picture appears as a card showing:
   its own section below.
 - **Copy reference** and **Delete** buttons.
 
-The line under the heading tells you how many images you have, and that each
+The line under the heading tells you how many files you have, and that each
 upload is resized into several widths automatically. That is the site making
-sure a phone is not sent a picture built for a large screen.
+sure a phone is not sent a picture built for a large screen. It counts films in
+with the pictures and says *images* for the lot, which is the screen being loose
+with a word rather than anything being wrong; a film is not resized, and
+[the video section](#video) says what happens to one instead.
 
 **Copy reference** copies the library's own name for that file to your
-clipboard. You will not need it for ordinary editing — picking a picture for a
-page is done by choosing it, not by pasting a name — but whoever built your site
-may occasionally ask you for it.
+clipboard. Picking a *picture* for a page is done by choosing it from the
+library, so you will rarely need this — with one exception that matters: the
+**Video** section's video field is a box you paste a reference into. See
+[Putting a video on a page](#putting-a-video-on-a-page).
 
 ### Finding one picture among hundreds
 
@@ -172,9 +180,9 @@ A photo straight off a modern phone or camera can be several times larger than
 anything a web page needs. Large files matter for two reasons: they take longer
 to upload, and they cost your visitors time and mobile data.
 
-The site helps — it makes smaller copies of every upload so that each visitor
-gets a size suited to their screen. There are four, and their names appear on
-each card:
+The site helps — it makes smaller copies of every picture you upload so that each
+visitor gets a size suited to their screen. There are four, and their names
+appear on each card:
 
 | Name | Width |
 |---|---|
@@ -200,6 +208,74 @@ If the server your site runs on cannot resize pictures, a banner at the top of
 the Media screen says so, and uploads are kept at their original size only. That
 is a message for whoever looks after the site rather than something you can fix.
 
+## Video
+
+The library takes **MP4** and **WebM** film, up to 64 MB, and the **Video**
+section design puts one on a page. Both halves of that sentence are worth going
+through, because video behaves unlike a picture at every step.
+
+### What the library does with a film
+
+Very little, deliberately:
+
+- **It is stored exactly as you uploaded it.** None of the resizing described
+  further up this page happens to a film. There are no *sm*, *md*, *lg* or *xl*
+  copies, so a phone is sent the same file a large screen is.
+- **There is no focal point and nothing to crop**, so the marker on the card has
+  nothing to act on.
+- **There are no dimensions to read**, so the card's width-and-height readout
+  stays empty. Its file name and its size in megabytes are the two things worth
+  reading on a video's card.
+- **The library does not take a still frame from it**, so a film's card shows no
+  thumbnail. You will find it by its name — another reason to name files
+  sensibly before uploading.
+
+The whole business of keeping a film small therefore falls to you, before you
+upload. Keep clips short, and if the tool you exported from offers a smaller
+setting, take it.
+
+### Putting a video on a page
+
+Open the page from **Pages**, and add a **Video** section — see
+[Which design does what](editing.md#which-design-does-what).
+
+It has four fields, and only the second is required:
+
+- **Heading** — optional, as everywhere else.
+- **Video** — **required**, and the one unusual field in the whole editor: it is
+  a plain box rather than a picker. Go to **Media**, find the film, click **Copy
+  reference** on its card, come back, and paste it in.
+- **Still frame** — an ordinary picture field, with a **Change image** button
+  that opens the library. This is the picture a visitor sees before they press
+  play. **Set one.** Without it they see a black rectangle, and a black rectangle
+  is not an invitation.
+- **Caption** — optional, shown beneath the film.
+
+Save and publish as you would any other change.
+
+### What a visitor gets
+
+Three promises worth knowing, because they are the difference between video that
+is welcome on a page and video that is not:
+
+- **It never plays on its own.** There is no setting to make it, and that is on
+  purpose — a film starting by itself under somebody's cursor is the thing people
+  close the tab over.
+- **Nothing is downloaded until somebody presses play.** Until then the page
+  carries the still frame you chose and nothing else, so a page with a film on it
+  is no slower to open than a page with a photograph on it.
+- **Once they press play, they are downloading the file you uploaded**, on
+  whatever connection they are on. It arrives in pieces as it plays rather than
+  all at once, so it starts quickly, but a 40 MB film is still 40 MB of somebody's
+  mobile data. **Under about 20 MB is kind**, which is what the field's own help
+  text says.
+
+Two smaller things. A browser too old to play the format shows a **Download the
+video** link instead, so nobody is left with a blank space. And if the film is
+deleted from the library while a page still points at it, the page shows a
+download link where the player was — the same rule as a missing picture, and the
+same fix: put a replacement in.
+
 ## Removing a picture
 
 There are two different removals, and it is worth keeping them apart:
@@ -221,25 +297,6 @@ saying how many you have selected, with **Clear** to change your mind and a
 
 Use this for a batch of obvious mistakes, not as a tidy-up of anything you are
 unsure about.
-
-## Video
-
-The library takes **MP4** and **WebM** video, up to 64 MB. Video is worth
-understanding separately from pictures, because it is treated differently:
-
-- **It is stored exactly as you uploaded it.** No smaller copies are made, so
-  every visitor downloads the file you provided at the size you provided it. A
-  40 MB clip is a 40 MB download, on a phone, on mobile data.
-- **There is no focal point and no dimensions readout**, for the same reason.
-
-So the whole burden of keeping a video small falls on you before you upload. Keep
-clips short, and if the tool you exported from offers a smaller setting, take it.
-
-Whether your site can **show** a video, and where, depends on the section designs
-it was built with. If you open a section and find a field asking for a video, fill
-it in as its help text describes. If you want video on a site that has no such
-field, that is a question for whoever built the site rather than something you can
-add here.
 
 ## Checking your work
 

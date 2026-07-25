@@ -69,12 +69,13 @@ may never open this screen.
 
 ### Media
 
-Every picture and video on your site, in one library. Pages and collection
+Every picture and every film on your site, in one library. Pages and collection
 entries borrow from it rather than holding their own copies, which is why
 swapping a photo everywhere is one upload rather than ten.
 
 Uploading, descriptions, file sizes and what makes a good picture are covered in
-[Pictures and video](pictures.md).
+[Pictures and video](pictures.md). Film is accepted too — MP4 and WebM — and
+behaves differently enough to have [its own section](pictures.md#video) there.
 
 ### Builder
 
@@ -125,9 +126,14 @@ the name other people in the admin see next to your work — and your **Email**.
 
 Two honest notes about this screen:
 
-- **Changes you make here are not kept yet.** There is a Save Changes button and
-  it reports success, but your name and email are not actually updated. If either
-  is wrong, ask an administrator to correct it for you on the **Users** screen.
+- **Whether Save Changes does anything depends on your account.** An
+  administrator's details are saved, and the screen says *your details have been
+  saved*. Every other kind of account is refused, and told so plainly: *your
+  account cannot change these details. Ask an administrator to update them for
+  you on the Users screen.* That is not a fault — names and email addresses live
+  on the **Users** screen, which only an administrator can reach — but it does
+  mean that if you are an editor or an author, this screen is somewhere to read
+  your details rather than change them.
 - **Your password is not changed here.** It has its own screen, which is not
   listed in the menu. To reach it, put `/admin/password` on the end of your
   site's address — so `https://your-site.com/admin/password`. It asks for your
