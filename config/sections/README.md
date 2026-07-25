@@ -95,6 +95,7 @@ Four consequences worth knowing before you write a design:
 | `card-grid` | A repeating grid of cards |
 | `facts` | A row of figures with captions |
 | `gallery` | A grid of pictures with captions |
+| `video` | A film, played in the page |
 | `people` | Names, roles, photographs and short biographies |
 | `logos` | Partner, association or certification marks |
 | `quote` | Something a customer said, with their name and role |
