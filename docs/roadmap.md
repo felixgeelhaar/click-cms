@@ -113,8 +113,14 @@ Every item here holds the lines v1 was built on, because they are the product:
 
 ## Depth and adoption
 
-8. **More builder node types.** *(incremental)* Columns/containers, video,
-   embed, list, quote, divider, and reusable blocks or templates.
+8. **More builder node types.** *(incremental)* ~~Columns/containers, video,
+   embed, list, quote, divider~~ (done — all six, server-rendered and editable;
+   the embed node builds its iframe from an allowlisted URL rather than
+   rendering author markup, and the work closed a stored-XSS hole in the
+   existing button and image nodes). **Reusable blocks or templates** remain
+   open, and are not another node type: they need a data-model decision first —
+   whether a page references a saved block or holds a snapshot of it, and what
+   happens to every page using one when it changes.
 
 9. **Collaboration review workflow.** *(medium)* The request-review →
    approve → publish-together flow beyond presence and comments, with optional
@@ -124,16 +130,34 @@ Every item here holds the lines v1 was built on, because they are the product:
    stepping stone.
 
 10. **Adoption and DX.** *(varies)* ~~A second theme beyond the default~~ (done —
-    `themes/dark`, alongside a real theme system), a documentation site, an
-    installation/quick-start guide, an example content seeder, and a published
-    Docker image.
+    `themes/dark`, alongside a real theme system), ~~an installation/quick-start
+    guide~~ (done — `docs/install.md`, plus a README corrected of several claims
+    that were simply untrue), ~~an example content seeder~~ (done —
+    `bin/click-seed.php`, which writes through the same services the admin UI
+    posts to and never overwrites), ~~a published Docker image~~ (done — GHCR on
+    release, multi-arch, smoke-started by the workflow that publishes it).
+    Releases now also attach an install archive, because the existing package is
+    an upgrade package and cannot be installed from.
 
-11. **A render cache.** *(medium)* Under load, every request reads files. A
-    page/render cache invalidated on publish keeps a flat-file site fast without
-    adding a runtime dependency (the cache is itself flat files).
+    **Still open:** a documentation site. The docs are good enough to read in
+    the repository, so this is presentation rather than substance.
 
-12. **Accessibility audit.** *(small–medium)* An automated a11y pass over the
-    admin UI and the default public theme, fixing what it finds.
+11. ~~**A render cache.**~~ *(done)* Rendered public pages are stored as flat
+    files under `data/cache/pages`, **off by default**. Invalidation is a
+    storage decorator rather than a call in each handler, so no code path can
+    change a document and forget to clear; non-content admin writes are covered
+    by a blanket flush. Previews and signed-in renders are excluded on both
+    sides. What it cannot see — a `web.render` plugin varying on anything not in
+    the key, and section schemas edited on disk — is stated in `core.md` rather
+    than papered over.
+
+12. ~~**Accessibility audit.**~~ *(done)* axe-core runs over every admin screen
+    as part of the suite. Five defects it found and eight it could not (Login's
+    placeholder-only labels and suppressed focus outline, an ARIA-prohibited
+    label on a drag handle no keyboard could reach, a missing skip link) are
+    fixed, along with five WCAG contrast failures. The one forced visual change
+    is a darker border on form controls, whose background matches the surface
+    behind them and which therefore had no compliant boundary at all.
 
 ## Shipped since this list was written
 
