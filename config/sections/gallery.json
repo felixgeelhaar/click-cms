@@ -1,0 +1,22 @@
+{
+  "label": "Gallery",
+  "description": "A grid of pictures with optional captions.",
+  "icon": "images",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading" },
+    { "name": "intro", "type": "textarea", "label": "Intro text",
+      "help": "Optional. A sentence or two above the pictures." },
+    { "name": "columns", "type": "select", "label": "Columns",
+      "options": ["2", "3", "4"], "default": "3",
+      "help": "How many pictures sit side by side on a wide screen." },
+    { "name": "images", "type": "repeater", "label": "Pictures", "min": 1, "max": 24,
+      "fields": [
+        { "name": "image", "type": "image", "label": "Picture", "required": true,
+          "displayWidth": 480,
+          "help": "Give the picture a description in the media library — that description is what screen readers announce." },
+        { "name": "caption", "type": "text", "label": "Caption",
+          "help": "Optional wording shown under the picture." }
+      ]
+    }
+  ]
+}

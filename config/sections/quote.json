@@ -1,0 +1,18 @@
+{
+  "label": "Quote",
+  "description": "Something a customer said, with their name and role.",
+  "icon": "quote",
+  "fields": [
+    { "name": "quote", "type": "textarea", "label": "The words", "required": true,
+      "help": "Quote them as they said it, without quotation marks. Two or three sentences read best." },
+    { "name": "attribution", "type": "text", "label": "Said by", "required": true,
+      "help": "The person's name. An unattributed quote reads as invented." },
+    { "name": "role", "type": "text", "label": "Role or company",
+      "help": "Optional, for example Head of Facilities, Northgate Practice." },
+    { "name": "portrait", "type": "image", "label": "Portrait", "displayWidth": 96,
+      "labelField": "portraitAlt",
+      "help": "Optional. A small square photograph works best." },
+    { "name": "portraitAlt", "type": "text", "label": "Portrait description",
+      "help": "Describes the portrait for screen readers and when the picture fails to load. It is not shown on the page." }
+  ]
+}

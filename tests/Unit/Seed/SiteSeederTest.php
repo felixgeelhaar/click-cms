@@ -264,7 +264,10 @@ final class SiteSeederTest extends TestCase
         // a stored shape the header would reject throws here.
         $rebuilt = Menu::fromArray($menu->data);
 
-        $this->assertCount(4, $rebuilt->items());
+        // Counted from the fixture, not written as a literal: the point of this
+        // test is that every stored item survives the domain, and hardcoding the
+        // number meant adding a menu entry failed it for no reason at all.
+        $this->assertCount(count(ExampleSite::menu()->items()), $rebuilt->items());
         foreach ($rebuilt->items() as $item) {
             $this->assertNotSame('', $item->target(), "\"{$item->label()}\" has no destination");
         }

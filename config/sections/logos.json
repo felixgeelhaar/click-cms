@@ -1,0 +1,21 @@
+{
+  "label": "Logos and accreditations",
+  "description": "A strip of partner, association or certification marks.",
+  "icon": "badge",
+  "fields": [
+    { "name": "heading", "type": "text", "label": "Heading",
+      "help": "For example Accredited by, or Who we work with." },
+    { "name": "columns", "type": "select", "label": "Columns",
+      "options": ["2", "3", "4"], "default": "4",
+      "help": "How many marks sit side by side on a wide screen." },
+    { "name": "logos", "type": "repeater", "label": "Marks", "min": 1, "max": 24,
+      "fields": [
+        { "name": "logo", "type": "image", "label": "Mark", "required": true,
+          "displayWidth": 200,
+          "help": "A transparent PNG or an SVG on a white background reproduces best." },
+        { "name": "title", "type": "text", "label": "Name", "required": true,
+          "help": "The organisation or scheme the mark belongs to. Shown under the mark, and used as its description if the media library has none." }
+      ]
+    }
+  ]
+}

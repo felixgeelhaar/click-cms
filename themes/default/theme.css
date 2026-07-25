@@ -241,3 +241,108 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
 @media (max-width: 48rem) {
   .cms-items { grid-template-columns: 1fr !important; }
 }
+
+/* ---------------------------------------------------------------- images --
+ *
+ * Until this rule the only image rule was `.cms-items img`, which covers a
+ * picture inside a repeater and nothing else. A top-level image — `media-text`
+ * ships one, and it is on the seeded home page — had no width rule at all, and
+ * the renderer writes the file's intrinsic `width`/`height` into the tag. So a
+ * real 2048-pixel upload rendered 2048 pixels wide and pushed the page sideways.
+ *
+ * Invisible so far only because the example site's pictures are SVG, which
+ * carries no pixel dimensions for the renderer to emit. The first person to
+ * upload a photograph would have found it.
+ */
+.cms-section img { max-width: 100%; height: auto; }
+
+/* --------------------------------------------------- the newer designs --
+ *
+ * Each of these exists because the design renders correct, semantic markup that
+ * the theme had no opinion about — a price indistinguishable from body text, a
+ * quote with no quotation about it, label/value pairs stacked so the pairing was
+ * invisible. Class names only; nothing here changes what the renderer emits.
+ */
+
+/* Prices. The grid already works; what was missing was a card to sit in and a
+ * figure that reads as a figure. */
+.cms-section--pricing .cms-item {
+  padding: 1.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+}
+.cms-section--pricing .cms-field--price {
+  font-size: 1.75rem;
+  color: var(--ink);
+  margin: 0 0 0.75rem;
+}
+
+/* A testimonial. Centred and set larger, because a quotation that looks like
+ * body copy is not read as a quotation. */
+.cms-section--quote { text-align: center; }
+.cms-section--quote .cms-field--quote p {
+  font-size: 1.35rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.cms-section--quote .cms-field--attribution { color: var(--ink); font-weight: 500; }
+.cms-section--quote .cms-field--portrait img {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 1rem auto 0;
+}
+
+/* Opening hours and similar pairs. Without this the label and the value stack
+ * as two muted paragraphs and nothing shows they belong together. */
+.cms-section--details .cms-items { gap: 0; }
+.cms-section--details .cms-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+.cms-section--details .cms-item p { margin: 0; }
+.cms-section--details .cms-field--label { color: var(--ink); font-weight: 500; }
+
+/* Questions and answers: a rule between them, so a long list can be scanned. */
+.cms-section--faq .cms-item + .cms-item {
+  border-top: 1px solid var(--rule);
+  padding-top: 1.25rem;
+}
+
+/* Accreditation marks. `.cms-items img { width: 100% }` stretches logos of
+ * different aspect ratios to different heights, which reads as carelessness.
+ * Constraining the height instead keeps a row of marks level. */
+.cms-section--logos .cms-items img {
+  height: 3.5rem;
+  width: auto;
+  object-fit: contain;
+}
+
+/* ------------------------------------------------- a collection listing --
+ *
+ * The markup the `collection-list` section emits. Without these the entries
+ * render as an unstyled bullet list — correct HTML that looks like a mistake,
+ * on the one page whose whole job is to show that publishing a post worked.
+ */
+.cms-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2rem;
+}
+.cms-entry img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+.cms-entry-title { font-size: 1.25rem; margin: 0 0 0.35rem; }
+.cms-entry-title a { color: var(--ink); text-decoration: none; }
+.cms-entry-title a:hover { text-decoration: underline; }
+.cms-entry-excerpt { margin: 0; color: var(--muted); }
