@@ -54,7 +54,7 @@ working to these rules rather than to the field list above.
 | any other `text`, `number`, `date` | `<p>` |
 | `textarea` | `<div>` of `<p>`, blank lines splitting paragraphs and single newlines becoming `<br>` |
 | `richtext` | `<div>` of the editor's own markup, sanitised to an allowlist |
-| `url` | `<p><a href>` — the address as the link's own wording, unless a `labelField` supplies it |
+| `url` | `<p><a href>` — its wording comes from `labelField`; failing that, from the row's `title` inside a repeater, and only then from the address itself |
 | `email` | `<p><a href="mailto:">` |
 | `image` | `<div><img loading="lazy">`, with a `srcset` of the variants that exist |
 | `select` | **nothing printed** — a `cms-section--{field}-{value}` class on the section |
@@ -106,3 +106,34 @@ Four consequences worth knowing before you write a design:
 `form` and `collection-list` are special-cased by id in the renderer: their
 fields configure something rather than describe it, so renaming their files
 breaks them. Every other design here is ordinary configuration.
+
+## Declaring what a field *is*: `as`
+
+By default the renderer infers the markup from a field's name and type — a field
+called `heading` or `title` becomes an `<h2>`, every other scalar a `<p>`, every
+repeater a `<ul>`. That is a good default and it used to be the ceiling: a
+testimonial could not be a `<blockquote>`, opening hours could not be a `<dl>`,
+and no page could have a heading below level two.
+
+A field may now declare a **role**. It is a closed vocabulary of intent, not an
+HTML element name — a design says `"as": "quote"` and the renderer decides that
+means a `<blockquote>`. Every guarantee about escaping and structure stays inside
+the renderer, where it is tested once, instead of being spread across every
+design anyone writes.
+
+| Field type | Role | What it renders |
+|---|---|---|
+| `text` | `heading` | `<h2>` — the default for a field named `heading` or `title` |
+| `text` | `subheading` | `<h3>`, for a part within a page |
+| `text`, `textarea`, `richtext` | `quote` | `<blockquote>` |
+| `text`, `textarea`, `richtext` | `note` | An aside, styled quieter |
+| `repeater` | `ordered` | `<ol>`, when the order *is* the meaning |
+| `repeater` | `definitions` | `<dl>` — the first sub-field in a row is the `<dt>`, the rest are `<dd>` |
+
+An unrecognised role, or one that makes no sense for the field's type
+(`definitions` on a text field, `quote` on a repeater), is **dropped** rather
+than honoured — rendering a guess would be worse than rendering the default.
+Declaring nothing renders exactly as it did before this existed.
+
+A row in a `definitions` repeater needs both a term and at least one value; a
+half-filled row is skipped, the same way an empty list item already is.

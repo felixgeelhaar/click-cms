@@ -61,7 +61,59 @@ final class FieldDefinition
          * of slugs) rather than one. False on every other type.
          */
         public readonly bool $multiple = false,
+
+        /**
+         * What this field *is*, when the default reading of its name and type is
+         * wrong.
+         *
+         * A deliberately small vocabulary of roles rather than an HTML element
+         * name. A design says `"as": "quote"` and the renderer decides that means
+         * a `<blockquote>`; it does not get to ask for a `<div onclick=…>`. That
+         * keeps every guarantee about escaping and structure inside the renderer,
+         * where it can be tested once, instead of distributing it across every
+         * section design anyone ever writes.
+         *
+         * It exists because element choice was previously derived entirely from a
+         * field's name and type: a field called `heading` or `title` produced an
+         * `<h2>`, every other scalar a `<p>`, every repeater a `<ul>`. That is a
+         * reasonable default and a poor ceiling — it made a testimonial
+         * impossible to mark up as a quotation, opening hours impossible to mark
+         * up as a description list, and left long pages with a flat heading
+         * outline because nothing could ever be an `<h3>`.
+         *
+         * Null means the default reading, so every design written before this
+         * renders byte-identically.
+         */
+        public readonly ?string $as = null,
     ) {}
+
+    /**
+     * The roles each field type may take, and nothing else.
+     *
+     * @var array<string, list<string>>
+     */
+    private const ROLES = [
+        // Prose and scalars: how prominently, or as a quotation.
+        'text' => ['heading', 'subheading', 'quote', 'note'],
+        'textarea' => ['quote', 'note'],
+        'richtext' => ['quote', 'note'],
+        // A repeater's shape: a plain list, a numbered one, or term-and-definition
+        // pairs — which is the correct markup for opening hours or a spec table
+        // and was previously unreachable.
+        'repeater' => ['ordered', 'definitions'],
+    ];
+
+    /** The declared role, or null when it is absent, unknown, or wrong for the type. */
+    private static function roleFor(FieldType $type, mixed $declared): ?string
+    {
+        if (!is_string($declared) || $declared === '') {
+            return null;
+        }
+
+        $allowed = self::ROLES[$type->value] ?? [];
+
+        return in_array($declared, $allowed, true) ? $declared : null;
+    }
 
     /**
      * @param array<string, mixed> $spec
@@ -141,6 +193,12 @@ final class FieldDefinition
                 : null,
             references: $references,
             multiple: $type === FieldType::Reference && (bool) ($spec['multiple'] ?? false),
+            // Validated against what the renderer can actually draw, and against
+            // the field's own type: `definitions` means nothing on a text field
+            // and `quote` means nothing on a repeater. An unrecognised or
+            // misapplied role is dropped rather than honoured, because rendering
+            // a guess would be worse than rendering the default.
+            as: self::roleFor($type, $spec['as'] ?? null),
         );
     }
 
@@ -179,6 +237,9 @@ final class FieldDefinition
         }
         if ($this->labelField !== null) {
             $out['labelField'] = $this->labelField;
+        }
+        if ($this->as !== null) {
+            $out['as'] = $this->as;
         }
         if ($this->displayWidth !== null) {
             $out['displayWidth'] = $this->displayWidth;
