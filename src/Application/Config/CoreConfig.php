@@ -389,6 +389,35 @@ final class CoreConfig
         return $this->mysqlSetting('core.updates.feedUrl', 'CLICK_CMS_UPDATE_FEED_URL', '');
     }
 
+    /**
+     * Every key whose signature on the feed is trusted unconditionally.
+     *
+     * `core.updates.publicKey` is the single-key form; `core.updates.publicKeys`
+     * takes a list, which is what makes a rotation survivable — the old and new
+     * key can both be trusted while installations catch up. These are the anchor:
+     * a feed can announce further keys, but never revoke one of these, so the
+     * operator stays the root of trust.
+     *
+     * @return list<string>
+     */
+    public function updatePublicKeys(): array
+    {
+        $keys = [];
+        foreach ($this->stringList('core.updates.publicKeys', []) as $key) {
+            $key = trim($key);
+            if ($key !== '') {
+                $keys[] = $key;
+            }
+        }
+
+        $single = $this->updatePublicKey();
+        if ($single !== '' && !in_array($single, $keys, true)) {
+            $keys[] = $single;
+        }
+
+        return $keys;
+    }
+
     public function updatePublicKey(): string
     {
         return $this->mysqlSetting('core.updates.publicKey', 'CLICK_CMS_UPDATE_PUBLIC_KEY', '');

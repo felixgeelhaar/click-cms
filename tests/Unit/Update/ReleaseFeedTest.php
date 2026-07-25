@@ -352,4 +352,158 @@ final class ReleaseFeedTest extends TestCase
     {
         return openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
     }
+
+    /* ------------------------------------------------------ key rotation -- */
+
+    /** @return array{0: \OpenSSLAsymmetricKey, 1: string} a keypair and its public half */
+    private function newKeypair(): array
+    {
+        $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+
+        return [$key, openssl_pkey_get_details($key)['key']];
+    }
+
+    /** @param list<array<string, mixed>> $releases */
+    private function feedAnnouncing(array $publicKeys, int $sequence, array $releases): string
+    {
+        return (string) json_encode([
+            'sequence' => $sequence,
+            'expires' => gmdate('c', time() + 86400),
+            'keys' => $publicKeys,
+            'releases' => $releases,
+        ]);
+    }
+
+    /**
+     * The point of rotation: a feed signed by the *current* key can hand trust
+     * to a new one, and the next feed — signed only by that new key — is
+     * believed. Without this, retiring a key means editing every installation by
+     * hand, which is why in practice it never happens.
+     */
+    public function testAFeedCanHandTrustToANewKeyWhichThenWorksOnItsOwn(): void
+    {
+        $state = $this->dir . '/state';
+        [$newKey, $newPublic] = $this->newKeypair();
+
+        // Announced by a feed signed with the configured key.
+        [$url] = $this->publish($this->feedAnnouncing([$newPublic], 10, [$this->release('1.1.0')]));
+        $this->assertCount(1, (new ReleaseFeed($state))->fetch($url, $this->publicKey)['releases']);
+
+        // The next feed is signed ONLY by the new key.
+        [$next] = $this->publish($this->feedAnnouncing([$newPublic], 11, [$this->release('1.2.0')]), signWith: $newKey);
+        $result = (new ReleaseFeed($state))->fetch($next, $this->publicKey);
+
+        $this->assertNull($result['error']);
+        $this->assertSame('1.2.0', $result['releases'][0]->version->toString());
+    }
+
+    /**
+     * The obvious attack: an untrusted key announcing itself. If this worked,
+     * the signature would be decorative — anyone could mint their own trust.
+     */
+    public function testAFeedSignedByAnUntrustedKeyCannotAnnounceItself(): void
+    {
+        $state = $this->dir . '/state';
+        [$attackerKey, $attackerPublic] = $this->newKeypair();
+
+        [$url] = $this->publish(
+            $this->feedAnnouncing([$attackerPublic], 10, [$this->release('9.9.9')]),
+            signWith: $attackerKey
+        );
+
+        $result = (new ReleaseFeed($state))->fetch($url, $this->publicKey);
+        $this->assertSame([], $result['releases']);
+
+        // And the attempt must leave no trust behind for a second try.
+        [$again] = $this->publish($this->feedAnnouncing([$attackerPublic], 11, [$this->release('9.9.9')]), signWith: $attackerKey);
+        $this->assertSame([], (new ReleaseFeed($state))->fetch($again, $this->publicKey)['releases']);
+    }
+
+    /**
+     * The operator's configured key is the anchor. A feed may add keys but must
+     * never be able to talk an installation out of the one its operator typed —
+     * otherwise a compromised online key could lock the owner out of their own
+     * update channel.
+     */
+    public function testAnAnnouncementCannotRevokeTheConfiguredKey(): void
+    {
+        $state = $this->dir . '/state';
+        [, $otherPublic] = $this->newKeypair();
+
+        // A feed that announces only some other key.
+        [$url] = $this->publish($this->feedAnnouncing([$otherPublic], 10, [$this->release('1.1.0')]));
+        (new ReleaseFeed($state))->fetch($url, $this->publicKey);
+
+        // The configured key must still verify a later feed. Sequence 11, since
+        // the announcement above was 10 and a feed may never go backwards.
+        [$next] = $this->publish((string) json_encode([
+            'sequence' => 11,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [$this->release('1.2.0')],
+        ]));
+        $result = (new ReleaseFeed($state))->fetch($next, $this->publicKey);
+
+        $this->assertNull($result['error'], 'the configured key must remain trusted');
+    }
+
+    /**
+     * A retired key really is retired: the announcement replaces the set rather
+     * than growing it, or a compromised online key would stay trusted forever —
+     * exactly what rotation exists to undo.
+     */
+    public function testAnAnnouncedKeyCanBeRetiredByALaterAnnouncement(): void
+    {
+        $state = $this->dir . '/state';
+        [$firstKey, $firstPublic] = $this->newKeypair();
+        [, $secondPublic] = $this->newKeypair();
+
+        [$a] = $this->publish($this->feedAnnouncing([$firstPublic], 10, [$this->release('1.1.0')]));
+        (new ReleaseFeed($state))->fetch($a, $this->publicKey);
+
+        // Configured key drops the first announced key and names another.
+        [$b] = $this->publish($this->feedAnnouncing([$secondPublic], 11, [$this->release('1.2.0')]));
+        (new ReleaseFeed($state))->fetch($b, $this->publicKey);
+
+        // The retired key must no longer verify anything.
+        [$c] = $this->publish($this->feedAnnouncing([$firstPublic], 12, [$this->release('9.9.9')]), signWith: $firstKey);
+        $this->assertSame([], (new ReleaseFeed($state))->fetch($c, $this->publicKey)['releases']);
+    }
+
+    /**
+     * An ordinary feed carries no `keys` block. Adopting one must not be the only
+     * thing that keeps the set alive, or a rotation would quietly undo itself on
+     * the very next fetch.
+     */
+    public function testAnAnnouncedKeySurvivesAFeedThatSaysNothingAboutKeys(): void
+    {
+        $state = $this->dir . '/state';
+        [$newKey, $newPublic] = $this->newKeypair();
+
+        [$a] = $this->publish($this->feedAnnouncing([$newPublic], 10, [$this->release('1.1.0')]));
+        (new ReleaseFeed($state))->fetch($a, $this->publicKey);
+
+        // An ordinary feed, no keys block, signed by the configured key.
+        [$b] = $this->publish((string) json_encode([
+            'sequence' => 11,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [$this->release('1.2.0')],
+        ]));
+        (new ReleaseFeed($state))->fetch($b, $this->publicKey);
+
+        // The rotated key must still work.
+        [$c] = $this->publish($this->feedAnnouncing([$newPublic], 12, [$this->release('1.3.0')]), signWith: $newKey);
+        $this->assertCount(1, (new ReleaseFeed($state))->fetch($c, $this->publicKey)['releases']);
+    }
+
+    /** Several configured keys are all trusted, so a rotation has an overlap window. */
+    public function testAnyOfSeveralConfiguredKeysIsTrusted(): void
+    {
+        [$secondKey, $secondPublic] = $this->newKeypair();
+        [$url] = $this->publish($this->feedJson([$this->release('1.1.0')]), signWith: $secondKey);
+
+        $result = (new ReleaseFeed())->fetch($url, [$this->publicKey, $secondPublic]);
+
+        $this->assertNull($result['error']);
+        $this->assertCount(1, $result['releases']);
+    }
 }

@@ -51,7 +51,7 @@ $dryRun = in_array('--dry-run', $argvFlags, true);
 $config = CoreConfig::load($root . '/config/core.json');
 $policy = $config->updatePolicy();
 $feedUrl = $config->updateFeedUrl();
-$publicKey = $config->updatePublicKey();
+$publicKeys = $config->updatePublicKeys();
 
 $say = static fn (string $line): int => (int) fwrite(STDOUT, date('c') . '  ' . $line . "\n");
 $fail = static function (string $line): never {
@@ -63,7 +63,7 @@ if (!$policy->checksForUpdates()) {
     $say('Update policy is "manual"; nothing to do.');
     exit(0);
 }
-if ($feedUrl === '' || $publicKey === '') {
+if ($feedUrl === '' || $publicKeys === []) {
     // Not an error: an installation that never configured a feed is simply not
     // using this. Saying so beats failing obscurely every night in a cron mail.
     $say('No update feed or signing key configured; nothing to do.');
@@ -86,10 +86,10 @@ $service = new UpdateService(
 
 // Everything below runs under the lock, so two overlapping cron runs cannot both
 // install. A run that finds the lock held simply ends.
-$outcome = $scheduler->withLock(static function () use ($service, $scheduler, $feedUrl, $publicKey, $policy, $config, $dryRun, $say) {
+$outcome = $scheduler->withLock(static function () use ($service, $scheduler, $feedUrl, $publicKeys, $policy, $config, $dryRun, $say) {
     $allowPre = $config->updateAllowPreRelease();
 
-    $decision = $service->check($feedUrl, $publicKey, $policy, $allowPre);
+    $decision = $service->check($feedUrl, $publicKeys, $policy, $allowPre);
 
     // A dry run deliberately does not record the check. Previewing what would
     // happen must not consume the interval and leave the next real run silently
@@ -137,7 +137,7 @@ $outcome = $scheduler->withLock(static function () use ($service, $scheduler, $f
     // a feed that changed between the check above and this call cannot slip an
     // install past the rule that permitted the first one. There is no
     // administrator here to catch that.
-    $result = $service->applyIfAutomatic($feedUrl, $publicKey, $policy, $allowPre);
+    $result = $service->applyIfAutomatic($feedUrl, $publicKeys, $policy, $allowPre);
 
     if (($result['success'] ?? false) !== true) {
         return ['status' => 'error', 'message' => 'Update to ' . $version . ' failed: '
