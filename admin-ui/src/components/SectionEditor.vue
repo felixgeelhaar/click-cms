@@ -49,8 +49,19 @@
             <span class="section-index">{{ index + 1 }}</span>
             <div>
               <p class="section-type">{{ labelFor(section.type) }}</p>
-              <p v-if="!typeFor(section.type)" class="section-missing">
+              <!--
+                Only claim a design is gone when we actually know the catalogue.
+                `typeFor()` is null both for a type that was removed and for one
+                we simply failed to fetch, and reporting the second as the first
+                told an editor their page's design "is no longer declared" when
+                nothing was wrong with it but a request.
+              -->
+              <p v-if="!typeFor(section.type) && catalogueKnown" class="section-missing">
                 Unknown section type “{{ section.type }}” — its design is no longer declared.
+              </p>
+              <p v-else-if="!typeFor(section.type)" class="section-unavailable">
+                The fields for this section cannot be shown until the section
+                designs load. Your content is safe — reload the page to try again.
               </p>
             </div>
           </div>
@@ -90,8 +101,10 @@
           </template>
 
           <!-- A section whose type has been removed keeps its stored values so
-               deleting a definition cannot silently destroy content. -->
-          <pre v-else class="orphan-values">{{ JSON.stringify(section.values, null, 2) }}</pre>
+               deleting a definition cannot silently destroy content. Shown only
+               once we know the type is genuinely gone: dumping JSON at an editor
+               because a request failed reads as "your page is broken". -->
+          <pre v-else-if="catalogueKnown" class="orphan-values">{{ JSON.stringify(section.values, null, 2) }}</pre>
         </div>
       </li>
     </ol>
@@ -163,6 +176,14 @@ const strip = () =>
 const commit = () => emit('update:modelValue', strip());
 
 const typeFor = (id) => types.value.find((t) => t.id === id) ?? null;
+
+/**
+ * Whether the set of declared designs is actually known.
+ *
+ * False while the catalogue is loading and false if it failed, so nothing
+ * downstream mistakes "we could not ask" for "the answer is no".
+ */
+const catalogueKnown = computed(() => !loadingTypes.value && !typesError.value);
 const labelFor = (id) => typeFor(id)?.label ?? id;
 
 const fieldComponent = (field) => {
@@ -268,6 +289,7 @@ onMounted(async () => {
 .icon-btn.danger { color: var(--color-danger-600, #dc2626); }
 .icon-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .section-body { padding: 1rem; }
+.section-unavailable { margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--app-text-muted); }
 .orphan-values { margin: 0; padding: 0.75rem; background: var(--app-surface-strong); border-radius: 8px; font-size: 0.8125rem; overflow-x: auto; }
 .add-row { border: 1px dashed var(--app-border); border-radius: 10px; padding: 1rem; }
 .add-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; }
