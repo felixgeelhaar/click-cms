@@ -19,11 +19,16 @@ namespace Click\Cms\Application\Authentication;
  *
  * Safe methods are exempt: GET and HEAD must not change state, so there is
  * nothing to forge.
+ *
+ * There is deliberately no cookie in this scheme. The token is minted into the
+ * session and handed to the client by `GET /api/auth/check`; the browser never
+ * holds a copy the CMS can read back. A `COOKIE` constant naming `click_csrf`
+ * used to sit beside HEADER, referenced by nothing and set by nothing, which
+ * described a double-submit-cookie design this does not implement.
  */
 final class CsrfGuard
 {
     public const HEADER = 'X-Click-CSRF';
-    public const COOKIE = 'click_csrf';
 
     /** Methods that must not change state, and so need no token. */
     private const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
