@@ -1,6 +1,10 @@
 <template>
   <div class="field" :class="{ 'field-error': error }">
-    <label :for="inputId" class="field-label">
+    <!-- `for` binds only to real form controls. Rich text is a contenteditable
+         <div>, so the label carries an id there instead and the editor points
+         back at it with aria-labelledby — the same association, expressed the
+         way ARIA allows for something that is not a <input>. -->
+    <label :id="labelId" :for="labelableId" class="field-label">
       {{ field.label }}
       <span v-if="field.required" class="required" aria-hidden="true">*</span>
     </label>
@@ -12,6 +16,7 @@
     <RichTextField
       v-if="field.type === 'richtext'"
       :model-value="modelValue ?? ''"
+      :labelledby="labelId"
       :describedby="describedBy"
       :invalid="!!error"
       @update:model-value="emitValue($event)"
@@ -95,6 +100,16 @@ const emit = defineEmits(['update:modelValue']);
 
 const uid = useId();
 const inputId = computed(() => `field-${props.field.name}-${uid}`);
+const labelId = computed(() => `${inputId.value}-label`);
+
+// Types whose control is a real form element, and so can be the target of a
+// `for`. Rich text is not one; a multi-value reference renders chips plus an
+// "add" dropdown that names itself, so neither is `for` meaningful there.
+const labelableId = computed(() => {
+  if (props.field.type === 'richtext') return undefined;
+  if (props.field.type === 'reference' && props.field.multiple) return undefined;
+  return inputId.value;
+});
 
 const describedBy = computed(() => {
   if (props.error) return `${inputId.value}-error`;
@@ -124,9 +139,12 @@ const emitValue = (raw) => {
 .field-label { display: block; margin-bottom: 0.4rem; font-weight: 500; font-size: 0.875rem; color: var(--app-text); }
 .required { color: var(--color-danger-600, #dc2626); margin-left: 0.15rem; }
 input[type="text"], input[type="number"], input[type="url"], input[type="email"], input[type="date"], textarea, select {
-  width: 100%; padding: 0.625rem 0.75rem; border: 1px solid var(--app-border);
+  width: 100%; padding: 0.625rem 0.75rem; border: 1px solid var(--control-border);
   border-radius: 8px; background: var(--app-surface); color: var(--app-text);
   font: inherit;
+}
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--focus-ring);
 }
 textarea { resize: vertical; }
 .field-error input, .field-error textarea, .field-error select { border-color: var(--color-danger-600, #dc2626); }

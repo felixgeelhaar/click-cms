@@ -9,6 +9,15 @@
   --ink: #1a1a1a;
   --muted: #4a5568;
   --rule: #e2e8f0;
+  /*
+   * --rule is a hairline: 1.2:1 against the page, which is right for a divider
+   * and wrong for a form field. WCAG 2.2 asks the boundary that identifies a
+   * control to clear 3:1, and here the boundary is all there is — the input's
+   * background is the same white as the page behind it. --field-rule is that
+   * same neutral taken to 3.6:1, and it is used on controls only, so sections,
+   * dividers and the header keep the hairline they were drawn with.
+   */
+  --field-rule: #7d8798;
   --accent: #0066cc;
   --measure: 68rem;
 }
@@ -202,7 +211,7 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
 .cms-form input,
 .cms-form textarea {
   font: inherit; color: var(--ink); width: 100%;
-  padding: 0.6rem 0.75rem; border: 1px solid var(--rule); border-radius: 6px;
+  padding: 0.6rem 0.75rem; border: 1px solid var(--field-rule); border-radius: 6px;
   background: #fff;
 }
 .cms-form input:focus,
@@ -212,6 +221,18 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem; }
   font: inherit; font-weight: 500; cursor: pointer;
   padding: 0.7rem 1.5rem; border: 0; border-radius: 6px;
   background: var(--accent); color: #fff;
+}
+/*
+ * The submit button, the brand and every link in a section were left to the
+ * browser's own focus ring. That ring varies by browser and disappears against
+ * a coloured button; the navigation already states its own, so these state the
+ * same one and the whole page answers the keyboard consistently.
+ */
+.cms-form button[type="submit"]:focus-visible,
+.cms-brand:focus-visible,
+.cms-section a:focus-visible,
+.cms-section--call-to-action .cms-field--buttonUrl a:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
 }
 .cms-form button[type="submit"]:disabled { opacity: 0.6; cursor: default; }
 .cms-form-status:not(:empty) { margin-top: 0.75rem; color: var(--muted); }

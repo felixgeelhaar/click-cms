@@ -67,9 +67,12 @@
           :aria-pressed="item.id === modelValue"
           @click="choose(item)"
         >
+          <!-- The button already says the file's name, right underneath. An alt
+               that repeats it makes the option announce itself twice; the
+               thumbnail is decoration inside a named control. -->
           <img
             :src="item.urls?.variants?.sm?.url ?? item.urls?.original"
-            :alt="item.alt || item.originalName"
+            alt=""
             loading="lazy"
           />
           <span class="chooser-name">{{ item.originalName }}</span>
@@ -138,13 +141,16 @@ onMounted(async () => {
 .unknown { margin: 0 0 0.5rem; font-size: 0.8125rem; color: var(--app-text-muted); }
 .picker { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; }
 .hint { font-size: 0.8125rem; color: var(--app-text-muted); }
-.chooser { list-style: none; margin: 0.75rem 0 0; padding: 0.6rem; display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); border: 1px solid var(--app-border); border-radius: 8px; max-height: 280px; overflow-y: auto; }
+.chooser { list-style: none; margin: 0.75rem 0 0; padding: 0.6rem; display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); border: 1px solid var(--control-border); border-radius: 8px; max-height: 280px; overflow-y: auto; }
 .chooser-item { width: 100%; padding: 0.3rem; border: 1px solid transparent; border-radius: 6px; background: none; cursor: pointer; text-align: left; }
 .chooser-item.current { border-color: var(--color-primary-600); }
+.chooser-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .chooser-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; display: block; }
 .chooser-name { display: block; margin-top: 0.25rem; font-size: 0.6875rem; color: var(--app-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.btn-sm { padding: 0.35rem 0.7rem; font-size: 0.8125rem; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); }
+.btn-sm { padding: 0.35rem 0.7rem; font-size: 0.8125rem; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); }
 .link-btn { background: none; border: none; color: var(--color-primary-600); cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
+.btn-sm:focus-visible,
+.link-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .field-message { margin: 0.35rem 0 0; font-size: 0.8125rem; }
 .help-message { color: var(--app-text-muted); }
 .error-message { color: var(--color-danger-600, #dc2626); }

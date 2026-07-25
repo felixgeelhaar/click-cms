@@ -136,7 +136,7 @@ const reasonLabel = (reason) => ({
 .versions-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .versions-heading { margin: 0; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--app-text-muted); }
 .versions-note { margin: 0.75rem 0 0; font-size: 0.8125rem; line-height: 1.45; color: var(--app-text-muted); }
-.versions-note.warn { color: var(--color-warning-500); }
+.versions-note.warn { color: var(--color-warning-text, #b45309); }
 .versions-error { margin: 0.75rem 0 0; font-size: 0.8125rem; color: var(--color-danger-600, #dc2626); }
 .versions-empty { margin: 0.75rem 0 0; font-size: 0.875rem; color: var(--app-text-muted); }
 .versions-list { list-style: none; margin: 0.75rem 0 0; padding: 0; }
@@ -147,10 +147,27 @@ const reasonLabel = (reason) => ({
 .version-meta { margin: 0.15rem 0 0; font-size: 0.75rem; color: var(--app-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .version-tag { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.1rem 0.4rem; border-radius: 999px; border: 1px solid var(--app-border); color: var(--app-text-muted); }
 .version-tag.current { border-color: var(--color-primary-600); color: var(--color-primary-600); }
-.version-tag.live { border-color: var(--color-success-500); color: var(--color-success-500); }
+.version-tag.live { border-color: var(--color-success-500); color: var(--color-success-text, #15803d); }
 .confirm { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem; max-width: 24rem; }
 .confirm-text { flex-basis: 100%; margin: 0; font-size: 0.8125rem; line-height: 1.4; color: var(--app-text-muted); text-align: right; }
 .btn-sm.primary { background: var(--color-primary-600); color: white; border-color: var(--color-primary-600); }
-.btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); font: inherit; white-space: nowrap; }
+.btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); font: inherit; white-space: nowrap; }
 .btn-sm:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

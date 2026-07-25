@@ -37,6 +37,39 @@ const { title = 'Click CMS Admin' } = Astro.props;
             --color-warning-500: #f59e0b;
             --color-danger-500: #ef4444;
 
+            /*
+             * Status wording is drawn in text, and text has to clear 4.5:1.
+             * --color-success-500 is a fill colour: on white it measures 2.3:1,
+             * which is fine behind a badge and unreadable as a word. These are
+             * the same hues taken to a legible lightness, one per mode.
+             */
+            --color-success-text: #15803d;
+            --color-warning-text: #b45309;
+
+            /*
+             * Red says "this went wrong", and it says it in words. Those words
+             * were painted in --color-danger-500, which is 3.8:1 on white — a
+             * fill colour doing a text colour's job. --color-danger-600 is the
+             * legible one and is restated per mode; --color-danger-fill is the
+             * one a solid button uses, dark enough for white lettering in both.
+             */
+            --color-danger-600: #dc2626;
+            --color-danger-fill: #dc2626;
+
+            /*
+             * The visible boundary of a form control is the only thing that says
+             * "you can type here" — the field's own background matches the card
+             * it sits on — so WCAG 2.2 asks it to clear 3:1, which the hairline
+             * --app-border (1.27:1 on white) does not. This is that hairline
+             * taken to 3.6:1 and used for controls only; cards, rules and
+             * dividers keep --app-border, because a decorative separator carries
+             * no information and is exempt.
+             */
+            --control-border: #7d8798;
+
+            /* Focus ring: 3.6:1 on light surfaces, 7.2:1 on dark ones. */
+            --focus-ring: var(--color-primary-600);
+
             --app-bg: linear-gradient(180deg, #f7f9fb 0%, #eef2f5 100%);
             --app-surface: #ffffff;
             --app-surface-strong: #f7f9fb;
@@ -97,6 +130,13 @@ const { title = 'Click CMS Admin' } = Astro.props;
             --card-radius-sm: 12px;
             --card-shadow: 0 18px 40px rgba(2, 6, 23, 0.45);
             --card-shadow-soft: 0 12px 28px rgba(2, 6, 23, 0.45);
+
+            --color-success-text: #4ade80;
+            --color-warning-text: #fbbf24;
+            --color-danger-600: #f87171;
+            --color-danger-fill: #dc2626;
+            --control-border: #5f6b7d;
+            --focus-ring: var(--color-primary-500);
         }
 
         * {

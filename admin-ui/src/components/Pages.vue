@@ -39,7 +39,10 @@
     <div v-else class="page-list">
       <div v-for="page in filteredPages" :key="page.key" class="page-card">
         <div class="page-info">
-          <h3>{{ page.data?.title || slugOf(page) }}</h3>
+          <!-- h2, not h3: this screen's only h1 is "Pages", so a card title at
+               level 3 skips a level and breaks the outline a screen reader
+               navigates by. The size is set in CSS, not by the tag. -->
+          <h2>{{ page.data?.title || slugOf(page) }}</h2>
           <p class="page-slug">/{{ slugOf(page) }}</p>
 
           <div class="state-row">
@@ -250,17 +253,22 @@ onMounted(loadPages);
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
 .locale-picker { display: flex; align-items: center; gap: 0.5rem; }
 .locale-label { color: var(--app-text-muted); font-size: 0.875rem; font-weight: 500; }
-.locale-select { padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--app-border); background: var(--app-surface); color: var(--app-text); font-size: 0.875rem; font-weight: 500; }
+.locale-select { padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--control-border); background: var(--app-surface); color: var(--app-text); font-size: 0.875rem; font-weight: 500; }
+.locale-select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--focus-ring); }
 
 .filter-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .tab { padding: 0.5rem 1rem; background: none; border: none; border-radius: 8px; cursor: pointer; color: var(--app-text-muted); font-weight: 500; }
 .tab.active { background: var(--sidebar-active); color: var(--sidebar-active-text); }
+.tab:focus-visible,
+.btn-primary:focus-visible,
+.btn-sm:focus-visible,
+.lang-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
-.notice { margin-bottom: 1rem; color: var(--color-danger-500); font-size: 0.875rem; }
+.notice { margin-bottom: 1rem; color: var(--color-danger-600, #dc2626); font-size: 0.875rem; }
 .loading, .empty-state { text-align: center; padding: 3rem; color: var(--app-text-muted); }
 .page-list { display: flex; flex-direction: column; gap: 1rem; }
 .page-card { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.5rem; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius-sm); }
-.page-info h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
+.page-info h2 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
 .page-slug { color: var(--app-text-muted); font-size: 0.875rem; margin-bottom: 0.5rem; }
 
 .state-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem; }
@@ -286,8 +294,9 @@ a.lang-chip:hover, a.lang-chip:focus-visible { background: var(--sidebar-hover);
 
 .page-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
 .btn-sm { display: inline-block; padding: 0.5rem 1rem; font-size: 0.875rem; border-radius: 6px; cursor: pointer; text-decoration: none; }
-.btn-secondary { background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--app-border); }
-.btn-danger { background: var(--color-danger-500); color: white; border: none; }
+.btn-secondary { background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--control-border); }
+/* White on --color-danger-500 is 3.8:1 — under the 4.5:1 its own label needs. */
+.btn-danger { background: var(--color-danger-fill, #dc2626); color: white; border: none; }
 
 /* The badge palette above is tuned for light surfaces; on dark ones the same
    tints go muddy, so they are restated rather than left to wash out. */

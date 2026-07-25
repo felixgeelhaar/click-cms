@@ -184,7 +184,7 @@ onMounted(load);
 .editor { border: 1px solid var(--app-border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; background: var(--card-bg); }
 .editor-title { margin: 0 0 1rem; font-size: 1.125rem; }
 .editor label { display: block; margin: 0 0 0.3rem; font-size: 0.875rem; font-weight: 500; }
-.editor input, .editor select { width: 100%; padding: 0.6rem 0.7rem; margin-bottom: 0.3rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.editor input, .editor select { width: 100%; padding: 0.6rem 0.7rem; margin-bottom: 0.3rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .editor input:disabled { opacity: 0.65; }
 .hint { margin: 0 0 1rem; font-size: 0.8125rem; color: var(--app-text-muted); }
 .editor-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
@@ -198,10 +198,27 @@ onMounted(load);
 .role { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--app-surface-strong); white-space: nowrap; }
 .role--admin { background: var(--color-primary-600); color: #fff; }
 .row-actions { display: flex; gap: 0.5rem; }
-.btn-sm { padding: 0.35rem 0.7rem; font-size: 0.8125rem; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); }
+.btn-sm { padding: 0.35rem 0.7rem; font-size: 0.8125rem; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); }
 .btn-sm.danger { color: var(--color-danger-600, #dc2626); }
 .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-primary { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
-.btn-secondary { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--app-border); }
+.btn-secondary { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--control-border); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

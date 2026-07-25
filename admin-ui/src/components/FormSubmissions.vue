@@ -127,6 +127,23 @@ onMounted(load);
 .submission-field dt { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--app-text-muted); }
 .submission-field dd { margin: 0; font-size: 0.9375rem; color: var(--app-text); overflow-wrap: anywhere; }
 .submission-field dd.is-message { white-space: pre-wrap; }
-.btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); font: inherit; white-space: nowrap; }
+.btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); font: inherit; white-space: nowrap; }
 .btn-sm:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

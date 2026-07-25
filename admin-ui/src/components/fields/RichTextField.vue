@@ -19,12 +19,20 @@
     <!-- contenteditable holds HTML. It is populated from the model imperatively
          rather than with v-html bound to a keystroke, so the caret is not reset
          on every character typed. -->
+    <!--
+      role="textbox" makes this an input, and an input needs a name. The field
+      wrapper's <label> cannot use `for` here — `for` only binds to real form
+      controls, and a contenteditable <div> is not one — so the wrapper passes
+      the label's id and this points at it. Standalone, it names itself.
+    -->
     <div
       ref="editable"
       class="rt-content"
       contenteditable="true"
       role="textbox"
       aria-multiline="true"
+      :aria-labelledby="labelledby"
+      :aria-label="labelledby ? undefined : 'Rich text'"
       :aria-describedby="describedby"
       :aria-invalid="invalid ? 'true' : undefined"
       @input="onInput"
@@ -40,6 +48,8 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   // Forwarded from the field wrapper for accessibility; optional.
   describedby: { type: String, default: undefined },
+  // The id of the wrapper's <label>, which becomes this editor's name.
+  labelledby: { type: String, default: undefined },
   invalid: { type: Boolean, default: false },
 });
 
@@ -231,7 +241,7 @@ const makeList = (tag) => {
 
 <style scoped>
 .rich-text {
-  border: 1px solid var(--app-border);
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   background: var(--app-surface);
   overflow: hidden;
@@ -259,7 +269,7 @@ const makeList = (tag) => {
   line-height: 1;
 }
 .rt-btn:hover { background: var(--app-surface); border-color: var(--app-border); }
-.rt-btn:focus-visible { outline: 2px solid var(--color-primary-600, #2563eb); outline-offset: 1px; }
+.rt-btn:focus-visible { outline: 2px solid var(--focus-ring, #0f766e); outline-offset: 1px; }
 .rt-sep { width: 1px; align-self: stretch; margin: 0.15rem 0.25rem; background: var(--app-border); }
 .rt-content {
   min-height: 8rem;
@@ -269,7 +279,7 @@ const makeList = (tag) => {
   line-height: 1.55;
   outline: none;
 }
-.rt-content:focus { box-shadow: inset 0 0 0 2px var(--color-primary-600, #2563eb); }
+.rt-content:focus { box-shadow: inset 0 0 0 2px var(--focus-ring, #0f766e); }
 .rt-content :deep(h2) { font-size: 1.25rem; margin: 0.5rem 0; }
 .rt-content :deep(h3) { font-size: 1.1rem; margin: 0.5rem 0; }
 .rt-content :deep(ul),

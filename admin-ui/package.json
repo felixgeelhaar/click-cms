@@ -18,8 +18,10 @@
   },
   "devDependencies": {
     "@vue/test-utils": "^2.4.11",
+    "axe-core": "^4.12.1",
     "jsdom": "^29.1.1",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "vitest-axe": "^0.1.0"
   }
 }

@@ -196,12 +196,29 @@ onMounted(load);
 .comment-badge { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-success-700, #15803d); }
 .comment-form { margin-top: 1.25rem; }
 .comment-form-label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--app-text-muted); margin-bottom: 0.35rem; }
-.comment-input { width: 100%; box-sizing: border-box; padding: 0.6rem 0.75rem; font: inherit; font-size: 0.9375rem; color: var(--app-text); background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 8px; resize: vertical; }
+.comment-input { width: 100%; box-sizing: border-box; padding: 0.6rem 0.75rem; font: inherit; font-size: 0.9375rem; color: var(--app-text); background: var(--app-surface); border: 1px solid var(--control-border); border-radius: 8px; resize: vertical; }
 .comment-form-actions { margin-top: 0.6rem; display: flex; justify-content: flex-end; }
-.btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); font: inherit; white-space: nowrap; }
+.btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); font: inherit; white-space: nowrap; }
 .btn-sm:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-primary { padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; color: #fff; background: var(--color-primary-600, #4f46e5); font: inherit; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-link { padding: 0; font-size: 0.8125rem; font-weight: 600; border: none; background: none; cursor: pointer; color: var(--color-primary-600, #4f46e5); font: inherit; }
 .btn-link:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

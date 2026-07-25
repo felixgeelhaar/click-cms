@@ -21,10 +21,16 @@
         @drop="onDrop(index)"
       >
         <div class="row-head">
+          <!-- Pointer-only, and hidden from assistive tech on purpose. A <span>
+               may not carry aria-label (ARIA forbids it on a role-less element,
+               and screen readers duly ignore it), and this control is not
+               focusable, so advertising it would name something a keyboard
+               cannot reach. The arrow buttons beside it are the reachable path
+               and they are labelled. -->
           <span
             class="drag-handle"
             draggable="true"
-            :aria-label="`Reorder entry ${index + 1} — drag to move, or use the arrow buttons`"
+            aria-hidden="true"
             @dragstart="onDragStart(index)"
             @dragend="onDragEnd"
           >⠿</span>
@@ -155,7 +161,7 @@ const {
 </script>
 
 <style scoped>
-.repeater { border: 1px solid var(--app-border); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem; }
+.repeater { border: 1px solid var(--control-border); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem; }
 .repeater-legend { font-weight: 600; font-size: 0.875rem; padding: 0 0.4rem; }
 .required { color: var(--color-danger-600, #dc2626); }
 .repeater-help { margin: 0 0 0.75rem; font-size: 0.8125rem; color: var(--app-text-muted); }
@@ -170,10 +176,12 @@ const {
 .drag-handle:active { cursor: grabbing; }
 .row-number { font-size: 0.75rem; font-weight: 600; color: var(--app-text-muted); margin-right: auto; }
 .row-controls { display: flex; gap: 0.25rem; }
-.icon-btn { width: 28px; height: 28px; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; line-height: 1; }
+.icon-btn { width: 28px; height: 28px; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); line-height: 1; }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .icon-btn.danger { color: var(--color-danger-600, #dc2626); }
-.btn-add { padding: 0.5rem 0.9rem; border: 1px dashed var(--app-border); background: none; border-radius: 8px; cursor: pointer; color: var(--app-text); font: inherit; }
+.btn-add { padding: 0.5rem 0.9rem; border: 1px dashed var(--control-border); background: none; border-radius: 8px; cursor: pointer; color: var(--app-text); font: inherit; }
 .btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
+.icon-btn:focus-visible,
+.btn-add:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .limit-note { margin-left: 0.6rem; font-size: 0.8125rem; color: var(--app-text-muted); }
 </style>

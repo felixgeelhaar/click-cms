@@ -97,9 +97,26 @@ const submit = async () => {
 .error { color: var(--color-danger-600, #dc2626); background: var(--app-surface-strong); }
 .success { color: var(--color-primary-600); background: var(--app-surface-strong); }
 label { display: block; margin: 0 0 0.35rem; font-size: 0.875rem; font-weight: 500; }
-input { width: 100%; padding: 0.65rem 0.75rem; margin-bottom: 0.35rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+input { width: 100%; padding: 0.65rem 0.75rem; margin-bottom: 0.35rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .hint { margin: 0 0 1rem; font-size: 0.8125rem; color: var(--app-text-muted); }
 .mismatch { color: var(--color-danger-600, #dc2626); }
 .btn-primary { width: 100%; padding: 0.7rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

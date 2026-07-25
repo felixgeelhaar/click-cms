@@ -36,10 +36,13 @@
       >
         <header class="section-head">
           <div class="section-identity">
+            <!-- Pointer-only, and hidden on purpose: a role-less <span> may not
+                 carry aria-label, and this handle takes no focus. The labelled
+                 arrow buttons opposite are the keyboard path. -->
             <span
               class="drag-handle"
               draggable="true"
-              :aria-label="`Reorder section ${index + 1} — drag to move, or use the arrow buttons`"
+              aria-hidden="true"
               @dragstart="onDragStart(index)"
               @dragend="onDragEnd"
             >⠿</span>
@@ -260,16 +263,19 @@ onMounted(async () => {
 .section-type { margin: 0; font-weight: 600; font-size: 0.9375rem; }
 .section-missing { margin: 0.15rem 0 0; font-size: 0.8125rem; color: var(--color-danger-600, #dc2626); }
 .section-controls { display: flex; gap: 0.25rem; }
-.icon-btn { width: 28px; height: 28px; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; line-height: 1; }
+.icon-btn { width: 28px; height: 28px; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); line-height: 1; }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .icon-btn.danger { color: var(--color-danger-600, #dc2626); }
+.icon-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .section-body { padding: 1rem; }
 .orphan-values { margin: 0; padding: 0.75rem; background: var(--app-surface-strong); border-radius: 8px; font-size: 0.8125rem; overflow-x: auto; }
 .add-row { border: 1px dashed var(--app-border); border-radius: 10px; padding: 1rem; }
 .add-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; }
 .add-controls { display: flex; gap: 0.75rem; }
-.add-controls select { flex: 1; padding: 0.625rem 0.75rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.add-controls select { flex: 1; padding: 0.625rem 0.75rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.add-controls select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--focus-ring); }
 .add-description { margin: 0.5rem 0 0; font-size: 0.8125rem; color: var(--app-text-muted); }
 .btn-primary { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 </style>

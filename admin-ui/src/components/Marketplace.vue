@@ -6,7 +6,7 @@
     </p>
 
     <p v-if="error" class="banner error" role="alert">{{ error }}</p>
-    <p v-if="notice" class="banner success">{{ notice }}</p>
+    <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
 
     <!-- Stated plainly, because the two paths are not equally trusted and the
          person installing should know which one they are using. -->
@@ -176,5 +176,22 @@ onMounted(load);
 .upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .btn-primary { padding: 0.55rem 1.1rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; white-space: nowrap; }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
-.btn-secondary { padding: 0.55rem 1.1rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--app-border); }
+.btn-secondary { padding: 0.55rem 1.1rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--control-border); }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

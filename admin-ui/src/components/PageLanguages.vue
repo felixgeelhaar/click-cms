@@ -112,10 +112,27 @@ const stale = computed(() => props.locales.filter((c) => c !== props.current && 
 .lang-name { font-size: 0.875rem; font-weight: 600; }
 .lang-code { margin-left: 0.4rem; font-size: 0.6875rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: var(--app-text-muted); }
 .lang-state { font-size: 0.75rem; color: var(--app-text-muted); }
-.lang.live .lang-state { color: var(--color-success-500); }
-.lang.stale .lang-state { color: var(--color-warning-500); }
-.lang.never .lang-state, .lang.down .lang-state { color: var(--color-danger-500); }
+.lang.live .lang-state { color: var(--color-success-text, #15803d); }
+.lang.stale .lang-state { color: var(--color-warning-text, #b45309); }
+.lang.never .lang-state, .lang.down .lang-state { color: var(--color-danger-600, #dc2626); }
 .lang.missing { border-style: dashed; }
 .langs-note { margin: 0.75rem 0 0; font-size: 0.8125rem; line-height: 1.45; color: var(--app-text-muted); }
-.langs-note.warn { color: var(--color-warning-500); }
+.langs-note.warn { color: var(--color-warning-text, #b45309); }
+
+/*
+ * Focus. Every control here is reachable by keyboard and, until this rule, none
+ * of them said so: the browser default is easy to lose against these surfaces
+ * and several controls sit on tinted backgrounds where it disappears entirely.
+ * One ring, stated once, on whatever the keyboard is actually on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--focus-ring, #0f766e);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 </style>

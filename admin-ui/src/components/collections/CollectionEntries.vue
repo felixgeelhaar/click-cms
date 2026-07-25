@@ -22,7 +22,7 @@
         <div class="entry-info">
           <!-- Interpolated, never v-html: an entry title is author-supplied data
                and is escaped like every other value on this screen. -->
-          <h3 class="entry-title">{{ entryTitle(entry) }}</h3>
+          <h2 class="entry-title">{{ entryTitle(entry) }}</h2>
           <p class="entry-slug">{{ entry.slug }}</p>
           <span :class="['status-badge', stateOf(entry)]">{{ stateLabel(stateOf(entry)) }}</span>
         </div>
@@ -141,8 +141,13 @@ onMounted(loadEntries);
 
 .btn-primary { padding: 0.625rem 1rem; background: var(--color-primary-600); color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; }
 .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem; border-radius: 6px; cursor: pointer; }
-.btn-secondary { background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--app-border); }
-.btn-danger { background: var(--color-danger-500); color: white; border: none; }
+.btn-secondary { background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--control-border); }
+/* White on --color-danger-500 is 3.8:1. --color-danger-fill is the same red
+   taken just far enough for its own lettering to clear 4.5:1. */
+.btn-danger { background: var(--color-danger-fill, #dc2626); color: white; border: none; }
+.btn-back:focus-visible,
+.btn-primary:focus-visible,
+.btn-sm:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 6px; }
 
 [data-theme="dark"] .status-badge.live { background: rgba(34, 197, 94, 0.18); color: #86efac; }
 [data-theme="dark"] .status-badge.pending { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
