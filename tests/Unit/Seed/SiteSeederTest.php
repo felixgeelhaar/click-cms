@@ -12,6 +12,7 @@ use Click\Cms\Application\Seed\ExampleSite;
 use Click\Cms\Application\Seed\SiteSeeder;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\History\RetentionPolicy;
+use Click\Cms\Domain\Menu\Menu;
 use Click\Cms\Domain\Publishing\Publishable;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Domain\ValueObjects\ContentKey;
@@ -237,6 +238,52 @@ final class SiteSeederTest extends TestCase
         $description = 'The workshop floor, with benches under high windows.';
         $this->assertStringContainsString('alt="' . $description . '"', $html);
         $this->assertStringNotContainsString('>' . $description . '<', $html);
+    }
+
+    /**
+     * The seeded menu must be one the site can actually draw.
+     *
+     * This exists because the first version of the seeder wrote the menu
+     * document by hand and used `href` for each item's destination — which is
+     * what the menus *API* returns, not what is *stored*. Stored, the key is
+     * `target`. So the seeded menu had four items with no destination, and the
+     * header threw `A menu item needs a target` on every single page of the
+     * site. Every other test here passed: none of them rendered a header.
+     *
+     * Building the menu through the domain model is the fix; this is the test
+     * that would have caught it either way.
+     */
+    public function testTheSeededMenuIsOneTheSiteCanRender(): void
+    {
+        $this->seeder->seed($this->admin);
+
+        $menu = $this->content->get(ContentKey::for('menu', 'main', $this->content->defaultLocale()));
+        $this->assertNotNull($menu);
+
+        // Reconstructing through the domain is exactly what the header does, so
+        // a stored shape the header would reject throws here.
+        $rebuilt = Menu::fromArray($menu->data);
+
+        $this->assertCount(4, $rebuilt->items());
+        foreach ($rebuilt->items() as $item) {
+            $this->assertNotSame('', $item->target(), "\"{$item->label()}\" has no destination");
+        }
+    }
+
+    /** And every destination names a page the seeder actually created. */
+    public function testEveryMenuItemPointsAtASeededPage(): void
+    {
+        $this->seeder->seed($this->admin);
+
+        $slugs = array_keys(ExampleSite::pages());
+
+        foreach (ExampleSite::menu()->items() as $item) {
+            $this->assertContains(
+                $item->target(),
+                $slugs,
+                "the menu links to \"{$item->target()}\", which is not one of the seeded pages"
+            );
+        }
     }
 
     /* ------------------------------------------------- it never overwrites -- */

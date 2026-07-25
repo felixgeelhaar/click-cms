@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Click\Cms\Application\Seed;
 
+use Click\Cms\Domain\Menu\Menu;
+use Click\Cms\Domain\Menu\MenuItem;
+
 /**
  * The example site: content, and nothing else.
  *
@@ -343,22 +346,30 @@ final class ExampleSite
     }
 
     /**
-     * The main menu. Its hrefs are the page slugs above, so the navigation the
-     * theme renders actually goes somewhere.
+     * The main menu, as the domain model — not as a stored array.
      *
-     * @return array{name: string, items: list<array{label: string, href: string, external: bool}>}
+     * The first version of this hand-wrote the document, and used `href` for
+     * each item's destination because that is what the menus *API* returns. What
+     * is *stored* is `target`; `href` is the resolved form the controller
+     * computes on the way out. The seeded menu was therefore a menu with no
+     * destinations, and every page 500'd the moment the header tried to render
+     * it — which no unit test noticed, because none of them rendered a header.
+     *
+     * Building it through `Menu` is what makes that class of mistake impossible:
+     * an item with no target now throws here, at seed time, rather than on a
+     * visitor's request.
      */
-    public static function menu(): array
+    public static function menu(): Menu
     {
-        return [
-            'name' => 'Main menu',
-            'items' => [
-                ['label' => 'Home', 'href' => '/', 'external' => false],
-                ['label' => 'About', 'href' => '/about', 'external' => false],
-                ['label' => 'Journal', 'href' => '/journal', 'external' => false],
-                ['label' => 'Contact', 'href' => '/contact', 'external' => false],
-            ],
-        ];
+        // Bare slugs, not paths: an internal target is a slug (optionally with a
+        // locale prefix), and the controller turns it into an href on the way
+        // out. `/about` is rejected outright, which is how this was found.
+        return Menu::create('main', 'Main menu', [
+            MenuItem::create('Home', 'home'),
+            MenuItem::create('About', 'about'),
+            MenuItem::create('Journal', 'journal'),
+            MenuItem::create('Contact', 'contact'),
+        ]);
     }
 
     /**

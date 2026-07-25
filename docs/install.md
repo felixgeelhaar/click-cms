@@ -108,11 +108,15 @@ against a site that already has content, and safe to run twice. There is no flag
 that deletes anything — to remove the example site, delete its pages from the
 admin.
 
-In Docker:
+In Docker, run it **as the web server's user**:
 
 ```bash
-docker exec click-cms php bin/click-seed.php
+docker exec -u www-data click-cms php bin/click-seed.php
 ```
+
+`docker exec` runs as root by default, and content it creates that way is owned
+by root — the site can read it and then cannot edit or delete any of it. The
+same applies to every CLI tool here.
 
 ### 3. Choose a storage backend
 
