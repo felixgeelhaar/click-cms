@@ -18,13 +18,16 @@ final class FieldDefinition
     /**
      * @param list<string>          $options    Allowed values, for Select fields.
      * @param list<FieldDefinition> $fields     Sub-fields, for Repeater fields.
-     * @param ?string               $labelField For Url fields: the name of the field
-     *                                          holding the link's text. A link and its
-     *                                          wording are one control to a reader, but
-     *                                          two fields to an editor; without this the
-     *                                          renderer has no way to know they belong
-     *                                          together and prints the raw address on
-     *                                          the page next to a separate label.
+     * @param ?string               $labelField The field that supplies this one's human
+     *                                          wording. On a Url field that is the link's
+     *                                          text; on an Image field it is the picture's
+     *                                          description. Either way the pair is one
+     *                                          thing to a reader and two fields to an
+     *                                          editor, and without the declaration the
+     *                                          renderer prints both — a raw address beside
+     *                                          a stray label, or an image description
+     *                                          repeated as a paragraph under the picture
+     *                                          it was written to replace.
      * @param ?int                  $displayWidth For Image fields: the width in CSS
      *                                          pixels the section shows the image at.
      *                                          A card in a four-column grid and a
@@ -125,9 +128,10 @@ final class FieldDefinition
             fields: $fields,
             min: isset($spec['min']) ? (int) $spec['min'] : null,
             max: isset($spec['max']) ? (int) $spec['max'] : null,
-            labelField: $type === FieldType::Url && is_string($spec['labelField'] ?? null)
-                ? trim($spec['labelField'])
-                : null,
+            labelField: in_array($type, [FieldType::Url, FieldType::Image], true)
+                && is_string($spec['labelField'] ?? null)
+                    ? trim($spec['labelField'])
+                    : null,
             // Ignored on every other type: a display width means nothing for a
             // number or a date, and silently accepting it there would suggest
             // it does something.
