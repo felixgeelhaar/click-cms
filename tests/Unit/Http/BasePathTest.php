@@ -41,6 +41,20 @@ final class BasePathTest extends TestCase
     }
 
     /**
+     * The null object every URL-emitting class defaults to. Without it each of
+     * them would need a nullable dependency and a `?->url() ?? $path` at every
+     * call — the shape that quietly leaves one URL unprefixed.
+     */
+    public function testTheRootIsTheDoNothingPrefix(): void
+    {
+        $root = BasePath::root();
+
+        $this->assertSame('', $root->prefix());
+        $this->assertSame('/api/pages', $root->url('/api/pages'));
+        $this->assertSame('/api/pages', $root->strip('/api/pages'));
+    }
+
+    /**
      * PHP's built-in server reports the *requested path* as SCRIPT_NAME when it
      * routes through a script, so `/api/pages` would otherwise be read as a site
      * installed under `/api`. Only a script name that actually names a PHP file

@@ -34,6 +34,19 @@ final class BasePath
     private function __construct(private readonly string $prefix) {}
 
     /**
+     * No prefix — a site at the domain root, and the default every URL-emitting
+     * class takes.
+     *
+     * A null object rather than a nullable dependency on purpose: `?->url() ??
+     * $path` at a dozen call sites is the shape that eventually leaves one URL
+     * unprefixed, and one unprefixed URL is a broken page.
+     */
+    public static function root(): self
+    {
+        return new self('');
+    }
+
+    /**
      * Work out the prefix for this request.
      *
      * @param array<string, mixed> $server    The request's `$_SERVER`.

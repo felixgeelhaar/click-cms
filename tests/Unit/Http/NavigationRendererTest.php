@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Tests\Unit\Http;
 
+use Click\Cms\Http\BasePath;
 use Click\Cms\Http\NavigationRenderer;
 use PHPUnit\Framework\TestCase;
 
@@ -136,5 +137,42 @@ final class NavigationRendererTest extends TestCase
         $this->assertStringContainsString('<script>', $html);
         $this->assertStringContainsString("classList.add('cms-js')", $html);
         $this->assertStringContainsString('cms-nav-open', $html);
+    }
+
+    /* ------------------------------------------------ under a URL prefix -- */
+
+    public function testOnSiteLinksCarryTheInstallationsPrefix(): void
+    {
+        $renderer = new NavigationRenderer(BasePath::detect([], '/2026/cms'));
+
+        $html = $renderer->render([$this->item('News', '/news')], '/home', 'Acme');
+
+        $this->assertStringContainsString('<a href="/2026/cms/news"', $html);
+        $this->assertStringContainsString('<a class="cms-brand" href="/2026/cms/"', $html);
+    }
+
+    /** An external link names its own host; prefixing it would corrupt it. */
+    public function testAnExternalLinkIsLeftAlone(): void
+    {
+        $renderer = new NavigationRenderer(BasePath::detect([], '/2026/cms'));
+
+        $html = $renderer->render([$this->item('Docs', 'https://example.com/docs', true)], '/home', null);
+
+        $this->assertStringContainsString('href="https://example.com/docs"', $html);
+    }
+
+    /**
+     * The current-page mark survives the prefix. Menu hrefs and the current href
+     * are both site paths, so they are compared before either is prefixed — the
+     * alternative is a nav in which nothing is ever marked current.
+     */
+    public function testTheCurrentItemIsStillMarkedUnderAPrefix(): void
+    {
+        $renderer = new NavigationRenderer(BasePath::detect([], '/2026/cms'));
+
+        $html = $renderer->render([$this->item('Home', '/home')], '/home', null);
+
+        $this->assertStringContainsString('<a href="/2026/cms/home" aria-current="page">Home</a>', $html);
+        $this->assertStringContainsString('cms-nav-item--current', $html);
     }
 }

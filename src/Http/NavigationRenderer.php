@@ -28,6 +28,20 @@ namespace Click\Cms\Http;
  */
 final class NavigationRenderer
 {
+    private readonly BasePath $urlBase;
+
+    /**
+     * @param BasePath|null $urlBase The prefix this installation is served under.
+     *        Menu hrefs are stored as site paths (`/about`) — which is what makes
+     *        a menu portable between installations — so the prefix goes on here,
+     *        at the moment they become links. Null means the domain root, leaving
+     *        the markup exactly as it was before prefixes existed.
+     */
+    public function __construct(?BasePath $urlBase = null)
+    {
+        $this->urlBase = $urlBase ?? BasePath::root();
+    }
+
     /**
      * @param list<array{label: string, href: string, external: bool, children?: array<int, array<string, mixed>>}> $items
      * @param string $currentHref The href of the page being rendered, so the
@@ -46,7 +60,8 @@ final class NavigationRenderer
         }
 
         $brandHtml = $brand !== ''
-            ? '<a class="cms-brand" href="/">' . $this->escape($brand) . '</a>'
+            ? '<a class="cms-brand" href="' . $this->escape($this->urlBase->url('/')) . '">'
+                . $this->escape($brand) . '</a>'
             : '';
 
         $navHtml = '';
@@ -81,9 +96,15 @@ final class NavigationRenderer
     {
         $label = $this->escape((string) ($item['label'] ?? ''));
         $href = (string) ($item['href'] ?? '');
-        $hrefAttr = $this->escape($href);
 
         $external = (bool) ($item['external'] ?? false);
+
+        // The link as it will be written. An external href names its own host and
+        // is left exactly as stored; an on-site one gains this installation's
+        // prefix. Note the *unprefixed* $href is what the current-page comparison
+        // below uses — both sides of it are site paths, and prefixing one of them
+        // would mean no item is ever marked current.
+        $hrefAttr = $this->escape($external ? $href : $this->urlBase->url($href));
         // An external link opens in a new tab and does not hand the opener
         // window to the destination.
         $rel = $external ? ' rel="noopener noreferrer" target="_blank"' : '';

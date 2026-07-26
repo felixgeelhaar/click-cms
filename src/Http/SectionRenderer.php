@@ -46,6 +46,14 @@ final class SectionRenderer
 
     private readonly RichTextSanitizer $sanitizer;
 
+    /**
+     * The prefix this installation is served under, for the URLs this renderer
+     * writes itself rather than receives — the form endpoint. The media base is
+     * separate because its caller hands it over as a whole URL, already
+     * prefixed.
+     */
+    private readonly BasePath $urlBase;
+
     public function __construct(
         private readonly SectionTypeRepository $sectionTypes,
         private readonly ?MediaService $media = null,
@@ -58,10 +66,14 @@ final class SectionRenderer
          * rather than half of something.
          */
         private readonly ?EntryListings $listings = null,
+        ?BasePath $urlBase = null,
     ) {
         // Defaulted rather than required so existing callers are unaffected: the
         // sanitiser is pure domain logic with no dependencies of its own.
         $this->sanitizer = $sanitizer ?? new RichTextSanitizer();
+        // Likewise the prefix: a caller that never heard of one emits exactly
+        // what it emitted before.
+        $this->urlBase = $urlBase ?? BasePath::root();
     }
 
     /**
@@ -227,7 +239,7 @@ final class SectionRenderer
             // The confirmation the visitor sees after submitting, carried on the
             // form so the enhancement script below can show it without a second
             // round trip. Escaped: it is editor text landing in an attribute.
-            . '<form class="cms-form" method="POST" action="/api/forms/submit"'
+            . '<form class="cms-form" method="POST" action="' . $this->urlBase->url('/api/forms/submit') . '"'
             . ' data-confirmation="' . $this->escape($confirmation) . '">'
             . '<input type="hidden" name="page" value="' . $slug . '">'
             . '<input type="hidden" name="locale" value="' . $locale . '">'

@@ -209,6 +209,18 @@ class Application
         return $this->urlBase ??= BasePath::detect($_SERVER, $this->config?->basePath());
     }
 
+    /**
+     * Where media files are served from, as this installation spells it.
+     *
+     * One place, because every renderer and every API response has to agree: an
+     * image resolved against one base and a srcset against another is a page
+     * that loads its fallback and none of its variants.
+     */
+    private function mediaBaseUrl(): string
+    {
+        return $this->urlBase()->url('/api/media/file');
+    }
+
     public function boot(): void
     {
         if ($this->booted) {
@@ -346,7 +358,8 @@ class Application
             $this->basePath,
             $this->contentService,
             $this->history,
-            $this->config
+            $this->config,
+            $this->urlBase(),
         );
 
         // User management is core (the admin UI depends on it); it fires the same
@@ -364,7 +377,7 @@ class Application
         // Navigation menus: managed through the admin and rendered into the site's
         // header, both reading the same stored menu.
         $this->menusController = new MenusController($this->contentService);
-        $this->navigationRenderer = new NavigationRenderer();
+        $this->navigationRenderer = new NavigationRenderer($this->urlBase());
 
         // Collections — repeatable content types (posts, team members, …) defined
         // in config/collections. Their entries are ordinary content documents, so
@@ -403,6 +416,7 @@ class Application
             // "What links here" scans reference fields on demand rather than
             // keeping a stored index a flat-file write would have to maintain.
             new BackReferenceService($collectionTypes, $this->contentService),
+            $this->urlBase(),
         );
 
         // Themes live outside the application so a site's design survives a
@@ -483,7 +497,7 @@ class Application
 
         // Plugin management is core — the admin UI's Plugins page depends on it —
         // so it is wired here rather than in a plugin that could be disabled.
-        $this->pluginsController = new PluginsController($this->pluginManager);
+        $this->pluginsController = new PluginsController($this->pluginManager, $this->urlBase());
         $this->marketplaceController = new MarketplaceController($this->pluginManager, $this->config, $this->basePath);
 
         // Identity — login, logout, password changes, the default admin — is its
@@ -676,7 +690,13 @@ class Application
             // link that predates a slug change still lands somewhere.
             $redirect = $this->redirectsController->rules()->match($path);
             if ($redirect !== null) {
-                return ['redirect' => $redirect->to, 'status' => $redirect->statusCode()];
+                // A rule's target is stored as a site path, so it gains this
+                // installation's prefix on the way into the Location header. A
+                // target that names another site entirely is left alone by url().
+                return [
+                    'redirect' => $this->urlBase()->url($redirect->to),
+                    'status' => $redirect->statusCode(),
+                ];
             }
 
             return $this->notFoundPage($locale);
@@ -784,7 +804,7 @@ class Application
             $title,
             static function (string $ref) use ($media): string {
                 $item = $media->find($ref);
-                return $item?->urls('/api/media/file')['original'] ?? '';
+                return $item?->urls($this->mediaBaseUrl())['original'] ?? '';
             }
         );
 
@@ -807,7 +827,7 @@ class Application
             htmlspecialchars($served->code, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
             $head,
             $this->renderSiteHeader($href, $served),
-            $stylesheet,
+            $this->urlBase()->url($stylesheet),
             // Escaped by the shell, so the raw title goes in.
             $title,
         );
@@ -815,6 +835,10 @@ class Application
         $renderer = new SectionRenderer(
             new JsonSectionTypeRepository($this->basePath . '/config/sections'),
             $media,
+            $this->mediaBaseUrl(),
+            null,
+            null,
+            $this->urlBase(),
         );
 
         return $shell->render($renderer->renderFields($type->schema, $entry->data));
@@ -1151,7 +1175,7 @@ class Application
                 $page->title(),
                 static function (string $ref) use ($media): string {
                     $item = $media->find($ref);
-                    return $item?->urls('/api/media/file')['original'] ?? '';
+                    return $item?->urls($this->mediaBaseUrl())['original'] ?? '';
                 }
             );
         }
@@ -1182,7 +1206,7 @@ class Application
             ? $this->themes->stylesheetUrl($theme)
             : '/theme.css';
 
-        $shell = new \Click\Cms\Http\PageShell($lang, $head, $nav, $stylesheet, $page->title());
+        $shell = new \Click\Cms\Http\PageShell($lang, $head, $nav, $this->urlBase()->url($stylesheet), $page->title());
 
         // A plugin may take over rendering. The builder wraps its node tree in the
         // shell above, so the page keeps nav, SEO and theme; a full theme is free
@@ -1205,9 +1229,10 @@ class Application
             // Defaults repeated because the listing service is the fifth argument;
             // a page carrying a listing section is how a collection becomes visible
             // at all, so this is not an optional extra on the public render path.
-            '/api/media/file',
+            $this->mediaBaseUrl(),
             null,
             $this->entryListings,
+            $this->urlBase(),
         );
         $body = $renderer->render($page);
 
@@ -1246,7 +1271,7 @@ class Application
 
         // Stateless, so a render path that never ran boot() (a direct-render test)
         // gets one on demand rather than a half-built kernel.
-        $renderer = $this->navigationRenderer ??= new NavigationRenderer();
+        $renderer = $this->navigationRenderer ??= new NavigationRenderer($this->urlBase());
 
         return $renderer->render($items, $currentHref, $brand);
     }
