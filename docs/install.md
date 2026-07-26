@@ -47,6 +47,36 @@ technical knowledge at all.
 No database, no long-running process, no build step at deploy time. This runs on
 ordinary shared hosting, which is the constraint that decided most of its design.
 
+### Ask the host, rather than guessing
+
+Every release ships `public/preflight.php`, which answers the list above for a
+specific host — and answers it **as the web server**, which matters because
+shared hosting routinely runs one PHP on the command line and another for the
+web, so a shell session can tell you the wrong thing.
+
+Set a token, either in the server config (better — an update replaces the file,
+and with it any edit):
+
+```apache
+SetEnv CLICK_PREFLIGHT_TOKEN a-long-hard-to-guess-string
+```
+
+then open `https://example.com/preflight.php?token=a-long-hard-to-guess-string`.
+It reports the PHP version, the extensions, the largest upload the host will
+accept, whether the update feed can be fetched and verified, and whether there is
+a writable directory outside the document root to keep the site's own files in.
+Failures are separated from warnings: a failure means it will not run here, a
+warning means it will run with something missing.
+
+Until a token is set the page answers 404, like a file that is not there, so an
+installation that never uses it never publishes a description of its server. When
+you are done, delete it or unset the token — and note that an update restores the
+placeholder, so forgetting fails safe on the next release.
+
+The check that most often fails is the upload ceiling: PHP's own default is 2 MB,
+well under what the CMS accepts, and it is otherwise discovered in the middle of
+moving a site's media.
+
 ## Route 1 — Docker
 
 ```bash

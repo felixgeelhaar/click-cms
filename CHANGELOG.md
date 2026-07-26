@@ -5,6 +5,27 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+### The host can be asked whether it will work, before installing
+- `public/preflight.php` ships with every release. Opened in a browser with a
+  token, it reports the PHP version, the extensions, the largest upload the host
+  accepts, whether the update feed can be fetched and verified, and whether there
+  is a writable directory outside the document root for the app root.
+- It answers **as the web server**, which is the point: shared hosting routinely
+  runs one PHP on the command line and another for the web, so a shell session
+  can report the wrong version, the wrong extensions and the wrong upload limit.
+- Failures are separated from warnings, because "this will not run here" and
+  "this runs with smaller images" are not the same message. The check that most
+  often fails is the upload ceiling — PHP's own default is 2 MB, well under what
+  the CMS accepts, and it is otherwise found halfway through moving a site's
+  media.
+- The page answers 404 until a token is set, so an installation that never uses
+  it never publishes a description of its server. The token can be set in the
+  server config as `CLICK_PREFLIGHT_TOKEN` rather than by editing the file —
+  which is also what makes forgetting to remove it fail safe, since an update
+  restores the shipped placeholder.
+- `composer lint` now syntax-checks `public/` as well as `src`, `plugins` and
+  `bin` — CI already parsed it on 8.1, so the local command was the one lagging.
+
 ### A site can be installed in a subdirectory
 - `example.com/2026/cms/` now works, with no configuration. Everything used to
   assume a domain root: routes were matched against the raw request path, so a
