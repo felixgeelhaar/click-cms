@@ -119,9 +119,41 @@ class Application
     /** …where it lives in URL space, which is {@see urlBase()}. */
     private ?BasePath $urlBase = null;
 
+    /**
+     * The environment variable naming the installation's root directory.
+     *
+     * Why an environment variable rather than a setting in a file: on shared
+     * hosting the whole account is served from one document root, so an
+     * installation placed inside it has `content/`, `data/` and `config/`
+     * reachable over HTTP unless the app root is moved above the served
+     * directory. The root could only ever be passed from `public/index.php` —
+     * which a release replaces, so an operator's edit survived exactly until
+     * their first update, which is worse than not offering it at all. What the
+     * server holds (a vhost `SetEnv`, `.user.ini`, an FPM pool) is not something
+     * an update can overwrite.
+     */
+    public const ROOT_ENV = 'CLICK_CMS_ROOT';
+
     public function __construct(?string $basePath = null)
     {
-        $this->basePath = $basePath ?? dirname(__DIR__, 2);
+        $this->basePath = $basePath ?? self::rootFromEnvironment() ?? dirname(__DIR__, 2);
+    }
+
+    /**
+     * The configured root, when one is set and usable.
+     *
+     * A path that is not a directory is ignored rather than honoured: a typo in
+     * a server config would otherwise take the site down with a page of
+     * missing-file errors, and falling back to the installation is exactly how
+     * the site behaved before anybody set the variable.
+     */
+    private static function rootFromEnvironment(): ?string
+    {
+        $configured = getenv(self::ROOT_ENV);
+
+        return is_string($configured) && $configured !== '' && is_dir($configured)
+            ? rtrim($configured, '/')
+            : null;
     }
 
     public function run(): void

@@ -95,6 +95,47 @@ root, which would serve `content/`, `data/` and `config/` to the internet.
 
 An Apache virtual host to copy is in [`docker/apache-vhost.conf`](../docker/apache-vhost.conf).
 
+### In a subdirectory
+
+A site does not have to answer at a domain root. `example.com/2026/cms/` works
+with no configuration at all: the CMS reads where it is installed from the
+request, and adjusts both what it routes and what it links to.
+
+Put the contents of `public/` at the address the site should answer on, and the
+rest of the archive anywhere the web server can read:
+
+```
+/web/2026/cms/     index.php, .htaccess, theme.css      ← the public directory
+~/click-cms/       src, vendor, plugins, themes, config, content, data
+```
+
+Then tell the CMS where the rest of it is, so `index.php` can find it:
+
+```apache
+# .htaccess next to the public files, or the vhost
+SetEnv CLICK_CMS_ROOT /home/example/click-cms
+```
+
+Splitting it this way is worth doing whenever the document root cannot be moved
+— which is most shared hosting, where the whole account is served from one tree.
+Everything the site is made of then sits outside it, and `content/`, `data/` and
+`config/` are unreachable over HTTP whatever a rewrite rule does.
+
+Set nothing and the CMS uses the directory above `public/`, which is the
+ordinary layout. The path is read from the server rather than written into a
+file **because an update replaces `public/`**: an edit to `index.php` would
+survive only until the next release.
+
+If the prefix cannot be detected — behind a reverse proxy, where the script sits
+at one path and the site is published at another — name it:
+
+```json
+{ "core": { "basePath": "/2026/cms" } }
+```
+
+An empty string there means the domain root, and is honoured as an answer rather
+than read as the absence of one.
+
 ## Route 3 — From source
 
 ```bash
