@@ -72,6 +72,19 @@ final class UpdateNotice
         }
     }
 
+    /**
+     * Drop what was remembered.
+     *
+     * Called when an update is installed: the remembered answer describes the
+     * version that was running a moment ago, and keeping it means the admin goes
+     * on offering a release the site already has — until the check interval
+     * elapses, which is a day. Forgetting makes the next sign-in ask again.
+     */
+    public function forget(): void
+    {
+        @unlink($this->path());
+    }
+
     private function path(): string
     {
         return rtrim($this->directory, '/') . '/' . self::FILE;

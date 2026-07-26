@@ -3,6 +3,16 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.2] — 2026-07-26
+
+### The update notice stops offering a release the site already installed
+- After a successful update the admin went on reporting the previous version and
+  offering the release it had just installed — for as long as the check interval,
+  which is a day. The cached answer was written before the swap and nothing
+  cleared it.
+- Installing now forgets what was remembered, so the next sign-in asks again
+  against the code that is actually running.
+
 ## [1.5.1] — 2026-07-26
 
 ### A failed update stops claiming it was rolled back

@@ -157,10 +157,18 @@ final class UpdatesController
         }
 
         if (!$result['success']) {
-            // The installer rolls back on failure, so the site is as it was; the
-            // administrator needs the reason, not a bare 500.
+            // The reason, not a bare 500 — and the reason matters more since the
+            // installer learned to admit when a rollback did not work: that
+            // message tells an operator the site is part-updated and where the
+            // backup is.
             return ['status' => 500, 'error' => $result['error'] ?? 'The update could not be installed.'];
         }
+
+        // What was remembered describes the version that was running a moment
+        // ago. Keeping it means the admin goes on offering a release the site
+        // already has, for as long as the check interval — a day. Forgetting
+        // makes the next sign-in ask again, against the code now installed.
+        $this->notice?->forget();
 
         return ['data' => [
             'installed' => true,
