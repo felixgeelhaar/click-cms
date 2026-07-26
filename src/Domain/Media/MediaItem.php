@@ -366,7 +366,15 @@ final class MediaItem
      *
      * @return array<string, mixed>
      */
-    public function toArray(?int $displayWidth = null): array
+    /**
+     * @param string $baseUrl Where media is served from, as the *installation*
+     *        spells it. Defaulted so existing callers are unaffected — but a
+     *        caller answering an HTTP request should pass the real one: an
+     *        installation under a prefix that serialises the default emits URLs
+     *        for a path that does not exist, and the admin shows broken
+     *        thumbnails while the delivery API looks perfectly fine.
+     */
+    public function toArray(?int $displayWidth = null, string $baseUrl = '/api/media/file'): array
     {
         $quality = $this->quality($displayWidth);
 
@@ -388,8 +396,8 @@ final class MediaItem
             // The named crops and their boxes, mirroring squareCrop: the plain
             // dimensions beside the ready-made URLs in urls.crops.
             'crops' => $this->crops,
-            'urls' => $this->urls(),
-            'srcset' => $this->srcset(),
+            'urls' => $this->urls($baseUrl),
+            'srcset' => $this->srcset($baseUrl),
             // The mark itself, plus a ready-made CSS value so a front end that
             // crops with object-fit keeps the subject visible without knowing
             // the fraction convention. Both ride along in the existing payload,
