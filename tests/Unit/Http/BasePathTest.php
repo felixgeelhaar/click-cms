@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Tests\Unit\Http;
 
 use Click\Cms\Http\BasePath;
+use Click\Cms\Http\TrustedProxies;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -94,6 +95,124 @@ final class BasePathTest extends TestCase
     {
         $this->assertSame('', BasePath::detect(['SCRIPT_NAME' => '/2026/cms/index.php'], '')->prefix());
         $this->assertSame('', BasePath::detect(['SCRIPT_NAME' => '/2026/cms/index.php'], '   ')->prefix());
+    }
+
+    /* --------------------------------------------------- forwarded prefix -- */
+
+    /**
+     * The case detection alone cannot see: a proxy publishes the site at
+     * /blog/ and forwards to an application that is installed at a root, so the
+     * script's own path says nothing about the public URL. This is what
+     * `core.basePath` was the only answer to, and what the field's convention —
+     * `X-Forwarded-Prefix` — answers without configuration per environment.
+     */
+    public function testATrustedProxyMaySayWhereTheSiteIsPublished(): void
+    {
+        $base = BasePath::detect(
+            [
+                'SCRIPT_NAME' => '/index.php',
+                'REMOTE_ADDR' => '10.0.0.1',
+                'HTTP_X_FORWARDED_PREFIX' => '/blog',
+            ],
+            null,
+            new TrustedProxies(['10.0.0.0/8'])
+        );
+
+        $this->assertSame('/blog', $base->prefix());
+    }
+
+    /**
+     * The whole point of the gate. Any visitor can send this header, and the
+     * prefix ends up in every URL the site emits — so an untrusted sender who
+     * was believed could rewrite every link on a page, and a cached render would
+     * then serve their version to everybody else.
+     */
+    public function testAnUntrustedSenderIsIgnored(): void
+    {
+        $server = [
+            'SCRIPT_NAME' => '/2026/cms/index.php',
+            'REMOTE_ADDR' => '203.0.113.9',
+            'HTTP_X_FORWARDED_PREFIX' => '/evil',
+        ];
+
+        $this->assertSame('/2026/cms', BasePath::detect($server, null, new TrustedProxies(['10.0.0.0/8']))->prefix());
+        // And with no proxies configured at all — the default for every site.
+        $this->assertSame('/2026/cms', BasePath::detect($server)->prefix());
+    }
+
+    /** Configuration is still the last word, for an operator who needs it to be. */
+    public function testAConfiguredPrefixBeatsAForwardedOne(): void
+    {
+        $base = BasePath::detect(
+            ['REMOTE_ADDR' => '10.0.0.1', 'HTTP_X_FORWARDED_PREFIX' => '/blog'],
+            '/configured',
+            new TrustedProxies(['10.0.0.0/8'])
+        );
+
+        $this->assertSame('/configured', $base->prefix());
+    }
+
+    /**
+     * A trusted proxy is trusted, not infallible. A value that is not a path —
+     * one carrying a scheme, a traversal, or a control character — is dropped
+     * rather than concatenated into every link on the page.
+     */
+    public function testAForwardedPrefixThatIsNotAPathIsRefused(): void
+    {
+        $trusted = new TrustedProxies(['10.0.0.0/8']);
+
+        $refused = [
+            'https://evil.example',
+            // A scheme with one slash: not a URL the browser would follow, but
+            // spliced onto every link it is still not a prefix anyone meant.
+            'https:/evil.example',
+            '/a/../../etc',
+            "/blog\n/x",
+            '/a<b>',
+            '\\evil',
+        ];
+
+        foreach ($refused as $value) {
+            $base = BasePath::detect(
+                [
+                    'SCRIPT_NAME' => '/2026/cms/index.php',
+                    'REMOTE_ADDR' => '10.0.0.1',
+                    'HTTP_X_FORWARDED_PREFIX' => $value,
+                ],
+                null,
+                $trusted
+            );
+
+            $this->assertSame('/2026/cms', $base->prefix(), "refused: {$value}");
+        }
+    }
+
+    /** Leftmost wins in a proxy chain, as it does for every X-Forwarded header. */
+    public function testTheFirstValueOfAChainIsUsed(): void
+    {
+        $base = BasePath::detect(
+            ['REMOTE_ADDR' => '10.0.0.1', 'HTTP_X_FORWARDED_PREFIX' => '/blog, /inner'],
+            null,
+            new TrustedProxies(['10.0.0.0/8'])
+        );
+
+        $this->assertSame('/blog', $base->prefix());
+    }
+
+    /** A proxy publishing at the root says so, and is believed. */
+    public function testATrustedProxyMaySayTheSiteIsAtTheRoot(): void
+    {
+        $base = BasePath::detect(
+            [
+                'SCRIPT_NAME' => '/2026/cms/index.php',
+                'REMOTE_ADDR' => '10.0.0.1',
+                'HTTP_X_FORWARDED_PREFIX' => '/',
+            ],
+            null,
+            new TrustedProxies(['10.0.0.0/8'])
+        );
+
+        $this->assertSame('', $base->prefix());
     }
 
     /* ------------------------------------------------------------- strip -- */
