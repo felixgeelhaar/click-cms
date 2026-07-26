@@ -26,6 +26,7 @@ use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
+use Click\Cms\Http\BasePath;
 use Click\Cms\Http\CoreApiRoutes;
 use Click\Cms\Application\Theme\ThemeRepository;
 use Click\Cms\Application\Update\ReleaseFeed;
@@ -112,7 +113,11 @@ class Application
     private ?CoreConfig $config = null;
     private ?Settings $settings = null;
 
+    /** Where the installation lives on disk. Not to be confused with… */
     private string $basePath;
+
+    /** …where it lives in URL space, which is {@see urlBase()}. */
+    private ?BasePath $urlBase = null;
 
     public function __construct(?string $basePath = null)
     {
@@ -122,24 +127,15 @@ class Application
     public function run(): void
     {
         $this->boot();
-        
-        $uri = $_SERVER['REQUEST_URI'] ?? '/';
-        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-
-        // Route on the path alone. The query string was previously matched as
-        // part of it, so `/api/pages?locale=de` looked to the router like a path
-        // named "pages?locale=de" and answered "Endpoint not found" — every
-        // query parameter core has ever wanted to read was unreachable.
-        $queryStart = strpos($uri, '?');
-        if ($queryStart !== false) {
-            $uri = substr($uri, 0, $queryStart);
-        }
 
         $this->applySecurityHeaders();
         $this->touchSession();
-        
-        $response = $this->handleRequest($uri, $method);
-        
+
+        $response = $this->route(
+            (string) ($_SERVER['REQUEST_URI'] ?? '/'),
+            (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')
+        );
+
         if (isset($response['raw']) && $response['raw']) {
             // Raw HTML response.
             //
@@ -174,6 +170,43 @@ class Application
             http_response_code($response['status'] ?? 200);
             echo json_encode($response);
         }
+    }
+
+    /**
+     * Turn a raw request URI into a response.
+     *
+     * Everything that stands between what the web server received and what the
+     * router matches lives here, so the two reductions are in one place and can
+     * be exercised without a live response.
+     *
+     * @return array<string, mixed>
+     */
+    public function route(string $requestUri, string $method): array
+    {
+        // Route on the path alone. The query string was previously matched as
+        // part of it, so `/api/pages?locale=de` looked to the router like a path
+        // named "pages?locale=de" and answered "Endpoint not found" — every
+        // query parameter core has ever wanted to read was unreachable.
+        $queryStart = strpos($requestUri, '?');
+        $path = $queryStart === false ? $requestUri : substr($requestUri, 0, $queryStart);
+
+        // Then take off the prefix this installation is served under, so every
+        // route below matches `/api/…` and knows nothing about where the site is
+        // installed. At the domain root this changes nothing.
+        return $this->handleRequest($this->urlBase()->strip($path), $method);
+    }
+
+    /**
+     * The URL prefix this installation is served under.
+     *
+     * Public because it is not only the router's business: anything that hands
+     * out a URL — media links, the stylesheet, form actions, redirects — has to
+     * put the same prefix back on, or the site routes correctly and then serves
+     * links pointing at the domain root.
+     */
+    public function urlBase(): BasePath
+    {
+        return $this->urlBase ??= BasePath::detect($_SERVER, $this->config?->basePath());
     }
 
     public function boot(): void
