@@ -5,6 +5,16 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [1.4.3] — 2026-07-26
 
+### Supply chain: third-party actions pinned to commits
+- Every third-party GitHub Action was referenced by a mutable tag. That matters
+  here because `release.yml` attaches the archives installations download and
+  republishes the signed feed sites install security releases from unattended —
+  an action at a moving tag can change what ships without this repository
+  changing. All eleven now name a commit.
+- `brace-expansion` 2.1.2 (GHSA-mh99-v99m-4gvg, DoS) is overridden to 5.0.8. It
+  is reachable only through a devDependency and never shipped, but the 2.x line
+  has no patched release, so accepting it meant accepting it permanently.
+
 ### Media URLs carry the prefix everywhere, not just in the delivery API
 - 1.4.0 prefixed the media URLs the page endpoint resolves, and missed the ones
   `MediaItem::toArray()` builds — which is what the media library listing, the
