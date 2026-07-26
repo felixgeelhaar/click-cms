@@ -88,6 +88,7 @@ import Updates from './Updates.vue';
 import Builder from './Builder.vue';
 import ChangePassword from './ChangePassword.vue';
 import { installCsrfFetch, setCsrfToken } from '../lib/api.js';
+import { currentRoute as routeFromLocation, withBase } from '../lib/base.js';
 
 const currentRoute = ref('/admin');
 const isLoggedIn = ref(false);
@@ -233,8 +234,11 @@ const currentComponent = computed(() => getRouteComponent());
 const currentProps = computed(() => getRouteProps());
 
 const handleNavigate = (path) => {
+  // The route stays as the app spells it — `/admin/pages` — and only the address
+  // bar gets the installation's prefix. That is what keeps every route
+  // comparison below free of the question of where the CMS is installed.
   currentRoute.value = path;
-  window.history.pushState({}, '', path);
+  window.history.pushState({}, '', withBase(path));
   // Following a link closes the mobile drawer, so the destination is not left
   // hidden behind the menu the reader just used.
   mobileNavOpen.value = false;
@@ -242,9 +246,9 @@ const handleNavigate = (path) => {
 
 onMounted(async () => {
   installCsrfFetch();
-  currentRoute.value = window.location.pathname + window.location.search;
+  currentRoute.value = routeFromLocation();
   await checkAuth();
-  window.addEventListener('popstate', () => { currentRoute.value = window.location.pathname + window.location.search; });
+  window.addEventListener('popstate', () => { currentRoute.value = routeFromLocation(); });
   window.addEventListener('keydown', onKeydown);
 });
 
