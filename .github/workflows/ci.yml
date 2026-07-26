@@ -33,7 +33,7 @@ jobs:
       # suite never ran here at all, and it stayed red for two days and through
       # a release because it passed for anyone whose local PHP was newer.
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.5'
           extensions: gd, zip, pdo_sqlite
@@ -82,7 +82,7 @@ jobs:
       # promise itself — that the shipped code parses and the application boots
       # and serves a page.
       - name: Set up the oldest PHP the project claims to support
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.1'
           extensions: gd, zip, pdo_sqlite
