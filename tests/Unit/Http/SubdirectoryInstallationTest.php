@@ -116,6 +116,23 @@ final class SubdirectoryInstallationTest extends TestCase
         return $id;
     }
 
+    /** The media library is management, so it needs a session. */
+    private function signInAsAdmin(): void
+    {
+        $id = bin2hex(random_bytes(32));
+        @mkdir($this->base . '/data/sessions', 0o700, true);
+        file_put_contents(
+            $this->base . '/data/sessions/' . $id . '.json',
+            json_encode([
+                'username' => 'admin',
+                'expiresAt' => time() + 3600,
+                'lastActivity' => time(),
+                'user' => ['username' => 'admin', 'role' => 'admin'],
+            ])
+        );
+        $_COOKIE[\Click\Cms\Application\Authentication\SessionStore::COOKIE] = $id;
+    }
+
     /** @return array{body: string, status: int} */
     private function get(Application $app, string $requestUri): array
     {
@@ -240,6 +257,31 @@ final class SubdirectoryInstallationTest extends TestCase
         // prefixed and the other not renders the fallback and no variant, which
         // looks like a working page until someone checks what was downloaded.
         $this->assertStringStartsWith("/2026/cms/api/media/file/{$id}-md.jpg 1024w", $media['srcset']);
+    }
+
+    /**
+     * The media library and the upload response, which the admin UI reads to
+     * show a thumbnail and to write a reference into a page.
+     *
+     * These serialise through MediaItem::toArray(), which built its URLs from
+     * the default base and so ignored the prefix entirely — every thumbnail in
+     * an editor's media library was a broken image, and every URL handed back
+     * from an upload pointed at a path that does not exist. The page endpoint
+     * resolved media correctly the whole time, which is what made it look fine
+     * from the outside.
+     */
+    public function testTheMediaLibraryReportsUrlsUnderThePrefix(): void
+    {
+        $app = $this->installedAt('/2026/cms/index.php');
+        $id = $this->storeImage($app);
+        $this->signInAsAdmin();
+
+        $body = json_decode($this->get($app, '/2026/cms/api/media')['body'], true);
+        $item = ($body['data'] ?? [])[0] ?? null;
+
+        $this->assertNotNull($item, 'the library should list the stored image');
+        $this->assertSame("/2026/cms/api/media/file/{$id}.jpg", $item['urls']['original']);
+        $this->assertStringStartsWith("/2026/cms/api/media/file/{$id}-md.jpg", $item['srcset']);
     }
 
     public function testAConfiguredPrefixOverridesTheDetectedOne(): void

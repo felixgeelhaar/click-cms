@@ -3,6 +3,21 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.3] — 2026-07-26
+
+### Media URLs carry the prefix everywhere, not just in the delivery API
+- 1.4.0 prefixed the media URLs the page endpoint resolves, and missed the ones
+  `MediaItem::toArray()` builds — which is what the media library listing, the
+  upload response and the single-item endpoints all serialise through. Under a
+  prefix they named `/api/media/file/…`, a path that does not exist there.
+- The visible consequence is an editor's media library full of broken
+  thumbnails, and an upload handing back a URL that 404s, while the delivery API
+  looks perfectly correct — which is exactly why it survived the first release:
+  the half that a front end reads was right.
+- `toArray()` now takes the base its URLs should be built from, defaulted so
+  nothing else changes, and every HTTP response passes the installation's real
+  one.
+
 ## [1.4.2] — 2026-07-26
 
 ### The preflight page survives the installation it is diagnosing
