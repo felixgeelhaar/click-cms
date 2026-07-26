@@ -71,6 +71,28 @@ final class CoreConfig
     }
 
     /**
+     * The URL prefix this installation is served under, when it cannot be
+     * detected.
+     *
+     * Unset by default, and that is the case worth understanding: unset means
+     * "work it out from the request", which is right for every install that is
+     * reached directly — including a site in a subdirectory, where the front
+     * controller's own path already says where it lives. Setting it is for the
+     * arrangement detection cannot see, a reverse proxy that serves the site at
+     * one path while the script sits at another.
+     *
+     * Null rather than an empty string on purpose: an empty string is a
+     * legitimate answer meaning "the domain root", and a site that says so
+     * explicitly must not be second-guessed by detection.
+     */
+    public function basePath(): ?string
+    {
+        $value = $this->get('core.basePath');
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
      * Origins allowed to read the delivery API from a browser.
      *
      * Empty by default, which means same-origin only. A front end served from

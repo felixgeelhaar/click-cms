@@ -233,6 +233,28 @@ final class CoreConfigTest extends TestCase
     }
 
     /**
+     * Null, not an empty string. The difference between "work out where I am"
+     * and "I am at the domain root" is the difference between a site that runs
+     * in a subdirectory and one that 404s on every route.
+     */
+    public function testTheBasePathIsUnsetUntilASiteConfiguresOne(): void
+    {
+        $this->assertNull(CoreConfig::fromArray([])->basePath());
+    }
+
+    public function testAConfiguredBasePathIsRead(): void
+    {
+        $config = CoreConfig::fromArray(['core' => ['basePath' => '/2026/cms']]);
+
+        $this->assertSame('/2026/cms', $config->basePath());
+    }
+
+    public function testANonStringBasePathIsIgnoredRatherThanCoerced(): void
+    {
+        $this->assertNull(CoreConfig::fromArray(['core' => ['basePath' => true]])->basePath());
+    }
+
+    /**
      * @param list<Locale> $locales
      * @return list<string>
      */
