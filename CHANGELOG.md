@@ -3,6 +3,26 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.1] — 2026-07-26
+
+### `CLICK_CMS_ROOT` and `CLICK_PREFLIGHT_TOKEN` are found where the server puts them
+- Found on a live installation within an hour of 1.4.0, on exactly the hosting
+  this project is written for. `SetEnv CLICK_CMS_ROOT …` in an `.htaccess`
+  reached PHP as `REDIRECT_CLICK_CMS_ROOT` and under no other name: Apache
+  prefixes variables with `REDIRECT_` once a request has been through an
+  internal redirect, and on a `cgi-fcgi` SAPI every PHP request has been.
+- 1.4.0 read `getenv()` alone, so it found nothing, fell back to the directory
+  above `public/`, could not find its own `vendor/`, and answered 500 — a
+  correctly configured installation behaving exactly as though it had never been
+  configured. The preflight page had the same fault and answered 404 to a
+  correct token, which is the worst possible moment for a diagnostic to be
+  wrong.
+- All three names are now consulted, most direct first: the process environment,
+  `$_SERVER`, then its `REDIRECT_`-prefixed forms.
+- **Only affects installations that set either variable**, which means anyone
+  who followed 1.4.0's own instructions for keeping content and config out of a
+  document root. A site at a domain root that sets neither is unaffected.
+
 ## [1.4.0] — 2026-07-26
 
 ### The host can be asked whether it will work, before installing
