@@ -31,6 +31,9 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
  */
 final class CollectionsController
 {
+    /** Where this installation lives in URL space. */
+    private readonly BasePath $urlBase;
+
     /**
      * @param callable(): array<string, mixed> $currentUser Resolves the signed-in
      *        user for the current request, or [] when anonymous.
@@ -50,7 +53,13 @@ final class CollectionsController
         // Answers "what links here?" by scanning reference fields. Optional; the
         // back-reference route reports the feature absent without it.
         private readonly ?BackReferenceService $backReferences = null,
-    ) {}
+        // The prefix this installation is served under, for the preview URL this
+        // controller builds. Null means the domain root, so a caller that never
+        // heard of prefixes is unaffected.
+        ?BasePath $urlBase = null,
+    ) {
+        $this->urlBase = $urlBase ?? BasePath::root();
+    }
 
     /**
      * @return array<string, callable>
@@ -353,7 +362,7 @@ final class CollectionsController
         // The link points at the entry's own preview delivery endpoint. The
         // language rides along only when it is not the default, mirroring the key
         // the token signed — the handler rebuilds the same key to verify.
-        $url = '/api/collections/' . rawurlencode($type) . '/preview/' . rawurlencode($slug)
+        $url = $this->urlBase->url('/api/collections/' . rawurlencode($type) . '/preview/' . rawurlencode($slug))
             . '?token=' . rawurlencode($link['token'])
             . ($locale !== null ? '&locale=' . rawurlencode($locale) : '');
 

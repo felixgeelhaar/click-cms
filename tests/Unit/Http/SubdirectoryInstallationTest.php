@@ -76,6 +76,46 @@ final class SubdirectoryInstallationTest extends TestCase
         return $app;
     }
 
+    /**
+     * A stored image, and a published page that references it.
+     *
+     * Written as metadata rather than uploaded: what is under test is the URL
+     * the API hands out for a known id, and going through the image processor
+     * would make the test depend on GD for no gain.
+     *
+     * @return string The media id.
+     */
+    private function storeImage(Application $app): string
+    {
+        // The shape a real id has — a name, a dash and eight hex digits — because
+        // that is what the reference scanner recognises in a page's sections.
+        $id = 'photo-a1b2c3d4';
+        mkdir($this->base . '/content/media', 0o775, true);
+        file_put_contents(
+            $this->base . '/content/media/' . $id . '.json',
+            json_encode([
+                'id' => $id,
+                'extension' => 'jpg',
+                'mimeType' => 'image/jpeg',
+                'originalName' => 'photo.jpg',
+                'bytes' => 1024,
+                'width' => 1600,
+                'height' => 900,
+                'variants' => ['md', 'lg'],
+            ])
+        );
+
+        $storage = (new \ReflectionMethod($app, 'getContentService'))->invoke($app);
+        $storage->save(Content::create(ContentKey::page('with-media'), [
+            'title' => 'With media',
+            'sections' => [['type' => 'image', 'values' => ['image' => $id]]],
+        ]));
+        $inner = (new \ReflectionProperty($storage, 'storage'))->getValue($storage);
+        $inner->publish(ContentKey::page('with-media'));
+
+        return $id;
+    }
+
     /** @return array{body: string, status: int} */
     private function get(Application $app, string $requestUri): array
     {
@@ -162,11 +202,46 @@ final class SubdirectoryInstallationTest extends TestCase
         $this->assertSame(200, $this->get($app, '/2026/cms/index.php/api/pages')['status']);
     }
 
+    /* ------------------------------------------- what the site hands out -- */
+
     /**
-     * A configured prefix beats detection, which is what a site behind a reverse
-     * proxy needs — there the script's own path says nothing about the public
-     * URL.
+     * The half that is easy to ship broken: a site that routes correctly and
+     * then serves a page whose stylesheet, links and images all point at the
+     * domain root. The admin still works, so nothing looks wrong until a visitor
+     * loads an unstyled page.
      */
+    public function testARenderedPageLinksToItselfNotToTheDomainRoot(): void
+    {
+        $app = $this->installedAt('/2026/cms/index.php');
+
+        $html = $this->get($app, '/2026/cms/home')['body'];
+
+        $this->assertStringContainsString('href="/2026/cms/theme.css"', $html);
+        $this->assertStringNotContainsString('href="/theme.css"', $html);
+    }
+
+    /**
+     * The delivery API is read by a front end on another host, which resolves
+     * these against the CMS origin. A media URL missing the prefix is a broken
+     * image on someone else's site.
+     */
+    public function testDeliveredMediaUrlsCarryThePrefix(): void
+    {
+        $app = $this->installedAt('/2026/cms/index.php');
+        $id = $this->storeImage($app);
+
+        $body = json_decode($this->get($app, '/2026/cms/api/pages/with-media')['body'], true);
+        $media = $body['media'][$id] ?? null;
+
+        $this->assertNotNull($media, 'the page response should resolve its media references');
+        $this->assertSame("/2026/cms/api/media/file/{$id}.jpg", $media['urls']['original']);
+
+        // The srcset too, not only the original: a front end that gets one
+        // prefixed and the other not renders the fallback and no variant, which
+        // looks like a working page until someone checks what was downloaded.
+        $this->assertStringStartsWith("/2026/cms/api/media/file/{$id}-md.jpg 1024w", $media['srcset']);
+    }
+
     public function testAConfiguredPrefixOverridesTheDetectedOne(): void
     {
         file_put_contents(
