@@ -3,7 +3,7 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.4.0] — 2026-07-26
 
 ### The host can be asked whether it will work, before installing
 - `public/preflight.php` ships with every release. Opened in a browser with a
