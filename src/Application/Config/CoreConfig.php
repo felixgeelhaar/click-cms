@@ -71,6 +71,46 @@ final class CoreConfig
     }
 
     /**
+     * The URL prefix this installation is served under, when it cannot be
+     * detected.
+     *
+     * Unset by default, and that is the case worth understanding: unset means
+     * "work it out from the request", which is right for every install that is
+     * reached directly — including a site in a subdirectory, where the front
+     * controller's own path already says where it lives. Setting it is for the
+     * arrangement detection cannot see, a reverse proxy that serves the site at
+     * one path while the script sits at another.
+     *
+     * Null rather than an empty string on purpose: an empty string is a
+     * legitimate answer meaning "the domain root", and a site that says so
+     * explicitly must not be second-guessed by detection.
+     */
+    public function basePath(): ?string
+    {
+        $value = $this->get('core.basePath');
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * Proxies whose `X-Forwarded-Prefix` this site believes.
+     *
+     * Empty by default, which means nobody: the header is written by whoever
+     * sent the request, and the prefix it carries goes into every URL the site
+     * emits. A site that named no proxy behaves exactly as it did before the
+     * header was understood at all.
+     *
+     * Addresses or CIDR ranges — a range because an ingress controller's pods do
+     * not keep one address.
+     *
+     * @return list<string>
+     */
+    public function trustedProxies(): array
+    {
+        return $this->stringList('core.trustedProxies', []);
+    }
+
+    /**
      * Origins allowed to read the delivery API from a browser.
      *
      * Empty by default, which means same-origin only. A front end served from

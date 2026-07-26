@@ -26,7 +26,9 @@ use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
+use Click\Cms\Http\BasePath;
 use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\TrustedProxies;
 use Click\Cms\Application\Theme\ThemeRepository;
 use Click\Cms\Application\Update\ReleaseFeed;
 use Click\Cms\Application\Update\UpdateInstaller;
@@ -112,34 +114,61 @@ class Application
     private ?CoreConfig $config = null;
     private ?Settings $settings = null;
 
+    /** Where the installation lives on disk. Not to be confused with… */
     private string $basePath;
+
+    /** …where it lives in URL space, which is {@see urlBase()}. */
+    private ?BasePath $urlBase = null;
+
+    /**
+     * The environment variable naming the installation's root directory.
+     *
+     * Why an environment variable rather than a setting in a file: on shared
+     * hosting the whole account is served from one document root, so an
+     * installation placed inside it has `content/`, `data/` and `config/`
+     * reachable over HTTP unless the app root is moved above the served
+     * directory. The root could only ever be passed from `public/index.php` —
+     * which a release replaces, so an operator's edit survived exactly until
+     * their first update, which is worse than not offering it at all. What the
+     * server holds (a vhost `SetEnv`, `.user.ini`, an FPM pool) is not something
+     * an update can overwrite.
+     */
+    public const ROOT_ENV = 'CLICK_CMS_ROOT';
 
     public function __construct(?string $basePath = null)
     {
-        $this->basePath = $basePath ?? dirname(__DIR__, 2);
+        $this->basePath = $basePath ?? self::rootFromEnvironment() ?? dirname(__DIR__, 2);
+    }
+
+    /**
+     * The configured root, when one is set and usable.
+     *
+     * A path that is not a directory is ignored rather than honoured: a typo in
+     * a server config would otherwise take the site down with a page of
+     * missing-file errors, and falling back to the installation is exactly how
+     * the site behaved before anybody set the variable.
+     */
+    private static function rootFromEnvironment(): ?string
+    {
+        $configured = getenv(self::ROOT_ENV);
+
+        return is_string($configured) && $configured !== '' && is_dir($configured)
+            ? rtrim($configured, '/')
+            : null;
     }
 
     public function run(): void
     {
         $this->boot();
-        
-        $uri = $_SERVER['REQUEST_URI'] ?? '/';
-        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-
-        // Route on the path alone. The query string was previously matched as
-        // part of it, so `/api/pages?locale=de` looked to the router like a path
-        // named "pages?locale=de" and answered "Endpoint not found" — every
-        // query parameter core has ever wanted to read was unreachable.
-        $queryStart = strpos($uri, '?');
-        if ($queryStart !== false) {
-            $uri = substr($uri, 0, $queryStart);
-        }
 
         $this->applySecurityHeaders();
         $this->touchSession();
-        
-        $response = $this->handleRequest($uri, $method);
-        
+
+        $response = $this->route(
+            (string) ($_SERVER['REQUEST_URI'] ?? '/'),
+            (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')
+        );
+
         if (isset($response['raw']) && $response['raw']) {
             // Raw HTML response.
             //
@@ -174,6 +203,59 @@ class Application
             http_response_code($response['status'] ?? 200);
             echo json_encode($response);
         }
+    }
+
+    /**
+     * Turn a raw request URI into a response.
+     *
+     * Everything that stands between what the web server received and what the
+     * router matches lives here, so the two reductions are in one place and can
+     * be exercised without a live response.
+     *
+     * @return array<string, mixed>
+     */
+    public function route(string $requestUri, string $method): array
+    {
+        // Route on the path alone. The query string was previously matched as
+        // part of it, so `/api/pages?locale=de` looked to the router like a path
+        // named "pages?locale=de" and answered "Endpoint not found" — every
+        // query parameter core has ever wanted to read was unreachable.
+        $queryStart = strpos($requestUri, '?');
+        $path = $queryStart === false ? $requestUri : substr($requestUri, 0, $queryStart);
+
+        // Then take off the prefix this installation is served under, so every
+        // route below matches `/api/…` and knows nothing about where the site is
+        // installed. At the domain root this changes nothing.
+        return $this->handleRequest($this->urlBase()->strip($path), $method);
+    }
+
+    /**
+     * The URL prefix this installation is served under.
+     *
+     * Public because it is not only the router's business: anything that hands
+     * out a URL — media links, the stylesheet, form actions, redirects — has to
+     * put the same prefix back on, or the site routes correctly and then serves
+     * links pointing at the domain root.
+     */
+    public function urlBase(): BasePath
+    {
+        return $this->urlBase ??= BasePath::detect(
+            $_SERVER,
+            $this->config?->basePath(),
+            new TrustedProxies($this->config?->trustedProxies() ?? []),
+        );
+    }
+
+    /**
+     * Where media files are served from, as this installation spells it.
+     *
+     * One place, because every renderer and every API response has to agree: an
+     * image resolved against one base and a srcset against another is a page
+     * that loads its fallback and none of its variants.
+     */
+    private function mediaBaseUrl(): string
+    {
+        return $this->urlBase()->url('/api/media/file');
     }
 
     public function boot(): void
@@ -313,7 +395,8 @@ class Application
             $this->basePath,
             $this->contentService,
             $this->history,
-            $this->config
+            $this->config,
+            $this->urlBase(),
         );
 
         // User management is core (the admin UI depends on it); it fires the same
@@ -331,7 +414,7 @@ class Application
         // Navigation menus: managed through the admin and rendered into the site's
         // header, both reading the same stored menu.
         $this->menusController = new MenusController($this->contentService);
-        $this->navigationRenderer = new NavigationRenderer();
+        $this->navigationRenderer = new NavigationRenderer($this->urlBase());
 
         // Collections — repeatable content types (posts, team members, …) defined
         // in config/collections. Their entries are ordinary content documents, so
@@ -370,6 +453,7 @@ class Application
             // "What links here" scans reference fields on demand rather than
             // keeping a stored index a flat-file write would have to maintain.
             new BackReferenceService($collectionTypes, $this->contentService),
+            $this->urlBase(),
         );
 
         // Themes live outside the application so a site's design survives a
@@ -450,7 +534,7 @@ class Application
 
         // Plugin management is core — the admin UI's Plugins page depends on it —
         // so it is wired here rather than in a plugin that could be disabled.
-        $this->pluginsController = new PluginsController($this->pluginManager);
+        $this->pluginsController = new PluginsController($this->pluginManager, $this->urlBase());
         $this->marketplaceController = new MarketplaceController($this->pluginManager, $this->config, $this->basePath);
 
         // Identity — login, logout, password changes, the default admin — is its
@@ -643,7 +727,13 @@ class Application
             // link that predates a slug change still lands somewhere.
             $redirect = $this->redirectsController->rules()->match($path);
             if ($redirect !== null) {
-                return ['redirect' => $redirect->to, 'status' => $redirect->statusCode()];
+                // A rule's target is stored as a site path, so it gains this
+                // installation's prefix on the way into the Location header. A
+                // target that names another site entirely is left alone by url().
+                return [
+                    'redirect' => $this->urlBase()->url($redirect->to),
+                    'status' => $redirect->statusCode(),
+                ];
             }
 
             return $this->notFoundPage($locale);
@@ -751,7 +841,7 @@ class Application
             $title,
             static function (string $ref) use ($media): string {
                 $item = $media->find($ref);
-                return $item?->urls('/api/media/file')['original'] ?? '';
+                return $item?->urls($this->mediaBaseUrl())['original'] ?? '';
             }
         );
 
@@ -774,7 +864,7 @@ class Application
             htmlspecialchars($served->code, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
             $head,
             $this->renderSiteHeader($href, $served),
-            $stylesheet,
+            $this->urlBase()->url($stylesheet),
             // Escaped by the shell, so the raw title goes in.
             $title,
         );
@@ -782,6 +872,10 @@ class Application
         $renderer = new SectionRenderer(
             new JsonSectionTypeRepository($this->basePath . '/config/sections'),
             $media,
+            $this->mediaBaseUrl(),
+            null,
+            null,
+            $this->urlBase(),
         );
 
         return $shell->render($renderer->renderFields($type->schema, $entry->data));
@@ -1118,7 +1212,7 @@ class Application
                 $page->title(),
                 static function (string $ref) use ($media): string {
                     $item = $media->find($ref);
-                    return $item?->urls('/api/media/file')['original'] ?? '';
+                    return $item?->urls($this->mediaBaseUrl())['original'] ?? '';
                 }
             );
         }
@@ -1149,7 +1243,7 @@ class Application
             ? $this->themes->stylesheetUrl($theme)
             : '/theme.css';
 
-        $shell = new \Click\Cms\Http\PageShell($lang, $head, $nav, $stylesheet, $page->title());
+        $shell = new \Click\Cms\Http\PageShell($lang, $head, $nav, $this->urlBase()->url($stylesheet), $page->title());
 
         // A plugin may take over rendering. The builder wraps its node tree in the
         // shell above, so the page keeps nav, SEO and theme; a full theme is free
@@ -1172,9 +1266,10 @@ class Application
             // Defaults repeated because the listing service is the fifth argument;
             // a page carrying a listing section is how a collection becomes visible
             // at all, so this is not an optional extra on the public render path.
-            '/api/media/file',
+            $this->mediaBaseUrl(),
             null,
             $this->entryListings,
+            $this->urlBase(),
         );
         $body = $renderer->render($page);
 
@@ -1213,7 +1308,7 @@ class Application
 
         // Stateless, so a render path that never ran boot() (a direct-render test)
         // gets one on demand rather than a half-built kernel.
-        $renderer = $this->navigationRenderer ??= new NavigationRenderer();
+        $renderer = $this->navigationRenderer ??= new NavigationRenderer($this->urlBase());
 
         return $renderer->render($items, $currentHref, $brand);
     }
