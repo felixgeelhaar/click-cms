@@ -3,6 +3,33 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### A site can be installed in a subdirectory
+- `example.com/2026/cms/` now works, with no configuration. Everything used to
+  assume a domain root: routes were matched against the raw request path, so a
+  request under a subdirectory matched nothing at all, and every URL the CMS
+  handed out started at `/`. That left the claim that this runs on ordinary
+  shared hosting only half true — a subdirectory is the normal shape there.
+- The prefix is detected from the request, so unzipping the archive into a
+  directory is the whole installation step. `core.basePath` overrides detection
+  for a reverse proxy, where the script's path and the public URL differ; an
+  empty value there means the domain root and is honoured rather than read as
+  unset.
+- Hosting without `mod_rewrite` works too: `/2026/cms/index.php/api/pages`
+  resolves to the same route a rewriting host produces.
+- The admin UI is one build that runs at any prefix — its assets are addressed
+  relative to the document, and its requests and links pick the prefix up at
+  runtime. No per-installation build, which would put a build step back into
+  deployment.
+- **`CLICK_CMS_ROOT`** names the installation's directory when it is not the one
+  above `public/`. That is how `content/`, `data/` and `config/` stay out of a
+  document root that cannot be moved. It is an environment variable — a vhost
+  `SetEnv`, `.user.ini`, an FPM pool — precisely because an update replaces
+  `public/`, so an edit to `index.php` would not survive one.
+- Nothing changes for a site at a domain root: with no prefix, every path is
+  emitted exactly as it was.
+
 ## [1.3.0] — 2026-07-25
 
 No change to any shipped PHP file. A minor release rather than a patch because
