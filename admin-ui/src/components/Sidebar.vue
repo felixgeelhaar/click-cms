@@ -26,7 +26,7 @@
              show it on hover and open it in a new tab. -->
         <li v-for="item in group.items" :key="item.href">
           <a
-            :href="item.href"
+            :href="withBase(item.href)"
             :class="['nav-item', { active: isActive(item.href) }]"
             :aria-current="isActive(item.href) ? 'page' : undefined"
             :title="collapsed ? item.label : undefined"
@@ -45,6 +45,7 @@
 
 <script setup>
 import { computed, ref } from 'vue';
+import { withBase } from '../lib/base.js';
 const props = defineProps({ activeRoute: String, userRole: String, collapsed: Boolean, showBuilder: Boolean });
 const emit = defineEmits(['navigate']);
 
