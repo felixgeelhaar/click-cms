@@ -15,8 +15,34 @@ declare(strict_types=1);
 // (which is the same string) because nothing is autoloaded yet. A path that is
 // not a directory is ignored, so a typo in a server config leaves an ordinary
 // install running instead of a blank page.
-$configuredRoot = getenv('CLICK_CMS_ROOT');
-$root = is_string($configuredRoot) && $configuredRoot !== '' && is_dir($configuredRoot)
+/**
+ * The same lookup {@see \Click\Cms\Http\ServerEnvironment} performs, written
+ * out because nothing is autoloaded yet — this file is what finds the code.
+ *
+ * All three names matter: Apache prefixes SetEnv variables with REDIRECT_ once
+ * a request has been through an internal redirect, and on a cgi-fcgi SAPI every
+ * PHP request has been.
+ */
+function click_cms_server_value(string $name): ?string
+{
+    $candidates = [getenv($name), $_SERVER[$name] ?? null];
+    $prefix = '';
+    for ($i = 0; $i < 3; $i++) {
+        $prefix .= 'REDIRECT_';
+        $candidates[] = $_SERVER[$prefix . $name] ?? null;
+    }
+
+    foreach ($candidates as $value) {
+        if (is_string($value) && trim($value) !== '') {
+            return trim($value);
+        }
+    }
+
+    return null;
+}
+
+$configuredRoot = click_cms_server_value('CLICK_CMS_ROOT');
+$root = $configuredRoot !== null && is_dir($configuredRoot)
     ? rtrim($configuredRoot, '/')
     : __DIR__ . '/..';
 

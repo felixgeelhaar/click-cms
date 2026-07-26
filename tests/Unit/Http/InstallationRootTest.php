@@ -69,6 +69,30 @@ final class InstallationRootTest extends TestCase
         $this->assertSame(dirname(__DIR__, 3), (new Application())->getBasePath());
     }
 
+    /**
+     * The production shape. Apache's `SetEnv` reached PHP only as
+     * `REDIRECT_CLICK_CMS_ROOT` on a cgi-fcgi SAPI, so reading `getenv()` alone
+     * found nothing: the site fell back to the directory above `public/`, could
+     * not find its own `vendor/`, and answered 500 while being correctly
+     * configured the whole time.
+     */
+    public function testARootSetByApacheThroughARedirectIsFound(): void
+    {
+        $root = sys_get_temp_dir() . '/click-cms-redirect-' . bin2hex(random_bytes(6));
+        mkdir($root, 0o775, true);
+        $previous = $_SERVER;
+
+        try {
+            unset($_SERVER[Application::ROOT_ENV]);
+            $_SERVER['REDIRECT_' . Application::ROOT_ENV] = $root;
+
+            $this->assertSame($root, (new Application())->getBasePath());
+        } finally {
+            $_SERVER = $previous;
+            @rmdir($root);
+        }
+    }
+
     /** An explicit path still wins — it is what every test and tool passes. */
     public function testAnExplicitPathBeatsTheVariable(): void
     {

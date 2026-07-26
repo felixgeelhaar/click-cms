@@ -28,6 +28,7 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\BasePath;
 use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\ServerEnvironment;
 use Click\Cms\Http\TrustedProxies;
 use Click\Cms\Application\Theme\ThemeRepository;
 use Click\Cms\Application\Update\ReleaseFeed;
@@ -150,11 +151,14 @@ class Application
      */
     private static function rootFromEnvironment(): ?string
     {
-        $configured = getenv(self::ROOT_ENV);
+        // Through ServerEnvironment rather than getenv(), because a value set
+        // with Apache's SetEnv arrives as REDIRECT_CLICK_CMS_ROOT on a cgi-fcgi
+        // SAPI and under no other name — which is a great deal of shared
+        // hosting, and is exactly where this failed: a correctly configured
+        // installation behaving as though it had never been configured.
+        $configured = ServerEnvironment::lookup(self::ROOT_ENV, $_SERVER);
 
-        return is_string($configured) && $configured !== '' && is_dir($configured)
-            ? rtrim($configured, '/')
-            : null;
+        return $configured !== null && is_dir($configured) ? rtrim($configured, '/') : null;
     }
 
     public function run(): void

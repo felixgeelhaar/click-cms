@@ -35,7 +35,34 @@ declare(strict_types=1);
 /** Replaced by an operator, or left alone and set through the environment. */
 const TOKEN = 'change-me-before-using';
 
-$configured = (string) (getenv('CLICK_PREFLIGHT_TOKEN') ?: TOKEN);
+/**
+ * The same lookup {@see \Click\Cms\Http\ServerEnvironment} performs, written
+ * out because nothing is autoloaded yet — this file is what finds the code.
+ *
+ * All three names matter: Apache prefixes SetEnv variables with REDIRECT_ once
+ * a request has been through an internal redirect, and on a cgi-fcgi SAPI every
+ * PHP request has been.
+ */
+function click_cms_preflight_value(string $name): ?string
+{
+    $candidates = [getenv($name), $_SERVER[$name] ?? null];
+    $prefix = '';
+    for ($i = 0; $i < 3; $i++) {
+        $prefix .= 'REDIRECT_';
+        $candidates[] = $_SERVER[$prefix . $name] ?? null;
+    }
+
+    foreach ($candidates as $value) {
+        if (is_string($value) && trim($value) !== '') {
+            return trim($value);
+        }
+    }
+
+    return null;
+}
+
+
+$configured = click_cms_preflight_value('CLICK_PREFLIGHT_TOKEN') ?? TOKEN;
 $presented = (string) ($_GET['token'] ?? '');
 
 // Refused while the token is still the shipped placeholder, or too short to be
