@@ -3,6 +3,63 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### The host can be asked whether it will work, before installing
+- `public/preflight.php` ships with every release. Opened in a browser with a
+  token, it reports the PHP version, the extensions, the largest upload the host
+  accepts, whether the update feed can be fetched and verified, and whether there
+  is a writable directory outside the document root for the app root.
+- It answers **as the web server**, which is the point: shared hosting routinely
+  runs one PHP on the command line and another for the web, so a shell session
+  can report the wrong version, the wrong extensions and the wrong upload limit.
+- Failures are separated from warnings, because "this will not run here" and
+  "this runs with smaller images" are not the same message. The check that most
+  often fails is the upload ceiling — PHP's own default is 2 MB, well under what
+  the CMS accepts, and it is otherwise found halfway through moving a site's
+  media.
+- The page answers 404 until a token is set, so an installation that never uses
+  it never publishes a description of its server. The token can be set in the
+  server config as `CLICK_PREFLIGHT_TOKEN` rather than by editing the file —
+  which is also what makes forgetting to remove it fail safe, since an update
+  restores the shipped placeholder.
+- `composer lint` now syntax-checks `public/` as well as `src`, `plugins` and
+  `bin` — CI already parsed it on 8.1, so the local command was the one lagging.
+
+### A site can be installed in a subdirectory
+- `example.com/2026/cms/` now works, with no configuration. Everything used to
+  assume a domain root: routes were matched against the raw request path, so a
+  request under a subdirectory matched nothing at all, and every URL the CMS
+  handed out started at `/`. That left the claim that this runs on ordinary
+  shared hosting only half true — a subdirectory is the normal shape there.
+- The prefix is detected from the request, so unzipping the archive into a
+  directory is the whole installation step. `core.basePath` states it outright
+  where that is preferred; an empty value there means the domain root and is
+  honoured rather than read as unset.
+- Behind a reverse proxy — the one arrangement a request cannot show, since the
+  script sits at one path and the site is published at another — the CMS reads
+  `X-Forwarded-Prefix`, but **only from a proxy the site has named** in
+  `core.trustedProxies` (addresses or CIDR ranges). Nobody is trusted by
+  default. The header is written by whoever sent the request and its value lands
+  in every URL the site emits, so an unnamed sender who was believed could
+  rewrite every link on a page — and a cached render would then serve their
+  version to everyone else. A value that is not a path is refused even from a
+  trusted proxy, on the grounds that a misconfigured proxy is likelier than a
+  hostile one.
+- Hosting without `mod_rewrite` works too: `/2026/cms/index.php/api/pages`
+  resolves to the same route a rewriting host produces.
+- The admin UI is one build that runs at any prefix — its assets are addressed
+  relative to the document, and its requests and links pick the prefix up at
+  runtime. No per-installation build, which would put a build step back into
+  deployment.
+- **`CLICK_CMS_ROOT`** names the installation's directory when it is not the one
+  above `public/`. That is how `content/`, `data/` and `config/` stay out of a
+  document root that cannot be moved. It is an environment variable — a vhost
+  `SetEnv`, `.user.ini`, an FPM pool — precisely because an update replaces
+  `public/`, so an edit to `index.php` would not survive one.
+- Nothing changes for a site at a domain root: with no prefix, every path is
+  emitted exactly as it was.
+
 ## [1.3.0] — 2026-07-25
 
 No change to any shipped PHP file. A minor release rather than a patch because

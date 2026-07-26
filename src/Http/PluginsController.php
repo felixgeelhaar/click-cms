@@ -20,7 +20,17 @@ use Throwable;
  */
 final class PluginsController
 {
-    public function __construct(private readonly PluginManager $plugins) {}
+    /** Where this installation lives in URL space. */
+    private readonly BasePath $urlBase;
+
+    public function __construct(
+        private readonly PluginManager $plugins,
+        // Null means the domain root, so a caller that never heard of prefixes
+        // is unaffected.
+        ?BasePath $urlBase = null,
+    ) {
+        $this->urlBase = $urlBase ?? BasePath::root();
+    }
 
     /**
      * @return array<string, array{string, callable}>
@@ -149,11 +159,14 @@ final class PluginsController
         return ['data' => [
             'name' => 'Click CMS',
             'version' => '0.1.0',
+            // Addresses a client is meant to call, so they are spelt the way
+            // this installation is reached rather than the way its source
+            // writes them.
             'endpoints' => [
-                'pages' => '/api/pages',
-                'users' => '/api/users',
-                'media' => '/api/media',
-                'plugins' => '/api/plugins',
+                'pages' => $this->urlBase->url('/api/pages'),
+                'users' => $this->urlBase->url('/api/users'),
+                'media' => $this->urlBase->url('/api/media'),
+                'plugins' => $this->urlBase->url('/api/plugins'),
             ],
         ]];
     }

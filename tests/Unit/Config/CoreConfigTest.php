@@ -233,6 +233,44 @@ final class CoreConfigTest extends TestCase
     }
 
     /**
+     * Null, not an empty string. The difference between "work out where I am"
+     * and "I am at the domain root" is the difference between a site that runs
+     * in a subdirectory and one that 404s on every route.
+     */
+    public function testTheBasePathIsUnsetUntilASiteConfiguresOne(): void
+    {
+        $this->assertNull(CoreConfig::fromArray([])->basePath());
+    }
+
+    public function testAConfiguredBasePathIsRead(): void
+    {
+        $config = CoreConfig::fromArray(['core' => ['basePath' => '/2026/cms']]);
+
+        $this->assertSame('/2026/cms', $config->basePath());
+    }
+
+    public function testANonStringBasePathIsIgnoredRatherThanCoerced(): void
+    {
+        $this->assertNull(CoreConfig::fromArray(['core' => ['basePath' => true]])->basePath());
+    }
+
+    /**
+     * Nobody, until a site says otherwise — the header these unlock is written
+     * by whoever sent the request.
+     */
+    public function testNoProxyIsTrustedByDefault(): void
+    {
+        $this->assertSame([], CoreConfig::fromArray([])->trustedProxies());
+    }
+
+    public function testTrustedProxiesAreRead(): void
+    {
+        $config = CoreConfig::fromArray(['core' => ['trustedProxies' => ['10.0.0.0/8', '::1']]]);
+
+        $this->assertSame(['10.0.0.0/8', '::1'], $config->trustedProxies());
+    }
+
+    /**
      * @param list<Locale> $locales
      * @return list<string>
      */

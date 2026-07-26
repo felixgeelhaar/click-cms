@@ -48,12 +48,31 @@ final class CoreApiRoutes
     private ?JsonVersionStore $versions = null;
     private ?PreviewLinks $previewLinks = null;
 
+    /**
+     * The prefix this installation is served under.
+     *
+     * It matters more here than anywhere: the delivery API is read by a front
+     * end on another host, which resolves these URLs against the CMS origin. A
+     * media URL missing the prefix is a broken image on somebody else's site,
+     * and nothing in this installation ever shows the fault.
+     */
+    private readonly BasePath $urlBase;
+
     public function __construct(
         private readonly string $basePath,
         private readonly ?ContentService $content = null,
         private ?HistoryService $history = null,
         private readonly ?CoreConfig $config = null,
-    ) {}
+        ?BasePath $urlBase = null,
+    ) {
+        $this->urlBase = $urlBase ?? BasePath::root();
+    }
+
+    /** Where media files are served from, as this installation spells it. */
+    private function mediaBaseUrl(): string
+    {
+        return $this->urlBase->url('/api/media/file');
+    }
 
     /**
      * @return array<string, callable>
@@ -259,8 +278,8 @@ final class CoreApiRoutes
             }
 
             $resolved[$id] = [
-                'urls' => $item->urls(),
-                'srcset' => $item->srcset(),
+                'urls' => $item->urls($this->mediaBaseUrl()),
+                'srcset' => $item->srcset($this->mediaBaseUrl()),
                 'width' => $item->width,
                 'height' => $item->height,
                 'alt' => $item->alt,
@@ -476,7 +495,12 @@ final class CoreApiRoutes
         }
 
         return ['data' => [
-            'url' => $link['path'],
+            // PreviewLinks returns a site path; turning one into a URL somebody
+            // can open is this layer's job, and under a prefix that means saying
+            // where this installation lives. A preview link is made to be pasted
+            // into a chat window, so one missing the prefix fails in front of
+            // whoever it was shared with.
+            'url' => $this->urlBase->url($link['path']),
             'expiresAt' => $link['expiresAt'],
             'expiresInSeconds' => max(0, $link['expiresAt'] - time()),
         ]];

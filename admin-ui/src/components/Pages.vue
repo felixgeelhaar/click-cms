@@ -5,7 +5,7 @@
         <h1 class="page-title">Pages</h1>
         <p class="page-subtitle">Manage your content pages</p>
       </div>
-      <a class="btn-primary" :href="newPageHref" @click="go($event, newPageHref)">+ New Page</a>
+      <a class="btn-primary" :href="withBase(newPageHref)" @click="go($event, newPageHref)">+ New Page</a>
     </div>
 
     <div class="toolbar">
@@ -56,7 +56,7 @@
                 v-if="pageIn(code, slugOf(page))"
                 class="lang-chip"
                 :class="[stateOf(pageIn(code, slugOf(page))), { current: code === activeLocale }]"
-                :href="editHref(slugOf(page), code)"
+                :href="withBase(editHref(slugOf(page), code))"
                 :aria-label="`Edit ${page.data?.title || slugOf(page)} in ${localeName(code)} — ${stateLabel(stateOf(pageIn(code, slugOf(page))))}`"
                 @click="go($event, editHref(slugOf(page), code))"
               >
@@ -74,7 +74,7 @@
         <div class="page-actions">
           <a
             class="btn-sm btn-secondary"
-            :href="editHref(slugOf(page), activeLocale)"
+            :href="withBase(editHref(slugOf(page), activeLocale))"
             :aria-label="`Edit ${page.data?.title || slugOf(page)}`"
             @click="go($event, editHref(slugOf(page), activeLocale))"
           >Edit</a>
@@ -92,6 +92,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import { withBase } from '../lib/base.js';
 
 const emit = defineEmits(['navigate']);
 
