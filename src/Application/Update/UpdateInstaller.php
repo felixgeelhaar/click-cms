@@ -33,7 +33,7 @@ use ZipArchive;
  * that needs either says so in its notes and is not a candidate for unattended
  * installation.
  */
-final class UpdateInstaller
+class UpdateInstaller
 {
     /** Directories a release package replaces. Everything else is left alone. */
     private const REPLACEABLE = ['src', 'public', 'plugins', 'vendor', 'bin'];
@@ -123,18 +123,19 @@ final class UpdateInstaller
             }
 
             $live = $this->basePath . '/' . $dir;
-            if (is_dir($live) && !@rename($live, "$backup/$dir")) {
-                $this->rollback($moved, $backup);
+            if (is_dir($live) && !$this->move($live, "$backup/$dir")) {
+                $unrestored = $this->rollback($moved, $backup);
                 $this->removeTree($staging);
-                return $this->failure("Could not set aside \"$dir\"; the update was rolled back.");
+                return $this->swapFailure($dir, $unrestored, $backup);
             }
 
-            if (!@rename($incoming, $live)) {
-                // Put back what was just moved, including this one.
-                @rename("$backup/$dir", $live);
-                $this->rollback($moved, $backup);
+            if (!$this->move($incoming, $live)) {
+                // Put back what was just moved, including this one. Its own
+                // restore counts towards what could not be put back.
+                $unrestored = $this->move("$backup/$dir", $live) ? [] : [$dir];
+                $unrestored = array_merge($unrestored, $this->rollback($moved, $backup));
                 $this->removeTree($staging);
-                return $this->failure("Could not install \"$dir\"; the update was rolled back.");
+                return $this->swapFailure($dir, $unrestored, $backup);
             }
 
             $moved[] = $dir;
@@ -299,15 +300,75 @@ final class UpdateInstaller
     }
 
     /** @param list<string> $moved */
-    private function rollback(array $moved, string $backup): void
+    /**
+     * Move a directory, reporting whether it worked.
+     *
+     * Protected, and the only reason is that the failure path below cannot
+     * otherwise be tested: a half-applied update is the one outcome that must
+     * behave correctly, and it is not reachable by feeding the installer bad
+     * input. A test overrides this to fail one specific move.
+     */
+    protected function move(string $from, string $to): bool
     {
+        return @rename($from, $to);
+    }
+
+    /**
+     * Put back what was moved, and say what could not be put back.
+     *
+     * The results used to be discarded, and the caller then reported "the update
+     * was rolled back" whether or not any of it had been. That was found on a
+     * real installation: the swap failed partway, the message said everything
+     * was restored, and the site was left with new code in src/ and no public/
+     * at all. An operator reading that message stops looking, which is the worst
+     * thing a wrong message can cause.
+     *
+     * @param list<string> $moved
+     * @return list<string> Directories that could NOT be restored.
+     */
+    private function rollback(array $moved, string $backup): array
+    {
+        $failed = [];
+
         foreach ($moved as $dir) {
             $live = $this->basePath . '/' . $dir;
             if (is_dir($live)) {
                 $this->removeTree($live);
             }
-            @rename("$backup/$dir", $live);
+            if (!$this->move("$backup/$dir", $live)) {
+                $failed[] = $dir;
+            }
         }
+
+        return $failed;
+    }
+
+    /**
+     * The failure message for a swap that could not be completed, told
+     * accurately.
+     *
+     * When everything went back, an operator can stop worrying. When it did not,
+     * they need three things in one sentence: that the installation is
+     * half-applied, which parts, and where the backup is — because finishing the
+     * job is now a manual act.
+     *
+     * @param list<string> $unrestored
+     * @return array{success: bool, error: string, backup: ?string}
+     */
+    private function swapFailure(string $dir, array $unrestored, string $backup): array
+    {
+        if ($unrestored === []) {
+            return $this->failure("Could not install \"$dir\"; the update was rolled back.");
+        }
+
+        return [
+            'success' => false,
+            'error' => "Could not install \"$dir\", and the installation could not be put back: "
+                . implode(', ', $unrestored)
+                . " could not be restored. The site is part-updated and may not serve. "
+                . "A copy of what was replaced is in $backup — restore it before trying again.",
+            'backup' => $backup,
+        ];
     }
 
     private function download(string $url): ?string
