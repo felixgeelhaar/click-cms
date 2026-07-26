@@ -76,6 +76,73 @@ final class UpdateInstallerTest extends TestCase
         return new UpdateInstaller($this->base, $this->base . '/data/updates');
     }
 
+    /* ------------------------------------------------- the site's own rewrite -- */
+
+    /**
+     * The file that holds an installation together is not replaced.
+     *
+     * `public/.htaccess` is where a site says where its own code lives
+     * (`SetEnv CLICK_CMS_ROOT`) and what URL prefix it answers on
+     * (`RewriteBase`). Both exist *because* an update replaces `public/` — and
+     * replacing that file along with the rest takes the site down: it can no
+     * longer find its own vendor/, so it 500s, and every clean URL 404s.
+     *
+     * Worse than a manual mistake, because a security release installs
+     * unattended: the site would break itself, overnight, from an update meant
+     * to protect it.
+     */
+    public function testAnUpdateLeavesTheSitesOwnHtaccessInPlace(): void
+    {
+        mkdir($this->base . '/public', 0o755, true);
+        $live = "SetEnv CLICK_CMS_ROOT /home/example/click-cms\nRewriteBase /2026/cms/\nRewriteEngine On\n";
+        file_put_contents($this->base . '/public/.htaccess', $live);
+        file_put_contents($this->base . '/public/index.php', '<?php // version 1');
+
+        $package = $this->makePackage('update.zip', [
+            'click-cms-1.5.0/public/index.php' => '<?php // version 2',
+            'click-cms-1.5.0/public/.htaccess' => "RewriteEngine On\nRewriteRule ^(.*)$ index.php [QSA,L]\n",
+        ]);
+        $result = $this->installer()->install($this->releaseFor($package), $package);
+
+        $this->assertTrue($result['success'], (string) ($result['error'] ?? ''));
+        $this->assertSame($live, file_get_contents($this->base . '/public/.htaccess'));
+        // The rest of public/ still updates.
+        $this->assertSame('<?php // version 2', file_get_contents($this->base . '/public/index.php'));
+    }
+
+    /**
+     * The incoming version is kept beside it, so an operator can see what
+     * changed rather than having to diff against a release archive.
+     */
+    public function testTheShippedHtaccessIsLeftAlongsideForComparison(): void
+    {
+        mkdir($this->base . '/public', 0o755, true);
+        file_put_contents($this->base . '/public/.htaccess', "RewriteBase /2026/cms/\n");
+
+        $shipped = "RewriteEngine On\n# something new\nRewriteRule ^(.*)$ index.php [QSA,L]\n";
+        $package = $this->makePackage('update.zip', [
+            'click-cms-1.5.0/public/.htaccess' => $shipped,
+            'click-cms-1.5.0/public/index.php' => '<?php',
+        ]);
+        $this->installer()->install($this->releaseFor($package), $package);
+
+        $this->assertSame($shipped, file_get_contents($this->base . '/public/.htaccess.dist'));
+    }
+
+    /** A first install with no .htaccess of its own takes the shipped one. */
+    public function testAnInstallWithoutAnHtaccessTakesTheShippedOne(): void
+    {
+        mkdir($this->base . '/public', 0o755, true);
+        $shipped = "RewriteEngine On\nRewriteRule ^(.*)$ index.php [QSA,L]\n";
+        $package = $this->makePackage('update.zip', [
+            'click-cms-1.5.0/public/.htaccess' => $shipped,
+        ]);
+        $this->installer()->install($this->releaseFor($package), $package);
+
+        $this->assertSame($shipped, file_get_contents($this->base . '/public/.htaccess'));
+        $this->assertFileDoesNotExist($this->base . '/public/.htaccess.dist');
+    }
+
     /* ------------------------------------------------------------ happy path -- */
 
     public function testInstallsAReleaseAndKeepsABackup(): void
