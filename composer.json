@@ -27,13 +27,13 @@
     "scripts": {
         "test": "phpunit --no-progress",
         "test:admin": "cd admin-ui && npm test",
-        "lint": "find src plugins bin -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null",
+        "lint": "find src plugins bin public -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null",
         "seed": "php bin/click-seed.php"
     },
     "scripts-descriptions": {
         "test": "Run the PHP test suite.",
         "test:admin": "Run the admin UI test suite.",
-        "lint": "Syntax-check every PHP file in src, plugins and bin.",
+        "lint": "Syntax-check every PHP file in src, plugins, bin and public.",
         "seed": "Fill a fresh install with the example site. Never overwrites."
     }
 }
