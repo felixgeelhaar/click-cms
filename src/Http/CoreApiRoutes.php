@@ -758,6 +758,7 @@ final class CoreApiRoutes
         return $this->mediaLibrary ??= new MediaLibrary(
             $this->media(),
             fn (): Role => Role::fromName($this->currentUser()['role'] ?? null),
+            $this->mediaBaseUrl(),
         );
     }
 
@@ -789,7 +790,7 @@ final class CoreApiRoutes
 
         return $item === null
             ? ['status' => 404, 'error' => 'Media not found']
-            : ['data' => $item->toArray($this->requestedDisplayWidth())];
+            : ['data' => $item->toArray($this->requestedDisplayWidth(), $this->mediaBaseUrl())];
     }
 
     /**
@@ -807,7 +808,7 @@ final class CoreApiRoutes
             return ['status' => 422, 'error' => $result['error']];
         }
 
-        return ['status' => 201, 'data' => $result['item']->toArray()];
+        return ['status' => 201, 'data' => $result['item']->toArray(null, $this->mediaBaseUrl())];
     }
 
     /**
@@ -849,7 +850,7 @@ final class CoreApiRoutes
         // treating an empty update as an error.
         $item ??= $this->media()->find($id);
 
-        return ['data' => $item?->toArray()];
+        return ['data' => $item?->toArray(null, $this->mediaBaseUrl())];
     }
 
     /**

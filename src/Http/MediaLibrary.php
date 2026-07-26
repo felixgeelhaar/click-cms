@@ -53,6 +53,8 @@ final class MediaLibrary
     public function __construct(
         private readonly MediaService $media,
         private readonly Closure $currentRole,
+        /** Where this installation serves media from; see MediaItem::toArray(). */
+        private readonly string $mediaBaseUrl = '/api/media/file',
     ) {}
 
     /**
@@ -115,7 +117,7 @@ final class MediaLibrary
             // Enrich rather than replace: the item's own payload is untouched and
             // the derived folder rides alongside it, so a front end can group
             // without re-deriving the rule this class owns.
-            $data[] = ['folder' => $this->folderOf($item)] + $item->toArray($displayWidth);
+            $data[] = ['folder' => $this->folderOf($item)] + $item->toArray($displayWidth, $this->mediaBaseUrl);
         }
 
         return [
