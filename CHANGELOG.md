@@ -3,6 +3,27 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.2] — 2026-07-26
+
+### The preflight page survives the installation it is diagnosing
+- `preflight.php` loaded the autoloader from above its own directory, which is
+  wrong for exactly the split-root install 1.4.0 introduced: there the code
+  lives wherever `CLICK_CMS_ROOT` points. It fataled with a blank 500 on the
+  first installation it was used on — a diagnostic failing in the same way as
+  the thing it diagnoses, which turns one wrong answer into two.
+- It now resolves the root the way `index.php` does, and when the files are not
+  there it *says so*: which path it looked in, what it expected, and the reason
+  that path is often wrong on shared hosting — SFTP is frequently chrooted, so
+  the directory an operator uploaded to is not the absolute path PHP resolves.
+
+### `.htaccess` says what to do when clean URLs 404
+- A subdirectory install whose `index.php/api/pages` works while `/api/pages`
+  404s has a `RewriteBase` problem: Apache is meant to derive it from the
+  directory, and on some shared hosting it resolves the rewrite against the
+  document root instead. The shipped file now carries the line, commented, with
+  the symptom named — because that pair of behaviours is otherwise very hard to
+  attribute.
+
 ## [1.4.1] — 2026-07-26
 
 ### `CLICK_CMS_ROOT` and `CLICK_PREFLIGHT_TOKEN` are found where the server puts them
