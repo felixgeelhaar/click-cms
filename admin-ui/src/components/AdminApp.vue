@@ -58,6 +58,10 @@
           <Sidebar :active-route="currentRoute" :user-role="currentUser?.role" :collapsed="isCollapsed" :show-builder="hasBuilder" @navigate="handleNavigate" />
         </aside>
         <main id="admin-main" ref="mainEl" tabindex="-1" class="main-content" :class="{ collapsed: isCollapsed }">
+          <!-- Above the page rather than inside it, so it is seen once on
+               arrival wherever the reader lands, and never competes with the
+               screen they came for. -->
+          <UpdateNotice :capabilities="currentUser?.capabilities ?? []" />
           <component :is="currentComponent" v-bind="currentProps" @navigate="handleNavigate" @saved="handleNavigate('/admin/pages')" @cancel="handleNavigate('/admin/pages')" @back="handleNavigate('/admin/plugins')" @branding-updated="handleBrandingUpdate" />
         </main>
       </div>
@@ -68,6 +72,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import Sidebar from './Sidebar.vue';
+import UpdateNotice from './UpdateNotice.vue';
 import Login from './Login.vue';
 import Dashboard from './Dashboard.vue';
 import Pages from './Pages.vue';
