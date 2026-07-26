@@ -3,6 +3,21 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.5] — 2026-07-26
+
+### The version the code reports is the version that was released
+- `Application::VERSION` said `1.3.0` while 1.4.0 through 1.4.4 shipped. Its own
+  docblock calls bumping it part of cutting a release; four releases went by
+  without it.
+- The consequence is not cosmetic. The updater compares that constant against
+  the feed to decide what to install, so an installation running 1.4.4 believed
+  it was on 1.3.0, was offered 1.4.4 permanently, and under an unattended policy
+  would have re-installed the same release on every run — swapping directories
+  under a live site each time.
+- A test now checks the constant against the newest changelog entry on every
+  push, and the release workflow refuses to build a tag that disagrees with it.
+- `/api/info` reported a hardcoded `0.1.0`; it reports the real version now.
+
 ## [1.4.4] — 2026-07-26
 
 ### An update no longer breaks a site that told it where to look

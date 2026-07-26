@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Http;
 
 use Click\Cms\Application\Plugin\PluginManager;
+use Click\Cms\Core\Application;
 use Click\Cms\Domain\Plugin\PluginState;
 use Click\Cms\Domain\ValueObjects\PluginId;
 use Throwable;
@@ -158,7 +159,7 @@ final class PluginsController
     {
         return ['data' => [
             'name' => 'Click CMS',
-            'version' => '0.1.0',
+            'version' => Application::VERSION,
             // Addresses a client is meant to call, so they are spelt the way
             // this installation is reached rather than the way its source
             // writes them.

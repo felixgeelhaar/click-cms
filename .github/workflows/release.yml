@@ -66,6 +66,19 @@ jobs:
             echo "security=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # A tag and a constant that disagree produce an installation that cannot
+      # tell what it is running — which is how 1.3.0 stayed in the code through
+      # four releases. Cheaper to refuse here than to ship it.
+      - name: The code must agree with the tag
+        run: |
+          version="${{ steps.meta.outputs.version }}"
+          declared=$(grep -oE "const VERSION = '[^']+'" src/Core/Application.php | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          if [ "$version" != "$declared" ]; then
+            echo "::error::tag v${version} but Application::VERSION is ${declared}"
+            exit 1
+          fi
+          echo "tag and Application::VERSION agree: ${version}"
+
       - name: Install runtime dependencies
         run: composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
 
