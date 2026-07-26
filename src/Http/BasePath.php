@@ -49,11 +49,19 @@ final class BasePath
     /**
      * Work out the prefix for this request.
      *
-     * @param array<string, mixed> $server    The request's `$_SERVER`.
+     * Three sources, most trustworthy first: what the site configured, what a
+     * proxy the site trusts says, and what the request itself shows.
+     *
+     * @param array<string, mixed> $server     The request's `$_SERVER`.
      * @param string|null          $configured `core.basePath`, when a site sets it.
+     * @param TrustedProxies|null  $proxies    Who may set `X-Forwarded-Prefix`.
+     *                                         Nobody, unless a site says otherwise.
      */
-    public static function detect(array $server, ?string $configured = null): self
-    {
+    public static function detect(
+        array $server,
+        ?string $configured = null,
+        ?TrustedProxies $proxies = null,
+    ): self {
         // An explicit setting wins, including an explicitly empty one. It exists
         // for the case detection cannot see: behind a reverse proxy the script
         // lives at one path and the public URL is another, and only the operator
@@ -63,6 +71,11 @@ final class BasePath
         // configured around. Absent (null) is what means "work it out".
         if ($configured !== null) {
             return new self(self::normalise($configured));
+        }
+
+        $forwarded = self::forwardedPrefix($server, $proxies);
+        if ($forwarded !== null) {
+            return new self(self::normalise($forwarded));
         }
 
         $script = (string) ($server['SCRIPT_NAME'] ?? '');
@@ -79,6 +92,57 @@ final class BasePath
         $directory = str_replace('\\', '/', dirname($script));
 
         return new self(self::normalise($directory));
+    }
+
+    /**
+     * The prefix a trusted proxy says the site is published under, if any.
+     *
+     * `X-Forwarded-Prefix` is the field's convention for the arrangement
+     * detection cannot see: a proxy serving the site at `/blog/` in front of an
+     * application installed at a root, where the script's own path says nothing
+     * about the public URL. Honouring it means such a site needs no per-
+     * environment configuration.
+     *
+     * It is only ever read from a sender the site named as its proxy, because
+     * this header is written by whoever sent the request. The prefix goes into
+     * every URL the site emits, so believing an untrusted sender would let a
+     * visitor rewrite every link on a page — and a cached render would then hand
+     * their version to everybody else.
+     *
+     * @param array<string, mixed> $server
+     */
+    private static function forwardedPrefix(array $server, ?TrustedProxies $proxies): ?string
+    {
+        if ($proxies === null || !$proxies->trusts((string) ($server['REMOTE_ADDR'] ?? ''))) {
+            return null;
+        }
+
+        $header = (string) ($server['HTTP_X_FORWARDED_PREFIX'] ?? '');
+        if ($header === '') {
+            return null;
+        }
+
+        // Leftmost wins in a chain, as with every other X-Forwarded header: it is
+        // the prefix the outermost proxy — the one facing the visitor — publishes.
+        $value = trim(explode(',', $header, 2)[0]);
+
+        // A trusted proxy is trusted, not infallible, and a misconfigured one is
+        // a likelier source of nonsense than an attacker. Only something that is
+        // actually a path is accepted: no scheme, no traversal, nothing that has
+        // to be escaped in an attribute. Anything else falls through to the
+        // request's own evidence rather than being concatenated into every link.
+        // No colon in the allowed set, though a path segment may legally contain
+        // one: a prefix has no use for it, and leaving it out is what makes
+        // `https:/evil.example` fail here rather than end up spliced onto the
+        // front of every link as a relative path.
+        if ($value === '' || preg_match('#^/?[A-Za-z0-9._~%!$&\'()*+,;=@/-]*$#', $value) !== 1) {
+            return null;
+        }
+        if (str_contains($value, '..') || str_contains($value, '//')) {
+            return null;
+        }
+
+        return $value;
     }
 
     /** The prefix, with a leading slash and no trailing one. Empty at the root. */

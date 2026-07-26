@@ -126,15 +126,35 @@ ordinary layout. The path is read from the server rather than written into a
 file **because an update replaces `public/`**: an edit to `index.php` would
 survive only until the next release.
 
-If the prefix cannot be detected — behind a reverse proxy, where the script sits
-at one path and the site is published at another — name it:
+### Behind a reverse proxy
+
+A proxy that publishes the site at `/blog/` in front of an application installed
+at a root is the one case the request cannot show: the script's own path says
+nothing about the public URL. Two ways to deal with it.
+
+Most proxies already send `X-Forwarded-Prefix`. Name the proxy and the CMS will
+believe it:
 
 ```json
-{ "core": { "basePath": "/2026/cms" } }
+{ "core": { "trustedProxies": ["10.0.0.0/8"] } }
 ```
 
-An empty string there means the domain root, and is honoured as an answer rather
-than read as the absence of one.
+Addresses or CIDR ranges — a range because an ingress controller's pods do not
+keep one address. **Nobody is trusted by default**, and that is deliberate: the
+header is written by whoever sent the request, and the prefix it carries goes
+into every URL the site emits, so believing an unnamed sender would let a visitor
+rewrite every link on a page. Name only the proxy your traffic actually arrives
+through, and make sure nothing else can reach the application directly.
+
+Or state the prefix outright, which needs no trust in anybody:
+
+```json
+{ "core": { "basePath": "/blog" } }
+```
+
+This wins over everything else. An empty string means the domain root, and is
+honoured as an answer rather than read as the absence of one — which is what a
+site published at a root from a script in a directory needs to say.
 
 ## Route 3 — From source
 

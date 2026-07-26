@@ -12,10 +12,19 @@ All notable changes to click-cms are documented here. This project adheres to
   handed out started at `/`. That left the claim that this runs on ordinary
   shared hosting only half true — a subdirectory is the normal shape there.
 - The prefix is detected from the request, so unzipping the archive into a
-  directory is the whole installation step. `core.basePath` overrides detection
-  for a reverse proxy, where the script's path and the public URL differ; an
-  empty value there means the domain root and is honoured rather than read as
-  unset.
+  directory is the whole installation step. `core.basePath` states it outright
+  where that is preferred; an empty value there means the domain root and is
+  honoured rather than read as unset.
+- Behind a reverse proxy — the one arrangement a request cannot show, since the
+  script sits at one path and the site is published at another — the CMS reads
+  `X-Forwarded-Prefix`, but **only from a proxy the site has named** in
+  `core.trustedProxies` (addresses or CIDR ranges). Nobody is trusted by
+  default. The header is written by whoever sent the request and its value lands
+  in every URL the site emits, so an unnamed sender who was believed could
+  rewrite every link on a page — and a cached render would then serve their
+  version to everyone else. A value that is not a path is refused even from a
+  trusted proxy, on the grounds that a misconfigured proxy is likelier than a
+  hostile one.
 - Hosting without `mod_rewrite` works too: `/2026/cms/index.php/api/pages`
   resolves to the same route a rewriting host produces.
 - The admin UI is one build that runs at any prefix — its assets are addressed

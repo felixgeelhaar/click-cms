@@ -93,6 +93,24 @@ final class CoreConfig
     }
 
     /**
+     * Proxies whose `X-Forwarded-Prefix` this site believes.
+     *
+     * Empty by default, which means nobody: the header is written by whoever
+     * sent the request, and the prefix it carries goes into every URL the site
+     * emits. A site that named no proxy behaves exactly as it did before the
+     * header was understood at all.
+     *
+     * Addresses or CIDR ranges — a range because an ingress controller's pods do
+     * not keep one address.
+     *
+     * @return list<string>
+     */
+    public function trustedProxies(): array
+    {
+        return $this->stringList('core.trustedProxies', []);
+    }
+
+    /**
      * Origins allowed to read the delivery API from a browser.
      *
      * Empty by default, which means same-origin only. A front end served from

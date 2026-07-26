@@ -28,6 +28,7 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\BasePath;
 use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\TrustedProxies;
 use Click\Cms\Application\Theme\ThemeRepository;
 use Click\Cms\Application\Update\ReleaseFeed;
 use Click\Cms\Application\Update\UpdateInstaller;
@@ -238,7 +239,11 @@ class Application
      */
     public function urlBase(): BasePath
     {
-        return $this->urlBase ??= BasePath::detect($_SERVER, $this->config?->basePath());
+        return $this->urlBase ??= BasePath::detect(
+            $_SERVER,
+            $this->config?->basePath(),
+            new TrustedProxies($this->config?->trustedProxies() ?? []),
+        );
     }
 
     /**

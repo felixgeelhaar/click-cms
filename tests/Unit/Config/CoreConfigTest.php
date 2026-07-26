@@ -255,6 +255,22 @@ final class CoreConfigTest extends TestCase
     }
 
     /**
+     * Nobody, until a site says otherwise — the header these unlock is written
+     * by whoever sent the request.
+     */
+    public function testNoProxyIsTrustedByDefault(): void
+    {
+        $this->assertSame([], CoreConfig::fromArray([])->trustedProxies());
+    }
+
+    public function testTrustedProxiesAreRead(): void
+    {
+        $config = CoreConfig::fromArray(['core' => ['trustedProxies' => ['10.0.0.0/8', '::1']]]);
+
+        $this->assertSame(['10.0.0.0/8', '::1'], $config->trustedProxies());
+    }
+
+    /**
      * @param list<Locale> $locales
      * @return list<string>
      */
