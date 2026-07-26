@@ -76,6 +76,58 @@ final class UpdateInstallerTest extends TestCase
         return new UpdateInstaller($this->base, $this->base . '/data/updates');
     }
 
+    /* ----------------------------------------------- telling the truth after -- */
+
+    /**
+     * An update that could not be undone must not claim it was.
+     *
+     * Found by installing over HTTP: the swap failed partway, the response said
+     * "the update was rolled back", and the installation was left with new code
+     * in src/ and no public/ at all — a site with no document root, told that
+     * nothing had changed. The operator's next move after that message is to
+     * look somewhere else entirely.
+     *
+     * Simulated by making the restore impossible: the backup directory is
+     * removed before the failing rename, so nothing can be put back.
+     */
+    public function testAFailedRollbackSaysSoRatherThanClaimingSuccess(): void
+    {
+        mkdir($this->base . '/public', 0o755, true);
+        file_put_contents($this->base . '/public/index.php', '<?php // live');
+
+        // A package whose `public` cannot be installed: an unwritable live
+        // directory in its place is enough to make the rename fail.
+        $package = $this->makePackage('update.zip', [
+            'click-cms-1.5.0/src/App.php' => '<?php // version 2',
+            'click-cms-1.5.0/public/index.php' => '<?php // version 2',
+        ]);
+
+        // The shape seen in the wild: public/ is set aside successfully, the
+        // incoming one cannot be put in its place, and neither can the original
+        // — leaving the site with new code and no public/ at all. Anything
+        // moving *to* the live public fails; moving it aside is allowed.
+        $live = $this->base . '/public';
+        $installer = new class ($this->base, $this->base . '/data/updates', $live) extends UpdateInstaller {
+            public function __construct(string $base, string $backups, private readonly string $blocked)
+            {
+                parent::__construct($base, $backups);
+            }
+
+            protected function move(string $from, string $to): bool
+            {
+                return $to === $this->blocked ? false : parent::move($from, $to);
+            }
+        };
+
+        $result = $installer->install($this->releaseFor($package), $package);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('public', (string) $result['error']);
+        // The message must name the backup, because a human has to finish the job.
+        $this->assertStringContainsString($this->base . '/data/updates', (string) $result['error']);
+        $this->assertNotEmpty($result['backup']);
+    }
+
     /* ------------------------------------------------- the site's own rewrite -- */
 
     /**

@@ -3,6 +3,30 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.1] — 2026-07-26
+
+### A failed update stops claiming it was rolled back
+- When a swap failed partway, the installer reported "the update was rolled
+  back" whether or not any of it had been. Found on a real installation: the
+  swap failed, the message said everything was restored, and the site was left
+  with new code in `src/` and no `public/` at all — a site with no document
+  root, told that nothing had changed.
+- The restore results were discarded. They are checked now, and when something
+  cannot be put back the message says so, names what is missing, and gives the
+  path to the backup — because finishing the job is a manual act and an operator
+  who is told "rolled back" stops looking.
+- `UpdateInstaller` is no longer `final`, with one protected `move()` seam. The
+  half-applied case is the outcome that most needs to behave, and it cannot be
+  reached by feeding the installer bad input.
+
+### The update endpoints are covered where the buttons meet them
+- The notice's tests stubbed `fetch` and the installer's called it directly;
+  nothing tested the seam between them, which is how the dishonest message
+  reached an installation. Endpoint tests now cover what the buttons ask for:
+  that the sign-in check is cached, that "check now" always refreshes, that an
+  editor is refused, and that applying with nothing on offer does not claim to
+  have installed anything.
+
 ## [1.5.0] — 2026-07-26
 
 ### The admin says when an update is waiting
