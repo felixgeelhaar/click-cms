@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Click\Cms\Http;
 
 use Click\Cms\Application\Config\CoreConfig;
+use Click\Cms\Application\Update\UpdateNotice;
+use Click\Cms\Application\Update\UpdateScheduler;
 use Click\Cms\Application\Update\UpdateService;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
@@ -35,6 +37,14 @@ final class UpdatesController
         private readonly UpdateService $updates,
         private readonly CoreConfig $config,
         private readonly mixed $currentUser,
+        /**
+         * Remembers the last answer so the admin can show a notice without a
+         * network round trip. Optional so a caller that never heard of it — a
+         * test, an older embedder — behaves exactly as before and always asks
+         * the feed.
+         */
+        private readonly ?UpdateNotice $notice = null,
+        private readonly ?UpdateScheduler $scheduler = null,
     ) {
     }
 
@@ -66,6 +76,34 @@ final class UpdatesController
             return $denied;
         }
 
+        // Answered from memory when there is a recent answer.
+        //
+        // This endpoint is what the admin calls on every sign-in to decide
+        // whether to show an update notice, and it used to fetch the release
+        // feed each time — a network round trip inside the sign-in path, and a
+        // poll rate set by how often people happen to log in. Now the feed is
+        // consulted on the scheduler's interval and remembered in between, so
+        // signing in costs a file read.
+        //
+        // `POST /api/updates/check` still forces a refresh: that is somebody
+        // pressing "check now", and it should mean it.
+        if ($this->notice !== null && $this->scheduler !== null) {
+            $now = time();
+
+            if (!$this->scheduler->isDue($now)) {
+                $remembered = $this->notice->remembered();
+                if ($remembered !== null) {
+                    return ['data' => $remembered + ['fromCache' => true]];
+                }
+            }
+
+            $state = $this->state();
+            $this->notice->remember($state, $now);
+            $this->scheduler->markChecked($now);
+
+            return ['data' => $state + ['fromCache' => false]];
+        }
+
         return ['data' => $this->state()];
     }
 
@@ -82,7 +120,13 @@ final class UpdatesController
             return $denied;
         }
 
-        return ['data' => $this->state()];
+        // Always the feed: this is the button, and a button that might not do
+        // anything is worse than no button.
+        $state = $this->state();
+        $this->notice?->remember($state, time());
+        $this->scheduler?->markChecked(time());
+
+        return ['data' => $state + ['fromCache' => false]];
     }
 
     /**

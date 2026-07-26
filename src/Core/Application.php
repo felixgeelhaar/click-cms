@@ -33,6 +33,8 @@ use Click\Cms\Http\TrustedProxies;
 use Click\Cms\Application\Theme\ThemeRepository;
 use Click\Cms\Application\Update\ReleaseFeed;
 use Click\Cms\Application\Update\UpdateInstaller;
+use Click\Cms\Application\Update\UpdateNotice;
+use Click\Cms\Application\Update\UpdateScheduler;
 use Click\Cms\Application\Update\UpdateService;
 use Click\Cms\Http\MarketplaceController;
 use Click\Cms\Http\ThemesController;
@@ -76,7 +78,7 @@ class Application
      * signed feed offers, so it is the single answer to "what is running here?"
      * — bumping it is part of cutting a release, not an afterthought.
      */
-    public const VERSION = '1.4.5';
+    public const VERSION = '1.5.0';
 
     /**
      * The password the installer seeds. Published in the documentation and
@@ -479,6 +481,9 @@ class Application
             ),
             $this->config,
             fn (): array => $this->getSessionUser() ?? [],
+            // So the admin's sign-in check reads a file instead of the feed.
+            new UpdateNotice($this->basePath . '/data/updates'),
+            new UpdateScheduler($this->basePath . '/data/updates'),
         );
 
         // Sessions and login throttling are collaborators rather than methods on

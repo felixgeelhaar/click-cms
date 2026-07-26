@@ -3,6 +3,28 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] — 2026-07-26
+
+### The admin says when an update is waiting
+- Signing in now shows a notice when a newer release is available, with the
+  version, whether it is a security release, and a button to install it.
+- This is the answer to unattended updates on shared hosting, where the cron
+  entry `bin/click-update.php` needs either does not exist or lives behind a
+  panel nobody opens. An update nobody is told about does not get installed.
+- Deliberately an offer, not an automatic install: swapping the software under
+  someone who is working is not a thing to do to them. Shown only to a user with
+  `plugins.install`, because a notice you cannot act on is noise.
+- A feed that is slow, down or misconfigured leaves the admin exactly as it was.
+  Whether a newer version exists is not worth interrupting a sign-in over.
+
+### Checking for updates no longer costs a network round trip per sign-in
+- `GET /api/updates` fetched the release feed on **every** call, which put an
+  external request in the sign-in path and made the poll rate a function of how
+  often people log in. It now answers from the last remembered check and
+  consults the feed on the scheduler's existing interval.
+- `POST /api/updates/check` still always refreshes — that is somebody pressing
+  "check now", and it should mean it.
+
 ## [1.4.5] — 2026-07-26
 
 ### The version the code reports is the version that was released
