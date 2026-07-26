@@ -59,7 +59,12 @@ marketplace-registry/
 .claude/
 
 # Headless demo — generated/runtime bits (source, compose and seed are tracked).
+# Customer material does not belong in this repository. The demo directory is
+# scratch for building a real site with this CMS, and what comes out of it —
+# screenshots of someone's admin, a guide written for a named person — is
+# theirs, not an example. Ignored so it cannot be added back by a wide `git add`.
 demo/state/
+docs/turboscience-demo/
 demo/turboscience-web/node_modules/
 demo/turboscience-web/dist/
 demo/turboscience-web/package-lock.json
