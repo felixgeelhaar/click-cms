@@ -78,7 +78,33 @@ if (
     exit("Not Found\n");
 }
 
-require_once __DIR__ . '/../vendor/autoload.php';
+// The same root resolution index.php performs, and for the same reason: on a
+// split-root install the autoloader is not above this file, it is wherever
+// CLICK_CMS_ROOT points. Assuming otherwise made this page fatal on exactly the
+// installation it was written to diagnose — and a preflight that dies for the
+// same reason as the site turns one wrong answer into two.
+$root = click_cms_preflight_value('CLICK_CMS_ROOT');
+$root = $root !== null && is_dir($root) ? rtrim($root, '/') : __DIR__ . '/..';
+
+if (!is_file($root . '/vendor/autoload.php')) {
+    // Reported rather than fataled. "I looked here and found nothing" is the
+    // most useful sentence this page can print, because a missing autoloader is
+    // what a wrong CLICK_CMS_ROOT looks like from here — and a blank 500 is
+    // what it looked like before.
+    header('Content-Type: text/plain; charset=utf-8');
+    http_response_code(503);
+    echo "click-cms preflight\n\n";
+    echo "The installation's own files are not where this page was told to look.\n\n";
+    echo '  CLICK_CMS_ROOT:  ' . (click_cms_preflight_value('CLICK_CMS_ROOT') ?? '(not set)') . "\n";
+    echo "  looked in:       {$root}\n";
+    echo "  expected:        {$root}/vendor/autoload.php\n\n";
+    echo "If that path looks right but does not exist, check whether it is the path\n";
+    echo "the *server* sees. SFTP is often chrooted to an account's home, so the\n";
+    echo "directory you uploaded to is not the absolute path PHP resolves.\n";
+    exit;
+}
+
+require_once $root . '/vendor/autoload.php';
 
 use Click\Cms\Application\Preflight\CheckStatus;
 use Click\Cms\Application\Preflight\HostReport;

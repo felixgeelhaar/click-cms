@@ -1,5 +1,16 @@
 RewriteEngine On
 
+# Installed in a subdirectory? Uncomment this and name the URL path the site
+# answers on, with a trailing slash — `RewriteBase /2026/cms/`.
+#
+# Apache is supposed to work this out from the directory the .htaccess is in,
+# and on many servers it does. On others — shared hosting especially — the
+# substitution below is resolved against the document root instead, and every
+# clean URL 404s while `index.php/api/pages` works perfectly. That combination
+# is the symptom; this line is the cure.
+#
+# RewriteBase /
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ index.php [QSA,L]
