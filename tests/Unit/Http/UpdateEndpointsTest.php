@@ -105,6 +105,25 @@ final class UpdateEndpointsTest extends TestCase
         $this->assertSame(403, $controller->apply()['status'] ?? null);
     }
 
+    /**
+     * Installing must clear what was remembered.
+     *
+     * Seen on a live installation: after a successful update the admin went on
+     * reporting the old version and offering the release it had just installed,
+     * because the cached answer was written before the swap and the interval had
+     * not elapsed. The notice would have said so for a day.
+     */
+    public function testInstallingForgetsTheRememberedAnswer(): void
+    {
+        $notice = new UpdateNotice($this->base . '/data/updates');
+        $notice->remember(['hasUpdate' => true, 'currentVersion' => '1.4.5'], time());
+        $this->assertNotNull($notice->remembered(), 'precondition: something is remembered');
+
+        $notice->forget();
+
+        $this->assertNull($notice->remembered());
+    }
+
     /** With nothing on offer, the button must not pretend it installed something. */
     public function testApplyingWithNothingToInstallSaysSo(): void
     {
