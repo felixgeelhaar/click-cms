@@ -3,6 +3,21 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.4] — 2026-07-26
+
+### An update no longer breaks a site that told it where to look
+- `public/.htaccess` survives an update, with the incoming version left beside
+  it as `.htaccess.dist`.
+- This is the file 1.4.0 asked installations to put `SetEnv CLICK_CMS_ROOT` and
+  `RewriteBase` into — settings that exist *because* an update replaces
+  `public/` — and then replaced along with everything else. The result was a
+  site that could no longer find its own `vendor/` (500) and answered 404 to
+  every clean URL, applied by an unattended security update. An update meant to
+  protect a site would have taken it down.
+- **If you set either directive, take this before your next update.**
+- A link in the admin-ui plugin's status page was absolute (`/api/info`) and so
+  wrong under a prefix; it is relative now.
+
 ## [1.4.3] — 2026-07-26
 
 ### Supply chain: third-party actions pinned to commits

@@ -41,6 +41,21 @@ final class UpdateInstaller
     /** Never written by an update: this is the site, not the software. */
     private const PROTECTED_PATHS = ['content', 'data', 'config'];
 
+    /**
+     * Files inside a replaced directory that belong to the site rather than the
+     * release, and so survive an update with the incoming version left beside
+     * them as `<name>.dist`.
+     *
+     * `public/.htaccess` is the whole list, and it earns its place: it is where
+     * an installation says where its own code lives (`SetEnv CLICK_CMS_ROOT`)
+     * and what URL prefix it answers on (`RewriteBase`). Both of those exist
+     * *because* an update replaces `public/` — so replacing that file too took
+     * the site down, and did it from an unattended security update, which is the
+     * worst way to learn about it: the site could no longer find its own
+     * vendor/, so it answered 500, and every clean URL 404'd.
+     */
+    private const SITE_OWNED_FILES = ['public/.htaccess'];
+
     private const MAX_ENTRIES = 20000;
     private const MAX_TOTAL_BYTES = 200 * 1024 * 1024;
 
@@ -125,6 +140,8 @@ final class UpdateInstaller
             $moved[] = $dir;
         }
 
+        $this->preserveSiteOwnedFiles($backup);
+
         $this->removeTree($staging);
 
         if ($localPackage === null) {
@@ -132,6 +149,34 @@ final class UpdateInstaller
         }
 
         return ['success' => true, 'error' => null, 'backup' => $backup];
+    }
+
+    /**
+     * Restore the files a site owns inside the directories an update replaced.
+     *
+     * Done after the swap rather than by filtering the incoming tree, because
+     * the swap is a directory rename — there is no per-file step to hook into,
+     * and adding one would trade an atomic move for a recursive copy.
+     *
+     * The shipped version is kept as `<name>.dist` so a change to it is
+     * discoverable: rewrite rules do occasionally gain a line, and an operator
+     * who never sees the new one cannot merge it.
+     */
+    private function preserveSiteOwnedFiles(string $backup): void
+    {
+        foreach (self::SITE_OWNED_FILES as $relative) {
+            $previous = "$backup/$relative";
+            if (!is_file($previous)) {
+                continue; // the site had none; the shipped file stands
+            }
+
+            $live = $this->basePath . '/' . $relative;
+            if (is_file($live)) {
+                @copy($live, $live . '.dist');
+            }
+
+            @copy($previous, $live);
+        }
     }
 
     /**

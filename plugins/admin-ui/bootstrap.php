@@ -158,7 +158,7 @@ npm run build</code></pre>
         </ul>
         
         <p style="margin-top: 2rem;">
-            <a href="/api/info" class="btn">View API Status</a>
+            <a href="api/info" class="btn">View API Status</a>
         </p>
     </div>
 </body>
