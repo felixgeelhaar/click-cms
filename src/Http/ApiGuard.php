@@ -72,6 +72,16 @@ final class ApiGuard
             return false;
         }
 
+        // A schedule is the same shape of leak as history, and hangs off the
+        // same public prefix. It says when a page that is not public yet will
+        // become public — which for an embargoed announcement, an earnings
+        // release or an offer with a start date is precisely the thing being
+        // kept quiet. The site-wide listing is worse again: it is every pending
+        // change on the site in one anonymous read.
+        if ($path === 'schedule' || preg_match('#^pages/[^/]+/schedule$#', $path) === 1) {
+            return false;
+        }
+
         // Published content, read by a front end that has no account.
         if ($path === 'pages' || str_starts_with($path, 'pages/')) {
             return true;

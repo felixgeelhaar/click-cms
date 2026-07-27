@@ -34,6 +34,22 @@
         @unpublish="unpublishPage"
       />
 
+      <!--
+        Only for a page that exists. Scheduling something with no working copy
+        to promote would produce a schedule the sweeper drops as soon as it
+        fires, which is a worse way to learn "save it first" than not offering
+        the control.
+      -->
+      <PageSchedule
+        v-if="!isNew && !translationMissing"
+        :schedule="schedule"
+        :can-schedule="can('content.publish')"
+        :busy="scheduleBusy"
+        @save="saveSchedule"
+        @clear="clearSchedule"
+      />
+      <p v-if="scheduleError" class="banner error" role="alert">{{ scheduleError }}</p>
+
       <PageLanguages
         v-if="!isNew && siteLocales.length > 1"
         :locales="siteLocales"
@@ -211,6 +227,7 @@ import SectionEditor from './SectionEditor.vue';
 import PresenceBar from './collaboration/PresenceBar.vue';
 import CommentsPanel from './collaboration/CommentsPanel.vue';
 import PagePublication from './PagePublication.vue';
+import PageSchedule from './PageSchedule.vue';
 import PageLanguages from './PageLanguages.vue';
 import PageVersions from './PageVersions.vue';
 import ImageField from './fields/ImageField.vue';
@@ -317,6 +334,16 @@ const languageName = (code) => {
 
 const publication = ref(null);
 const publishBusy = ref('');
+
+/* ------------------------------------------------------ scheduling -- */
+
+// Null until the API answers, which the panel reads as "still checking" rather
+// than "nothing scheduled" — the same distinction the publication banner draws,
+// and for the same reason: an unknown answer shown as a definite one is this
+// codebase's recurring bug.
+const schedule = ref(null);
+const scheduleBusy = ref(false);
+const scheduleError = ref('');
 
 /* --------------------------------------------------------- history -- */
 
@@ -501,7 +528,7 @@ const reload = async () => {
   loading.value = true;
   try {
     await loadPage();
-    await Promise.all([loadTranslations(), loadVersions()]);
+    await Promise.all([loadTranslations(), loadVersions(), loadSchedule()]);
   } catch (e) {
     loadError.value = `Could not load this page: ${e.message}`;
   } finally {
@@ -577,7 +604,7 @@ const savePage = async () => {
       // live" — which is the whole point of doing it here rather than leaving
       // the editor to discover it on the public site.
       await refreshPublication();
-      await Promise.all([loadTranslations(), loadVersions()]);
+      await Promise.all([loadTranslations(), loadVersions(), loadSchedule()]);
       notice.value = 'Saved. This is not on the public site until you publish.';
     }
   } catch (e) {
@@ -626,7 +653,7 @@ const publicationAction = async (action) => {
       ? `Published in ${languageName(locale.value)}. This page is now on the public site.`
       : `Taken down. Visitors now get a "page not found" for this page in ${languageName(locale.value)}.`;
 
-    await Promise.all([loadTranslations(), loadVersions()]);
+    await Promise.all([loadTranslations(), loadVersions(), loadSchedule()]);
   } catch (e) {
     publishError.value = `Could not ${action} this page: ${e.message}`;
   } finally {
@@ -636,6 +663,90 @@ const publicationAction = async (action) => {
 
 const publishPage = () => publicationAction('publish');
 const unpublishPage = () => publicationAction('unpublish');
+
+/* ------------------------------------------------------- scheduling -- */
+
+const loadSchedule = async () => {
+  if (!storedSlug.value) {
+    schedule.value = { publishAt: null, unpublishAt: null };
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/pages/${storedSlug.value}/schedule${localeQuery()}`);
+    const body = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      // A 501 means this installation has no schedule store. Not an error to
+      // put in front of the editor — there is simply nothing to schedule with —
+      // so the panel is left in its "nothing scheduled" state and says so.
+      if (res.status !== 501) {
+        scheduleError.value = body.error || `Could not read the schedule (${res.status}).`;
+      }
+      schedule.value = { publishAt: null, unpublishAt: null };
+      return;
+    }
+
+    schedule.value = body.data ?? { publishAt: null, unpublishAt: null };
+  } catch (e) {
+    scheduleError.value = `Could not read the schedule: ${e.message}`;
+    schedule.value = { publishAt: null, unpublishAt: null };
+  }
+};
+
+const saveSchedule = async ({ publishAt, unpublishAt }) => {
+  scheduleBusy.value = true;
+  scheduleError.value = '';
+  notice.value = '';
+
+  try {
+    const res = await fetch(`/api/pages/${storedSlug.value}/schedule${localeQuery()}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publishAt, unpublishAt }),
+    });
+    const body = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      scheduleError.value = body.error || `Could not save the schedule (${res.status}).`;
+      return;
+    }
+
+    schedule.value = body.data ?? schedule.value;
+    notice.value = publishAt || unpublishAt
+      ? 'Schedule saved. Nothing changes on the public site until the time you set.'
+      : 'Schedule cancelled.';
+  } catch (e) {
+    scheduleError.value = `Could not save the schedule: ${e.message}`;
+  } finally {
+    scheduleBusy.value = false;
+  }
+};
+
+const clearSchedule = async () => {
+  scheduleBusy.value = true;
+  scheduleError.value = '';
+  notice.value = '';
+
+  try {
+    const res = await fetch(`/api/pages/${storedSlug.value}/schedule${localeQuery()}`, {
+      method: 'DELETE',
+    });
+    const body = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      scheduleError.value = body.error || `Could not cancel the schedule (${res.status}).`;
+      return;
+    }
+
+    schedule.value = body.data ?? { publishAt: null, unpublishAt: null };
+    notice.value = 'Schedule cancelled.';
+  } catch (e) {
+    scheduleError.value = `Could not cancel the schedule: ${e.message}`;
+  } finally {
+    scheduleBusy.value = false;
+  }
+};
 
 /* -------------------------------------------------------- history -- */
 
@@ -766,7 +877,7 @@ onMounted(async () => {
     }
 
     await loadPage();
-    await Promise.all([loadTranslations(), loadVersions()]);
+    await Promise.all([loadTranslations(), loadVersions(), loadSchedule()]);
   } catch (e) {
     loadError.value = `Could not load this page: ${e.message}`;
   } finally {

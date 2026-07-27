@@ -180,6 +180,51 @@ nothing than something wrong.
 **Delete**, on the Pages list, is the one that removes the page itself. Take
 down first, and delete only when you are certain.
 
+## Publishing at a set time
+
+Under the banner is **Scheduled publishing**. It answers a different question
+from the banner above it: not *what can the public see now*, but *what is going
+to change, and when*.
+
+Two fields, either of which may be left empty:
+
+- **Publish at** — the page goes live at this time, without anyone being at a
+  keyboard.
+- **Take down at** — the page comes off the public site at this time.
+
+Set both and you have a window: an offer that opens on Monday morning and closes
+on Friday night, arranged once and then left alone.
+
+The times are in **your own timezone** — the panel says which one it thinks you
+are in, and you should check that line the first time you use it. What is stored
+is the exact instant you picked, so a colleague in another country sees the same
+moment expressed in theirs.
+
+### What scheduling does not do
+
+- **It is not a publish.** Nothing is on the public site until the time arrives.
+  The banner above still tells you the truth about right now.
+- **It does not save your work.** Save first. Scheduling an unsaved page
+  schedules the last thing you saved, not what is on your screen.
+- **It respects who you are.** If your account cannot publish, it cannot
+  schedule either — otherwise "cannot publish" would mean "cannot publish
+  *immediately*", which is not a rule at all.
+- **Each language is separate.** Scheduling the German page does nothing to the
+  English one, exactly as publishing by hand does not.
+
+### If a scheduled time passes and nothing happens
+
+The panel will tell you so, in as many words. It means the site is missing the
+piece that does the work: a *cron entry* that runs `bin/click-schedule.php`
+every few minutes.
+
+This is not something you can fix from the admin. Ask whoever looks after the
+site — for them it is one line, and
+[`docs/core.md`](core.md#scheduled-publishing) says exactly which.
+
+Until that is in place, scheduling is a note to yourself and nothing more. That
+is why the warning exists rather than a silent wait.
+
 ## Undoing a mistake with version history
 
 Below the Save button is **Version history**, and it is the reason you can afford

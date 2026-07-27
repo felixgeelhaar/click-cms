@@ -87,6 +87,19 @@ final class ApiGuardTest extends TestCase
         // prefix but must never be anonymously readable.
         $this->assertFalse($this->guard->isPublic('pages/home/versions', 'GET'));
         $this->assertFalse($this->guard->isPublic('pages/home/versions/abc', 'GET'));
+        // A schedule hangs off the same public prefix as version history and
+        // leaks the same class of thing: unpublished editorial intent. Knowing
+        // a page goes live at nine tomorrow is knowing about a page that is not
+        // public yet, and for an embargoed announcement that is the whole
+        // secret.
+        $this->assertFalse($this->guard->isPublic('pages/home/schedule', 'GET'));
+        $this->assertFalse($this->guard->isPublic('schedule', 'GET'));
+        // Webhook management is deny-by-default like everything unnamed. Worth
+        // pinning rather than assuming: the endpoint list is a set of URLs this
+        // server can be made to fetch, and the delivery log describes changes
+        // that may not be public yet.
+        $this->assertFalse($this->guard->isPublic('webhooks', 'GET'));
+        $this->assertFalse($this->guard->isPublic('webhooks/deliveries', 'GET'));
         // Entry management and draft reads stay private; only /published and the
         // signature-gated /preview are open.
         $this->assertFalse($this->guard->isPublic('collections/blog/entries', 'GET'));

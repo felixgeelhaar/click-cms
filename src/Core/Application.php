@@ -9,6 +9,7 @@ use Click\Cms\Application\Preview\PreviewLinks;
 use Click\Cms\Application\Authentication\CsrfGuard;
 use Click\Cms\Application\Authentication\LoginThrottle;
 use Click\Cms\Application\Authentication\SessionStore;
+use Click\Cms\Application\Authentication\TwoFactorService;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Config\Settings;
 use Click\Cms\Application\Event\EventBus;
@@ -46,6 +47,8 @@ use Click\Cms\Application\Collection\EntryRouter;
 use Click\Cms\Application\Collection\ReferenceResolver;
 use Click\Cms\Domain\Collection\CollectionType;
 use Click\Cms\Domain\Publishing\Publishable;
+use Click\Cms\Domain\Publishing\PublishingStorage;
+use Click\Cms\Infrastructure\Publishing\FileScheduleStore;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository;
 use Click\Cms\Http\CollectionsController;
@@ -87,7 +90,19 @@ class Application
     private const INITIAL_PASSWORD = 'admin';
 
     private bool $booted = false;
+
+    /**
+     * Who unattended work is being carried out for, while it is running. Null
+     * at every other moment, which is every ordinary request. See {@see runAs()}.
+     */
+    private ?string $actingAs = null;
+
     private ?PluginManager $pluginManager = null;
+
+    /** The fully decorated storage: authorised, versioned, audited, announced. */
+    private ?PublishingStorage $publishingStorage = null;
+    private ?FileScheduleStore $scheduleStore = null;
+
     private ?ContentService $contentService = null;
     private ?EventDispatcher $eventDispatcher = null;
     private ?EventBus $eventBus = null;
@@ -303,7 +318,10 @@ class Application
             );
             // Who is acting, read lazily on each write because the storage stack
             // outlives any one request. Shared by versioning and the audit trail.
-            $author = fn (): ?string => $this->getSessionUser()['username'] ?? null;
+            // `actingUsername()` rather than the session directly, so unattended
+            // work carried out on somebody's behalf — a scheduled publication —
+            // is recorded against the person who asked for it. See `runAs()`.
+            $author = fn (): ?string => $this->actingUsername();
 
             // Audit wraps versioning as the outermost decorator, so every write —
             // save, delete, publish, unpublish and a history restore — leaves a
@@ -393,6 +411,13 @@ class Application
             );
 
             $this->contentService = new ContentService($storage, $this->config->defaultLocale());
+
+            // Kept so unattended work can write through the *same* decorated
+            // stack a request does. A CLI sweep that reached a bare backend
+            // instead would publish without a version, without an audit entry
+            // and without dropping the stale render cache — three silent
+            // divergences between "published by hand" and "published on time".
+            $this->publishingStorage = $storage;
 
         $this->history = new HistoryService($storage, $versions);
         $this->auditService = new AuditService($auditLog);
@@ -561,7 +586,8 @@ class Application
             // that subscribes to no auth event from building a payload — or
             // reading the lockout file twice to detect a transition nobody is
             // listening for.
-            new AuthGate(
+            twoFactor: new TwoFactorService($this->contentService, $this->twoFactorIssuer()),
+            gate: new AuthGate(
                 fn (string $hook, array $payload): array
                     => $this->pluginManager?->executeHookIsolated($hook, $payload) ?? [],
                 fn (string $hook): bool => $this->pluginManager?->hasHookListeners($hook) ?? false,
@@ -611,6 +637,33 @@ class Application
     public function getBasePath(): string
     {
         return $this->basePath;
+    }
+
+    /**
+     * The storage every write goes through, decorators and all.
+     *
+     * For unattended work — the scheduled-publication sweep — that must land
+     * identically to a write made through a request. Not for handlers: they
+     * have {@see getContentService()}, which speaks in pages rather than keys.
+     */
+    public function getPublishingStorage(): PublishingStorage
+    {
+        if ($this->publishingStorage === null) {
+            throw new \RuntimeException('The application must be booted before its storage is used.');
+        }
+
+        return $this->publishingStorage;
+    }
+
+    /**
+     * Where deferred publications are kept, as the web path opens it.
+     *
+     * The same directory {@see CoreApiRoutes} writes to, so a schedule set in
+     * the admin is the one the sweeper finds.
+     */
+    public function getScheduleStore(): FileScheduleStore
+    {
+        return $this->scheduleStore ??= new FileScheduleStore($this->basePath . '/data/schedule');
     }
 
     private function handleRequest(string $uri, string $method): array
@@ -1670,9 +1723,80 @@ class Application
         return $decision['preflight'];
     }
 
+    /**
+     * Run a piece of work attributed to a named account that is not the session.
+     *
+     * There is exactly one caller shape for this: unattended work carried out on
+     * somebody's behalf, of which a scheduled publication is the first. Such a
+     * write is genuinely that person's act — they asked for it, the system only
+     * waited — so recording it against nobody would make the audit trail read as
+     * though the site had published itself, and recording it against the session
+     * would be worse still, since a cron run has none.
+     *
+     * Deliberately narrow. It sets a name for the versioning and audit
+     * decorators to read and restores whatever was there afterwards, including
+     * when the work throws; it grants nothing and is not consulted by any
+     * permission check. Authorisation for a scheduled publish was settled when
+     * the schedule was set, by an account that held the publish capability then
+     * — see {@see \Click\Cms\Application\Content\PageService::schedule()}. If
+     * this ever starts being read by an authorizer it has become an
+     * impersonation mechanism and should be removed.
+     *
+     * @template T
+     * @param callable(): T $work
+     * @return T
+     */
+    /**
+     * The name an authenticator app shows beside this site's codes.
+     *
+     * The host, because that is what actually distinguishes one installation
+     * from another in somebody's app — three sites all labelled "Click CMS"
+     * would be three entries nobody can tell apart, and picking the wrong one is
+     * a failed sign-in with no explanation.
+     *
+     * The host is attacker-controlled, so it is reduced to a hostname shape
+     * before use. It only ever appears inside an `otpauth://` URI that escapes
+     * it, so this is belt and braces rather than the only defence — but a header
+     * reaching a QR code that somebody scans is not a path to be casual about.
+     */
+    private function twoFactorIssuer(): string
+    {
+        $host = $_SERVER['HTTP_HOST'] ?? '';
+
+        if (!is_string($host)) {
+            return 'Click CMS';
+        }
+
+        // Strip any port, then accept only what a hostname may contain.
+        $host = preg_replace('/:\d+$/', '', trim($host)) ?? '';
+
+        return preg_match('/^[A-Za-z0-9.-]{1,253}$/', $host) === 1 ? $host : 'Click CMS';
+    }
+
+    public function runAs(?string $username, callable $work): mixed
+    {
+        $previous = $this->actingAs;
+        $this->actingAs = $username;
+
+        try {
+            return $work();
+        } finally {
+            $this->actingAs = $previous;
+        }
+    }
+
     private function getSessionUser(): ?array
     {
         return $this->sessions?->user();
+    }
+
+    /**
+     * Whoever is being acted for, when that is not the session. See
+     * {@see runAs()} for why this exists and what it deliberately does not do.
+     */
+    private function actingUsername(): ?string
+    {
+        return $this->actingAs ?? ($this->getSessionUser()['username'] ?? null);
     }
 
     private function getSessionData(): array
