@@ -65,6 +65,7 @@ final class Navigation
             'docs/admin-tour.md',
             'docs/editing.md',
             'docs/publishing.md',
+            'docs/two-factor.md',
             'docs/pictures.md',
             'docs/collections.md',
         ],
@@ -76,6 +77,7 @@ final class Navigation
         'Building on it' => [
             'docs/core.md',
             'docs/visual-builder.md',
+            'docs/webhooks.md',
             'docs/collaboration.md',
             'docs/practices.md',
             'docs/roadmap.md',

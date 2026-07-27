@@ -46,7 +46,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { withBase } from '../lib/base.js';
-const props = defineProps({ activeRoute: String, userRole: String, collapsed: Boolean, showBuilder: Boolean });
+const props = defineProps({ activeRoute: String, userRole: String, collapsed: Boolean, showBuilder: Boolean, showWebhooks: Boolean });
 const emit = defineEmits(['navigate']);
 
 const iconPaths = {
@@ -64,6 +64,8 @@ const iconPaths = {
   redirects: ['M9 17H7A5 5 0 0 1 7 7h2', 'M15 7h2a5 5 0 0 1 0 10h-2', 'M8 12h8'],
   // A paint roller: a theme is the site's surface, not its structure.
   themes: ['M19 3H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z', 'M12 10v4', 'M9 14h6v7H9z'],
+  // An arrow leaving a box: something here going out to somewhere else.
+  webhooks: ['M4 4h8', 'M4 4v8', 'M4 4l7 7', 'M14 10h6a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-6'],
   // A download arrow into a tray: new code arriving.
   updates: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3'],
   settings: ['M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'],
@@ -92,16 +94,22 @@ const navGroups = computed(() => {
   groups.push({ id: 'content', label: 'Content', collapsible: true, items: content });
 
   if (props.userRole === 'admin') {
-    groups.push({ id: 'manage', label: 'Manage', collapsible: true, items: [
+    const manage = [
       { href: '/admin/plugins', icon: 'plugins', label: 'Plugins' },
       { href: '/admin/marketplace', icon: 'marketplace', label: 'Marketplace' },
       { href: '/admin/users', icon: 'users', label: 'Users' },
       { href: '/admin/redirects', icon: 'redirects', label: 'Redirects' },
       { href: '/admin/menus', icon: 'menus', label: 'Menus' },
       { href: '/admin/themes', icon: 'themes', label: 'Themes' },
+    ];
+    // Only when the plugin serving it is installed, like Builder above: a menu
+    // item whose every request answers 404 is worse than no menu item.
+    if (props.showWebhooks) manage.push({ href: '/admin/webhooks', icon: 'webhooks', label: 'Webhooks' });
+    manage.push(
       { href: '/admin/settings', icon: 'settings', label: 'Settings' },
       { href: '/admin/updates', icon: 'updates', label: 'Updates' },
-    ] });
+    );
+    groups.push({ id: 'manage', label: 'Manage', collapsible: true, items: manage });
   }
 
   groups.push({ id: 'account', label: 'Account', collapsible: true, items: [
