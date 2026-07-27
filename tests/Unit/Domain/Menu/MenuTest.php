@@ -178,4 +178,72 @@ final class MenuTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         Menu::create('Not A Menu Id', 'Name');
     }
+
+    /* ---------------------------------------------------- anchors -- */
+
+    /**
+     * A one-page site's navigation is anchors, and until now none of it could
+     * be expressed here: a target had to be a page slug or an absolute URL, so
+     * "Contact" pointing at #contact simply could not be saved. That is the
+     * common case for the sites this CMS is aimed at, not an exotic one.
+     */
+    public function testAnAnchorIsAValidTarget(): void
+    {
+        $item = MenuItem::create('Kontakt', '#contact');
+
+        $this->assertSame('#contact', $item->target());
+        $this->assertFalse($item->isExternal());
+        $this->assertTrue($item->isAnchor());
+    }
+
+    /** A section of a particular page, rather than of whatever page is open. */
+    public function testAPageAnchorKeepsBothParts(): void
+    {
+        $item = MenuItem::create('Team', 'about#team');
+
+        $this->assertSame('about', $item->slug());
+        $this->assertSame('team', $item->fragment());
+        $this->assertFalse($item->isExternal());
+    }
+
+    public function testALocalePrefixedPageAnchorWorks(): void
+    {
+        $item = MenuItem::create('Team', 'de/about#team');
+
+        $this->assertSame('de', $item->localeCode());
+        $this->assertSame('about', $item->slug());
+        $this->assertSame('team', $item->fragment());
+    }
+
+    /**
+     * The reason this class exists is that an editor's string lands inside an
+     * href. A fragment is a new shape of input, so it gets the same treatment:
+     * an id, and nothing that could close the attribute or carry a scheme.
+     */
+    public function testAHostileFragmentIsRefused(): void
+    {
+        foreach ([
+            '#"onmouseover="alert(1)',
+            '#javascript:alert(1)',
+            '# space',
+            '#<script>',
+            "#a'b",
+            '#',
+        ] as $target) {
+            try {
+                MenuItem::create('Bad', $target);
+                $this->fail("accepted a hostile fragment: {$target}");
+            } catch (InvalidArgumentException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function testAnAnchorSurvivesTheRoundTripThroughAnArray(): void
+    {
+        $item = MenuItem::fromArray(MenuItem::create('Kontakt', '#contact')->toArray());
+
+        $this->assertSame('#contact', $item->target());
+        $this->assertTrue($item->isAnchor());
+    }
 }

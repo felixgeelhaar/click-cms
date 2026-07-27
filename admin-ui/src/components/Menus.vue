@@ -64,7 +64,7 @@
                   :default-locale="defaultLocale"
                   :described-by="`item-${i}-target-hint`"
                 />
-                <span :id="`item-${i}-target-hint`" class="field-hint">One of this site's pages, or an external http(s) address.</span>
+                <span :id="`item-${i}-target-hint`" class="field-hint">One of this site's pages, an anchor on the current page (#contact), a section of a page (about#team), or an external http(s) address.</span>
               </div>
             </div>
 

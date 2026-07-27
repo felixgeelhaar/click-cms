@@ -3,6 +3,26 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] — 2026-07-27
+
+### A menu can point at an anchor
+- `#contact` for a section of the page being viewed, `about#team` for a section
+  of a named one, with the locale prefix working as before (`de/about#team`).
+- Until now a target had to be a page slug or an absolute URL, which meant a
+  one-page site — the ordinary shape for the sites this CMS serves — could not
+  express its navigation at all, and had to hardcode it in the front end.
+- Fragments are held to the same standard as every other target: an id shape
+  only, so nothing in one can close the attribute it lands in or smuggle a
+  scheme. `#" onmouseover="…` is refused exactly like `javascript:` is.
+
+### A headless front end can read the navigation
+- `GET /api/menus` and `GET /api/menus/:id` are readable without an account,
+  like pages, published collection entries and search.
+- Withholding them meant a site could read its content from the CMS but not its
+  navigation, so the nav had to live in the front end — the one arrangement a
+  CMS exists to prevent. Writing a menu stays management: `PUT` is still refused
+  anonymously.
+
 ## [1.5.2] — 2026-07-26
 
 ### The update notice stops offering a release the site already installed

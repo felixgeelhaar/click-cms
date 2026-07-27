@@ -12,9 +12,10 @@ use PHPUnit\Framework\TestCase;
 /**
  * Menu management as a core controller, mirroring UsersController.
  *
- * The "may this caller manage menus" gate is the kernel's ApiGuard, and menus
- * are management, so deny-by-default already protects these routes — nothing is
- * added to any public allowlist. What this pins is the controller's own
+ * Writing a menu is management and stays behind the kernel's ApiGuard. *Reading*
+ * one is delivery: a menu is what every visitor sees in the header, so a
+ * headless front end must be able to fetch it without an account — see
+ * ApiGuardTest. What this pins is the controller's own
  * guarantees: a menu round-trips through save and load, a bad target never
  * reaches storage, and the render path ({@see MenusController::resolvedItems()})
  * hands the public renderer only labels and safe hrefs.
@@ -222,5 +223,48 @@ final class MenusControllerTest extends TestCase
     public function testGettingAMissingMenuIs404(): void
     {
         $this->assertSame(404, $this->menus->get('nope')['status']);
+    }
+
+    /* ---------------------------------------------- anchors -- */
+
+    /**
+     * A one-page site's navigation. Before anchors existed as a target these
+     * items could not be saved at all, so such a site had to hardcode its nav
+     * in the front end — the one thing having a CMS is meant to avoid.
+     */
+    public function testAnAnchorResolvesToABareFragment(): void
+    {
+        $this->put('main', ['name' => 'Main', 'items' => [
+            ['label' => 'Was wir bieten', 'target' => '#services'],
+            ['label' => 'Kontakt', 'target' => '#contact'],
+        ]]);
+
+        $items = $this->menus->resolvedItems('main', null);
+
+        $this->assertSame('#services', $items[0]['href']);
+        $this->assertSame('#contact', $items[1]['href']);
+        $this->assertFalse($items[0]['external']);
+    }
+
+    /** A section of a named page keeps both halves. */
+    public function testAPageAnchorResolvesToPathAndFragment(): void
+    {
+        $this->put('main', ['name' => 'Main', 'items' => [
+            ['label' => 'Team', 'target' => 'about#team'],
+        ]]);
+
+        $this->assertSame('/about#team', $this->menus->resolvedItems('main', null)[0]['href']);
+    }
+
+    /** A hostile fragment never reaches storage, like any other bad target. */
+    public function testAnInvalidAnchorIsRefused(): void
+    {
+        $result = $this->put('main', ['name' => 'Main', 'items' => [
+            ['label' => 'Bad', 'target' => '#" onmouseover="alert(1)'],
+        ]]);
+
+        // 400, as for any other target the domain refuses — the anchor is not
+        // a special case, which is the point.
+        $this->assertSame(400, $result['status'] ?? null);
     }
 }

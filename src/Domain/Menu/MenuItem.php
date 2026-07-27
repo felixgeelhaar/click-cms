@@ -22,11 +22,17 @@ use InvalidArgumentException;
  *     same-origin path it controls; or
  *   - an absolute `http`/`https` URL, whose scheme is checked explicitly so that
  *     `javascript:`, `data:`, `mailto:`, `ftp:` and protocol-relative `//host`
- *     are all refused rather than passed through.
+ *     are all refused rather than passed through; or
+ *   - a fragment — `#contact`, or `about#team` for a section of a named page.
+ *     A one-page site's navigation is entirely anchors, which is the ordinary
+ *     shape for the sites this CMS serves, and until this existed such a
+ *     navigation could not be saved at all.
  *
- * Anything else throws. There is no third category and no "trust the editor"
- * escape hatch, because the editor's trust is exactly what an attacker who
- * reaches the editor would be borrowing.
+ * Anything else throws. There is no "trust the editor" escape hatch, because
+ * the editor's trust is exactly what an attacker who reaches the editor would
+ * be borrowing. A fragment is held to the same standard as the rest: it must
+ * look like an id, so nothing in it can close the attribute it will sit in or
+ * smuggle a scheme.
  *
  * A menu item may carry children — one level only. Real navigation groups links
  * under a heading ("Products" → Widgets, Gadgets); a third level is refused so a
@@ -37,6 +43,16 @@ final class MenuItem
     private const SLUG_PATTERN = '/^[a-z0-9][a-z0-9-]*$/';
 
     /**
+     * What may follow a `#`.
+     *
+     * An HTML id: a letter first, then letters, digits, hyphen, underscore,
+     * colon or dot. Deliberately narrower than the spec — which allows almost
+     * anything — because the value is written into an href attribute, and
+     * quotes, spaces and angle brackets are exactly what an injection needs.
+     */
+    private const FRAGMENT_PATTERN = '/^[A-Za-z][A-Za-z0-9_:.-]*$/';
+
+    /**
      * @param list<MenuItem> $children
      */
     private function __construct(
@@ -45,6 +61,7 @@ final class MenuItem
         private readonly bool $external,
         private readonly ?string $localeCode,
         private readonly ?string $slug,
+        private readonly ?string $fragment,
         private readonly array $children,
     ) {}
 
@@ -63,7 +80,7 @@ final class MenuItem
             throw new InvalidArgumentException('A menu item needs a target.');
         }
 
-        [$external, $localeCode, $slug] = self::classify($target);
+        [$external, $localeCode, $slug, $fragment] = self::classify($target);
 
         foreach ($children as $child) {
             if (!$child instanceof self) {
@@ -78,7 +95,7 @@ final class MenuItem
             }
         }
 
-        return new self($label, $target, $external, $localeCode, $slug, array_values($children));
+        return new self($label, $target, $external, $localeCode, $slug, $fragment, array_values($children));
     }
 
     /**
@@ -122,6 +139,21 @@ final class MenuItem
         return $this->localeCode;
     }
 
+    /**
+     * The id this item points at, without the `#`, or null when it points at a
+     * whole page.
+     */
+    public function fragment(): ?string
+    {
+        return $this->fragment;
+    }
+
+    /** Whether this points within a page rather than at one. */
+    public function isAnchor(): bool
+    {
+        return $this->fragment !== null;
+    }
+
     /** The internal page slug, or null when the target is an external URL. */
     public function slug(): ?string
     {
@@ -163,8 +195,41 @@ final class MenuItem
      *
      * @return array{0: bool, 1: ?string, 2: ?string} [external, localeCode, slug]
      */
+    /**
+     * A fragment must look like an id and nothing else.
+     *
+     * It ends up inside an href attribute, so the characters that matter are
+     * the ones that could leave it: quotes, spaces, angle brackets. Refusing
+     * everything but an id shape is cheaper to reason about than escaping, and
+     * an editor who wanted `#my section` meant `#my-section`.
+     */
+    private static function assertFragment(string $fragment, string $target): void
+    {
+        if (preg_match(self::FRAGMENT_PATTERN, $fragment) !== 1) {
+            throw new InvalidArgumentException(
+                "Menu target \"{$target}\" has an invalid anchor. Use an id such as #contact."
+            );
+        }
+    }
+
     private static function classify(string $target): array
     {
+        // A fragment is split off first, so `about#team` is judged as the page
+        // `about` plus the id `team` rather than as a slug containing a `#`.
+        // A bare `#contact` has no page part: it points within whatever page is
+        // being viewed, which is what a one-page navigation means.
+        $fragment = null;
+        $hash = strpos($target, '#');
+        if ($hash !== false) {
+            $fragment = substr($target, $hash + 1);
+            self::assertFragment($fragment, $target);
+            $target = substr($target, 0, $hash);
+
+            if ($target === '') {
+                return [false, null, null, $fragment];
+            }
+        }
+
         // A scheme followed by `://` is an absolute URL. Only http and https are
         // allowed through; every other scheme (and `javascript:` in particular,
         // which has no `//`) falls past this and is tested as an internal slug,
@@ -174,7 +239,7 @@ final class MenuItem
             $host = parse_url($target, PHP_URL_HOST);
 
             if (($scheme === 'http' || $scheme === 'https') && is_string($host) && $host !== '') {
-                return [true, null, null];
+                return [true, null, null, $fragment];
             }
 
             throw new InvalidArgumentException(
@@ -189,7 +254,7 @@ final class MenuItem
             $slug = $parts[0];
             self::assertSlug($slug, $target);
 
-            return [false, null, $slug];
+            return [false, null, $slug, $fragment];
         }
 
         if (count($parts) === 2) {
@@ -202,7 +267,7 @@ final class MenuItem
             }
             self::assertSlug($slug, $target);
 
-            return [false, Locale::fromString($localeCode)->code, $slug];
+            return [false, Locale::fromString($localeCode)->code, $slug, $fragment];
         }
 
         // Three or more segments: a page address here is a single slug, not a
