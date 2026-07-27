@@ -40,6 +40,87 @@ final class SiteBuilderTest extends TestCase
     // Discovery and URLs
     // ------------------------------------------------------------------
 
+    /**
+     * A sidebar label the generic transform cannot produce.
+     *
+     * Labels are `ucfirst` over the filename with hyphens turned into spaces,
+     * which reads correctly for `visual-builder` and cannot possibly be right
+     * for an initialism: shipping `docs/sso.md` put **"Sso"** in the navigation
+     * of a published site.
+     *
+     * The document's own `# ` heading is not the answer — that is a title
+     * ("Installing Click CMS") where a sidebar wants a name ("Install"), which
+     * is exactly why `Page::label` exists apart from `RenderedDocument::title`.
+     * Nor is a cleverer transform: nothing in `multi-site` distinguishes a
+     * hyphen inside a word from `visual-builder`'s hyphen between two. It is
+     * per-document knowledge, so it is stated per document.
+     */
+    public function testAnInitialismIsNamedProperlyInTheSidebar(): void
+    {
+        $this->fixture();
+        file_put_contents(
+            $this->workspace . '/repo/docs/sso.md',
+            "# Single sign-on\n\nSigning in with an account you already have.\n"
+        );
+
+        $this->build();
+        $html = $this->read('sso/index.html');
+
+        $this->assertStringContainsString('>SSO</a>', $html);
+        $this->assertStringNotContainsString('>Sso</a>', $html);
+    }
+
+    /**
+     * A hyphen inside a word survives, where one between words becomes a space.
+     * The filename alone cannot tell those apart, which is the whole reason the
+     * overrides exist.
+     */
+    public function testAHyphenatedWordKeepsItsHyphen(): void
+    {
+        $this->fixture();
+        file_put_contents(
+            $this->workspace . '/repo/docs/multi-site.md',
+            "# Running more than one site\n\nOne installation, many sites.\n"
+        );
+
+        $this->build();
+
+        $this->assertStringContainsString('>Multi-site</a>', $this->read('multi-site/index.html'));
+    }
+
+    /**
+     * Everything the transform already handles must go on being handled by it.
+     * An override list that had to name every page would be a manifest nobody
+     * keeps current, and `visual-builder` is the case it gets right.
+     */
+    public function testAnOrdinaryNameStillComesFromTheFilename(): void
+    {
+        $this->fixture();
+        file_put_contents(
+            $this->workspace . '/repo/docs/visual-builder.md',
+            "# The visual builder\n\nA node tree.\n"
+        );
+
+        $this->build();
+
+        $this->assertStringContainsString('>Visual builder</a>', $this->read('visual-builder/index.html'));
+    }
+
+    /**
+     * The override list names documents that may not exist — a page written on
+     * a branch, or one since renamed. It must not be able to fail a build, for
+     * the same reason `Navigation` skips a manifest entry with no file behind
+     * it.
+     */
+    public function testAnOverrideForAMissingDocumentIsHarmless(): void
+    {
+        $this->fixture();
+
+        $written = $this->build();
+
+        $this->assertContains('index.html', $written);
+    }
+
     public function testEveryMarkdownFileBecomesAPage(): void
     {
         $this->fixture();

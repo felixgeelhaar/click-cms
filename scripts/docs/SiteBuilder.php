@@ -170,10 +170,36 @@ final class SiteBuilder
         );
     }
 
+    /**
+     * Sidebar names the generic transform below cannot produce.
+     *
+     * Two kinds, and neither is derivable from a filename:
+     *
+     * - **Initialisms.** `sso` capitalises to "Sso", which is not a word and
+     *   was live on the published site until somebody read the sidebar.
+     * - **Hyphens inside a word.** `multi-site` and `visual-builder` are the
+     *   same string shape and want opposite treatment — one keeps its hyphen,
+     *   the other becomes two words. Nothing in the name says which.
+     *
+     * A document's own `# ` heading is deliberately *not* used instead. That is
+     * a title where this is a name: "Installing Click CMS" against "Install",
+     * "Running more than one site" against "Multi-site". A sidebar of full
+     * titles is a sidebar nobody can scan, which is why {@see Page::label} is a
+     * separate thing from {@see RenderedDocument::title} in the first place.
+     *
+     * Entries for documents that do not exist are simply never consulted, so a
+     * page renamed or written on a branch cannot break a build from here.
+     */
+    private const LABELS = [
+        'sso' => 'SSO',
+        'multi-site' => 'Multi-site',
+        'two-factor' => 'Two-factor',
+    ];
+
     /** `visual-builder` reads as "Visual builder" in a sidebar, not as a file name. */
     private function label(string $name): string
     {
-        return ucfirst(str_replace('-', ' ', $name));
+        return self::LABELS[$name] ?? ucfirst(str_replace('-', ' ', $name));
     }
 
     /**
