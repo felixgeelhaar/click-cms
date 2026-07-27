@@ -26,6 +26,16 @@
           <span class="brand-mark">C</span>
           <span class="brand-name">{{ brandLabel }}</span>
         </button>
+        <!--
+          Which site this is, shown only when the installation serves more than
+          one. Somebody looking after eight client sites with three tabs open
+          needs the answer on screen rather than inferable from the address bar:
+          editing the wrong client's homepage is a mistake with no warning and
+          an audience.
+        -->
+        <span v-if="site.multiSite" class="site-chip" :title="`You are editing ${site.title}`">
+          {{ site.title }}
+        </span>
         <div class="topbar-right">
           <!-- The visible word names the current theme; on its own that reads as
                a label, not a control. The accessible name says what pressing it
@@ -55,7 +65,7 @@
              sets. It is only in the tree while open. -->
         <div v-if="mobileNavOpen" class="sidebar-backdrop" aria-hidden="true" @click="mobileNavOpen = false"></div>
         <aside id="admin-sidebar" class="sidebar-shell" :class="{ collapsed: isCollapsed, 'is-open': mobileNavOpen }">
-          <Sidebar :active-route="currentRoute" :user-role="currentUser?.role" :collapsed="isCollapsed" :show-builder="hasBuilder" @navigate="handleNavigate" />
+          <Sidebar :active-route="currentRoute" :user-role="currentUser?.role" :collapsed="isCollapsed" :show-builder="hasBuilder" :show-webhooks="hasWebhooks" @navigate="handleNavigate" />
         </aside>
         <main id="admin-main" ref="mainEl" tabindex="-1" class="main-content" :class="{ collapsed: isCollapsed }">
           <!-- Above the page rather than inside it, so it is seen once on
@@ -85,6 +95,7 @@ import Settings from './Settings.vue';
 import Redirects from './Redirects.vue';
 import Menus from './Menus.vue';
 import FormSubmissions from './FormSubmissions.vue';
+import Webhooks from './Webhooks.vue';
 import Plugins from './Plugins.vue';
 import PluginDetail from './PluginDetail.vue';
 import Marketplace from './Marketplace.vue';
@@ -124,6 +135,13 @@ const hasBuilder = computed(
   () => installedPluginIds.value.includes('visual-builder') && can('edit.freeform')
 );
 
+// Same shape as the builder: the screen is offered only when the plugin that
+// serves it is installed, so a site that deleted `plugins/webhooks` does not
+// show a menu item whose every request answers 404.
+const hasWebhooks = computed(
+  () => installedPluginIds.value.includes('webhooks') && can('settings.manage')
+);
+
 const checkAuth = async () => {
   try {
     const res = await fetch('/api/auth/check');
@@ -133,8 +151,35 @@ const checkAuth = async () => {
     setCsrfToken(data.data?.csrfToken ?? null);
     isLoggedIn.value = data.data?.authenticated || false;
     currentUser.value = data.data?.user || null;
-    if (isLoggedIn.value) { await loadInstalledPlugins(); }
+    if (isLoggedIn.value) { await Promise.all([loadInstalledPlugins(), loadSite()]); }
   } catch (e) { isLoggedIn.value = false; }
+};
+
+/**
+ * The site this session is editing.
+ *
+ * `multiSite` false by default, so a single-site installation — which is most of
+ * them — never draws the chip, and a failed request leaves it hidden rather than
+ * showing an empty badge.
+ */
+const site = ref({ id: '', title: '', multiSite: false });
+
+const loadSite = async () => {
+  try {
+    const res = await fetch('/api/site');
+    const body = await res.json();
+
+    if (res.ok && body.data && typeof body.data === 'object') {
+      site.value = {
+        id: String(body.data.id ?? ''),
+        title: String(body.data.title || body.data.id || ''),
+        multiSite: body.data.multiSite === true,
+      };
+    }
+  } catch {
+    // Cosmetic. A site that cannot be named is not a reason to interrupt
+    // anybody's work.
+  }
 };
 
 const loadInstalledPlugins = async () => {
@@ -209,6 +254,7 @@ const getRouteComponent = () => {
   if (path === '/admin/menus') return can('settings.manage') ? Menus : Dashboard;
   if (path === '/admin/submissions') return FormSubmissions;
   if (path === '/admin/builder') return hasBuilder.value ? Builder : Dashboard;
+  if (path === '/admin/webhooks') return hasWebhooks.value ? Webhooks : Dashboard;
   if (path.startsWith('/admin/pages/edit/')) return PageEdit;
   if (path === '/admin/pages/new') return PageEdit;
   if (path.startsWith('/admin/plugins/')) return PluginDetail;
@@ -261,6 +307,18 @@ onUnmounted(() => { window.removeEventListener('keydown', onKeydown); });
 </script>
 
 <style scoped>
+.site-chip {
+  margin-left: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--color-primary-500) 16%, transparent);
+  color: var(--app-text);
+  border: 1px solid var(--app-border);
+  white-space: nowrap;
+}
+
 .admin-app { min-height: 100vh; }
 /* Off-screen until focused, then a real, visible target at the top left. */
 .skip-link {

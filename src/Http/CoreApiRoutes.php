@@ -20,6 +20,7 @@ use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Media\GdImageProcessor;
+use Click\Cms\Infrastructure\Publishing\FileScheduleStore;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
 use Click\Cms\Infrastructure\Storage\VersioningStorage;
@@ -47,6 +48,7 @@ final class CoreApiRoutes
     private ?VersioningStorage $storage = null;
     private ?JsonVersionStore $versions = null;
     private ?PreviewLinks $previewLinks = null;
+    private ?FileScheduleStore $scheduleStore = null;
 
     /**
      * The prefix this installation is served under.
@@ -58,14 +60,43 @@ final class CoreApiRoutes
      */
     private readonly BasePath $urlBase;
 
+    /**
+     * @param string  $basePath    The **site's** root. Content, media, versions,
+     *        schedules and every other per-site thing hangs off this, so a
+     *        multi-site installation hands in a different one per request and
+     *        nothing here has to know that sites exist.
+     * @param ?string $installRoot The installation's root, for things every site
+     *        shares. Only schema config today. Null means they are the same
+     *        directory, which is the single-site case and every existing caller.
+     */
     public function __construct(
         private readonly string $basePath,
         private readonly ?ContentService $content = null,
         private ?HistoryService $history = null,
         private readonly ?CoreConfig $config = null,
         ?BasePath $urlBase = null,
+        private readonly ?string $installRoot = null,
     ) {
         $this->urlBase = $urlBase ?? BasePath::root();
+    }
+
+    /**
+     * Where this site's section types are declared.
+     *
+     * A site's own `config/sections/` when it has one, and the installation's
+     * otherwise. That fallback is what lets an agency keep one shared set of
+     * designs across eight client sites while any one of them departs from it,
+     * without copying the other seven.
+     */
+    private function sectionTypesPath(): string
+    {
+        $own = $this->basePath . '/config/sections';
+
+        if (is_dir($own)) {
+            return $own;
+        }
+
+        return ($this->installRoot ?? $this->basePath) . '/config/sections';
     }
 
     /** Where media files are served from, as this installation spells it. */
@@ -95,6 +126,20 @@ final class CoreApiRoutes
             // getting an editor to load an image.
             'POST /api/pages/:slug/publish' => [$this, 'publishPage'],
             'POST /api/pages/:slug/unpublish' => [$this, 'unpublishPage'],
+
+            // Publication deferred to a stated time. A PUT rather than a POST
+            // because a page has one schedule and sending the same one twice
+            // must leave the same state — an editor who clicks Save twice has
+            // not asked for two publications.
+            //
+            // The site-wide listing sits at /api/schedule rather than under a
+            // page, because unlike a version a schedule is worth reading across
+            // every page at once: "what is about to change" is the question it
+            // exists to answer.
+            'GET /api/schedule' => [$this, 'listSchedules'],
+            'GET /api/pages/:slug/schedule' => [$this, 'getPageSchedule'],
+            'PUT /api/pages/:slug/schedule' => [$this, 'setPageSchedule'],
+            'DELETE /api/pages/:slug/schedule' => [$this, 'clearPageSchedule'],
 
             // History. Nested under the page rather than a top-level
             // /api/versions, because a version has no meaning apart from the
@@ -385,6 +430,81 @@ final class CoreApiRoutes
             $slug,
             $this->pages()->unpublish($slug, $this->currentUser(), $this->localeParam())
         );
+    }
+
+    /* -------------------------------------------------------- scheduling -- */
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPageSchedule(string $slug): array
+    {
+        return $this->scheduleResponse(
+            $this->pages()->scheduleOf($slug, $this->currentUser(), $this->localeParam())
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function setPageSchedule(string $slug): array
+    {
+        $body = $this->jsonBody();
+
+        return $this->scheduleResponse($this->pages()->schedule(
+            $slug,
+            $this->currentUser(),
+            $this->nullableString($body['publishAt'] ?? null),
+            $this->nullableString($body['unpublishAt'] ?? null),
+            $this->localeParam(),
+        ));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function clearPageSchedule(string $slug): array
+    {
+        return $this->scheduleResponse(
+            $this->pages()->clearSchedule($slug, $this->currentUser(), $this->localeParam())
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function listSchedules(): array
+    {
+        $result = $this->pages()->pendingSchedules($this->currentUser());
+
+        if ($result['error'] !== null) {
+            return ['status' => $result['status'], 'error' => $result['error']];
+        }
+
+        return ['data' => $result['schedules']];
+    }
+
+    /**
+     * @param array{schedule: array<string, mixed>, error: ?string, status: int} $result
+     * @return array<string, mixed>
+     */
+    private function scheduleResponse(array $result): array
+    {
+        if ($result['error'] !== null) {
+            return ['status' => $result['status'], 'error' => $result['error']];
+        }
+
+        return ['data' => $result['schedule']];
+    }
+
+    /**
+     * A field that is present but empty means "no time", not the string "".
+     * Sent by a form whose date input the editor cleared, which is how a
+     * schedule is removed one end at a time.
+     */
+    private function nullableString(mixed $value): ?string
+    {
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
     /**
@@ -994,7 +1114,7 @@ final class CoreApiRoutes
     private function sectionTypes(): JsonSectionTypeRepository
     {
         return $this->sectionTypes ??= new JsonSectionTypeRepository(
-            $this->basePath . '/config/sections'
+            $this->sectionTypesPath()
         );
     }
 
@@ -1005,7 +1125,23 @@ final class CoreApiRoutes
             $this->sectionTypes(),
             new SectionValidator(),
             $this->config?->locales() ?? [],
+            null,
+            $this->schedules(),
         );
+    }
+
+    /**
+     * Where deferred publications are kept.
+     *
+     * Under `data/` rather than `content/`: a schedule is operational state, not
+     * content — not versioned, not exported with a site's writing, and not
+     * something a storage migration should carry between backends. The same
+     * instance the CLI sweeper opens, so a schedule set in the admin is the one
+     * cron finds.
+     */
+    private function schedules(): FileScheduleStore
+    {
+        return $this->scheduleStore ??= new FileScheduleStore($this->basePath . '/data/schedule');
     }
 
     /**

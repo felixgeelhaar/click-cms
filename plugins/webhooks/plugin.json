@@ -1,0 +1,14 @@
+{
+  "name": "Webhooks",
+  "description": "Tells other systems when content changes: signed HTTP deliveries, queued to disk and sent from cron with retries",
+  "version": "1.0.0",
+  "author": "Click CMS",
+  "dependencies": [],
+  "hooks": [
+    "api.routes",
+    "content.saved",
+    "content.deleted",
+    "content.unpublished",
+    "content.published"
+  ]
+}

@@ -54,10 +54,24 @@ final class ThemeRepository
     /**
      * The conventional layout, so the kernel does not have to spell out two
      * paths it has no choice about.
+     *
+     * The two roots are separate arguments because they answer different
+     * questions once an installation serves more than one site. **Which themes
+     * exist** is a property of the installation — they are packages, deployed
+     * with the code, and copying eight identical directories per client would be
+     * absurd. **Which one is active** is a property of the site: an agency's
+     * whole reason for running eight sites is that they do not look alike.
+     *
+     * `$siteRoot` defaults to `$basePath`, which is the single-site case and
+     * every existing caller.
      */
-    public static function forInstallation(string $basePath, string $urlPrefix = '/themes'): self
+    public static function forInstallation(string $basePath, string $urlPrefix = '/themes', ?string $siteRoot = null): self
     {
-        return new self($basePath . '/themes', $basePath . '/data/theme.json', $urlPrefix);
+        return new self(
+            $basePath . '/themes',
+            ($siteRoot ?? $basePath) . '/data/theme.json',
+            $urlPrefix,
+        );
     }
 
     /**

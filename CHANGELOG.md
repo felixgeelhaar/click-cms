@@ -3,6 +3,94 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] — 2026-07-27
+
+Five features that every comparable CMS has and this one did not. Each is
+additive: nothing stored changes shape, and an installation that configures none
+of them behaves exactly as 1.6.0 did.
+
+### A page can be scheduled to publish, and to come down
+- Set a time and the page goes live without anyone at a keyboard; set a second
+  and it comes down again. Either alone, or both as a window.
+- A schedule is **not** a status field. Publication stays presence in `content/`,
+  and the schedule lives beside the document in `data/schedule/` as an intent —
+  which may legitimately disagree with the present, since that is what an intent
+  is.
+- It computes a state rather than replaying a queue. Cron does not always run,
+  and a window that opened at 09:00 and closed at 11:00, first swept at 11:30,
+  leaves the page down rather than publishing it and waiting a further sweep.
+- Governed by `content.publish`: an account that may not publish now may not
+  arrange to publish later either.
+- Needs `bin/click-schedule.php` from cron. A site without it gets a feature that
+  visibly does nothing — the panel says so — rather than one that half works.
+- **Security fix found on the way:** `GET /api/pages/:slug/schedule` was public,
+  because the anonymous allowlist opens `pages/*` to reads. A schedule says when
+  something not yet public becomes public, which for an embargo is the secret.
+
+### Webhooks tell another system when content changes
+- A plugin, `plugins/webhooks`. A statically generated front end can rebuild the
+  moment a page is published instead of on a timer.
+- Queued to disk and sent by `bin/click-webhooks.php`, never during the editor's
+  save: a receiver's latency does not belong on the Save button, a hanging
+  receiver must not hold a PHP worker, and an inline send cannot retry.
+- Signed `t=…,v1=…` HMAC-SHA256 over the exact body, the scheme Stripe and GitHub
+  converged on, with the timestamp inside the signed material as a replay
+  defence.
+- The payload carries identity, never the document. Users are content documents,
+  so a payload carrying `data` would post password hashes to a third party on
+  every password change.
+- Endpoint URLs are policed against SSRF: https only, no private, loopback or
+  link-local addresses, no embedded credentials, no redirects followed. Both
+  dials default to the restrictive answer.
+
+### An account can require a code as well as a password
+- TOTP (RFC 6238), core rather than a plugin, checked against the RFC's own test
+  vectors. Enrolment, ten single-use recovery codes, and a code step at sign-in.
+- The state between the two login steps authenticates **nothing** — the pending
+  session holds a username and no user record, so every guard treats the caller
+  as anonymous. Whoever holds the password alone reaches exactly one endpoint.
+- Wrong codes count against the same lockout wrong passwords do.
+- Turning it off requires the account password, so a borrowed session cannot
+  strip the protection off the account it borrowed.
+
+### Single sign-on, over OpenID Connect
+- Authorization code flow with PKCE, state and nonce, against any OIDC provider
+  — Entra ID, Google Workspace, Okta, Keycloak, Authentik.
+- ID tokens are verified against the provider's published keys with the algorithm
+  pinned to RS256, so `alg: none`, algorithm confusion and self-supplied keys are
+  all refused. `iss`, `aud`, `azp`, `exp`, `iat` and `nonce` are each checked, and
+  each has a test.
+- Accounts are linked by the provider's `sub`, never by email: addresses get
+  reassigned, and matching on one would hand the next holder the previous
+  holder's account.
+- Account creation and email matching are both **off by default**. With
+  provisioning on and a consumer provider, you have handed a login to anyone with
+  an email address.
+- **SAML is declined and not planned.** Verifying an assertion means XML digital
+  signatures, which is not something to hand-roll and would otherwise need a
+  runtime dependency this project does not take.
+
+### One installation can serve more than one site
+- Content, media, accounts and settings per site; code, plugins and themes
+  shared.
+- **Additive.** An installation with no `config/sites.json` keeps `content/` and
+  `data/` exactly where they are, and adding a second site does not move the
+  first.
+- Isolation is a property of *where the bytes are*: each request resolves a site
+  from its hostname and hands every service a different root. Nothing below the
+  kernel knows sites exist, so a query that forgot to scope itself is not
+  expressible.
+- The cost is stated rather than hidden: sites cannot share content, media or
+  accounts. For an agency serving separate clients that is the point; for one
+  newsroom feeding four brands this is the wrong tool.
+- `X-Forwarded-Host` is ignored — honouring it would let a visitor choose which
+  site's content they are served by sending a header.
+
+### Fixed
+- The login screen read `data.error?.message` while every endpoint here answers
+  with `error` as a string, so a locked-out person saw "Login failed" instead of
+  how long to wait.
+
 ## [1.6.0] — 2026-07-27
 
 ### A menu can point at an anchor

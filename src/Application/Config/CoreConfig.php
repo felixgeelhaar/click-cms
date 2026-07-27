@@ -414,6 +414,25 @@ final class CoreConfig
         return $this->int('core.auth.sprayMaxFailures', 50);
     }
 
+    /**
+     * The single sign-on block, `core.sso`, as it stands in the file.
+     *
+     * Returned raw rather than parsed into accessors here, because the whole
+     * block belongs to one feature and one class understands it —
+     * {@see \Click\Cms\Application\Authentication\Oidc\OidcSettings} — where the
+     * defaults and the "enabled means it has everything it needs" rule live
+     * together. Spreading a dozen accessors across this class would put half of
+     * that rule here and half there.
+     *
+     * @return array<string, mixed>
+     */
+    public function sso(): array
+    {
+        $value = $this->get('core.sso');
+
+        return is_array($value) ? $value : [];
+    }
+
     /** The window {@see self::sprayMaxFailures()} counts over. */
     public function sprayWindowSeconds(): int
     {

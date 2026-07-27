@@ -10,9 +10,15 @@ use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Domain\Schema\SectionTypeRepository;
 use Click\Cms\Domain\Content\ResolvedContent;
+use Click\Cms\Domain\Publishing\PublicationSchedule;
 use Click\Cms\Domain\Publishing\PublicationState;
+use Click\Cms\Domain\Publishing\ScheduledDocument;
+use Click\Cms\Domain\Publishing\ScheduleStore;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
+use DateTimeImmutable;
+use DateTimeZone;
+use InvalidArgumentException;
 
 /**
  * Managing pages: creating, editing, deleting, and who may do which.
@@ -48,6 +54,10 @@ final class PageService
      * @param ?PublishGate $publishGate Who may veto a publish. Null falls back
      *        to the process-wide gate the kernel installs at boot, so a caller
      *        that knows nothing about plugins still cannot publish past one.
+     * @param ?ScheduleStore $schedules Where deferred publications are kept.
+     *        Null means this installation has none, and every scheduling method
+     *        refuses with a 501 rather than accepting a schedule nothing will
+     *        ever carry out.
      */
     public function __construct(
         private readonly ContentService $content,
@@ -55,6 +65,7 @@ final class PageService
         private readonly SectionValidator $validator = new SectionValidator(),
         array $supportedLocales = [],
         private readonly ?PublishGate $publishGate = null,
+        private readonly ?ScheduleStore $schedules = null,
     ) {
         $this->supportedLocales = array_values($supportedLocales);
     }
@@ -390,6 +401,260 @@ final class PageService
         $this->content->unpublish($key);
 
         return ['page' => $page, 'error' => null, 'status' => 200, 'errors' => []];
+    }
+
+    /* ------------------------------------------------------- scheduling -- */
+
+    /**
+     * Arrange for a page to publish, or to come down, at a stated time.
+     *
+     * Scheduling is publishing, deferred, so it is governed by the publish
+     * permission and nothing weaker. An account that may not put a page live now
+     * may not arrange for it to put itself live at three in the morning either —
+     * a deferred act that skipped the check would be a way for any author to
+     * publish anything, just more slowly.
+     *
+     * The publish *gate* is a different matter and is deliberately not consulted
+     * here. A review workflow's answer is about the page as it stands, and the
+     * page will have changed by the time the schedule fires; asking now would
+     * cache a stale approval. {@see \Click\Cms\Application\Publishing\SchedulingService}
+     * asks it at the moment of publication instead, which is the moment the
+     * answer is about.
+     *
+     * @param array<string, mixed> $user
+     * @param ?string $publishAt   An absolute instant, or null for none.
+     * @param ?string $unpublishAt An absolute instant, or null for none.
+     * @return array{schedule: array<string, mixed>, error: ?string, status: int}
+     */
+    public function schedule(
+        string $slug,
+        array $user,
+        ?string $publishAt,
+        ?string $unpublishAt,
+        string|Locale|null $locale = null,
+    ): array {
+        $context = $this->scheduleContext($slug, $user, $locale);
+        if ($context['error'] !== null) {
+            return $this->scheduleFailure($context['error'], $context['status']);
+        }
+
+        try {
+            $schedule = PublicationSchedule::of(
+                $this->parseInstant($publishAt, 'publication'),
+                $this->parseInstant($unpublishAt, 'takedown'),
+            );
+        } catch (InvalidArgumentException $e) {
+            // 422 rather than 400: the request is well formed and the caller is
+            // entitled to make it; what is wrong is the pair of times in it.
+            return $this->scheduleFailure($e->getMessage(), 422);
+        }
+
+        $schedules = $this->schedules;
+        $schedules->save($context['key'], $schedule, $user['username'] ?? null);
+
+        return $this->scheduleResponse($context['key'], $schedule, $user['username'] ?? null);
+    }
+
+    /**
+     * What is scheduled for this page, if anything.
+     *
+     * @param array<string, mixed> $user
+     * @return array{schedule: array<string, mixed>, error: ?string, status: int}
+     */
+    public function scheduleOf(string $slug, array $user, string|Locale|null $locale = null): array
+    {
+        $context = $this->scheduleContext($slug, $user, $locale);
+        if ($context['error'] !== null) {
+            return $this->scheduleFailure($context['error'], $context['status']);
+        }
+
+        $key = $context['key'];
+
+        return $this->scheduleResponse(
+            $key,
+            $this->schedules->find($key),
+            $this->schedules->scheduledBy($key),
+        );
+    }
+
+    /**
+     * Cancel whatever was scheduled. Cancelling nothing is a success, because
+     * the state the caller asked for is the state that already holds.
+     *
+     * @param array<string, mixed> $user
+     * @return array{schedule: array<string, mixed>, error: ?string, status: int}
+     */
+    public function clearSchedule(string $slug, array $user, string|Locale|null $locale = null): array
+    {
+        $context = $this->scheduleContext($slug, $user, $locale);
+        if ($context['error'] !== null) {
+            return $this->scheduleFailure($context['error'], $context['status']);
+        }
+
+        $this->schedules->clear($context['key']);
+
+        return $this->scheduleResponse($context['key'], PublicationSchedule::none(), null);
+    }
+
+    /**
+     * Everything scheduled across the site, soonest first.
+     *
+     * Ordered by what happens next rather than by page, because the question
+     * this list answers is "what is about to change", and a reader scanning for
+     * that should not have to sort it themselves.
+     *
+     * @param array<string, mixed> $user
+     * @return array{schedules: list<array<string, mixed>>, error: ?string, status: int}
+     */
+    public function pendingSchedules(array $user): array
+    {
+        if ($this->schedules === null) {
+            return ['schedules' => [], 'error' => $this->noScheduleStoreMessage(), 'status' => 501];
+        }
+
+        // The listing shows unpublished work — what is queued to go live, and
+        // when — so it is gated on the same permission that may act on it.
+        if (!Role::fromName($user['role'] ?? null)->canPublishContentOwnedBy(null, $user['username'] ?? null)) {
+            return ['schedules' => [], 'error' => 'You do not have permission to see scheduled publications.', 'status' => 403];
+        }
+
+        $pending = $this->schedules->all();
+
+        usort($pending, static function (ScheduledDocument $a, ScheduledDocument $b): int {
+            $left = $a->schedule->nextDueAt();
+            $right = $b->schedule->nextDueAt();
+
+            // Neither can actually be null — an empty schedule is never stored —
+            // but the port permits it, and sorting must not depend on that.
+            if ($left === null || $right === null) {
+                return $left === $right ? 0 : ($left === null ? 1 : -1);
+            }
+
+            return $left <=> $right;
+        });
+
+        return [
+            'schedules' => array_map(
+                fn (ScheduledDocument $d): array => $this->scheduleShape($d->key, $d->schedule, $d->scheduledBy),
+                $pending
+            ),
+            'error' => null,
+            'status' => 200,
+        ];
+    }
+
+    /**
+     * The checks every scheduling operation shares: a store exists, the language
+     * parses, the page exists, and the caller may publish it.
+     *
+     * @param array<string, mixed> $user
+     * @return array{key: ?ContentKey, error: ?string, status: int}
+     */
+    private function scheduleContext(string $slug, array $user, string|Locale|null $locale): array
+    {
+        if ($this->schedules === null) {
+            return ['key' => null, 'error' => $this->noScheduleStoreMessage(), 'status' => 501];
+        }
+
+        $parsed = $this->parseLocale(is_string($locale) ? $locale : $locale?->code);
+        if ($parsed['error'] !== null) {
+            return ['key' => null, 'error' => $parsed['error'], 'status' => 400];
+        }
+
+        $page = $this->content->draftPage($slug, $parsed['locale']);
+        if ($page === null) {
+            return ['key' => null, 'error' => 'Page not found.', 'status' => 404];
+        }
+
+        $role = Role::fromName($user['role'] ?? null);
+        if (!$role->canPublishContentOwnedBy($page->data['owner'] ?? null, $user['username'] ?? null)) {
+            return ['key' => null, 'error' => 'You do not have permission to schedule this page.', 'status' => 403];
+        }
+
+        return ['key' => ContentKey::page($slug, $parsed['locale']), 'error' => null, 'status' => 200];
+    }
+
+    /**
+     * Read one instant from what an editor's browser sent.
+     *
+     * Only absolute times are schedules. A relative expression — "+1 week",
+     * "tomorrow" — is refused rather than resolved, because resolving it once at
+     * save time stores something the editor did not type, and *not* resolving it
+     * would make the stored schedule mean a different moment on every sweep.
+     *
+     * @throws InvalidArgumentException with a message naming which end is wrong.
+     */
+    private function parseInstant(?string $value, string $which): ?DateTimeImmutable
+    {
+        if ($value === null || trim($value) === '') {
+            return null;
+        }
+
+        // A full date is what separates an instant from an expression. Checked
+        // before parsing because `DateTimeImmutable` accepts both and reports
+        // no difference afterwards.
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', trim($value)) !== 1) {
+            throw new InvalidArgumentException(
+                "The scheduled {$which} must be a date and time, such as 2026-08-01T09:00:00Z."
+            );
+        }
+
+        try {
+            $parsed = new DateTimeImmutable(trim($value));
+        } catch (\Exception) {
+            throw new InvalidArgumentException("The scheduled {$which} is not a date and time this understands.");
+        }
+
+        $errors = DateTimeImmutable::getLastErrors();
+        if (is_array($errors) && (($errors['error_count'] ?? 0) > 0 || ($errors['warning_count'] ?? 0) > 0)) {
+            throw new InvalidArgumentException("The scheduled {$which} is not a date and time this understands.");
+        }
+
+        return $parsed->setTimezone(new DateTimeZone('UTC'));
+    }
+
+    /**
+     * @return array{schedule: array<string, mixed>, error: ?string, status: int}
+     */
+    private function scheduleResponse(ContentKey $key, PublicationSchedule $schedule, ?string $by): array
+    {
+        return [
+            'schedule' => $this->scheduleShape($key, $schedule, $by),
+            'error' => null,
+            'status' => 200,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function scheduleShape(ContentKey $key, PublicationSchedule $schedule, ?string $by): array
+    {
+        return $schedule->toArray() + [
+            'slug' => $key->slug,
+            'type' => $key->type,
+            'locale' => $key->locale->code,
+            'scheduledBy' => $by,
+        ];
+    }
+
+    /**
+     * @return array{schedule: array<string, mixed>, error: string, status: int}
+     */
+    private function scheduleFailure(string $message, int $status): array
+    {
+        return ['schedule' => [], 'error' => $message, 'status' => $status];
+    }
+
+    /**
+     * Refusing rather than quietly accepting. A site with no schedule store that
+     * answered "scheduled" would leave an editor waiting for a publication that
+     * nothing on the system is going to perform — the silent degradation
+     * `core.md` names as this codebase's recurring bug.
+     */
+    private function noScheduleStoreMessage(): string
+    {
+        return 'Scheduled publishing is not available on this installation.';
     }
 
     /**

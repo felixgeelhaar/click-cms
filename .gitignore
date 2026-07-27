@@ -34,6 +34,11 @@ logs/
 /data/
 /content/
 /storage/
+# Every other site's content and data, on an installation that serves more than
+# one. `config/sites.json` is deliberately NOT ignored: which sites exist and
+# which hostnames they answer for is deployment configuration and belongs in a
+# diff, unlike the content itself.
+/sites/
 *.sqlite
 *.sqlite3
 
