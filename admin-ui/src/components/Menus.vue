@@ -8,6 +8,17 @@
     </div>
 
     <div class="toolbar">
+      <!-- A menu is per language, like a page: the header is the first thing a
+           visitor reads, so it is the last thing that should be stuck in one
+           language. Hidden on a single-language site, where the choice is not a
+           choice. -->
+      <div v-if="locales.length > 1" class="menu-picker">
+        <label class="picker-label" for="menu-locale">Language</label>
+        <select id="menu-locale" v-model="activeLocale" class="picker-select" :disabled="loading" @change="selectMenu(selectedId)">
+          <option v-for="code in locales" :key="code" :value="code">{{ code.toUpperCase() }}</option>
+        </select>
+      </div>
+
       <div class="menu-picker">
         <label class="picker-label" for="menu-select">Menu</label>
         <select id="menu-select" v-model="selectedId" class="picker-select" :disabled="loading" @change="selectMenu(selectedId)">
@@ -132,6 +143,20 @@ const items = ref([]);
 // menu items must not be twenty requests for the same list.
 const pages = ref([]);
 const defaultLocale = ref('');
+/** The languages this site has, and the one whose menu is on screen. */
+const locales = ref([]);
+const activeLocale = ref('');
+
+/**
+ * The language to read and write, as a query string.
+ *
+ * Empty for the default language so a single-language site's requests look
+ * exactly as they did before this existed.
+ */
+const localeQuery = () =>
+  activeLocale.value && activeLocale.value !== defaultLocale.value
+    ? `?locale=${encodeURIComponent(activeLocale.value)}`
+    : '';
 const newId = ref('');
 
 const loading = ref(true);
@@ -180,7 +205,7 @@ const selectMenu = async (id) => {
   error.value = '';
   savedNotice.value = '';
   try {
-    const res = await fetch(`/api/menus/${encodeURIComponent(id)}`);
+    const res = await fetch(`/api/menus/${encodeURIComponent(id)}${localeQuery()}`);
     if (res.ok) {
       applyMenu((await res.json()).data);
       return;
@@ -212,6 +237,9 @@ const loadPages = async () => {
     const body = await res.json();
     pages.value = Array.isArray(body.data) ? body.data : [];
     defaultLocale.value = typeof body.locale === 'string' ? body.locale : '';
+    // The languages the site has, so the picker offers exactly those.
+    locales.value = Array.isArray(body.locales) && body.locales.length ? body.locales : [defaultLocale.value].filter(Boolean);
+    if (!activeLocale.value) activeLocale.value = defaultLocale.value;
   } catch {
     pages.value = [];
   }
@@ -250,7 +278,7 @@ const save = async () => {
   error.value = '';
   savedNotice.value = '';
   try {
-    const res = await fetch(`/api/menus/${encodeURIComponent(selectedId.value)}`, {
+    const res = await fetch(`/api/menus/${encodeURIComponent(selectedId.value)}${localeQuery()}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: menuName.value.trim() || selectedId.value, items: serialise() }),

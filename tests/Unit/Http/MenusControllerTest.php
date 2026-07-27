@@ -57,14 +57,18 @@ final class MenusControllerTest extends TestCase
     }
 
     /** @param array<string, mixed> $body */
-    private function put(string $id, array $body): array
+    private function put(string $id, array $body, ?string $locale = null): array
     {
         // The router hands the handler only the path param; the body is read
         // inside via jsonBody(), which falls back to $_POST when php://input is
         // empty — as it is under phpunit. This mirrors UsersControllerTest.
         $_POST = $body;
+        if ($locale !== null) {
+            $_GET['locale'] = $locale;
+        }
         $r = $this->menus->put($id);
         $_POST = [];
+        unset($_GET['locale']);
         return $r;
     }
 
@@ -266,5 +270,48 @@ final class MenusControllerTest extends TestCase
         // 400, as for any other target the domain refuses — the anchor is not
         // a special case, which is the point.
         $this->assertSame(400, $result['status'] ?? null);
+    }
+
+    /* ------------------------------------------- one menu per language -- */
+
+    /**
+     * A bilingual site needs bilingual navigation.
+     *
+     * Menus were stored under the default locale alone, so there was exactly one
+     * menu whatever language a visitor was reading — "Das bieten wir" for
+     * everyone, or "What we offer" for everyone. Pages have been per-locale
+     * since languages arrived; navigation is the part of a page a visitor reads
+     * first, and it was the part that could not be translated.
+     */
+    public function testAMenuCanBeTranslated(): void
+    {
+        $this->put('main', ['name' => 'Main', 'items' => [
+            ['label' => 'Das bieten wir', 'target' => '#services'],
+        ]], 'de');
+        $this->put('main', ['name' => 'Main', 'items' => [
+            ['label' => 'What we offer', 'target' => '#services'],
+        ]], 'en');
+
+        $this->assertSame('Das bieten wir', $this->menus->resolvedItems('main', 'de')[0]['label']);
+        $this->assertSame('What we offer', $this->menus->resolvedItems('main', 'en')[0]['label']);
+    }
+
+    /**
+     * Untranslated falls back to the default language rather than to nothing —
+     * the same rule pages follow. A site that has not translated its menu yet
+     * shows a navigation a visitor can use, not an empty header.
+     */
+    public function testAnUntranslatedMenuFallsBackToTheDefaultLanguage(): void
+    {
+        // Saved in the site's default language only — the state every site is in
+        // before anybody translates its navigation.
+        $this->put('main', ['name' => 'Main', 'items' => [
+            ['label' => 'Contact', 'target' => '#contact'],
+        ]]);
+
+        $items = $this->menus->resolvedItems('main', 'de');
+
+        $this->assertCount(1, $items, 'a visitor reading German should still get a header');
+        $this->assertSame('Contact', $items[0]['label']);
     }
 }
