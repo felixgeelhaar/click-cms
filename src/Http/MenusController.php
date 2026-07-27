@@ -189,15 +189,26 @@ final class MenusController
             return $item->target();
         }
 
+        // An anchor with no page part points within the page being viewed, so it
+        // is emitted as a bare fragment rather than being resolved against a
+        // slug it does not have. That is what a one-page navigation means, and
+        // prefixing it with a path would send every link to the home page.
+        $fragment = $item->fragment();
+        if ($item->slug() === null) {
+            return '#' . (string) $fragment;
+        }
+
         // A target that named its own locale keeps it; otherwise the page's
         // render locale decides. The default locale gets no prefix, matching the
         // public router.
         $localeCode = $item->localeCode() ?? $renderLocale->code;
         $slug = (string) $item->slug();
 
-        return $localeCode === $this->content->defaultLocale()->code
+        $path = $localeCode === $this->content->defaultLocale()->code
             ? '/' . $slug
             : '/' . $localeCode . '/' . $slug;
+
+        return $fragment === null ? $path : $path . '#' . $fragment;
     }
 
     /**

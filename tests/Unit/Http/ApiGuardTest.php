@@ -198,4 +198,24 @@ final class ApiGuardTest extends TestCase
         // A write to a published path is still not a public read.
         $this->assertFalse($this->guard->isPublic('collections/post/published', 'POST'));
     }
+
+    /**
+     * A menu is what every visitor sees in the header. Withholding it from the
+     * delivery API meant a headless site could read its content but not its
+     * navigation — so the nav had to be hardcoded in the front end, which is
+     * the one thing a CMS exists to prevent.
+     */
+    public function testAnyoneMayReadTheNavigation(): void
+    {
+        $this->assertTrue($this->guard->isPublic('menus', 'GET'));
+        $this->assertTrue($this->guard->isPublic('menus/main', 'GET'));
+    }
+
+    /** Reading it is public; changing it is not. */
+    public function testNobodyMayChangeTheNavigationAnonymously(): void
+    {
+        $this->assertFalse($this->guard->isPublic('menus/main', 'PUT'));
+        $this->assertFalse($this->guard->isPublic('menus/main', 'DELETE'));
+        $this->assertFalse($this->guard->isPublic('menus', 'POST'));
+    }
 }

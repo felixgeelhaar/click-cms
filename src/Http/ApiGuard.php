@@ -89,6 +89,18 @@ final class ApiGuard
             return true;
         }
 
+        // The site's own navigation, read by a front end with no account.
+        //
+        // A menu is what a visitor sees in the header of every page: labels and
+        // where they point. Withholding it from the delivery API meant a
+        // headless site could read its content but not its navigation, so the
+        // nav had to be hardcoded in the front end — which is the one thing a
+        // CMS is for. There is no draft menu and no unpublished item, so there
+        // is nothing here that a rendered page does not already show.
+        if ($path === 'menus' || preg_match('#^menus/[^/]+$#', $path) === 1) {
+            return $method === 'GET';
+        }
+
         // Published collection entries, read by a front end with no account. Only
         // the `/published` delivery paths are opened — never the `/entries`
         // management paths, which return working copies and drafts — so this can
