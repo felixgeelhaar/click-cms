@@ -24,8 +24,16 @@ describe('Profile', () => {
     await wrapper.get('button').trigger('click');
     await flushPromises();
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    const [url, init] = global.fetch.mock.calls[0];
+    // Filtered rather than indexed: the screen also asks for the account's
+    // two-step sign-in status when it mounts, so the save is no longer the only
+    // request it makes. What this test is about is unchanged — exactly one
+    // write, carrying the edited values — and asserting "exactly one write"
+    // still catches both the original bug (no request at all) and its opposite
+    // (the same change sent twice).
+    const writes = global.fetch.mock.calls.filter(([url]) => url.startsWith('/api/users/'));
+    expect(writes).toHaveLength(1);
+
+    const [url, init] = writes[0];
     expect(url).toBe('/api/users/ann');
     expect(init.method).toBe('PUT');
     expect(JSON.parse(init.body)).toEqual({

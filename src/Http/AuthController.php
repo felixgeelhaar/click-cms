@@ -8,6 +8,7 @@ use Click\Cms\Application\Authentication\CsrfGuard;
 use Click\Cms\Application\Authentication\LoginSprayGuard;
 use Click\Cms\Application\Authentication\LoginThrottle;
 use Click\Cms\Application\Authentication\SessionStore;
+use Click\Cms\Application\Authentication\TwoFactorService;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Plugin\AuthGate;
@@ -73,6 +74,12 @@ final class AuthController
         private readonly CoreConfig $config,
         private readonly string $initialPassword,
         ?AuthGate $gate = null,
+        /**
+         * The second factor. Optional so the two existing test harnesses and
+         * any caller predating it still construct; when absent, no account has
+         * a second factor and login behaves exactly as it did.
+         */
+        private readonly ?TwoFactorService $twoFactor = null,
     ) {
         // An inert gate when none was given: it permits everything and announces
         // nothing, which is exactly right for a CMS constructed without a plugin
@@ -99,6 +106,29 @@ final class AuthController
 
         if ($method === 'POST' && $action === 'logout') {
             return $this->logout();
+        }
+
+        // Completing a sign-in that stopped at the second factor. A POST because
+        // it establishes a session, and so it carries the CSRF token the pending
+        // session issued.
+        if ($method === 'POST' && $action === '2fa') {
+            return $this->completeTwoFactor();
+        }
+
+        if ($method === 'GET' && $action === '2fa') {
+            return $this->twoFactorStatus();
+        }
+
+        if ($method === 'POST' && $action === '2fa/enrol') {
+            return $this->beginTwoFactorEnrolment();
+        }
+
+        if ($method === 'POST' && $action === '2fa/confirm') {
+            return $this->confirmTwoFactorEnrolment();
+        }
+
+        if ($method === 'POST' && $action === '2fa/disable') {
+            return $this->disableTwoFactor();
         }
 
         if ($method === 'GET' && $action === 'me') {
@@ -251,6 +281,62 @@ final class AuthController
             return ['status' => 403, 'error' => $refusal];
         }
 
+        // The password was right. If this account carries a second factor, the
+        // sign-in stops here and nothing is authenticated yet: a *pending*
+        // session is written, holding the name and no `user` key at all, so
+        // `SessionStore::user()` keeps answering null and every guard in the
+        // application goes on treating the caller as anonymous. Whoever holds
+        // the password alone can reach exactly one endpoint — the one that asks
+        // for the code.
+        //
+        // The failure count is deliberately not cleared here. It is cleared when
+        // a session actually exists, so a correct password with no second factor
+        // cannot be used to keep resetting an account's lockout.
+        if ($this->twoFactorRequiredFor($username)) {
+            $this->sessions->start([
+                'pendingTwoFactor' => $username,
+                'pendingRemember' => $remember,
+                // Short and absolute. Somebody who walks away mid-login leaves a
+                // half-authenticated session behind, and it must expire on its
+                // own rather than waiting for the ordinary idle timeout.
+                'pendingExpiresAt' => time() + 300,
+                'csrfToken' => CsrfGuard::generateToken(),
+            ], false);
+
+            return ['data' => [
+                'success' => false,
+                'twoFactorRequired' => true,
+                // The token the next request must carry. It is the pending
+                // session's own, so the second step is CSRF-protected like every
+                // other state-changing call.
+                'csrfToken' => $this->sessions->read()['csrfToken'] ?? null,
+            ]];
+        }
+
+        $session = $this->establishSession($username, $userData, $remember);
+
+        // Last, once the session exists and the failure count is cleared: the
+        // hook says a sign-in happened, so nothing about it may still be pending.
+        $this->gate->announceLoggedIn($username, $userData, $remember);
+
+        return ['data' => ['success' => true, 'user' => $session['user']]];
+    }
+
+    /**
+     * Write the real session and clear the account's failure count.
+     *
+     * Extracted because there are now two ways to arrive at a signed-in state —
+     * straight through, and via the second factor — and a second copy of this is
+     * a second place for the session shape to drift. `SessionStore::start()`
+     * mints a fresh identifier every time it is called, so promoting a pending
+     * session also rotates the cookie, which is the session-fixation defence for
+     * the two-step flow.
+     *
+     * @param array<string, mixed> $userData
+     * @return array<string, mixed> The session that was written.
+     */
+    private function establishSession(string $username, array $userData, bool $remember): array
+    {
         $session = [
             'username' => $username,
             'loginTime' => time(),
@@ -266,17 +352,202 @@ final class AuthController
                 'role' => $userData['role'] ?? 'editor',
                 'capabilities' => Role::fromName($userData['role'] ?? null)->capabilityNames(),
                 'mustChangePassword' => (bool) ($userData['mustChangePassword'] ?? false),
+                'twoFactor' => $this->twoFactor?->isActiveFor($username) ?? false,
             ],
         ];
 
         $this->sessions->start($session, $remember);
         $this->clearFailedLogin($username);
 
-        // Last, once the session exists and the failure count is cleared: the
-        // hook says a sign-in happened, so nothing about it may still be pending.
-        $this->gate->announceLoggedIn($username, $userData, $remember);
+        return $session;
+    }
 
-        return ['data' => ['success' => true, 'user' => $session['user']]];
+    private function twoFactorRequiredFor(string $username): bool
+    {
+        return $this->twoFactor?->isActiveFor($username) ?? false;
+    }
+
+    /* ---------------------------------------------------- second factor -- */
+
+    /**
+     * Finish a sign-in that stopped at the second factor.
+     *
+     * @return array<string, mixed>
+     */
+    private function completeTwoFactor(): array
+    {
+        if ($this->twoFactor === null) {
+            return ['status' => 404, 'error' => 'Auth endpoint not found'];
+        }
+
+        $session = $this->sessions->read();
+        $username = $session['pendingTwoFactor'] ?? null;
+
+        if (!is_string($username) || $username === '') {
+            return ['status' => 401, 'error' => 'Sign in again.'];
+        }
+
+        // Absolute, not idle-based. A half-authenticated session left open on a
+        // shared machine must close on its own.
+        if ((int) ($session['pendingExpiresAt'] ?? 0) < time()) {
+            $this->sessions->clear();
+
+            return ['status' => 401, 'error' => 'That took too long. Sign in again.'];
+        }
+
+        // The same ceiling and the same per-account lockout the password step
+        // uses. Without this the second factor is six digits with unlimited
+        // guesses, which is a worse secret than the password it is defending.
+        $spray = $this->checkSprayCooloff();
+        if ($spray !== null) {
+            return $spray;
+        }
+
+        $lockout = $this->checkLockout($username);
+        if ($lockout !== null) {
+            return $lockout;
+        }
+
+        $code = (string) ($this->jsonBody()['code'] ?? '');
+        if (trim($code) === '') {
+            return ['status' => 400, 'error' => 'Enter the code from your authenticator app.'];
+        }
+
+        if (!$this->twoFactor->verifyChallenge($username, $code)) {
+            $this->gate->announceLoginFailed($username, AuthGate::FAILED_CREDENTIALS);
+            $this->recordFailedLogin($username);
+
+            return ['status' => 401, 'error' => 'That code is not right.'];
+        }
+
+        $account = $this->contentService->user($username);
+        if ($account === null) {
+            // The account went away between the two steps. Nothing to sign in to.
+            $this->sessions->clear();
+
+            return ['status' => 401, 'error' => 'Sign in again.'];
+        }
+
+        $remember = (bool) ($session['pendingRemember'] ?? false);
+        $established = $this->establishSession($username, $account->data, $remember);
+
+        $this->gate->announceLoggedIn($username, $account->data, $remember);
+
+        return ['data' => ['success' => true, 'user' => $established['user']]];
+    }
+
+    /**
+     * Whether the signed-in account has a second factor, and how many recovery
+     * codes it has left.
+     *
+     * @return array<string, mixed>
+     */
+    private function twoFactorStatus(): array
+    {
+        $user = $this->sessions->user();
+        if ($user === null) {
+            return ['status' => 401, 'error' => 'Not authenticated'];
+        }
+
+        if ($this->twoFactor === null) {
+            return ['data' => ['available' => false, 'active' => false, 'pending' => false]];
+        }
+
+        $enrolment = $this->twoFactor->enrolmentFor((string) ($user['username'] ?? ''));
+
+        return ['data' => [
+            'available' => true,
+            'active' => $enrolment->isActive(),
+            'pending' => $enrolment->isPending(),
+            'recoveryCodesLeft' => $enrolment->unusedRecoveryCodeCount(),
+        ]];
+    }
+
+    /**
+     * Issue a secret and recovery codes, and show them once.
+     *
+     * @return array<string, mixed>
+     */
+    private function beginTwoFactorEnrolment(): array
+    {
+        $user = $this->sessions->user();
+        if ($user === null || $this->twoFactor === null) {
+            return ['status' => 401, 'error' => 'Not authenticated'];
+        }
+
+        $username = (string) ($user['username'] ?? '');
+        $enrolment = $this->twoFactor->beginEnrolment($username);
+
+        if ($enrolment === null) {
+            // Already protected. Replacing a confirmed second factor without
+            // proof would make it removable by anyone holding a borrowed
+            // session, which is the thing it exists to prevent.
+            return ['status' => 409, 'error' => 'Two-factor authentication is already on for this account. Turn it off first.'];
+        }
+
+        return ['data' => $enrolment];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function confirmTwoFactorEnrolment(): array
+    {
+        $user = $this->sessions->user();
+        if ($user === null || $this->twoFactor === null) {
+            return ['status' => 401, 'error' => 'Not authenticated'];
+        }
+
+        $code = (string) ($this->jsonBody()['code'] ?? '');
+        $username = (string) ($user['username'] ?? '');
+
+        if (!$this->twoFactor->confirmEnrolment($username, $code)) {
+            return ['status' => 422, 'error' => 'That code is not right. Check your authenticator app and try again.'];
+        }
+
+        // The session's own copy of the flag would otherwise say "off" until the
+        // next sign-in, and the profile screen reads it.
+        $this->sessions->merge(['user' => ['twoFactor' => true]]);
+
+        return ['data' => ['success' => true, 'active' => true]];
+    }
+
+    /**
+     * Turn the second factor off, on proof of the account password.
+     *
+     * The password is required for the same reason changing a password requires
+     * the current one: a borrowed or hijacked session must not be able to strip
+     * the protection off the account it borrowed.
+     *
+     * @return array<string, mixed>
+     */
+    private function disableTwoFactor(): array
+    {
+        $user = $this->sessions->user();
+        if ($user === null || $this->twoFactor === null) {
+            return ['status' => 401, 'error' => 'Not authenticated'];
+        }
+
+        $username = (string) ($user['username'] ?? '');
+        $password = (string) ($this->jsonBody()['password'] ?? '');
+
+        if ($password === '') {
+            return ['status' => 400, 'error' => 'Enter your password to turn this off.'];
+        }
+
+        $account = $this->contentService->user($username);
+        $hash = $account?->data['password'] ?? null;
+
+        if (!is_string($hash) || !password_verify($password, $hash)) {
+            $this->recordFailedLogin($username, false);
+
+            return ['status' => 403, 'error' => 'That password is not correct.'];
+        }
+
+        $this->twoFactor->disable($username);
+        $this->sessions->merge(['user' => ['twoFactor' => false]]);
+
+        return ['data' => ['success' => true, 'active' => false]];
     }
 
     /**

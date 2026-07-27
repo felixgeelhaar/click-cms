@@ -160,6 +160,105 @@ Four consequences worth stating, because each was a choice:
 holds both, an author neither — which is what the role comments have claimed
 since they were written, and what nothing enforced while saving was publishing.
 
+### Two-step sign-in
+
+Core, on the "security is not uninstallable" line. The plugin hook
+{@see AuthGate} was designed with a second factor in mind and could carry one —
+but a second factor a site can uninstall, or that stops working when a plugin
+fails to load, is not a second factor. The hook remains the right home for
+somebody else's *different* second factor; this is the one that ships.
+
+TOTP (RFC 6238), hand-rolled, which is normally the wrong instinct and is
+defensible here for one reason: **the failure mode is loud**. A wrong
+implementation does not produce subtly weak codes, it produces codes that no
+authenticator app agrees with, which the first enrolment reveals — and the RFC
+publishes test vectors, which the suite checks against. The alternative was
+requiring a Composer package in order to turn on two-factor, which breaks the
+rule the whole project is built on.
+
+Four decisions worth stating:
+
+- **Enrolled is not confirmed.** A secret exists from the moment the key is
+  shown and protects nothing until the person has produced a code from it.
+  Treating "has a secret" as "has two-factor" locks people out at the exact
+  moment they have not finished setting it up.
+- **The state between the two login steps authenticates nothing.** The pending
+  session holds a username and no `user` key at all, so `SessionStore::user()`
+  goes on answering null and every guard treats the caller as anonymous.
+  Whoever holds the password alone can reach exactly one endpoint. If that were
+  not true the second factor would be decoration.
+- **Wrong codes count against the password lockout.** Six digits with unlimited
+  guesses is a weaker secret than the password it is strengthening.
+- **Recovery codes are hashed with SHA-256, not `password_hash`.** They are 100
+  bits of `random_bytes`, not something a person chose; slow hashing defends
+  low-entropy secrets and buys nothing here. The account password next door is
+  user-chosen and does use `password_hash` — the difference is the point.
+
+The enrolment lives in the account's own content document under `twoFactor`,
+which is the sharpest illustration of why `ContentGate` withholds document
+bodies from plugins: without that rule, every plugin would be handed this block
+on every save.
+
+### Scheduled publishing
+
+A page can be given a time to go live and a time to come down. It is core rather
+than a plugin for the same reason draft-and-publish is: it decides what the
+public can see, and a site able to uninstall it would have schedules on disk that
+nothing performs.
+
+**A schedule is not a status field, and does not reopen that argument.** The
+whole point of the section above is that publication is presence in `content/`
+and never a claim stored on the document. A schedule does not claim anything
+about the present — `publishAt` says *somebody intends this to be published
+then*, and intent and state may legitimately disagree. It is stored beside the
+document, in `data/schedule/`, never inside it. (There is a mundane second
+reason: the schema validator discards every field a section type does not
+declare, so a `publishAt` written into `data` would vanish on the next save.)
+
+**It is a sweep, not a trigger.** `bin/click-schedule.php`, from cron. Checking
+the schedule on each page request was considered and rejected twice over: a page
+nobody visits would never publish — and the pages most likely to be scheduled are
+exactly the ones with no traffic until they are live — and it would put a write
+on the public read path, which is one file read on shared hosting by design.
+
+    0,5,10,15,20,25,30,35,40,45,50,55 * * * *  cd /var/www/html && php bin/click-schedule.php
+
+A schedule is only as precise as the interval between sweeps. Five minutes is a
+reasonable default; one minute is not unreasonable.
+
+**A site with no cron entry gets a feature that visibly does nothing** rather
+than one that half works. The admin panel says so in as many words once a
+scheduled time has passed with the schedule still standing, because the
+alternative is an editor waiting indefinitely for a publication no process on the
+machine is going to perform. That is the `Failure is visible` quality applied to
+an absent operator rather than absent code.
+
+Four decisions worth stating:
+
+- **It computes a state, not a queue.** Cron does not always run. A window that
+  opened at 09:00 and closed at 11:00, first swept at 11:30, leaves the page
+  down — it does not publish it and wait a further sweep to take it down again.
+  Replaying stale instructions in order would put a page live that its editor
+  said should be gone, for however long the next sweep is away.
+- **Scheduling is governed by `content.publish`.** An account that may not
+  publish now may not arrange to publish later either, or the capability would
+  mean "cannot publish *immediately*", which is not a rule.
+- **The publish gate is asked at the moment of publication, not when the
+  schedule is set.** A review workflow's answer is about the page as it stands,
+  and the page will have changed by then. A refused scheduled publish keeps its
+  schedule and is retried, so an approval granted later still results in the
+  page going live.
+- **A takedown is not gated.** The gate exists so a review can stop something
+  reaching the public; a takedown moves the way the gate is protecting. Asking
+  its permission would let a broken review plugin hold a page live past the date
+  its editor set — which for a legal notice or an expiring offer is the failure
+  that actually costs.
+
+The sweep writes through the same decorated storage a request does, so a
+scheduled publish is versioned, audited and cache-invalidated exactly like one
+made by hand — and it is recorded against whoever set the schedule rather than
+against nobody, via `Application::runAs()`.
+
 ### Choosing a storage backend
 
 Core ships two, and `config/core.json` decides which one runs:
