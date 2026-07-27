@@ -239,8 +239,91 @@ jobs:
           touch _site/.nojekyll
           echo "Publishing $(find _site -type f | wc -l) files."
 
+      # The digest of the feed this run built, taken before the artifact leaves
+      # the runner. It is what the verification below compares against, so it
+      # has to be captured from the bytes that were actually uploaded rather
+      # than rebuilt afterwards.
+      - name: Record the feed digest
+        id: built
+        run: |
+          set -eu
+          if [ -f _site/feed.json ]; then
+            echo "sha256=$(sha256sum _site/feed.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha256=" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
       - uses: actions/deploy-pages@v4
+        id: deployment
+
+      # ---------------------------------------------------- verification --
+      #
+      # `deploy-pages` reporting success means GitHub accepted the deployment.
+      # It does not mean the site is serving what this run built, and on
+      # 2026-07-27 those two came apart: the v1.7.0 release deployed a correct
+      # 15-release feed, both jobs went green, and the site went on serving the
+      # 14-release feed from two hours earlier. The release was published, its
+      # packages were attached and downloadable, and no installation would ever
+      # have been offered it. A workflow_dispatch run of this same file, with an
+      # identical payload and the same pages_build_version, published it in
+      # seconds.
+      #
+      # The GitHub-side cause is not established, and this step does not pretend
+      # to fix it. What it fixes is the defect that belongs to this repository:
+      # the pipeline asserted success without checking the outcome, so the
+      # failure was invisible until somebody fetched the feed by hand. That is
+      # the same rule the signing check two steps up already applies — "reporting
+      # green without signing would be the silent failure this project keeps
+      # having to remove" — and it simply was not extended past the deploy.
+      #
+      # It is deliberately a check and not a retry. A retry that usually works
+      # would hide an infrastructure problem behind an occasional slow release,
+      # and this project's whole posture is to refuse or report rather than
+      # quietly do less than asked. Failing here also makes the behaviour
+      # reproducible, which is the prerequisite for ever diagnosing it.
+      - name: Verify the site is serving the feed this run built
+        if: steps.built.outputs.sha256 != ''
+        env:
+          EXPECTED: ${{ steps.built.outputs.sha256 }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -uo pipefail
+
+          # `page_url` always carries its trailing slash, but a missing one would
+          # silently request the wrong path, so it is not assumed.
+          base="${PAGE_URL%/}"
+          url="$base/feed.json"
+
+          # Pages is a CDN and a legitimate deploy takes a little while to reach
+          # every edge. Ten minutes is far longer than a healthy publish needs
+          # and short enough that a release does not sit unnoticed.
+          deadline=$(( $(date +%s) + 600 ))
+          attempt=0
+
+          while :; do
+            attempt=$(( attempt + 1 ))
+
+            # Cache-busted, because the question is what the origin now holds,
+            # not what an edge answered a minute ago.
+            got=$(curl -sS --max-time 30 -H 'Cache-Control: no-cache' \
+                    "$url?_verify=$(date +%s%N)" 2>/dev/null | sha256sum | awk '{print $1}')
+
+            if [ "$got" = "$EXPECTED" ]; then
+              echo "The published feed matches this run's build (attempt $attempt)."
+              exit 0
+            fi
+
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              break
+            fi
+
+            echo "Attempt $attempt: not serving this run's feed yet; waiting."
+            sleep 20
+          done
+
+          echo "::error::Pages accepted the deployment but $url is not serving the feed this run built, after 10 minutes and $attempt attempts. Expected sha256 $EXPECTED. The release is published and its packages are downloadable, but no installation will be offered it until the feed is republished — re-run this workflow. Do not treat a passing re-run as a fix: the deployment reported success and did not take effect, which is a fault worth reproducing." >&2
+          exit 1

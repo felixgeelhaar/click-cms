@@ -146,6 +146,46 @@ Release:
 3. The feed is rebuilt from the published releases, each package's `sha256` read
    from the artefact itself, signed with `UPDATE_PRIVATE_KEY`, and deployed to
    GitHub Pages.
+4. The published feed is **fetched back and compared** against the one the run
+   built. The workflow fails if the site is not serving it.
+
+### Why step 4 exists
+
+`actions/deploy-pages` reporting success means GitHub accepted the deployment.
+It does not mean the site is serving what was deployed, and on **2026-07-27**
+those two came apart:
+
+- The v1.7.0 release built a correct feed listing 15 releases, and both jobs
+  went green.
+- The site went on serving the 14-release feed built two hours earlier, for at
+  least fifteen minutes.
+- The release was published, its packages were attached and downloadable, and
+  **no installation would ever have been offered it** — the feed is the only way
+  a site learns a release exists.
+- A `workflow_dispatch` run of the same file, with an identical payload and the
+  same `pages_build_version`, published it in seconds.
+
+There is evidence this was not a one-off: v1.6.0 was released at 07:13 that day
+and only entered the feed at 17:08, when an unrelated merge happened to trigger
+a rebuild. Between those times it was published and undiscoverable. The pattern
+looks like the feed trailing until some *later* commit forces a republish, which
+would make every release invisible until unrelated work lands.
+
+**The GitHub-side cause is not established.** Several plausible explanations were
+tested and disproved — the deployment payloads are byte-identical between the
+run that failed and the one that worked, the concurrency group is correct, and
+the commit SHA is the same in both. The check does not pretend to fix that.
+
+What it fixes is the defect that belongs to this repository: the pipeline
+asserted success without checking the outcome, so the failure was invisible
+until somebody fetched the feed by hand. That is the same rule the signing check
+already applies one step earlier, and it simply had not been extended past the
+deploy.
+
+It is a check and **not a retry**, deliberately. A retry that usually works
+would hide an infrastructure problem behind an occasional slow release. Failing
+loudly also makes the behaviour reproducible, which is what any real diagnosis
+of the GitHub-side cause will need.
 
 ### One-time setup, for whoever runs the project
 
