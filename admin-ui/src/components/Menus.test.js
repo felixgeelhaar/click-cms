@@ -223,4 +223,36 @@ describe('a rejected target', () => {
     expect(banner.exists()).toBe(true);
     expect(banner.text()).toContain('not an allowed link');
   });
+
+  /**
+   * A menu is per language now, so the editor has to say which one it is
+   * editing — otherwise translating the navigation means editing the same
+   * document twice and losing the first attempt.
+   */
+  it('reads and writes the language being edited', async () => {
+    const calls = [];
+    global.fetch = vi.fn((url, init) => {
+      calls.push(`${init?.method ?? 'GET'} ${url}`);
+      const body = url.startsWith('/api/menus/')
+        ? { data: { id: 'main', name: 'Main', items: [] } }
+        : url === '/api/menus'
+          ? { data: [{ id: 'main', name: 'Main' }] }
+          : { data: [], locale: 'de', locales: ['de', 'en'] };
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
+    });
+
+    const wrapper = mount(Menus);
+    await flushPromises();
+
+    const picker = wrapper.find('#menu-locale');
+    expect(picker.exists()).toBe(true);
+
+    await picker.setValue('en');
+    await picker.trigger('change');
+    await flushPromises();
+
+    expect(calls.some((c) => c.includes('/api/menus/main?locale=en'))).toBe(true);
+    // The default language keeps the plain URL a single-language site sends.
+    expect(calls.some((c) => c === 'GET /api/menus/main')).toBe(true);
+  });
 });

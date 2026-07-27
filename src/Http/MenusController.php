@@ -67,8 +67,8 @@ final class MenusController
      */
     public function get(string $id): array
     {
-        $key = $this->keyFor($id);
-        $content = $key === null ? null : $this->content->get($key);
+        $locale = $this->requestedLocale();
+        $content = $this->menuContent($id, $locale);
 
         return $content === null
             ? ['status' => 404, 'error' => 'Menu not found']
@@ -99,7 +99,7 @@ final class MenusController
 
         // Menu::create has already accepted the id as a slug, so this key is
         // always well-formed — keyFor cannot return null here.
-        $key = $this->keyFor($menu->id());
+        $key = $this->keyFor($menu->id(), $this->requestedLocale());
         if ($key === null) {
             return ['status' => 400, 'error' => 'Invalid menu id'];
         }
@@ -144,8 +144,7 @@ final class MenusController
      */
     public function resolvedItems(string $menuId, ?string $locale = null): array
     {
-        $key = $this->keyFor($menuId);
-        $content = $key === null ? null : $this->content->get($key);
+        $content = $this->menuContent($menuId, $locale);
         if ($content === null) {
             return [];
         }
@@ -258,14 +257,55 @@ final class MenusController
      * id containing a colon (which would otherwise make {@see ContentKey}
      * misparse the composite key) a clean miss rather than a 500.
      */
-    private function keyFor(string $id): ?ContentKey
+    /**
+     * Where a menu lives, per language.
+     *
+     * Menus were keyed to the default locale alone, so a bilingual site had one
+     * navigation for both languages — the header being the first thing a
+     * visitor reads, and the only part of a page that could not be translated.
+     * They are keyed like pages now, and read with the same fallback: an
+     * untranslated menu shows the default language's rather than nothing.
+     */
+    /**
+     * A menu in the language asked for, or the default language's when that one
+     * has not been translated — the rule pages follow, so a half-translated site
+     * shows a usable header rather than an empty one.
+     */
+    private function menuContent(string $id, ?string $locale): ?Content
+    {
+        $key = $this->keyFor($id, $locale);
+        if ($key === null) {
+            return null;
+        }
+
+        $content = $this->content->get($key);
+        if ($content !== null) {
+            return $content;
+        }
+
+        $fallback = $this->keyFor($id, null);
+
+        return $fallback === null ? null : $this->content->get($fallback);
+    }
+
+    /** The `?locale=` a request named, if any. */
+    private function requestedLocale(): ?string
+    {
+        $raw = $_GET['locale'] ?? null;
+
+        return is_string($raw) && $raw !== '' ? $raw : null;
+    }
+
+    private function keyFor(string $id, ?string $locale = null): ?ContentKey
     {
         if (str_contains($id, ':')) {
             return null;
         }
 
+        $code = (Locale::tryFromString($locale) ?? $this->content->defaultLocale())->code;
+
         try {
-            return ContentKey::fromString('menu:' . $this->content->defaultLocale()->code . ':' . $id);
+            return ContentKey::fromString('menu:' . $code . ':' . $id);
         } catch (InvalidArgumentException) {
             return null;
         }

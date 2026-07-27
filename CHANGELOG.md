@@ -15,6 +15,18 @@ All notable changes to click-cms are documented here. This project adheres to
   only, so nothing in one can close the attribute it lands in or smuggle a
   scheme. `#" onmouseover="…` is refused exactly like `javascript:` is.
 
+### A menu can be translated
+- Menus were stored under the default language alone, so a bilingual site had
+  one navigation for both — "Das bieten wir" for everyone, or "What we offer"
+  for everyone. Pages have been per-language since languages arrived; the header
+  is the first thing a visitor reads and was the last thing that could not be
+  translated.
+- Menus are keyed by language now and read with the same fallback pages use: a
+  site that has not translated its navigation yet shows the default language's
+  rather than an empty header, so nothing breaks for anyone who never translates.
+- The admin gains a language picker on the menu editor, shown only where there
+  is more than one language to pick.
+
 ### A headless front end can read the navigation
 - `GET /api/menus` and `GET /api/menus/:id` are readable without an account,
   like pages, published collection entries and search.
