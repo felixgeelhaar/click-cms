@@ -34,6 +34,21 @@ use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 
+/**
+ * Which site this run acts on.
+ *
+ * A command line has no hostname, so it has to be told. `CLICK_CMS_SITE` covers
+ * a cron entry that always means the same site; `--site=` covers the rest. An
+ * installation that has declared no sites ignores both and behaves as it always
+ * has.
+ */
+$siteOption = null;
+foreach ($_SERVER['argv'] as $argument) {
+    if (str_starts_with($argument, '--site=')) {
+        $siteOption = substr($argument, 7);
+    }
+}
+
 // A command-line tool. Served over the web this would be an unauthenticated
 // endpoint that writes content, so it refuses to run under a web SAPI at all.
 if (PHP_SAPI !== 'cli') {
@@ -42,6 +57,21 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require __DIR__ . '/../vendor/autoload.php';
+
+/**
+ * Which site this run seeds.
+ *
+ * A command line has no hostname, so it has to be told. `CLICK_CMS_SITE` covers
+ * a cron entry that always means the same site; `--site=` covers the rest. An
+ * installation that has declared no sites ignores both.
+ */
+$siteOption = null;
+foreach ($_SERVER['argv'] as $argument) {
+    if (str_starts_with($argument, '--site=')) {
+        $siteOption = substr($argument, 7);
+    }
+}
+
 
 $basePath = dirname(__DIR__);
 $argv = $_SERVER['argv'];
@@ -82,7 +112,7 @@ if ($dryRun) {
 // storage, the same locales and the same collection registration the running
 // site uses. Building a parallel stack here would let the seeder succeed
 // against a store the site does not read.
-$app = new Application($basePath);
+$app = new Application($basePath, $siteOption);
 $app->boot();
 
 $content = $app->getContentService();

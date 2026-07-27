@@ -47,6 +47,21 @@ use Click\Cms\Application\Publishing\SweepOutcome;
 use Click\Cms\Core\Application;
 use Click\Cms\Domain\Publishing\ScheduledDocument;
 
+/**
+ * Which site this run acts on.
+ *
+ * A command line has no hostname, so it has to be told. `CLICK_CMS_SITE` covers
+ * a cron entry that always means the same site; `--site=` covers the rest. An
+ * installation that has declared no sites ignores both and behaves as it always
+ * has.
+ */
+$siteOption = null;
+foreach ($_SERVER['argv'] as $argument) {
+    if (str_starts_with($argument, '--site=')) {
+        $siteOption = substr($argument, 7);
+    }
+}
+
 $argv = $_SERVER['argv'];
 array_shift($argv);
 
@@ -62,7 +77,7 @@ $say = static function (string $line) use ($quiet, $stamp): void {
 };
 
 try {
-    $app = new Application($root);
+    $app = new Application($root, $siteOption);
     $app->boot();
 } catch (Throwable $e) {
     fwrite(STDERR, "click-schedule: the application could not start: {$e->getMessage()}\n");

@@ -8,10 +8,15 @@ A modern PHP CMS with plugin architecture, Vue admin UI, Visual Builder, and mar
 
 ## Features
 
-- **Plugin Architecture** - Seven plugins ship with it; the CMS boots with none
+- **Plugin Architecture** - Eight plugins ship with it; the CMS boots with none
 - **Visual Builder** - Drag-and-drop page builder with responsive layouts
 - **Modern Admin UI** - Vue 3 + Astro with collapsible sidebar, theme toggle
 - **REST & GraphQL APIs** - Headless content management
+- **Scheduled publishing** - a page goes live, and comes down, at a stated time
+- **Two-step sign-in** - TOTP, with recovery codes
+- **Single sign-on** - OpenID Connect against Entra ID, Google, Okta, Keycloak
+- **Webhooks** - signed, queued and retried, so a static front end knows to rebuild
+- **Multi-site** - one installation, many sites; shared code, separate content
 - **Marketplace** - GitHub Pages-based plugin marketplace with signed manifests
 - **Zero runtime dependencies** - `composer.json` requires PHP and nothing else
 - **Five storage backends** - flat JSON files by default; SQLite, MySQL, MariaDB
@@ -90,7 +95,7 @@ Switching the setting does not move existing content; move it first with
 
 ## Plugins
 
-Seven ship with the project. The CMS boots with `plugins/` deleted entirely —
+Eight ship with the project. The CMS boots with `plugins/` deleted entirely —
 that is the test of whether the line between core and plugin is drawn honestly.
 
 | Plugin | What it does |
@@ -102,9 +107,11 @@ that is the test of whether the line between core and plugin is drawn honestly.
 | `forms` | Contact forms; stores submissions and lists them for editors |
 | `collaboration` | Presence and page comments, for review before publishing |
 | `backup` | A ZIP export of content, media and drafts |
+| `webhooks` | Signed HTTP deliveries when content changes, queued and retried |
 
-Authentication, languages, media, redirects, menus, version history, preview and
-the REST API are **core**, not plugins — see [`docs/core.md`](docs/core.md) for
+Authentication (including two-step sign-in and single sign-on), languages,
+media, redirects, menus, version history, preview, scheduled publishing and the
+REST API are **core**, not plugins — see [`docs/core.md`](docs/core.md) for
 why each one cannot be removable.
 
 ## Architecture
@@ -117,14 +124,15 @@ click/
 │   ├── Domain/             # Domain models, no I/O
 │   ├── Http/               # Kernel, controllers, renderers
 │   └── Infrastructure/     # Storage, media, adapters
-├── plugins/                # The seven bundled plugins
+├── plugins/                # The eight bundled plugins
 ├── admin-ui/               # Vue 3 + Astro admin
 ├── themes/                 # Public themes
 ├── config/                 # Core settings, section and collection types
 ├── content/                # A site's documents and media (gitignored)
 ├── data/                   # Sessions, history, audit trail, caches (gitignored)
 ├── sdk/                    # PHP plugin SDK and a generated TypeScript client
-├── bin/                    # CLI tools (seed, migrate storage, update)
+├── bin/                    # CLI tools (seed, migrate storage, update,
+│                        #   schedule, webhooks, sites)
 └── public/                 # Web root — the only directory served
 ```
 
@@ -147,6 +155,11 @@ cd admin-ui && npm run build   # build the admin UI
 - [Updates](docs/updates.md) — the signed release feed and update policies
 - [Visual builder](docs/visual-builder.md) — the node document model
 - [Collaboration](docs/collaboration.md) — presence and review comments
+- [Publishing](docs/publishing.md) — saving vs publishing, and scheduling
+- [Two-step sign-in](docs/two-factor.md) — turning it on, and the recovery codes
+- [Single sign-on](docs/sso.md) — OpenID Connect setup, and what is checked
+- [Webhooks](docs/webhooks.md) — the payload, the signature, verifying it
+- [More than one site](docs/multi-site.md) — shared code, separate content
 - [Practices](docs/practices.md) — how this codebase is worked on
 
 ## License

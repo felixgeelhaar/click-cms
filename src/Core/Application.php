@@ -9,7 +9,11 @@ use Click\Cms\Application\Preview\PreviewLinks;
 use Click\Cms\Application\Authentication\CsrfGuard;
 use Click\Cms\Application\Authentication\LoginThrottle;
 use Click\Cms\Application\Authentication\SessionStore;
+use Click\Cms\Application\Authentication\Oidc\OidcService;
+use Click\Cms\Application\Authentication\Oidc\OidcSettings;
+use Click\Cms\Application\Authentication\Oidc\ProviderMetadata;
 use Click\Cms\Application\Authentication\TwoFactorService;
+use Click\Cms\Http\OidcController;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Config\Settings;
 use Click\Cms\Application\Event\EventBus;
@@ -47,6 +51,8 @@ use Click\Cms\Application\Collection\EntryRouter;
 use Click\Cms\Application\Collection\ReferenceResolver;
 use Click\Cms\Domain\Collection\CollectionType;
 use Click\Cms\Domain\Publishing\Publishable;
+use Click\Cms\Domain\Site\Site;
+use Click\Cms\Domain\Site\SiteRegistry;
 use Click\Cms\Domain\Publishing\PublishingStorage;
 use Click\Cms\Infrastructure\Publishing\FileScheduleStore;
 use Click\Cms\Domain\Schema\SectionValidator;
@@ -81,7 +87,7 @@ class Application
      * signed feed offers, so it is the single answer to "what is running here?"
      * — bumping it is part of cutting a release, not an afterthought.
      */
-    public const VERSION = '1.6.0';
+    public const VERSION = '1.7.0';
 
     /**
      * The password the installer seeds. Published in the documentation and
@@ -102,6 +108,11 @@ class Application
     /** The fully decorated storage: authorised, versioned, audited, announced. */
     private ?PublishingStorage $publishingStorage = null;
     private ?FileScheduleStore $scheduleStore = null;
+    private ?OidcController $oidcController = null;
+    private readonly ?string $requestedSiteId;
+    private ?SiteRegistry $siteRegistry = null;
+    private ?Site $site = null;
+    private ?OidcSettings $sso = null;
 
     private ?ContentService $contentService = null;
     private ?EventDispatcher $eventDispatcher = null;
@@ -153,9 +164,122 @@ class Application
      */
     public const ROOT_ENV = 'CLICK_CMS_ROOT';
 
-    public function __construct(?string $basePath = null)
+    /**
+     * The environment variable that names the site a command-line tool acts on.
+     *
+     * CLI runs have no hostname, so nothing else can decide. Every `bin/` tool
+     * accepts `--site=` too; this is for cron entries, where repeating the flag
+     * on each line is one more thing to get wrong.
+     */
+    public const SITE_ENV = 'CLICK_CMS_SITE';
+
+    public function __construct(?string $basePath = null, ?string $siteId = null)
     {
         $this->basePath = $basePath ?? self::rootFromEnvironment() ?? dirname(__DIR__, 2);
+        $this->requestedSiteId = $siteId ?? ServerEnvironment::lookup(self::SITE_ENV, $_SERVER);
+    }
+
+    /**
+     * Which sites this installation serves.
+     *
+     * Read once, from `config/sites.json`. An installation without that file
+     * has exactly one site whose content is at `content/` and `data/` — the
+     * layout every existing installation already has — so multi-site is
+     * additive rather than a migration.
+     */
+    private function siteRegistry(): SiteRegistry
+    {
+        if ($this->siteRegistry !== null) {
+            return $this->siteRegistry;
+        }
+
+        $path = $this->basePath . '/config/sites.json';
+
+        if (!is_file($path)) {
+            return $this->siteRegistry = SiteRegistry::single();
+        }
+
+        $raw = @file_get_contents($path);
+        $decoded = $raw === false ? null : json_decode($raw, true);
+
+        if (!is_array($decoded)) {
+            // Loud, because the alternative is silently serving every host from
+            // the primary site — which for an agency means one client's content
+            // appearing on another client's domain. `core.md` calls this out as
+            // the recurring bug: silent degradation that looks like working.
+            throw new \RuntimeException(
+                'config/sites.json exists but could not be read as JSON. '
+                . 'Fix it or remove it; serving every host from one site is not a safe default.'
+            );
+        }
+
+        return $this->siteRegistry = SiteRegistry::fromArray($decoded);
+    }
+
+    /**
+     * The site this request or command is for.
+     *
+     * By explicit id when one was given — the CLI case — and by hostname
+     * otherwise. An id that names no configured site is an error rather than a
+     * fallback: a cron entry with a typo would otherwise quietly operate on the
+     * wrong client's content.
+     */
+    public function site(): Site
+    {
+        if ($this->site !== null) {
+            return $this->site;
+        }
+
+        $registry = $this->siteRegistry();
+
+        if ($this->requestedSiteId !== null && $this->requestedSiteId !== '') {
+            $named = $registry->forId($this->requestedSiteId);
+
+            if ($named === null) {
+                throw new \RuntimeException("No site is configured with the id \"{$this->requestedSiteId}\".");
+            }
+
+            return $this->site = $named;
+        }
+
+        return $this->site = $registry->forHost($this->requestHost());
+    }
+
+    /**
+     * Where this site's content and data live.
+     *
+     * The single seam the whole of multi-site rests on. Everything below the
+     * kernel is handed paths built from here and never learns that sites exist
+     * — no service takes a site argument, no query has to remember to scope
+     * itself, and a forgotten scope is therefore not expressible.
+     *
+     * For the primary site this is the installation root, so `content/` and
+     * `data/` are exactly where they always were.
+     */
+    public function siteRoot(): string
+    {
+        return $this->basePath . $this->site()->rootSuffix();
+    }
+
+    /**
+     * The hostname this request arrived on.
+     *
+     * `Host` and deliberately not `X-Forwarded-Host`. The forwarded header is
+     * set by whoever is in front — which, unless a proxy is configured to strip
+     * it, includes the client — so honouring it would let a visitor choose
+     * which site's content they are served by sending a header. A reverse proxy
+     * that is doing its job passes the original `Host` through, so there is
+     * nothing to gain and a site-boundary bypass to lose.
+     *
+     * `Host` is still attacker-controlled, which is why an unrecognised value
+     * falls back to the default site rather than being trusted to name one, and
+     * why nothing here builds a path out of it.
+     */
+    private function requestHost(): ?string
+    {
+        $host = $_SERVER['HTTP_HOST'] ?? null;
+
+        return is_string($host) && $host !== '' ? $host : null;
     }
 
     /**
@@ -291,7 +415,7 @@ class Application
 
         // Runtime settings live under data/, not in the image, so an operator can
         // flip them from the admin and have them survive a redeploy.
-        $this->settings = Settings::load($this->basePath . '/data/settings.json');
+        $this->settings = Settings::load($this->siteRoot() . '/data/settings.json');
 
         $this->eventDispatcher = new EventDispatcher();
         $this->eventBus = new EventBus($this->eventDispatcher);
@@ -313,7 +437,7 @@ class Application
             // layout has to be read as *something*, and the only honest answer is
             // the language the site says it is written in.
             $versions = new JsonVersionStore(
-                $this->basePath . '/data/versions',
+                $this->siteRoot() . '/data/versions',
                 RetentionPolicy::keeping($this->config->historyRetainedVersions())
             );
             // Who is acting, read lazily on each write because the storage stack
@@ -327,10 +451,10 @@ class Application
             // save, delete, publish, unpublish and a history restore — leaves a
             // record of who did it, on top of the record of what changed. Both
             // still satisfy the storage port, so nothing downstream changes.
-            $auditLog = new JsonAuditLog($this->basePath . '/data/audit');
+            $auditLog = new JsonAuditLog($this->siteRoot() . '/data/audit');
             $storage = new AuditingStorage(
                 new VersioningStorage(
-                    StorageFactory::create($this->config, $this->basePath),
+                    StorageFactory::create($this->config, $this->siteRoot()),
                     $versions,
                     $author,
                 ),
@@ -376,7 +500,7 @@ class Application
             // content. There is no path that changes a document without going
             // through here, so there is no handler that can forget.
             $this->renderCache = new RenderCache(
-                $this->basePath . '/data/cache/pages',
+                $this->siteRoot() . '/data/cache/pages',
                 $this->config->cacheEnabled(),
             );
             if ($this->renderCache->isEnabled()) {
@@ -423,11 +547,18 @@ class Application
         $this->auditService = new AuditService($auditLog);
 
         $this->coreApiRoutes = new CoreApiRoutes(
-            $this->basePath,
+            // The site's root, not the installation's: everything this builds —
+            // storage, media, versions, schedules — belongs to one site. Schema
+            // config is looked up separately, below, because a site may share
+            // the installation's section types or declare its own.
+            $this->siteRoot(),
             $this->contentService,
             $this->history,
             $this->config,
             $this->urlBase(),
+            // The installation's root, so schema config falls back to the one
+            // every site shares when this site declares none of its own.
+            $this->basePath,
         );
 
         // User management is core (the admin UI depends on it); it fires the same
@@ -453,7 +584,12 @@ class Application
         // lifecycle a page has; without it saving an entry would put it live at
         // once. Done before the routes are gathered so the storage stack already
         // treats these types as publishable on the first write.
-        $collectionTypes = new JsonCollectionTypeRepository($this->basePath . '/config/collections');
+        // Per site when the site declares its own, and the installation's
+        // otherwise — the same fallback section types use, and for the same
+        // reason: eight client sites usually share one content model, and any
+        // one of them should be able to depart from it without copying the
+        // other seven.
+        $collectionTypes = new JsonCollectionTypeRepository($this->schemaPath('collections'));
         Publishable::register(array_map(
             static fn ($type): string => $type->id,
             $collectionTypes->all()
@@ -480,7 +616,7 @@ class Application
             $this->history,
             // Preview links share the one signing secret with the page previews,
             // so a token minted anywhere verifies everywhere.
-            new PreviewLinks($this->basePath . '/data/preview-secret'),
+            new PreviewLinks($this->siteRoot() . '/data/preview-secret'),
             // "What links here" scans reference fields on demand rather than
             // keeping a stored index a flat-file write would have to maintain.
             new BackReferenceService($collectionTypes, $this->contentService),
@@ -489,7 +625,10 @@ class Application
 
         // Themes live outside the application so a site's design survives a
         // deploy; the repository discovers them and remembers which is active.
-        $this->themes = ThemeRepository::forInstallation($this->basePath);
+        // Themes are installed once and chosen per site: an agency's whole
+        // reason for running eight sites is that they do not look alike, so the
+        // packages come from the installation and the choice from the site.
+        $this->themes = ThemeRepository::forInstallation($this->basePath, '/themes', $this->siteRoot());
         $this->themesController = new ThemesController(
             $this->themes,
             fn (): array => $this->getSessionUser() ?? [],
@@ -514,13 +653,13 @@ class Application
         // Sessions and login throttling are collaborators rather than methods on
         // this class, so each can be understood and tested on its own.
         $this->sessions = new SessionStore(
-            $this->basePath . '/data/sessions',
+            $this->siteRoot() . '/data/sessions',
             $this->getIdleTimeoutSeconds()
         );
         $this->apiGuard = new ApiGuard($this->sessions);
         $this->deliveryCors = new DeliveryCors($this->config->deliveryAllowedOrigins(), $this->apiGuard);
         $this->throttle = new LoginThrottle(
-            $this->basePath . '/data/lockouts.json',
+            $this->siteRoot() . '/data/lockouts.json',
             $this->config->lockoutMaxAttempts(),
             $this->config->lockoutWindowSeconds(),
             $this->config->lockoutDurationSeconds()
@@ -531,7 +670,7 @@ class Application
 
         $this->pluginManager = new PluginManager(
             $this->basePath . '/plugins',
-            $this->basePath . '/data',
+            $this->siteRoot() . '/data',
             $excludedIds,
             $excludedDirs
         );
@@ -587,12 +726,34 @@ class Application
             // reading the lockout file twice to detect a transition nobody is
             // listening for.
             twoFactor: new TwoFactorService($this->contentService, $this->twoFactorIssuer()),
+            ssoSettings: $this->ssoSettings(),
             gate: new AuthGate(
                 fn (string $hook, array $payload): array
                     => $this->pluginManager?->executeHookIsolated($hook, $payload) ?? [],
                 fn (string $hook): bool => $this->pluginManager?->hasHookListeners($hook) ?? false,
             ),
         );
+        // Single sign-on, built only when a site configured it. `OidcSettings`
+        // treats "enabled" as "has everything it needs", so a half-configured
+        // provider produces no controller and no button rather than a button
+        // that leads to a broken redirect.
+        $sso = $this->ssoSettings();
+        if ($sso->enabled) {
+            $metadata = new ProviderMetadata($sso, $this->siteRoot() . '/data/cache/sso');
+
+            $this->oidcController = new OidcController(
+                $sso,
+                $this->sessions,
+                $this->contentService,
+                new OidcService($sso, $metadata, $this->contentService),
+                $this->urlBase(),
+            );
+        } else {
+            // Still built, so the login screen can ask and be told "no" rather
+            // than having to interpret a 404.
+            $this->oidcController = new OidcController($sso, $this->sessions, $this->contentService);
+        }
+
         $this->authController->ensureDefaultAdminUser();
         $this->registerApiRoutes();
         
@@ -663,7 +824,7 @@ class Application
      */
     public function getScheduleStore(): FileScheduleStore
     {
-        return $this->scheduleStore ??= new FileScheduleStore($this->basePath . '/data/schedule');
+        return $this->scheduleStore ??= new FileScheduleStore($this->siteRoot() . '/data/schedule');
     }
 
     private function handleRequest(string $uri, string $method): array
@@ -896,7 +1057,7 @@ class Application
         $title = $type->titleOf($entry->data);
         $served = $locale ?? $entry->locale();
 
-        $media = new \Click\Cms\Application\Media\MediaService($this->basePath . '/content/media');
+        $media = new \Click\Cms\Application\Media\MediaService($this->siteRoot() . '/content/media');
 
         $head = \Click\Cms\Http\SeoMeta::forPage(
             $entry->data,
@@ -932,7 +1093,7 @@ class Application
         );
 
         $renderer = new SectionRenderer(
-            new JsonSectionTypeRepository($this->basePath . '/config/sections'),
+            new JsonSectionTypeRepository($this->schemaPath('sections')),
             $media,
             $this->mediaBaseUrl(),
             null,
@@ -1129,7 +1290,7 @@ class Application
     private function previewLinks(): \Click\Cms\Application\Preview\PreviewLinks
     {
         return new \Click\Cms\Application\Preview\PreviewLinks(
-            $this->basePath . '/data/preview-secret'
+            $this->siteRoot() . '/data/preview-secret'
         );
     }
 
@@ -1247,7 +1408,7 @@ class Application
         // One media service, shared by the renderer (which resolves in-page
         // images) and the SEO head (which resolves the Open Graph image), so all
         // media I/O stays here and SeoMeta stays pure.
-        $media = new \Click\Cms\Application\Media\MediaService($this->basePath . '/content/media');
+        $media = new \Click\Cms\Application\Media\MediaService($this->siteRoot() . '/content/media');
 
         // The language actually served, not the one requested. A German URL
         // showing English prose because the translation is missing must still
@@ -1323,7 +1484,7 @@ class Application
         // Sections are the CMS's own content model, so it renders them itself.
         // Without this a site could store a page but not show it.
         $renderer = new SectionRenderer(
-            new JsonSectionTypeRepository($this->basePath . '/config/sections'),
+            new JsonSectionTypeRepository($this->schemaPath('sections')),
             $media,
             // Defaults repeated because the listing service is the fifth argument;
             // a page carrying a listing section is how a collection becomes visible
@@ -1366,7 +1527,7 @@ class Application
     {
         $items = $this->menusController?->resolvedItems('main', $locale->code) ?? [];
 
-        $brand = ($this->settings ?? Settings::load($this->basePath . '/data/settings.json'))->siteName();
+        $brand = ($this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json'))->siteName();
 
         // Stateless, so a render path that never ran boot() (a direct-render test)
         // gets one on demand rather than a half-built kernel.
@@ -1421,12 +1582,12 @@ class Application
 
     private function handleHealthLive(): array
     {
-        return (new HealthCheck($this->basePath, $this->pluginManager !== null))->live();
+        return (new HealthCheck($this->siteRoot(), $this->pluginManager !== null))->live();
     }
 
     private function handleHealthReady(): array
     {
-        return (new HealthCheck($this->basePath, $this->pluginManager !== null))->ready();
+        return (new HealthCheck($this->siteRoot(), $this->pluginManager !== null))->ready();
     }
 
     private function applySecurityHeaders(): void
@@ -1469,6 +1630,19 @@ class Application
             return $csrf;
         }
 
+        // Single sign-on is checked before the general `auth/` dispatch, because
+        // its two endpoints are browser navigations that answer with a redirect
+        // rather than JSON, and `AuthController` speaks only JSON.
+        // `auth/sso` or `auth/sso/…`, and not `auth/ssoanything` — an unanchored
+        // prefix would hand this controller paths it has no route for, which it
+        // would answer 404 to rather than letting `AuthController` see them.
+        if ($this->isCoreAuthEnabled()
+            && $this->oidcController !== null
+            && ($path === 'auth/sso' || str_starts_with($path, 'auth/sso/'))
+        ) {
+            return $this->oidcController->handle($path, $method);
+        }
+
         if ($this->isCoreAuthEnabled() && str_starts_with($path, 'auth/')) {
             return $this->authController->handle($path, $method);
         }
@@ -1505,6 +1679,19 @@ class Application
         // action. CSRF and authentication have already been enforced above.
         if ($path === 'settings') {
             return $this->handleSettingsRequest($method);
+        }
+
+        // Which site this admin session is editing.
+        //
+        // Read by the admin UI so it can say so on screen when an installation
+        // serves more than one. Somebody who looks after eight client sites and
+        // has three tabs open needs the answer visible, not inferable from the
+        // address bar — editing the wrong client's homepage is a mistake with no
+        // warning and an audience.
+        if ($path === 'site' && $method === 'GET') {
+            return ['data' => $this->site()->toArray() + [
+                'multiSite' => $this->siteRegistry()->isMultiSite(),
+            ]];
         }
 
         // The audit trail — who did what, across the whole site. An operator
@@ -1666,7 +1853,7 @@ class Application
         }
 
         if ($method === 'GET') {
-            return ['data' => ($this->settings ?? Settings::load($this->basePath . '/data/settings.json'))->toArray()];
+            return ['data' => ($this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json'))->toArray()];
         }
 
         if ($method !== 'PUT') {
@@ -1678,7 +1865,7 @@ class Application
         }
 
         $data = $this->getJsonBody();
-        $settings = $this->settings ?? Settings::load($this->basePath . '/data/settings.json');
+        $settings = $this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json');
 
         // Only the keys we understand are acted on; an unknown key is ignored
         // rather than stored, so the settings file cannot accrete arbitrary
@@ -1759,6 +1946,38 @@ class Application
      * it, so this is belt and braces rather than the only defence — but a header
      * reaching a QR code that somebody scans is not a path to be casual about.
      */
+    /**
+     * Single sign-on as this site configured it, from `core.sso`.
+     *
+     * Read once and remembered, because it is consulted by the auth controller,
+     * the SSO controller and the login screen's status endpoint, and re-parsing
+     * it three times per request would be three chances for them to disagree.
+     */
+    private function ssoSettings(): OidcSettings
+    {
+        return $this->sso ??= OidcSettings::fromArray($this->config?->sso() ?? []);
+    }
+
+    /** Exposed so the login screen can ask whether to offer the button. */
+    public function getOidcController(): ?OidcController
+    {
+        return $this->oidcController;
+    }
+
+    /**
+     * Where a schema directory lives for the site being served.
+     *
+     * The site's own when it has one, the installation's otherwise. It replaces
+     * rather than merges, so what a site renders is answerable by looking in one
+     * place — a merge would mean reading two directories and knowing which wins.
+     */
+    private function schemaPath(string $kind): string
+    {
+        $own = $this->siteRoot() . '/config/' . $kind;
+
+        return is_dir($own) ? $own : $this->basePath . '/config/' . $kind;
+    }
+
     private function twoFactorIssuer(): string
     {
         $host = $_SERVER['HTTP_HOST'] ?? '';

@@ -73,6 +73,8 @@ final class Navigation
             'docs/install.md',
             'docs/updates.md',
             'docs/backup.md',
+            'docs/sso.md',
+            'docs/multi-site.md',
         ],
         'Building on it' => [
             'docs/core.md',

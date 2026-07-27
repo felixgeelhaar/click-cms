@@ -33,16 +33,16 @@ and discards anything the schema does not declare, so stored content can only
 ever hold a shape the site's templates were written for. See
 `src/Domain/Schema` and `src/Http/CoreApiRoutes`.
 
-**Free-form building — designed, not built.** `docs/visual-builder.md` defines
-a coherent data model: a node tree with breakpoints and per-breakpoint style
-overrides. `plugins/visual-builder` renders that tree to HTML server-side. What
-does not exist is the editor: canvas, node selection, drag and drop, a style
-panel, breakpoint switching, undo.
+**Free-form building — built.** `docs/visual-builder.md` defines the data
+model: a node tree with breakpoints and per-breakpoint style overrides.
+`plugins/visual-builder` renders that tree to HTML server-side, and the editor
+exists — `admin-ui/src/components/Builder.vue` with its palette and inspector.
 
-That editor is the largest single piece of work in this project — larger than
-the content core, schema system, media library and admin UI combined. It should
-be scoped as its own milestone, not treated as a plugin someone finishes off
-between other tasks.
+This paragraph said "designed, not built" long after the editor landed, which is
+the kind of stale claim this document exists to avoid. What remains open is
+reusable blocks or templates, and that is a data-model decision before it is a
+feature: whether a page references a saved block or holds a snapshot of it, and
+what happens to every page using one when it changes.
 
 ### The risk to resolve first
 
@@ -268,7 +268,18 @@ Done since:
 
 Outstanding:
 
-- No rate limiting on login beyond the existing lockout.
+- ~~No rate limiting on login beyond the existing lockout.~~ Done, and twice
+  over: `LoginThrottle` locks a named account out after its own threshold, and
+  `LoginSprayGuard` refuses every login while the site as a whole is over a
+  failure ceiling in a rolling window — which is the case the per-account
+  lockout cannot see, since a spray tries one password against a thousand
+  names. The same two limits now govern the second-factor step, because six
+  digits with unlimited guesses would be a weaker secret than the password it
+  strengthens.
+- ~~No second factor.~~ Done: TOTP in core, with recovery codes. See
+  `docs/two-factor.md` and the section in `core.md`.
+- ~~No single sign-on.~~ Done: OpenID Connect, with SAML explicitly declined and
+  the reason recorded. See `docs/sso.md`.
 - ~~Capabilities are enforced only where a handler remembers to ask for them.~~
   Mitigated: `AuthorizingStorage` asks the type-blind question — may this account
   mutate content at all — at the storage boundary, so a handler that forgets its

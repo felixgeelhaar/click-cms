@@ -60,14 +60,43 @@ final class CoreApiRoutes
      */
     private readonly BasePath $urlBase;
 
+    /**
+     * @param string  $basePath    The **site's** root. Content, media, versions,
+     *        schedules and every other per-site thing hangs off this, so a
+     *        multi-site installation hands in a different one per request and
+     *        nothing here has to know that sites exist.
+     * @param ?string $installRoot The installation's root, for things every site
+     *        shares. Only schema config today. Null means they are the same
+     *        directory, which is the single-site case and every existing caller.
+     */
     public function __construct(
         private readonly string $basePath,
         private readonly ?ContentService $content = null,
         private ?HistoryService $history = null,
         private readonly ?CoreConfig $config = null,
         ?BasePath $urlBase = null,
+        private readonly ?string $installRoot = null,
     ) {
         $this->urlBase = $urlBase ?? BasePath::root();
+    }
+
+    /**
+     * Where this site's section types are declared.
+     *
+     * A site's own `config/sections/` when it has one, and the installation's
+     * otherwise. That fallback is what lets an agency keep one shared set of
+     * designs across eight client sites while any one of them departs from it,
+     * without copying the other seven.
+     */
+    private function sectionTypesPath(): string
+    {
+        $own = $this->basePath . '/config/sections';
+
+        if (is_dir($own)) {
+            return $own;
+        }
+
+        return ($this->installRoot ?? $this->basePath) . '/config/sections';
     }
 
     /** Where media files are served from, as this installation spells it. */
@@ -1085,7 +1114,7 @@ final class CoreApiRoutes
     private function sectionTypes(): JsonSectionTypeRepository
     {
         return $this->sectionTypes ??= new JsonSectionTypeRepository(
-            $this->basePath . '/config/sections'
+            $this->sectionTypesPath()
         );
     }
 

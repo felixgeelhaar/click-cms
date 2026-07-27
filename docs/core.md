@@ -160,6 +160,77 @@ Four consequences worth stating, because each was a choice:
 holds both, an author neither — which is what the role comments have claimed
 since they were written, and what nothing enforced while saving was publishing.
 
+### More than one site
+
+One installation, many sites: code, plugins and themes shared; content, media,
+accounts and settings not.
+
+**It is additive, which is the whole reason it could be built at all.** An
+installation with no `config/sites.json` has one site whose content is at
+`content/` and `data/` — byte for byte where it has always been — and adding a
+second site does not move the first. Nothing about the stored shape changes,
+which is what keeps this inside the v1.x line rather than making it the v2
+concern a site dimension on `ContentKey` would have been.
+
+**The implementation is one seam.** Each request resolves a site from its
+hostname and hands every service a different root directory. Nothing below the
+kernel knows sites exist: no service takes a site argument, no query has to
+remember to scope itself.
+
+That is the decision worth defending. The usual implementation is a site column
+on every document and a predicate on every read — which is how multi-site is
+usually built and how it usually leaks, because one query somewhere forgets the
+predicate and a client sees another client's drafts. Here the isolation is a
+property of where the bytes are, so a forgotten scope is **not expressible**. It
+is the same reasoning that made publication presence-in-`content/` rather than a
+status field: a rule enforced by structure cannot be forgotten by a handler.
+
+Three consequences, each a real cost accepted knowingly:
+
+- **Sites cannot share content.** No cross-posting, no shared media library, no
+  account spanning sites. For an agency serving separate clients that is the
+  point; for a publisher with one newsroom feeding four brands this is the wrong
+  tool, and saying so is better than a half-isolation nobody can reason about.
+- **Section types fall back but do not merge.** A site's own
+  `config/sections/` replaces the installation's rather than adding to it, so
+  what a site renders is answerable by looking in one place.
+- **`X-Forwarded-Host` is ignored.** It is set by whoever is in front, which
+  unless a proxy strips it includes the client — so honouring it would let a
+  visitor pick which site's content they are served by sending a header.
+
+See [`docs/multi-site.md`](multi-site.md).
+
+### Single sign-on
+
+OpenID Connect, core for the same reason two-step sign-in is. Off unless a site
+configures it, and `enabled` means "has everything it needs" rather than "a flag
+is set" — a half-configured provider produces no button rather than one that
+leads to a broken redirect.
+
+**SAML is declined outright**, and that is a design decision rather than a gap.
+Verifying a SAML assertion means XML digital signatures, which means XML
+canonicalisation — a well-known source of signature-bypass bugs, not something to
+hand-roll, and a library for it would be the runtime dependency this project does
+not take. The TOTP case above was defensible because its failure mode is loud;
+this one's is silent, which is exactly the difference.
+
+Three decisions worth stating:
+
+- **The link is the provider's `sub`, never the email.** Addresses get
+  reassigned — `jo@company.com` leaves and a different Jo is given it six months
+  later — and matching on email would hand the second Jo the first Jo's account.
+  Email is used only to *find* an account the first time, only when the provider
+  has verified it, and only when the site opted in.
+- **Nothing the callback supplies is trusted alone.** State, nonce and the PKCE
+  verifier are generated server-side and held in a pending session; the code, the
+  state and the ID token are each checked against something this server kept.
+- **Closing local passwords applies only to linked accounts.** A site using SSO
+  still has a local administrator who is not linked, and closing password login
+  for them would mean losing the site along with the provider during an outage.
+
+See [`docs/sso.md`](sso.md) for the configuration and the full list of what the
+ID token is checked for.
+
 ### Two-step sign-in
 
 Core, on the "security is not uninstallable" line. The plugin hook
