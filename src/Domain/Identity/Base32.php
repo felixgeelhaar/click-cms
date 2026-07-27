@@ -25,11 +25,6 @@ final class Base32
 
     private function __construct() {}
 
-    public function __toString(): string
-    {
-        return self::class;
-    }
-
     public static function encode(string $raw): string
     {
         if ($raw === '') {

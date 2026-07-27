@@ -8,6 +8,7 @@ use Click\Cms\Application\Authentication\CsrfGuard;
 use Click\Cms\Application\Authentication\LoginSprayGuard;
 use Click\Cms\Application\Authentication\LoginThrottle;
 use Click\Cms\Application\Authentication\SessionStore;
+use Click\Cms\Application\Authentication\Oidc\OidcSettings;
 use Click\Cms\Application\Authentication\TwoFactorService;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Content\ContentService;
@@ -80,6 +81,13 @@ final class AuthController
          * a second factor and login behaves exactly as it did.
          */
         private readonly ?TwoFactorService $twoFactor = null,
+        /**
+         * How single sign-on is configured, so a password login can be refused
+         * for an account that belongs to a provider. Optional for the same
+         * reason the second factor is: a caller that supplies none gets the
+         * behaviour that existed before either.
+         */
+        private readonly ?OidcSettings $ssoSettings = null,
     ) {
         // An inert gate when none was given: it permits everything and announces
         // nothing, which is exactly right for a CMS constructed without a plugin
@@ -236,6 +244,23 @@ final class AuthController
             return $this->rejectCredentials($username);
         }
 
+        // An account that belongs to an identity provider, at a site that has
+        // turned local passwords off.
+        //
+        // Checked after the password is verified, not before. Refusing earlier
+        // would answer differently for a right password and a wrong one, which
+        // turns this into an oracle for whether a given account exists and is
+        // linked — and the whole reason a site sets this is that leaving the
+        // organisation should remove access, which an oracle helps nobody with.
+        if ($this->passwordLoginIsClosedFor($userData)) {
+            $this->gate->announceLoginFailed($username, AuthGate::FAILED_REFUSED);
+
+            return [
+                'status' => 403,
+                'error' => 'This account signs in through your organisation. Use the single sign-on button.',
+            ];
+        }
+
         if (($userData['status'] ?? 'active') !== 'active') {
             // Announced with its own reason, unlike the three above: the caller
             // is already told this apart from a bad password — it is a `403`,
@@ -365,6 +390,27 @@ final class AuthController
     private function twoFactorRequiredFor(string $username): bool
     {
         return $this->twoFactor?->isActiveFor($username) ?? false;
+    }
+
+    /**
+     * Whether this account may no longer sign in with a password.
+     *
+     * Only for accounts actually linked to the provider. A site that turns on
+     * single sign-on still has a local administrator who is not linked, and
+     * closing password login for them would lock the site's owner out of their
+     * own site the moment the provider had an outage.
+     *
+     * @param array<string, mixed> $userData
+     */
+    private function passwordLoginIsClosedFor(array $userData): bool
+    {
+        if ($this->ssoSettings === null || !$this->ssoSettings->enabled || $this->ssoSettings->allowPasswordLogin) {
+            return false;
+        }
+
+        $subject = $userData['ssoSubject'] ?? null;
+
+        return is_string($subject) && $subject !== '';
     }
 
     /* ---------------------------------------------------- second factor -- */
