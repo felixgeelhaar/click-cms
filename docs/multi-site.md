@@ -70,29 +70,67 @@ nothing to gain and a site boundary to lose.
 | accounts and sessions | plugins (the code) |
 | site name and branding | themes (the packages) |
 | menus, redirects | software updates |
-| version history, audit trail | **`config/core.json`** — see below |
+| version history, audit trail | self-update and the marketplace |
 | schedules, webhooks and their queues | |
 | which theme is active | |
 | section types, *if it declares any* | section types, otherwise |
+| `config/core.json`, *if it declares one* | `config/core.json`, otherwise |
 
-### `config/core.json` is installation-wide
+### A site can have its own `config/core.json`
 
-This is the sharp edge of the current design, and worth knowing before you plan
-around it. That one file holds the **storage backend**, the **languages the site
-publishes in**, the **single sign-on provider**, media crops, cache settings and
-the login thresholds — and every site on the installation reads the same one.
+Drop one at `sites/<id>/config/core.json` and it is laid over the
+installation's. A site overrides only the keys it names and keeps the
+installation's answer for everything else — so a site wanting German does not
+have to restate the storage backend, the cache settings and the login thresholds
+to get it.
 
-So today: eight client sites share one set of languages, one storage backend and
-one identity provider. Separate content, separate accounts, separate everything
-above — but not those.
+```json
+{
+  "core": {
+    "languages": { "default": "de", "available": ["de", "fr"] },
+    "storage":   { "backend": "sqlite" },
+    "sso":       { "enabled": true, "issuer": "https://id.acme.example" }
+  }
+}
+```
 
-If two of your clients need different languages or different SSO providers, they
-need separate installations. Splitting `core.json` per site is a reasonable thing
-to want and is not built; it is recorded here rather than discovered.
+Lists are **replaced, not merged**. `available: ["de"]` means this site
+publishes German — not German in addition to whatever the installation listed —
+because otherwise a site could only ever widen a set and never narrow one, and
+narrowing is the common case.
 
-What *is* per site is `data/settings.json` — the name and branding an
-administrator edits in the admin panel. Two different files with confusingly
-similar jobs, which is why they are named separately here.
+#### Two settings a site may not override
+
+| Setting | Why |
+|---|---|
+| `core.updates` | Self-update replaces `src/` in one directory tree that every site runs. Two sites asking for different policies is not a disagreement to resolve; it is a question with one outcome, and whichever site the updater ran as would decide for all of them. |
+| `core.marketplace` | It installs plugin code into the shared `plugins/` directory, so "where may code be installed from" cannot be a per-site answer without letting one site choose what another runs. |
+
+A site that sets either is **ignored and logged**, not silently dropped — look
+for `click-cms:` in the PHP error log. Configuration somebody wrote that does
+nothing is worse than configuration that is refused out loud.
+
+Which **plugins load** is deliberately not on that list. It looks similar and is
+not: the code is installed once and shared, and excluding one only decides what
+boots for this site. One client having the visual builder and another not is a
+normal thing to want.
+
+```json
+{ "core": { "plugins": { "exclude": { "ids": ["visual-builder"] } } } }
+```
+
+#### A malformed site config does not take the site down
+
+It falls back to the installation's configuration and logs. Taking a client's
+site offline over a stray comma — when a perfectly usable configuration is
+sitting right there — is the worse of the two failures.
+
+#### Not to be confused with `data/settings.json`
+
+That one is per site too, and holds the name and branding an administrator edits
+in the admin panel. Two files with confusingly similar jobs, which is why they
+are named separately here: `config/core.json` is deployment configuration, and
+`data/settings.json` is something a person edits on screen.
 
 **Accounts are per site.** Somebody who works on three of your client sites has
 three accounts. That is the safe default — an account that spanned sites would be

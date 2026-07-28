@@ -5,6 +5,30 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+### A site can have its own `config/core.json`
+- Multi-site scoped content, media, accounts and settings and left this one file
+  shared, so eight client sites had **one storage backend, one set of languages
+  and one identity provider between them**. That was documented as a limitation;
+  it is now removed.
+- `sites/<id>/config/core.json` is laid over the installation's, key by key. A
+  site overrides only what it names and keeps the installation's answer for
+  everything else — so wanting German does not mean restating the storage
+  backend, the cache settings and the login thresholds to keep them.
+- Lists are **replaced, not merged**. `available: ["de"]` means this site
+  publishes German, not German in addition to what the installation listed;
+  otherwise a site could only widen a set, never narrow one, and narrowing is
+  the common case.
+- **Two settings refuse to be overridden**, because the thing they configure
+  exists once per installation: `core.updates` (self-update replaces `src/` in
+  one tree every site runs) and `core.marketplace` (it installs code into the
+  shared `plugins/`). A site that sets either is **ignored and logged**, never
+  silently dropped.
+- Which plugins load is deliberately *not* on that list — the code is shared, and
+  excluding one only decides what boots for that site. One client having the
+  visual builder and another not is a normal thing to want.
+- A malformed site config falls back to the installation's and logs, rather than
+  taking that client's site down over a stray comma.
+
 ### A release now publishes its own feed reliably
 - A GitHub Pages deployment created under a `release` event is accepted, reports
   success, and is never served — 0 of 3 landed, against 8 of 8 from every other

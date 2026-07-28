@@ -15,6 +15,7 @@ use Click\Cms\Application\Authentication\Oidc\ProviderMetadata;
 use Click\Cms\Application\Authentication\TwoFactorService;
 use Click\Cms\Http\OidcController;
 use Click\Cms\Application\Config\CoreConfig;
+use Click\Cms\Application\Config\LayeredCoreConfig;
 use Click\Cms\Application\Config\Settings;
 use Click\Cms\Application\Event\EventBus;
 use Click\Cms\Application\Audit\AuditService;
@@ -2034,13 +2035,70 @@ class Application
     }
 
 
+    /**
+     * The installation's configuration with this site's laid over it.
+     *
+     * Multi-site scoped content, media, accounts and settings and left this file
+     * shared, so every site had one storage backend, one set of languages and
+     * one identity provider between them. A site now declares its own
+     * `config/core.json` and overrides only the keys it names.
+     *
+     * A few settings are refused because the thing they configure exists once
+     * per installation rather than once per site — see {@see LayeredCoreConfig}.
+     * A site that tries is logged rather than silently ignored: configuration
+     * somebody wrote and that does nothing is the failure this codebase keeps
+     * removing.
+     *
+     * @param array<string, mixed> $installation
+     * @return array<string, mixed>
+     */
+    private function withSiteConfig(array $installation): array
+    {
+        // The primary site's root *is* the installation, so its config file is
+        // the one already loaded. Layering it over itself would be harmless but
+        // pointless, and reading it twice invites the two copies to diverge.
+        if ($this->siteRoot() === $this->basePath) {
+            return $installation;
+        }
+
+        $path = $this->siteRoot() . '/config/core.json';
+
+        if (!is_file($path)) {
+            return $installation;
+        }
+
+        $raw = @file_get_contents($path);
+        $site = $raw === false ? null : json_decode($raw, true);
+
+        if (!is_array($site)) {
+            // Loud, and not fatal. A site whose config file is malformed should
+            // be obvious to whoever wrote it, but taking a client's site down
+            // over it — when the installation's configuration is perfectly
+            // usable — is a worse outcome than running on the shared defaults.
+            error_log("click-cms: {$path} is not valid JSON, so this site is running on the installation's configuration alone.");
+
+            return $installation;
+        }
+
+        $layering = new LayeredCoreConfig();
+        $effective = $layering->effective($installation, $site);
+
+        foreach ($layering->refused() as $refusedPath) {
+            error_log(
+                "click-cms: {$path} sets {$refusedPath}, which is configured once per installation and not per site. Ignored."
+            );
+        }
+
+        return $effective;
+    }
+
     private function loadCoreConfig(): void
     {
         $path = $this->basePath . '/config/core.json';
         if (file_exists($path)) {
             $config = json_decode(file_get_contents($path), true);
             if (is_array($config)) {
-                $this->coreConfig = $config;
+                $this->coreConfig = $this->withSiteConfig($config);
                 return;
             }
         }
