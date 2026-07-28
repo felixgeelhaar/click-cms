@@ -5,6 +5,8 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-07-28
+
 ### A site can have its own `config/core.json`
 - Multi-site scoped content, media, accounts and settings and left this one file
   shared, so eight client sites had **one storage backend, one set of languages
