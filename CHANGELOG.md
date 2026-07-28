@@ -3,6 +3,29 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### A release now publishes its own feed reliably
+- A GitHub Pages deployment created under a `release` event is accepted, reports
+  success, and is never served — 0 of 3 landed, against 8 of 8 from every other
+  trigger. Every other candidate was ruled out by experiment: the call
+  mechanism, the job structure, two deploys close together, the commit SHA,
+  workflow concurrency, CDN caching, and the build itself.
+- `release.yml` no longer deploys Pages from inside the release run. It
+  **dispatches** `pages.yml` — dispatched runs land — then **waits on that run
+  and fails with it**. Firing and forgetting would have restored the exact
+  failure this replaces: a green release over a feed nobody is serving.
+- Needs a `PAGES_DISPATCH_TOKEN` secret, because `GITHUB_TOKEN` deliberately
+  cannot start workflow runs. `docs/updates.md` says how to scope it, and what
+  it costs — a standing credential that can start workflow runs is a real
+  increase in attack surface, and the narrow scope is what keeps it small.
+- **Without the token the release still works**, taking the old path, which
+  fails its own verification loudly and tells the operator the one command that
+  republishes. Noisy degradation rather than silent.
+- Still a workaround, not a cure. The underlying GitHub behaviour is unexplained
+  and worth reporting upstream; [#26](https://github.com/felixgeelhaar/click-cms/issues/26)
+  has three reproductions.
+
 ## [1.7.2] — 2026-07-28
 
 **No functional changes.** Documentation only; there is nothing here an
