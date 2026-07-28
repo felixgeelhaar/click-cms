@@ -41,6 +41,16 @@ name: zz experiment — pages via workflow_call (issue #26)
 on:
   workflow_dispatch:
 
+# The same block `release.yml` declares, and the first attempt failed at startup
+# without it: a called workflow's `permissions` must be a subset of its caller's,
+# and `pages.yml` asks for `pages: write` and `id-token: write`. Omitting this
+# gave `startup_failure` with zero jobs, which looks alarming and says nothing
+# about the bug — a fault in the experiment, not a result from it.
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
   call-pages:
     name: Call pages.yml exactly as release.yml does
