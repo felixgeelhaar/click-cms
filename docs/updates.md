@@ -146,46 +146,31 @@ Release:
 3. The feed is rebuilt from the published releases, each package's `sha256` read
    from the artefact itself, signed with `UPDATE_PRIVATE_KEY`, and deployed to
    GitHub Pages.
-4. The published feed is **fetched back and compared** against the one the run
+4. The feed is published by **dispatching** `pages.yml` — not by deploying from
+   inside the release run, which does not take effect (see the known issue
+   below). The release job waits on that run and fails with it.
+5. The published feed is **fetched back and compared** against the one the run
    built. The workflow fails if the site is not serving it.
 
-### Why step 4 exists
+### Why step 5 exists
 
 `actions/deploy-pages` reporting success means GitHub accepted the deployment.
-It does not mean the site is serving what was deployed, and on **2026-07-27**
-those two came apart:
+It does not mean the site is serving what was deployed, and those two came apart
+three times — see [the known issue](#known-issue-a-pages-deploy-made-from-a-release-run-is-never-served)
+below for the evidence and the workaround.
 
-- The v1.7.0 release built a correct feed listing 15 releases, and both jobs
-  went green.
-- The site went on serving the 14-release feed built two hours earlier, for at
-  least fifteen minutes.
-- The release was published, its packages were attached and downloadable, and
-  **no installation would ever have been offered it** — the feed is the only way
-  a site learns a release exists.
-- A `workflow_dispatch` run of the same file, with an identical payload and the
-  same `pages_build_version`, published it in seconds.
+Step 4 avoids the condition that causes it. This step is what catches it if the
+avoidance ever stops working, and it is the reason the problem was found at all:
+until it existed, the pipeline asserted success without checking the outcome, so
+a release could be published, packaged, downloadable and offered to nobody, with
+every tick green.
 
-There is evidence this was not a one-off: v1.6.0 was released at 07:13 that day
-and only entered the feed at 17:08, when an unrelated merge happened to trigger
-a rebuild. Between those times it was published and undiscoverable. The pattern
-looks like the feed trailing until some *later* commit forces a republish, which
-would make every release invisible until unrelated work lands.
+That is the same rule the signing check one step earlier already applies —
+"reporting green without signing would be the silent failure this project keeps
+having to remove" — which simply had not been extended past the deploy.
 
-**The GitHub-side cause is not established.** Several plausible explanations were
-tested and disproved — the deployment payloads are byte-identical between the
-run that failed and the one that worked, the concurrency group is correct, and
-the commit SHA is the same in both. The check does not pretend to fix that.
-
-What it fixes is the defect that belongs to this repository: the pipeline
-asserted success without checking the outcome, so the failure was invisible
-until somebody fetched the feed by hand. That is the same rule the signing check
-already applies one step earlier, and it simply had not been extended past the
-deploy.
-
-It is a check and **not a retry**, deliberately. A retry that usually works
-would hide an infrastructure problem behind an occasional slow release. Failing
-loudly also makes the behaviour reproducible, which is what any real diagnosis
-of the GitHub-side cause will need.
+It is a check and **not a retry**, deliberately. A retry that usually works would
+hide an infrastructure problem behind an occasionally slow release.
 
 ### One-time setup, for whoever runs the project
 
@@ -201,6 +186,40 @@ Two things, once, before any of the above works:
    source selected there is nothing for it to deploy to, and every run fails at
    the last step.
 
+3. **Add a `PAGES_DISPATCH_TOKEN` secret**, so a release can publish its own
+   feed. Without it a release still succeeds and its packages still download,
+   but the feed is not updated and no installation is offered the release — see
+   [the known issue](#known-issue-a-pages-deploy-made-from-a-release-run-is-never-served)
+   below for why.
+
+   A fine-grained personal access token, scoped as narrowly as this can be:
+
+   - **Repository access:** only this repository.
+   - **Permissions:** `Actions: read and write` — enough to start a workflow run
+     and read its status. Nothing else.
+   - **Expiry:** set one. A token that never expires is a token nobody ever
+     revisits. Ninety days is reasonable; the release will fail loudly when it
+     lapses, which is the reminder.
+
+   Add it under **Settings → Secrets and variables → Actions** as
+   `PAGES_DISPATCH_TOKEN`.
+
+   **Why a token at all.** `GITHUB_TOKEN` deliberately cannot start further
+   workflow runs — that restriction exists to stop workflows triggering each
+   other in loops. Publishing the feed needs a *dispatched* run, so it needs a
+   credential that is allowed to dispatch.
+
+   **What it costs.** A standing credential in the repository that can start
+   workflow runs. Anyone who can read repository secrets, or alter a workflow
+   that uses them, could run arbitrary workflow code with it. That is a real
+   increase in attack surface, and the narrow scope above is what keeps it
+   small: it cannot read code, write contents, publish releases or touch other
+   repositories.
+
+   A GitHub App installation token is stronger — short-lived, revocable, not
+   tied to a person who might leave — and is the better choice for anything with
+   more than one maintainer.
+
 Then run **Publish site** once by hand to put the feed and the documentation up.
 
 To sign by hand:
@@ -213,34 +232,50 @@ php scripts/updates/build-feed.php releases.json private-key.pem _site \
 The tool refuses to sign a feed with a malformed entry, so a broken release is
 caught before it reaches anybody.
 
-### Known issue: a release may not reach the feed on the first try
+### Known issue: a Pages deploy made from a release run is never served
 
-**Check after every release**, until [issue #26][issue-26] is closed.
+Worked around, not cured. [Issue #26][issue-26] has the full investigation.
 
 [issue-26]: https://github.com/felixgeelhaar/click-cms/issues/26
 
-Twice now, the release workflow has deployed a correct feed, reported success on
-every job, and the site has gone on serving the previous one. The release is
-published and its packages download fine — but the feed is how an installation
-learns a release exists, so until the feed lists it, **nobody is offered it**.
-v1.6.0 was undiscoverable for ten hours that way.
+**The behaviour.** A GitHub Pages deployment created under a `release` event is
+accepted, reports success, and is then not served. The release is published and
+its packages download fine — but the feed is how an installation learns a release
+exists, so until the feed lists it, **nobody is offered it**. v1.6.0 was
+undiscoverable for ten hours before anyone noticed.
 
-Step 4 above catches it now: the workflow fetches the feed back and fails if the
-site is not serving what it built. When that happens the run goes red with the
-expected digest, and the fix is one command:
+**The evidence.** Eleven deploys, one clean split:
+
+| Trigger | Landed | Failed |
+|---|---|---|
+| `push` | 3 | 0 |
+| `workflow_dispatch` | 3 | 0 |
+| `workflow_call` from a dispatch | 1 | 0 |
+| the same, behind a `needs` | 1 | 0 |
+| **`release`** | **0** | **3** |
+
+Every other candidate — the call mechanism, the job structure, two deploys close
+together, the commit SHA, workflow concurrency, CDN caching, a malformed build —
+was ruled out by an experiment rather than by argument.
+
+**The workaround.** `release.yml` no longer deploys Pages itself. It dispatches
+`pages.yml` and waits for that run, failing with it. Dispatched runs land.
+
+**Two things still protect you**, because a workaround is not a cure:
+
+- `pages.yml` fetches the feed back after deploying and fails if the site is not
+  serving what it built. That check is what caught this in the first place.
+- The release job waits on the dispatched run rather than firing and forgetting,
+  so a release cannot go green over a feed nobody is serving.
+
+If a release ever does fail at this step, republish by hand:
 
 ```bash
 gh workflow run pages.yml --ref main
 ```
 
-That has republished it in seconds every time.
-
 **Do not read a passing re-run as the problem being solved.** The deployment
-reported success and did not take effect; re-running only papers over it. The
-cause is not established — six explanations have been ruled out by experiment, and
-the one that remains, that it happens only on `release`-triggered deploys, cannot
-be tested without publishing a release. Every real release is therefore a data
-point, which is why this section asks you to check.
+reported success and did not take effect; re-running only moves past it.
 
 ### The obligation this creates
 
