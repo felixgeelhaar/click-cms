@@ -1396,8 +1396,23 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
 
         return $this->pages = new PageService(
             $contentService,
-            new JsonSectionTypeRepository($this->pluginManager->getBasePath() . '/config/sections')
+            new JsonSectionTypeRepository($this->sectionTypesPath())
         );
+    }
+
+    /**
+     * Where this site's section types are declared.
+     *
+     * A site's own `config/sections/` when it has one, the installation's
+     * otherwise — the same fallback the kernel applies, mirrored here because
+     * a plugin resolving schema differently from the core that validates
+     * against it would render pages the validator would refuse.
+     */
+    private function sectionTypesPath(): string
+    {
+        $own = $this->pluginManager->getSiteRoot() . '/config/sections';
+
+        return is_dir($own) ? $own : $this->pluginManager->getBasePath() . '/config/sections';
     }
 
     private function timestamp(): string
@@ -1420,7 +1435,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             return null;
         }
 
-        $sessions = new SessionStore($this->pluginManager->getBasePath() . '/data/sessions');
+        $sessions = new SessionStore($this->pluginManager->getDataPath() . '/sessions');
 
         return $sessions->user();
     }
