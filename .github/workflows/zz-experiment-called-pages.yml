@@ -1,0 +1,48 @@
+# TEMPORARY — an experiment for issue #26, to be deleted once it has answered.
+#
+# ## What it is testing
+#
+# Every Pages deploy that failed to take effect came through `release.yml`
+# calling `pages.yml` via `workflow_call`. Every one that took effect came from
+# `pages.yml` being triggered directly, by a push or a dispatch. Three
+# occurrences, no counter-example — but "no counter-example" is not a cause, and
+# four earlier explanations for this bug were disproved after sounding just as
+# convincing.
+#
+# This isolates the one variable. It does nothing but call `pages.yml` the way
+# `release.yml` does. `pages.yml` builds the same site from the same commit and
+# ends with the verification step added in #23, which is what reports the answer.
+#
+# ## Reading the result
+#
+# - **Verification fails** → a called workflow's Pages deployment does not take
+#   effect, whatever the caller's event. `release.yml` must stop calling
+#   `pages.yml` and dispatch it instead.
+# - **Verification passes** → `workflow_call` alone is not sufficient, and the
+#   release *event* is implicated rather than the call mechanism. A different
+#   experiment is needed, and this one has still ruled something out.
+#
+# ## The confound, stated
+#
+# In a called workflow `github.event_name` is the *caller's* event, so here it
+# reads `workflow_dispatch` where in the failing runs it read `release`. This
+# therefore cannot distinguish "called" from "called by a release". It can only
+# show whether being called is sufficient on its own — which is worth knowing
+# either way, and is the cheapest question to ask first.
+#
+# ## Safety
+#
+# The feed this builds is equivalent to the one already published — same
+# releases, differing only in sequence and expiry — so neither outcome can leave
+# the site worse off. A failure leaves the current, correct feed in place.
+
+name: zz experiment — pages via workflow_call (issue #26)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call-pages:
+    name: Call pages.yml exactly as release.yml does
+    uses: ./.github/workflows/pages.yml
+    secrets: inherit
