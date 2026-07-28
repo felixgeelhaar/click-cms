@@ -1,0 +1,98 @@
+# TEMPORARY — verifies the dispatch machinery added in #27, then gets deleted.
+#
+# ## What this is for
+#
+# The new `publish-by-dispatch` job in release.yml can only run during a release,
+# and a release cannot be faked here: the tag/VERSION guard refuses a throwaway
+# tag, and re-running a release job dies on a duplicate Pages artifact. Both are
+# the repository defending itself correctly, and both mean the first time that
+# job ever executes would otherwise be a real release.
+#
+# Three things in it are mine and could be wrong, independently of the GitHub
+# behaviour it works around:
+#
+#   - the token actually has the scope to dispatch
+#   - the run-finding logic locates the run it just started
+#   - the polling reports that run's conclusion rather than its own
+#
+# I found two bugs in this code by reading it back — a heredoc that left literal
+# backslashes in a `--jq` argument, and a dispatch on GITHUB_REF_NAME which is
+# the *tag* during a release. Reading found those; running is what finds the
+# rest.
+#
+# The step below is copied verbatim from release.yml so the test exercises the
+# real thing rather than a paraphrase of it. What it cannot cover is the release
+# event itself — but a dispatched run is a dispatched run whoever started it, and
+# that is precisely the property the fix relies on.
+
+name: zz verify — dispatch machinery (PR #27)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Dispatch pages.yml and wait, exactly as a release does
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch the site workflow and wait for it
+        env:
+          # The dispatching token, not GITHUB_TOKEN. `gh` reads GH_TOKEN.
+          GH_TOKEN: ${{ secrets.PAGES_DISPATCH_TOKEN }}
+          REPO: ${{ github.repository }}
+          # The default branch, deliberately, and not GITHUB_REF_NAME — on a
+          # release event that is the *tag*. Dispatching on a tag would build
+          # the site from whatever that tag points at, so a release cut from an
+          # older commit would republish that commit's documentation over the
+          # current site. The feed is assembled from the GitHub API and is the
+          # same either way; the docs are not.
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          # Recorded before dispatching, and to the second, because the run is
+          # identified by being newer than this. A clock read after the dispatch
+          # could miss a run that started immediately.
+          since=$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+                  || date -u -v-1M +%Y-%m-%dT%H:%M:%SZ)
+
+          echo "Dispatching pages.yml on ${BRANCH}…"
+          gh workflow run pages.yml --repo "$REPO" --ref "$BRANCH"
+
+          # `gh workflow run` does not report the run it started, so it has to be
+          # found. Narrowed to dispatch-triggered runs of this workflow created
+          # since the timestamp above; the newest such run is ours.
+          #
+          # Two dispatches racing would be ambiguous. That is accepted: the only
+          # other dispatcher is a person, and the alternative — inventing a
+          # correlation id and threading it through an input — buys certainty
+          # against a case that does not happen during a release.
+          run_id=""
+          for _ in $(seq 1 30); do
+            run_id=$(gh run list --repo "$REPO" --workflow=pages.yml \
+                       --event=workflow_dispatch --created ">=${since}" \
+                       --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            [ -n "$run_id" ] && break
+            sleep 5
+          done
+
+          if [ -z "$run_id" ]; then
+            echo "::error::Dispatched pages.yml but no run appeared within 150s. The release is published and its packages are downloadable, but the feed has not been rebuilt, so no installation will be offered it. Publish it with: gh workflow run pages.yml --ref ${BRANCH}" >&2
+            exit 1
+          fi
+
+          url="https://github.com/${REPO}/actions/runs/${run_id}"
+          echo "Waiting on ${url}"
+
+          # `gh run watch --exit-status` returns the run's own conclusion, so a
+          # failed deploy — including one that fails the feed verification —
+          # fails this job and therefore the release.
+          gh run watch "$run_id" --repo "$REPO" --exit-status --interval 15 || {
+            echo "::error::The site workflow failed: ${url}. The release is published and its packages are downloadable, but until that run succeeds the feed does not list this release and no installation will be offered it." >&2
+            exit 1
+          }
+
+          echo "Feed published by ${url}"
