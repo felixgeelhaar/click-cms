@@ -80,7 +80,7 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
@@ -253,6 +253,17 @@ jobs:
             echo "sha256=" >> "$GITHUB_OUTPUT"
           fi
 
+      # These two are deliberately NOT on the latest major, while every other
+      # action in this repository was bumped off the deprecated Node 20 runtime.
+      # They are the component #26 is an open investigation into: a deployment
+      # accepted, reported successful, and never served. The evidence there is a
+      # table of eleven deploys compared against each other, and changing the
+      # version mid-investigation would reset that baseline — a later failure
+      # could no longer be told apart from a regression in the new major.
+      #
+      # Bump both to `upload-pages-artifact@v5` / `deploy-pages@v5` once #26 is
+      # closed, or sooner if Node 20 stops being merely deprecated. Until then
+      # the stale pin buys a comparable baseline, which is worth more.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
