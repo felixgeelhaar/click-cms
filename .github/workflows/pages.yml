@@ -115,11 +115,29 @@ jobs:
           # which applies the filter per page and would emit several arrays.
           gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > releases-api.json
 
+          # `notes` is the one line an installation is shown next to an offered
+          # update, so it has to read as a sentence on its own.
+          #
+          # It used to be the body's first line, which was wrong twice over: a
+          # body that opens with a blank line or a `###` heading yielded an
+          # empty string — 3 of 19 releases, including two of the last three —
+          # and a body that did open with prose yielded that prose *hard-wrapped
+          # at 80 columns*, so the note ended mid-sentence, often on an em dash,
+          # with raw markdown still in it.
+          #
+          # The release title is the reliable source: always present, written as
+          # a one-line summary, and not wrapped. Strip the `v1.8.0 — ` prefix and
+          # what remains is the summary. The body's first non-blank line stays as
+          # a fallback for a release titled with nothing but its tag.
           jq '[ .[] | select(.draft | not) | {
                 version: (.tag_name | ltrimstr("v")),
                 packageUrl: ("https://github.com/${{ github.repository }}/releases/download/" + .tag_name + "/click-cms-" + (.tag_name | ltrimstr("v")) + ".zip"),
                 security: (.body // "" | test("\\[security\\]"; "i")),
-                notes: (.body // "" | split("\n")[0]),
+                notes: (
+                  ((.name // "") | sub("^v[0-9]+\\.[0-9]+\\.[0-9]+\\s*[—–-]\\s*"; "")) as $title
+                  | if ($title | length) > 0 then $title
+                    else ((.body // "") | split("\n") | map(select(test("\\S"))) | (.[0] // "")) end
+                ),
                 requiresPhp: "8.1"
               } ]' releases-api.json > releases-raw.json
 
