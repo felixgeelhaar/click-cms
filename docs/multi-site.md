@@ -67,11 +67,32 @@ nothing to gain and a site boundary to lose.
 | Per site | Shared |
 |---|---|
 | pages, collections, media | the CMS code |
-| accounts and sessions | plugins |
-| settings, menus, redirects | themes |
-| version history, audit trail | software updates |
-| schedules, webhooks, SSO config | |
+| accounts and sessions | plugins (the code) |
+| site name and branding | themes (the packages) |
+| menus, redirects | software updates |
+| version history, audit trail | **`config/core.json`** — see below |
+| schedules, webhooks and their queues | |
+| which theme is active | |
 | section types, *if it declares any* | section types, otherwise |
+
+### `config/core.json` is installation-wide
+
+This is the sharp edge of the current design, and worth knowing before you plan
+around it. That one file holds the **storage backend**, the **languages the site
+publishes in**, the **single sign-on provider**, media crops, cache settings and
+the login thresholds — and every site on the installation reads the same one.
+
+So today: eight client sites share one set of languages, one storage backend and
+one identity provider. Separate content, separate accounts, separate everything
+above — but not those.
+
+If two of your clients need different languages or different SSO providers, they
+need separate installations. Splitting `core.json` per site is a reasonable thing
+to want and is not built; it is recorded here rather than discovered.
+
+What *is* per site is `data/settings.json` — the name and branding an
+administrator edits in the admin panel. Two different files with confusingly
+similar jobs, which is why they are named separately here.
 
 **Accounts are per site.** Somebody who works on three of your client sites has
 three accounts. That is the safe default — an account that spanned sites would be
@@ -115,8 +136,27 @@ service takes a site argument, no query has to remember to scope itself.
 The usual way to build this is a site column on every document and a predicate on
 every read. That is how multi-site is usually built and how it usually leaks: one
 query somewhere forgets the predicate, and a client sees another client's drafts.
-Here the isolation is a property of *where the bytes are*, so a forgotten scope is
-not expressible.
+Here the isolation is a property of *where the bytes are*, so no query below the
+kernel can forget to scope itself — it is handed a scoped root or nothing.
+
+**That is a claim about the kernel, not about everything.** This document first
+said a forgotten scope was "not expressible", which was wrong and was proved
+wrong within a day. Plugins get their paths from `PluginManager`, which offered
+only the *installation* root; five plugin call sites appended `/data/…` to it, and
+on any site but the primary that is another site's directory. Two of them read
+the session store that way to decide whether the caller was allowed to do
+something, found no session where they had looked, and permitted the request.
+
+`PluginManager` now offers `getSiteRoot()` beside `getBasePath()`, and the rule
+for anyone writing a plugin is:
+
+- **`getBasePath()`** — code the installation deploys: `plugins/`, `admin-ui/dist`,
+  `config/core.json`.
+- **`getSiteRoot()`** — anything belonging to a site: its `data/`, its `content/`,
+  the session store it reads to identify the caller.
+
+On a single-site installation the two are the same directory, which is exactly
+why getting it wrong is invisible until somebody declares a second site.
 
 The cost is the honest one: **sites cannot share content.** No cross-posting an
 article to two sites, no shared media library, no single account across sites. For

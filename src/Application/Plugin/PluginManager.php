@@ -24,6 +24,12 @@ class PluginManager
     private ?EventDispatcher $eventDispatcher = null;
     private ?object $contentService = null;
 
+    /**
+     * Where this site's `content/` and `data/` live — not necessarily the
+     * installation. See {@see getSiteRoot()} for why plugins need it.
+     */
+    private string $siteRoot;
+
     public function __construct(
         string $pluginsPath,
         ?string $dataPath = null,
@@ -32,7 +38,22 @@ class PluginManager
     )
     {
         $this->pluginsPath = rtrim($pluginsPath, '/');
-        $this->stateFile = ($dataPath ?? dirname($pluginsPath)) . '/plugin-state.json';
+
+        // The state file's fallback is exactly what it always was —
+        // `<installation>/plugin-state.json`, not `<installation>/data/`.
+        // Changing it would move the file on every installation that constructs
+        // this without a data path, and a moved state file reads as "every
+        // plugin was just activated".
+        $this->stateFile = rtrim($dataPath ?? dirname($this->pluginsPath), '/') . '/plugin-state.json';
+
+        // Derived from the data path when there is one, because that is the
+        // argument the kernel scopes per site. Without one there is only the
+        // installation, which is the single-site case and every caller that
+        // predates sites.
+        $this->siteRoot = $dataPath === null
+            ? dirname($this->pluginsPath)
+            : dirname(rtrim($dataPath, '/'));
+
         $this->excludedIds = $excludedIds;
         $this->excludedDirs = $excludedDirs;
         $this->loadState();
@@ -53,9 +74,49 @@ class PluginManager
         return $this->contentService;
     }
 
+    /**
+     * The **installation** root: where the code lives.
+     *
+     * For `plugins/`, `admin-ui/dist`, `themes/` and anything else deployed
+     * with the release. On a multi-site installation every site shares it.
+     *
+     * It is **not** where a site's data lives, and using it as though it were is
+     * how a plugin reaches around multi-site isolation — see {@see getSiteRoot()}.
+     */
     public function getBasePath(): string
     {
         return dirname($this->pluginsPath);
+    }
+
+    /**
+     * The **site's** root: where this site's `content/` and `data/` live.
+     *
+     * The same directory the kernel hands every core service, so a plugin that
+     * stores anything per-site — its own state, its queue, the session store it
+     * reads to identify the caller — lands in the same place as everything else
+     * belonging to that site.
+     *
+     * This exists because it was missing, and its absence was not theoretical.
+     * Multi-site scoped the kernel by handing each request a different root, on
+     * the reasoning that a forgotten scope would then not be expressible. It was
+     * expressible through here: five plugin call sites took
+     * {@see getBasePath()} and appended `/data/…`, which on any site but the
+     * primary is another site's directory. Two of them read the session store
+     * that way to decide whether the caller may do something, found no session
+     * where they looked, and permitted the request.
+     *
+     * On a single-site installation this and {@see getBasePath()} are the same
+     * directory, which is why the fault was invisible until sites existed.
+     */
+    public function getSiteRoot(): string
+    {
+        return $this->siteRoot;
+    }
+
+    /** This site's `data/` directory, which is what most callers actually want. */
+    public function getDataPath(): string
+    {
+        return $this->siteRoot . '/data';
     }
 
     public function getPluginsPath(): string

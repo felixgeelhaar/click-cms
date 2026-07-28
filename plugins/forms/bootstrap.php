@@ -323,7 +323,7 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
             return true;
         }
 
-        $sessions = new SessionStore($this->pluginManager->getBasePath() . '/data/sessions');
+        $sessions = new SessionStore($this->pluginManager->getDataPath() . '/sessions');
         $user = $sessions->user();
 
         if ($user === null) {

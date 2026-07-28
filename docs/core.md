@@ -181,9 +181,24 @@ That is the decision worth defending. The usual implementation is a site column
 on every document and a predicate on every read — which is how multi-site is
 usually built and how it usually leaks, because one query somewhere forgets the
 predicate and a client sees another client's drafts. Here the isolation is a
-property of where the bytes are, so a forgotten scope is **not expressible**. It
-is the same reasoning that made publication presence-in-`content/` rather than a
-status field: a rule enforced by structure cannot be forgotten by a handler.
+property of where the bytes are: nothing below the kernel is *given* an
+unscoped root, so nothing below the kernel can forget to scope. It is the same
+reasoning that made publication presence-in-`content/` rather than a status
+field — a rule enforced by structure cannot be forgotten by a handler.
+
+**With one correction, made the day after this was written.** The claim here was
+that a forgotten scope is "not expressible", full stop. It was expressible
+through the plugin API: `PluginManager` handed out only the installation root,
+and five plugin call sites appended `/data/…` to it. Two read the session store
+that way to authorise a request, found nothing where they looked, and allowed it.
+
+The kernel's guarantee held — every service it constructs is handed a scoped
+root. What did not hold was the boundary at the plugin surface, which is now
+`getSiteRoot()` for anything belonging to a site and `getBasePath()` for code the
+installation deploys. The lesson worth keeping is narrower and more useful than
+the original claim: **structure prevents a mistake only where the structure
+reaches**, and an API that hands out a wider scope than a caller needs is a hole
+in it.
 
 Three consequences, each a real cost accepted knowingly:
 

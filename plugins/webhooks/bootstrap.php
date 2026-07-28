@@ -341,7 +341,7 @@ class Plugin_webhooks extends \Click\Cms\Application\Plugin\BasePlugin
 
     private function dataDirectory(): string
     {
-        return $this->pluginManager->getBasePath() . '/data/webhooks';
+        return $this->pluginManager->getDataPath() . '/webhooks';
     }
 
     /**
@@ -371,7 +371,7 @@ class Plugin_webhooks extends \Click\Cms\Application\Plugin\BasePlugin
             return null;
         }
 
-        $sessions = new SessionStore($this->pluginManager->getBasePath() . '/data/sessions');
+        $sessions = new SessionStore($this->pluginManager->getDataPath() . '/sessions');
         $user = $sessions->user();
 
         // No session at all is the kernel's business, not this handler's: these

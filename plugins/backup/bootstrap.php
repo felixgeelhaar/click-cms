@@ -279,9 +279,26 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
 
     /* --------------------------------------------------------------- wiring -- */
 
+    /**
+     * The installation, for things every site shares. Config only.
+     */
     private function basePath(): string
     {
         return $this->pluginManager->getBasePath();
+    }
+
+    /**
+     * This site's root — its content, its media, its data.
+     *
+     * Distinct from {@see basePath()} on a multi-site installation, where they
+     * are different directories. Backing up `--site=acme` while reading the
+     * installation root would archive the primary site's content under the
+     * name of somebody else's, which is the worst possible thing for a backup
+     * to be wrong about.
+     */
+    private function siteRoot(): string
+    {
+        return $this->pluginManager->getSiteRoot();
     }
 
     private function coreConfig(): CoreConfig
@@ -291,7 +308,7 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
 
     private function store(): BackupStore
     {
-        return new BackupStore($this->basePath() . '/data/backups');
+        return new BackupStore($this->siteRoot() . '/data/backups');
     }
 
     /**
@@ -311,7 +328,7 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
         return new BackupService(
             $this->store(),
             $this->storage($config),
-            $this->basePath() . '/content/media',
+            $this->siteRoot() . '/content/media',
             $config->storageBackend(),
             $config->backupIncludeMedia(),
             $config->backupMaxMediaBytes(),
@@ -320,7 +337,7 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
 
     private function storage(CoreConfig $config): StorageInterface
     {
-        return StorageFactory::create($config, $this->basePath());
+        return StorageFactory::create($config, $this->siteRoot());
     }
 
     /* ---------------------------------------------------------- who is asking -- */
@@ -365,6 +382,6 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
             return null;
         }
 
-        return (new SessionStore($this->basePath() . '/data/sessions'))->user();
+        return (new SessionStore($this->siteRoot() . '/data/sessions'))->user();
     }
 }

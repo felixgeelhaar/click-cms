@@ -3,6 +3,46 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.7.1] — 2026-07-28
+
+### Plugins reached around multi-site isolation
+- `PluginManager` offered plugins only `getBasePath()`, the **installation**
+  root. Five plugin call sites appended `/data/…` to it, which on any site but
+  the primary is another site's directory.
+- **Two of them were permission checks.** `forms` and `webhooks` read the session
+  store that way to decide whether the caller may act, found no session where
+  they had looked, and — because both treat "no session" as "the kernel already
+  refused anonymous callers, so allow" — permitted the request. On a non-primary
+  site a signed-in author or viewer could have read another site's form leads or
+  managed its webhooks.
+- `webhooks` also kept its endpoint list and delivery queue there, so every site
+  shared one set of endpoints: publishing on one site delivered to endpoints
+  configured on another, carrying the first site's slugs and editor usernames.
+- `backup` read the installation root for content, media, storage and sessions,
+  so `--site=acme` could archive the primary site's content under another site's
+  name.
+- `collaboration` resolved section types from the installation, ignoring a site's
+  own — which would render pages the core validator then refused.
+
+`PluginManager` now offers `getSiteRoot()` and `getDataPath()` beside
+`getBasePath()`. The rule for a plugin: **`getBasePath()` for code the
+installation deploys, `getSiteRoot()` for anything belonging to a site.** On a
+single-site installation the two are the same directory, which is exactly why
+this was invisible until sites existed.
+
+**Only multi-site installations were affected** — those with a
+`config/sites.json` declaring more than one site, a feature one day old at the
+time of writing.
+
+### Corrected
+- `docs/core.md` and `docs/multi-site.md` claimed a forgotten scope was "not
+  expressible". It was, through the plugin API, and both now say what the
+  guarantee actually covers.
+- `docs/multi-site.md` listed SSO configuration as per site. It is not:
+  `config/core.json` is installation-wide, so every site shares one storage
+  backend, one set of languages and one identity provider. Now stated, with what
+  to do if that does not suit.
+
 ## [1.7.0] — 2026-07-27
 
 Five features that every comparable CMS has and this one did not. Each is
