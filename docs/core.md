@@ -208,7 +208,12 @@ Three consequences, each a real cost accepted knowingly:
   tool, and saying so is better than a half-isolation nobody can reason about.
 - **Section types fall back but do not merge.** A site's own
   `config/sections/` replaces the installation's rather than adding to it, so
-  what a site renders is answerable by looking in one place.
+  what a site renders is answerable by looking in one place. `config/core.json`
+  is the exception and *does* merge, key by key — a site declaring one language
+  setting should not have to restate the storage backend to keep it. Two
+  settings refuse to be overridden at all, because the thing they configure
+  exists once per installation: `core.updates` and `core.marketplace`. A site
+  that tries is logged rather than silently ignored.
 - **`X-Forwarded-Host` is ignored.** It is set by whoever is in front, which
   unless a proxy strips it includes the client — so honouring it would let a
   visitor pick which site's content they are served by sending a header.
