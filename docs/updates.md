@@ -213,6 +213,35 @@ php scripts/updates/build-feed.php releases.json private-key.pem _site \
 The tool refuses to sign a feed with a malformed entry, so a broken release is
 caught before it reaches anybody.
 
+### Known issue: a release may not reach the feed on the first try
+
+**Check after every release**, until [issue #26][issue-26] is closed.
+
+[issue-26]: https://github.com/felixgeelhaar/click-cms/issues/26
+
+Twice now, the release workflow has deployed a correct feed, reported success on
+every job, and the site has gone on serving the previous one. The release is
+published and its packages download fine — but the feed is how an installation
+learns a release exists, so until the feed lists it, **nobody is offered it**.
+v1.6.0 was undiscoverable for ten hours that way.
+
+Step 4 above catches it now: the workflow fetches the feed back and fails if the
+site is not serving what it built. When that happens the run goes red with the
+expected digest, and the fix is one command:
+
+```bash
+gh workflow run pages.yml --ref main
+```
+
+That has republished it in seconds every time.
+
+**Do not read a passing re-run as the problem being solved.** The deployment
+reported success and did not take effect; re-running only papers over it. The
+cause is not established — six explanations have been ruled out by experiment, and
+the one that remains, that it happens only on `release`-triggered deploys, cannot
+be tested without publishing a release. Every real release is therefore a data
+point, which is why this section asks you to check.
+
 ### The obligation this creates
 
 **The feed must be re-signed before it expires, even when there is no new

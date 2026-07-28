@@ -3,6 +3,25 @@
 All notable changes to click-cms are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.7.2] — 2026-07-28
+
+**No functional changes.** Documentation only; there is nothing here an
+installation needs.
+
+### Documented: a release may not reach the update feed on the first try
+- Twice the release workflow has deployed a correct feed, reported success on
+  every job, and left the site serving the previous one. The release is
+  published and downloadable, but the feed is how an installation learns a
+  release exists — so nobody is offered it. v1.6.0 was undiscoverable for ten
+  hours that way.
+- `docs/updates.md` now says to check after every release, what the failure looks
+  like, and the one command that republishes it. It also says plainly not to read
+  a passing re-run as a fix.
+- Tracked in [#26](https://github.com/felixgeelhaar/click-cms/issues/26), where
+  six explanations are ruled out by experiment. The one that remains — that it
+  happens only on `release`-triggered deploys — cannot be tested without
+  publishing a release, so this release is itself the next data point.
+
 ## [1.7.1] — 2026-07-28
 
 ### Plugins reached around multi-site isolation
