@@ -223,9 +223,10 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     `Application.php` / `CoreApiRoutes.php` toward application services — no
     behaviour change, less accumulation.
 
-24. **Admin coverage and smoke.** *(incremental)* Vitest for Users, Webhooks
-    and Redirects; one Playwright path login → edit → publish. Complements the
-    existing PHPUnit and axe suites.
+24. **Admin coverage and smoke.** *(incremental)* Vitest coverage for Users,
+    Webhooks and Redirects is started (list / empty / error / write-path
+    specs); one Playwright path login → edit → publish still open. Complements
+    the existing PHPUnit and axe suites.
 
 25. ~~**Doc honesty.**~~ *(done)* Prune stale backlog claims; `admin-ui/README.md`
     matches what ships (Astro + Vue 3, Sora / Source Sans 3 — no D3, no Inter,
