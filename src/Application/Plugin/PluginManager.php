@@ -25,6 +25,17 @@ class PluginManager
     private ?object $contentService = null;
 
     /**
+     * Directories under plugins/ that discover() could not load, with why.
+     *
+     * Cleared and rebuilt on every {@see discover()}. Empty when every folder
+     * either loaded cleanly or was deliberately excluded. Surfaced to the
+     * admin so a broken plugin.json is not a silent no-op.
+     *
+     * @var list<array{directory: string, reason: string}>
+     */
+    private array $discoveryIssues = [];
+
+    /**
      * Where this site's `content/` and `data/` live — not necessarily the
      * installation. See {@see getSiteRoot()} for why plugins need it.
      */
@@ -128,6 +139,7 @@ class PluginManager
     {
         $this->plugins = [];
         $this->listenerCache = [];
+        $this->discoveryIssues = [];
 
         if (!is_dir($this->pluginsPath)) {
             return [];
@@ -174,6 +186,16 @@ class PluginManager
         $this->sortByDependencies();
         
         return array_values($this->plugins);
+    }
+
+    /**
+     * Why some plugin directories were skipped on the last {@see discover()}.
+     *
+     * @return list<array{directory: string, reason: string}>
+     */
+    public function discoveryIssues(): array
+    {
+        return $this->discoveryIssues;
     }
 
     public function get(PluginId $id): ?Plugin
@@ -465,14 +487,48 @@ class PluginManager
     private function loadMetadata(string $dir): ?PluginMetadata
     {
         $metadataFile = $dir . '/plugin.json';
-        
+        $folder = basename($dir);
+
         if (!file_exists($metadataFile)) {
+            // A bootstrap without a manifest is almost always a mistake — the
+            // folder will never activate. Empty folders and junk are ignored.
+            if (is_file($dir . '/bootstrap.php')) {
+                $this->discoveryIssues[] = [
+                    'directory' => $folder,
+                    'reason' => 'Has bootstrap.php but no plugin.json, so it cannot be loaded.',
+                ];
+            }
+
             return null;
         }
 
-        $data = json_decode(file_get_contents($metadataFile), true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        $raw = file_get_contents($metadataFile);
+        if ($raw === false) {
+            $this->discoveryIssues[] = [
+                'directory' => $folder,
+                'reason' => 'plugin.json could not be read.',
+            ];
+
+            return null;
+        }
+
+        $data = json_decode($raw, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+            $this->discoveryIssues[] = [
+                'directory' => $folder,
+                'reason' => 'plugin.json is not valid JSON (' . json_last_error_msg() . ').',
+            ];
+
+            return null;
+        }
+
+        if (!isset($data['name']) || !is_string($data['name']) || trim($data['name']) === '') {
+            $this->discoveryIssues[] = [
+                'directory' => $folder,
+                'reason' => 'plugin.json is missing a name.',
+            ];
+
             return null;
         }
 

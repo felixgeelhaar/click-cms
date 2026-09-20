@@ -2,7 +2,23 @@
   <div class="plugins">
     <h1 class="page-title">Plugins</h1>
     <p class="page-subtitle">Extend your CMS functionality</p>
+
+    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+
+    <!-- Discovery problems used to be silent skips. An invalid plugin.json or a
+         bootstrap without a manifest left the list looking healthy while the
+         folder did nothing — surface them here instead. -->
+    <div v-if="issues.length" class="banner warn" role="status">
+      <p class="banner-title">{{ issues.length === 1 ? 'One plugin folder was skipped' : `${issues.length} plugin folders were skipped` }}</p>
+      <ul class="issue-list">
+        <li v-for="issue in issues" :key="issue.directory">
+          <code>{{ issue.directory }}</code> — {{ issue.reason }}
+        </li>
+      </ul>
+    </div>
+
     <div v-if="loading" class="loading">Loading...</div>
+    <div v-else-if="!plugins.length && !issues.length" class="empty">No plugins are installed.</div>
     <div v-else class="plugin-grid">
       <div v-for="plugin in plugins" :key="plugin.id" class="plugin-card">
         <div class="plugin-info">
@@ -22,16 +38,33 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+
 const plugins = ref([]);
+const issues = ref([]);
 const loading = ref(true);
+const error = ref('');
 
 const loadPlugins = async () => {
+  loading.value = true;
+  error.value = '';
   try {
     const res = await fetch('/api/plugins');
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      error.value = data.error || `Could not load plugins (${res.status}).`;
+      plugins.value = [];
+      issues.value = [];
+      return;
+    }
     plugins.value = data.data || [];
-  } catch (e) { console.error(e); }
-  loading.value = false;
+    issues.value = Array.isArray(data.issues) ? data.issues : [];
+  } catch (e) {
+    error.value = e.message || 'Could not load plugins.';
+    plugins.value = [];
+    issues.value = [];
+  } finally {
+    loading.value = false;
+  }
 };
 
 const activatePlugin = async (id) => {
@@ -51,7 +84,20 @@ onMounted(loadPlugins);
 .plugins { max-width: 1200px; }
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin-bottom: 0.5rem; }
 .page-subtitle { color: var(--app-text-muted); margin-bottom: 2rem; }
-.loading { text-align: center; padding: 3rem; color: var(--app-text-muted); }
+.loading, .empty { text-align: center; padding: 3rem; color: var(--app-text-muted); }
+.banner {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--app-surface-strong);
+  font-size: 0.875rem;
+  margin: 0 0 1.25rem;
+}
+.banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.warn { color: var(--color-warning-text, #a16207); border: 1px solid var(--app-border); }
+.banner-title { margin: 0 0 0.5rem; font-weight: 600; }
+.issue-list { margin: 0; padding-left: 1.25rem; }
+.issue-list li { margin: 0.25rem 0; }
+.issue-list code { font-size: 0.8125rem; }
 .plugin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
 .plugin-card { padding: 1.5rem; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); }
 .plugin-info h2 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; }

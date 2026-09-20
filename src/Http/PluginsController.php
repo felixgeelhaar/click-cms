@@ -67,6 +67,9 @@ final class PluginsController
                 ],
                 $this->plugins->all()
             ),
+            // Folders under plugins/ that discover() refused, so an operator
+            // sees a broken upload instead of an empty list that looks fine.
+            'issues' => $this->plugins->discoveryIssues(),
         ];
     }
 
