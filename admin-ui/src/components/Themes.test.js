@@ -71,8 +71,10 @@ describe('the theme list', () => {
     const active = wrapper.findAll('.theme-card').filter((c) => c.classes('active'));
     expect(active).toHaveLength(1);
     expect(active[0].text()).toContain('Dark');
-    expect(active[0].find('button').exists()).toBe(false);
-    expect(wrapper.findAll('button')).toHaveLength(1);
+    expect(active[0].find('[data-test="theme-activate"]').exists()).toBe(false);
+    // Upload is a label, not a button — only the non-active theme's Activate
+    // control is a real <button data-test="theme-activate">.
+    expect(wrapper.findAll('[data-test="theme-activate"]')).toHaveLength(1);
   });
 
   it('says so plainly when nothing is installed', async () => {
@@ -122,5 +124,49 @@ describe('switching theme', () => {
     expect(wrapper.text()).toContain('You do not have permission to change the theme.');
     const active = wrapper.findAll('.theme-card').filter((c) => c.classes('active'));
     expect(active[0].text()).toContain('Default');
+  });
+});
+
+describe('uploading a theme', () => {
+  it('posts FormData to /api/themes/upload and reloads the list', async () => {
+    let listed = [
+      theme('default', 'Default', true),
+      theme('dark', 'Dark', false),
+    ];
+
+    global.fetch = vi.fn(async (url, init) => {
+      if (String(url) === '/api/themes/upload' && init?.method === 'POST') {
+        listed = [
+          ...listed,
+          theme('coastal', 'Coastal', false),
+        ];
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ data: { id: 'coastal', name: 'Coastal' } }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ data: { active: 'default', themes: listed } }),
+      };
+    });
+
+    const wrapper = mount(Themes);
+    await flushPromises();
+
+    const input = wrapper.get('[data-test="theme-upload"] input');
+    const file = new File(['PK fake'], 'coastal.zip', { type: 'application/zip' });
+    Object.defineProperty(input.element, 'files', { value: [file] });
+    await input.trigger('change');
+    await flushPromises();
+
+    const uploadCall = global.fetch.mock.calls.find(
+      ([url, init]) => String(url) === '/api/themes/upload' && init?.method === 'POST',
+    );
+    expect(uploadCall, 'upload POST should have been sent').toBeTruthy();
+    expect(uploadCall[1].body).toBeInstanceOf(FormData);
+    expect(wrapper.text()).toContain('Coastal');
+    expect(wrapper.text()).toMatch(/Installed/);
   });
 });

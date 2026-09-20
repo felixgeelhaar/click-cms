@@ -62,6 +62,8 @@ import {
   updateProp as updatePropOp,
   updateStyle as updateStyleOp,
   setColumnCount as setColumnCountOp,
+  cloneSubtree,
+  insertSubtree,
 } from './builder/model.js';
 
 // Optional: a test (or a future deep link) can mount straight onto a page. The
@@ -80,8 +82,13 @@ const saving = ref(false);
 const loadError = ref('');
 const saveError = ref('');
 const notice = ref('');
+// Named block snapshots from GET /api/builder/blocks — paste templates, not live refs.
+const blocks = ref([]);
+const blocksError = ref('');
+const blocksBusy = ref(false);
 
 const nodes = computed(() => builder.value?.nodes ?? {});
+const rootId = computed(() => builder.value?.root ?? null);
 // The inspector offers these as the breakpoint a columns node un-stacks at, so
 // the choice is limited to breakpoints this document actually declares.
 const breakpoints = computed(() => (builder.value?.breakpoints ?? []).filter((bp) => bp.id !== 'base'));
@@ -96,7 +103,11 @@ const ctx = {
   selectedId,
   dragId,
   nodes,
+  rootId,
   breakpoints,
+  blocks,
+  blocksError,
+  blocksBusy,
   select(id) {
     selectedId.value = id;
   },
@@ -132,6 +143,64 @@ const ctx = {
     }
     touch();
   },
+  /**
+   * Paste a saved block at the current selection. The snapshot is deep-copied
+   * with new ids so two inserts never collide and editing the saved block later
+   * cannot rewrite this page.
+   */
+  insertBlock(block) {
+    if (!builder.value || !block) return null;
+    const id = insertSubtree(builder.value, block, selectedId.value);
+    if (!id) return null;
+    selectedId.value = id;
+    touch();
+    return id;
+  },
+  /**
+   * Snapshot the current selection and POST it as a named block. Refuses the
+   * page root — saving the whole document as a "block" is not a useful paste.
+   */
+  async saveBlock() {
+    if (!builder.value || !selectedId.value || selectedId.value === builder.value.root) {
+      return null;
+    }
+    const name = window.prompt('Name for this block');
+    if (name === null) return null;
+    const trimmed = String(name).trim();
+    if (!trimmed) {
+      blocksError.value = 'A block needs a name.';
+      return null;
+    }
+
+    const snapshot = cloneSubtree(builder.value, selectedId.value);
+    if (!snapshot) {
+      blocksError.value = 'Could not snapshot the selection.';
+      return null;
+    }
+
+    blocksBusy.value = true;
+    blocksError.value = '';
+    try {
+      const res = await fetch('/api/builder/blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed, root: snapshot.root, nodes: snapshot.nodes }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        blocksError.value = body.error || `Could not save the block (${res.status}).`;
+        return null;
+      }
+      await loadBlocks();
+      return body.data ?? null;
+    } catch (e) {
+      blocksError.value = `Could not save the block: ${e.message}`;
+      return null;
+    } finally {
+      blocksBusy.value = false;
+    }
+  },
+  loadBlocks,
 };
 provide('builderCtx', ctx);
 
@@ -243,8 +312,28 @@ async function save() {
   }
 }
 
+async function loadBlocks() {
+  blocksError.value = '';
+  try {
+    const res = await fetch('/api/builder/blocks');
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      // 403 is expected for accounts without free-form; keep the palette quiet.
+      if (res.status !== 403) {
+        blocksError.value = body.error || `Could not load blocks (${res.status}).`;
+      }
+      blocks.value = [];
+      return;
+    }
+    blocks.value = Array.isArray(body.data) ? body.data : [];
+  } catch (e) {
+    blocksError.value = `Could not load blocks: ${e.message}`;
+    blocks.value = [];
+  }
+}
+
 onMounted(async () => {
-  await loadPageList();
+  await Promise.all([loadPageList(), loadBlocks()]);
   if (props.slug) await loadPage(props.slug);
 });
 

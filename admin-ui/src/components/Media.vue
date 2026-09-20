@@ -183,6 +183,22 @@
             <span v-else class="muted">no resized versions</span>
           </p>
 
+          <!-- Declared art-directed crops already exist as files; showing them
+               here is how an editor checks the focal point actually kept the
+               subject in each box, without leaving the library. -->
+          <ul
+            v-if="cropList(item).length"
+            class="crop-previews"
+            data-test="crop-previews"
+            :aria-label="`Art-directed crops for ${item.originalName}`"
+          >
+            <li v-for="crop in cropList(item)" :key="crop.name" class="crop-preview">
+              <img :src="crop.url" :alt="`${crop.name} crop`" loading="lazy" />
+              <span class="crop-name">{{ crop.name }}</span>
+              <span class="crop-size">{{ crop.width }}×{{ crop.height }}</span>
+            </li>
+          </ul>
+
           <!-- The ladder never upscales, so a small upload quietly produces
                fewer variants. Saying only "sm" told the uploader nothing; the
                server words the consequence and this shows it. -->
@@ -291,6 +307,19 @@ const formatBytes = (bytes) => {
 // Prefer the smallest variant for a thumbnail so a grid never pulls full-size
 // originals over the wire.
 const thumbFor = (item) => item.urls?.variants?.sm?.url ?? item.urls?.original;
+
+// Declared art-directed crops ride in urls.crops as { name → { url, width, height } }.
+// Flatten for the template; empty when the site declared none or this item has none.
+const cropList = (item) => {
+  const crops = item?.urls?.crops;
+  if (!crops || typeof crops !== 'object') return [];
+  return Object.entries(crops).map(([name, meta]) => ({
+    name,
+    url: meta?.url ?? '',
+    width: meta?.width ?? 0,
+    height: meta?.height ?? 0,
+  })).filter((c) => c.url !== '');
+};
 
 // Build /api/media with the active search and folder. The root sentinel is sent
 // as an empty folder, which the server reads as "the ungrouped folder"; "all
@@ -570,6 +599,33 @@ onMounted(load);
 .card-quality { margin: 0.35rem 0 0; font-size: 0.75rem; line-height: 1.35; }
 .card-quality.low { color: var(--color-danger-600, #dc2626); }
 .card-quality.adequate { color: var(--app-text-muted); }
+.crop-previews {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.crop-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.crop-preview img {
+  display: block;
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--app-surface-strong);
+  border: 1px solid var(--app-border);
+}
+.crop-name { font-size: 0.65rem; font-weight: 600; color: var(--app-text); max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crop-size { font-size: 0.6rem; color: var(--app-text-muted); }
 .muted { opacity: 0.7; }
 .alt-label { display: block; margin: 0.6rem 0 0.25rem; font-size: 0.75rem; font-weight: 500; }
 .alt-input { width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--control-border); border-radius: 6px; background: var(--app-surface); color: var(--app-text); font: inherit; font-size: 0.8125rem; }

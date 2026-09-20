@@ -229,13 +229,12 @@ was said and the full decision trail — so a notifier is something that can be
 added later against a stable record rather than something the workflow was
 designed around.
 
-**Admin UI.** API and storage only. What a UI would need: a review panel on the
-page editor showing the current state and its trail, with request / approve /
-ask-for-changes actions; the requester's own view of what they are waiting on;
-an "open reviews" list for whoever reviews; a publish control that explains a
-`409` as an editorial state rather than an error; and a release screen that
-lists the chosen pages with each one's readiness, refusing to submit until all
-are green.
+**Admin UI.** The page editor carries a review panel (request / approve /
+ask-for-changes / cancel) against this API and the publish gate. Still open:
+the requester's own waiting list, an "open reviews" inbox for whoever reviews,
+a publish control that explains a `409` as an editorial state rather than an
+error (the panel already surfaces the refusal reason on publish), and a release
+screen that lists chosen pages with each one's readiness.
 
 **Live cursors.** Still not planned, and not a gap. Polling presence is the
 deliberate ceiling — see the transport argument above.

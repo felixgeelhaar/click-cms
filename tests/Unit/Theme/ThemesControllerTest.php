@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Tests\Unit\Theme;
 
+use Click\Cms\Application\Theme\ThemeInstaller;
 use Click\Cms\Application\Theme\ThemeRepository;
 use Click\Cms\Http\ThemesController;
 use PHPUnit\Framework\TestCase;
@@ -13,6 +14,9 @@ use PHPUnit\Framework\TestCase;
  * this controller is who is allowed to do it. These pin the two gates — a
  * listing needs a session, a switch needs the settings capability — and that a
  * request naming a theme nobody installed is refused rather than stored.
+ *
+ * Upload is the same gate as activate: installing a design is a site-wide
+ * change, so only an administrator may do it.
  */
 final class ThemesControllerTest extends TestCase
 {
@@ -22,6 +26,7 @@ final class ThemesControllerTest extends TestCase
     {
         $this->base = sys_get_temp_dir() . '/click-cms-themes-api-' . bin2hex(random_bytes(6));
         mkdir($this->base . '/themes', 0o775, true);
+        mkdir($this->base . '/data/theme-uploads', 0o775, true);
 
         foreach (['default', 'dark'] as $id) {
             mkdir($this->base . '/themes/' . $id, 0o775, true);
@@ -33,20 +38,29 @@ final class ThemesControllerTest extends TestCase
         }
 
         $_POST = [];
+        $_FILES = [];
     }
 
     protected function tearDown(): void
     {
         $_POST = [];
+        $_FILES = [];
         $this->rrmdir($this->base);
     }
 
     /** @param array<string, mixed> $user */
     private function controller(array $user): ThemesController
     {
+        $themes = ThemeRepository::forInstallation($this->base);
+
         return new ThemesController(
-            ThemeRepository::forInstallation($this->base),
-            static fn (): array => $user
+            $themes,
+            static fn (): array => $user,
+            new ThemeInstaller(
+                $this->base . '/themes',
+                $this->base . '/data/theme-uploads',
+                $themes,
+            ),
         );
     }
 
@@ -55,12 +69,26 @@ final class ThemesControllerTest extends TestCase
         return ThemeRepository::forInstallation($this->base);
     }
 
-    public function testTheRouteTableNamesTheTwoEndpoints(): void
+    /**
+     * @param array<string, string> $entries
+     */
+    private function makeZip(string $path, array $entries): void
+    {
+        $zip = new \ZipArchive();
+        $zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        foreach ($entries as $name => $contents) {
+            $zip->addFromString($name, $contents);
+        }
+        $zip->close();
+    }
+
+    public function testTheRouteTableNamesTheEndpoints(): void
     {
         $routes = $this->controller(['role' => 'admin'])->routes();
 
         $this->assertArrayHasKey('GET /api/themes', $routes);
         $this->assertArrayHasKey('POST /api/themes/activate', $routes);
+        $this->assertArrayHasKey('POST /api/themes/upload', $routes);
     }
 
     /* -------------------------------------------------------------- listing -- */
@@ -70,6 +98,7 @@ final class ThemesControllerTest extends TestCase
         $response = $this->controller([])->list();
 
         $this->assertSame(401, $response['status']);
+        $this->assertSame('unauthenticated', $response['code']);
     }
 
     public function testAnySignedInAccountMaySeeWhichThemeIsLive(): void
@@ -114,6 +143,7 @@ final class ThemesControllerTest extends TestCase
         $response = $this->controller(['role' => 'editor'])->activate();
 
         $this->assertSame(403, $response['status']);
+        $this->assertSame('forbidden', $response['code']);
         $this->assertSame('default', $this->repository()->active()?->id);
     }
 
@@ -143,6 +173,54 @@ final class ThemesControllerTest extends TestCase
 
         $this->assertSame(404, $response['status']);
         $this->assertSame('default', $this->repository()->active()?->id);
+    }
+
+    /* -------------------------------------------------------------- upload -- */
+
+    public function testAnonymousCallersCannotUploadATheme(): void
+    {
+        $response = $this->controller([])->upload();
+
+        $this->assertSame(401, $response['status']);
+        $this->assertSame('unauthenticated', $response['code']);
+    }
+
+    public function testAnEditorCannotUploadATheme(): void
+    {
+        $response = $this->controller(['role' => 'editor'])->upload();
+
+        $this->assertSame(403, $response['status']);
+        $this->assertSame('forbidden', $response['code']);
+    }
+
+    public function testAnAdministratorUploadsAValidThemeZip(): void
+    {
+        $zip = $this->base . '/data/upload-me.zip';
+        $this->makeZip($zip, [
+            'coastal/theme.json' => json_encode([
+                'name' => 'Coastal',
+                'version' => '1.0.0',
+                'description' => 'Sea air',
+            ]),
+            'coastal/theme.css' => "body { color: teal; }\n",
+        ]);
+
+        $_FILES['file'] = [
+            'name' => 'coastal.zip',
+            'type' => 'application/zip',
+            'tmp_name' => $zip,
+            'error' => UPLOAD_ERR_OK,
+            'size' => (int) filesize($zip),
+        ];
+
+        $response = $this->controller(['role' => 'admin'])->upload();
+
+        $this->assertSame(201, $response['status']);
+        $this->assertSame('coastal', $response['data']['id']);
+
+        $list = $this->controller(['role' => 'admin'])->list();
+        $ids = array_column($list['data']['themes'], 'id');
+        $this->assertContains('coastal', $ids);
     }
 
     /* ------------------------------------------------------------- helpers -- */
