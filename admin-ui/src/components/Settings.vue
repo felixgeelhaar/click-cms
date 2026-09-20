@@ -66,17 +66,54 @@
         </label>
       </div>
     </section>
+
+    <section class="panel">
+      <div class="setting">
+        <div class="setting-copy">
+          <h2 class="setting-title">Free-form editing</h2>
+          <p class="setting-desc">
+            Off, editors work only with the section types this site declares —
+            the layout cannot be broken from the admin. On, accounts that hold
+            the free-form capability (administrators, by default) can also use
+            the visual builder. Existing free-form pages keep rendering either
+            way; this only controls who may change them.
+          </p>
+          <p v-if="!freeformEditing" class="setting-state warn">
+            Free-form editing is off. The Builder is hidden and the API refuses
+            free-form saves.
+          </p>
+          <p v-else class="setting-state">
+            Free-form editing is on for accounts that are allowed to use it.
+          </p>
+        </div>
+
+        <label class="switch">
+          <input
+            type="checkbox"
+            :checked="freeformEditing"
+            :disabled="loading || savingFreeform"
+            @change="toggleFreeform($event.target.checked)"
+          />
+          <span class="switch-track" aria-hidden="true"></span>
+          <span class="switch-label">{{ freeformEditing ? 'On' : 'Off' }}</span>
+        </label>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue';
 
+const emit = defineEmits(['settings-updated']);
+
 const headless = ref(false);
 const siteName = ref('');
+const freeformEditing = ref(true);
 const loading = ref(true);
 const saving = ref(false);
 const savingName = ref(false);
+const savingFreeform = ref(false);
 const error = ref('');
 const notice = ref('');
 
@@ -89,6 +126,8 @@ const load = async () => {
     const body = await res.json();
     headless.value = Boolean(body.data?.headless);
     siteName.value = body.data?.siteName ?? '';
+    // Absent means on — matches the server default for upgraded installs.
+    freeformEditing.value = body.data?.freeformEditing !== false;
   } catch (e) {
     error.value = `Could not read the settings: ${e.message}`;
   } finally {
@@ -152,11 +191,44 @@ const toggle = async (on) => {
     notice.value = headless.value
       ? 'Headless mode is on. Your public pages are no longer rendered here.'
       : 'Headless mode is off. Your public pages are rendered again.';
+    emit('settings-updated', body.data);
   } catch (e) {
     headless.value = previous;
     error.value = `Could not save: ${e.message}`;
   } finally {
     saving.value = false;
+  }
+};
+
+const toggleFreeform = async (on) => {
+  const previous = freeformEditing.value;
+  freeformEditing.value = on;
+  savingFreeform.value = true;
+  error.value = '';
+  notice.value = '';
+
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ freeformEditing: on }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      freeformEditing.value = previous;
+      error.value = body.error || `Could not save (${res.status}).`;
+      return;
+    }
+    freeformEditing.value = body.data?.freeformEditing !== false;
+    notice.value = freeformEditing.value
+      ? 'Free-form editing is on for accounts that are allowed to use it.'
+      : 'Free-form editing is off. The Builder is hidden for everyone.';
+    emit('settings-updated', body.data);
+  } catch (e) {
+    freeformEditing.value = previous;
+    error.value = `Could not save: ${e.message}`;
+  } finally {
+    savingFreeform.value = false;
   }
 };
 

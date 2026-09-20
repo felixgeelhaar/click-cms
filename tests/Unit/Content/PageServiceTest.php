@@ -232,4 +232,51 @@ final class PageServiceTest extends TestCase
             $this->service->canModify([], ['username' => 'ann', 'role' => 'author'])
         );
     }
+
+    public function testAnEditorCannotSaveABuilderPayload(): void
+    {
+        $this->service->create(['title' => 'Home', 'slug' => 'home'], $this->admin());
+
+        $result = $this->service->update('home', [
+            'builder' => ['root' => 'r', 'nodes' => ['r' => ['type' => 'section', 'children' => []]]],
+        ], ['username' => 'ann', 'role' => 'editor']);
+
+        $this->assertSame(403, $result['status']);
+        $this->assertStringContainsString('free-form', strtolower((string) $result['error']));
+    }
+
+    public function testAnAdminCanSaveABuilderPayloadWhenTheSiteAllowsIt(): void
+    {
+        $this->service->create(['title' => 'Home', 'slug' => 'home'], $this->admin());
+
+        $builder = ['root' => 'r', 'nodes' => ['r' => ['type' => 'section', 'children' => []]], 'breakpoints' => []];
+        $result = $this->service->update('home', ['builder' => $builder], $this->admin());
+
+        $this->assertNull($result['error'], (string) ($result['error'] ?? ''));
+        $this->assertSame($builder, $result['page']->data['builder']);
+    }
+
+    public function testSitePolicyCanDisableFreeformEvenForAdmins(): void
+    {
+        $contentDir = $this->dir . '/gated-content';
+        mkdir($contentDir, 0o775, true);
+
+        $settings = \Click\Cms\Application\Config\Settings::load($this->dir . '/settings.json');
+        $settings->setFreeformEditing(false);
+        $policy = new \Click\Cms\Application\Editing\FreeformPolicy($settings);
+
+        $service = new PageService(
+            new ContentService(new JsonStorage($contentDir)),
+            new JsonSectionTypeRepository(dirname(__DIR__, 3) . '/config/sections'),
+            freeform: $policy,
+        );
+
+        $service->create(['title' => 'Home', 'slug' => 'home'], $this->admin());
+        $result = $service->update('home', [
+            'builder' => ['root' => 'r', 'nodes' => []],
+        ], $this->admin());
+
+        $this->assertSame(403, $result['status']);
+        $this->assertStringContainsString('turned off', (string) $result['error']);
+    }
 }

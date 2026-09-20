@@ -72,7 +72,7 @@
                arrival wherever the reader lands, and never competes with the
                screen they came for. -->
           <UpdateNotice :capabilities="currentUser?.capabilities ?? []" />
-          <component :is="currentComponent" v-bind="currentProps" @navigate="handleNavigate" @saved="handleNavigate('/admin/pages')" @cancel="handleNavigate('/admin/pages')" @back="handleNavigate('/admin/plugins')" @branding-updated="handleBrandingUpdate" />
+          <component :is="currentComponent" v-bind="currentProps" @navigate="handleNavigate" @saved="handleNavigate('/admin/pages')" @cancel="handleNavigate('/admin/pages')" @back="handleNavigate('/admin/plugins')" @branding-updated="handleBrandingUpdate" @settings-updated="handleSettingsUpdated" />
         </main>
       </div>
     </div>
@@ -132,7 +132,9 @@ const brandLabel = computed(() => branding.value.name || currentUser.value?.disp
 const can = (capability) => (currentUser.value?.capabilities ?? []).includes(capability);
 
 const hasBuilder = computed(
-  () => installedPluginIds.value.includes('visual-builder') && can('edit.freeform')
+  () => freeformEditing.value
+    && installedPluginIds.value.includes('visual-builder')
+    && can('edit.freeform')
 );
 
 // Same shape as the builder: the screen is offered only when the plugin that
@@ -141,6 +143,9 @@ const hasBuilder = computed(
 const hasWebhooks = computed(
   () => installedPluginIds.value.includes('webhooks') && can('settings.manage')
 );
+
+/** Site allows free-form; default on until settings load (matches server default). */
+const freeformEditing = ref(true);
 
 const checkAuth = async () => {
   try {
@@ -151,7 +156,9 @@ const checkAuth = async () => {
     setCsrfToken(data.data?.csrfToken ?? null);
     isLoggedIn.value = data.data?.authenticated || false;
     currentUser.value = data.data?.user || null;
-    if (isLoggedIn.value) { await Promise.all([loadInstalledPlugins(), loadSite()]); }
+    if (isLoggedIn.value) {
+      await Promise.all([loadInstalledPlugins(), loadSite(), loadEditingFlags()]);
+    }
   } catch (e) { isLoggedIn.value = false; }
 };
 
@@ -179,6 +186,24 @@ const loadSite = async () => {
   } catch {
     // Cosmetic. A site that cannot be named is not a reason to interrupt
     // anybody's work.
+  }
+};
+
+const loadEditingFlags = async () => {
+  try {
+    const res = await fetch('/api/settings');
+    const body = await res.json();
+    if (res.ok) {
+      freeformEditing.value = body.data?.freeformEditing !== false;
+    }
+  } catch {
+    freeformEditing.value = true;
+  }
+};
+
+const handleSettingsUpdated = (data) => {
+  if (data && typeof data === 'object' && 'freeformEditing' in data) {
+    freeformEditing.value = data.freeformEditing !== false;
   }
 };
 

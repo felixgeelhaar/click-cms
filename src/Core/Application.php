@@ -562,6 +562,9 @@ class Application
             // The installation's root, so schema config falls back to the one
             // every site shares when this site declares none of its own.
             $this->basePath,
+            new \Click\Cms\Application\Editing\FreeformPolicy(
+                $this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json')
+            ),
         );
 
         // User management is core (the admin UI depends on it); it fires the same
@@ -1901,11 +1904,16 @@ class Application
         if (array_key_exists('siteName', $data) && is_string($data['siteName'])) {
             $settings->setSiteName($data['siteName']);
         }
+        if (array_key_exists('freeformEditing', $data)) {
+            $settings->setFreeformEditing((bool) $data['freeformEditing']);
+        }
 
         // Settings are not content documents, so the storage decorator that
         // invalidates the render cache never sees this write. The site name is
         // the brand in every page's header, and headless mode changes whether
         // there is a public page at all, so both reach every cached document.
+        // Free-form on/off does not change rendered HTML by itself (existing
+        // builder pages still render), but flushing keeps the rule simple.
         $this->renderCache?->flush();
 
         return ['data' => $settings->toArray()];

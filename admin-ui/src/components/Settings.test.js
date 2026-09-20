@@ -3,23 +3,26 @@ import { mount, flushPromises } from '@vue/test-utils';
 import Settings from './Settings.vue';
 
 /**
- * The headless switch. Its whole value is that it reflects and changes the real
- * server state, so these pin that the switch reads the current mode and that
- * flipping it PUTs the new value rather than only changing the UI.
+ * The headless switch and the free-form editing switch. Their whole value is
+ * that they reflect and change the real server state, so these pin that each
+ * switch reads the current mode and that flipping it PUTs the new value rather
+ * than only changing the UI.
  */
 
-const withSettings = (headless) => {
+const withSettings = (headless, freeformEditing = true) => {
+  let state = { headless, siteName: '', freeformEditing };
   global.fetch = vi.fn(async (url, init) => {
     if (init?.method === 'PUT') {
       const sent = JSON.parse(init.body);
-      return { ok: true, json: async () => ({ data: { headless: sent.headless } }) };
+      state = { ...state, ...sent };
+      return { ok: true, json: async () => ({ data: { ...state } }) };
     }
-    return { ok: true, json: async () => ({ data: { headless } }) };
+    return { ok: true, json: async () => ({ data: { ...state } }) };
   });
 };
 
-const mountSettings = async (headless) => {
-  withSettings(headless);
+const mountSettings = async (headless, freeformEditing = true) => {
+  withSettings(headless, freeformEditing);
   const wrapper = mount(Settings);
   await flushPromises();
   return wrapper;
@@ -31,21 +34,21 @@ describe('the headless switch', () => {
   it('shows the switch off when the site renders its own pages', async () => {
     const wrapper = await mountSettings(false);
 
-    expect(wrapper.find('input[type="checkbox"]').element.checked).toBe(false);
+    expect(wrapper.findAll('input[type="checkbox"]')[0].element.checked).toBe(false);
     expect(wrapper.text()).toContain('The public site is on');
   });
 
   it('shows the switch on when the instance is headless', async () => {
     const wrapper = await mountSettings(true);
 
-    expect(wrapper.find('input[type="checkbox"]').element.checked).toBe(true);
+    expect(wrapper.findAll('input[type="checkbox"]')[0].element.checked).toBe(true);
     expect(wrapper.text()).toContain('The public site is off');
   });
 
   it('turning it on PUTs headless:true, not just a UI change', async () => {
     const wrapper = await mountSettings(false);
 
-    await wrapper.find('input[type="checkbox"]').setValue(true);
+    await wrapper.findAll('input[type="checkbox"]')[0].setValue(true);
     await flushPromises();
 
     const put = global.fetch.mock.calls.find(([, init]) => init?.method === 'PUT');
@@ -61,15 +64,38 @@ describe('the headless switch', () => {
       if (init?.method === 'PUT') {
         return { ok: false, status: 403, json: async () => ({ error: 'nope' }) };
       }
-      return { ok: true, json: async () => ({ data: { headless: false } }) };
+      return { ok: true, json: async () => ({ data: { headless: false, freeformEditing: true } }) };
     });
     const wrapper = mount(Settings);
     await flushPromises();
 
-    await wrapper.find('input[type="checkbox"]').setValue(true);
+    await wrapper.findAll('input[type="checkbox"]')[0].setValue(true);
     await flushPromises();
 
-    expect(wrapper.find('input[type="checkbox"]').element.checked).toBe(false);
+    expect(wrapper.findAll('input[type="checkbox"]')[0].element.checked).toBe(false);
     expect(wrapper.text()).toContain('nope');
+  });
+});
+
+describe('free-form editing', () => {
+  it('shows free-form on by default', async () => {
+    const wrapper = await mountSettings(false, true);
+
+    expect(wrapper.findAll('input[type="checkbox"]')[1].element.checked).toBe(true);
+    expect(wrapper.text()).toContain('Free-form editing is on');
+  });
+
+  it('turning it off PUTs freeformEditing:false', async () => {
+    const wrapper = await mountSettings(false, true);
+
+    await wrapper.findAll('input[type="checkbox"]')[1].setValue(false);
+    await flushPromises();
+
+    const put = global.fetch.mock.calls.find(([, init]) => {
+      if (init?.method !== 'PUT') return false;
+      return JSON.parse(init.body).freeformEditing === false;
+    });
+    expect(put, 'a freeformEditing PUT should have been sent').toBeTruthy();
+    expect(wrapper.text()).toContain('Free-form editing is off');
   });
 });

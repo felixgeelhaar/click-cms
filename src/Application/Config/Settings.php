@@ -83,11 +83,41 @@ final class Settings
     }
 
     /**
-     * @return array{headless: bool, siteName: string}
+     * Whether free-form (visual builder) editing is allowed on this site at all.
+     *
+     * On by default so existing installs keep today's behaviour. Off is the
+     * agency switch: section types only, even for administrators — so a client
+     * handed an admin account still cannot drop a free-form canvas onto a
+     * constrained layout. Capability checks still apply when this is on; this
+     * flag only answers "does the site offer free-form at all?".
+     */
+    public function freeformEditing(): bool
+    {
+        // Absent key means on: a settings file written before this existed must
+        // not silently disable the builder for every upgraded site.
+        if (!array_key_exists('freeformEditing', $this->values)) {
+            return true;
+        }
+
+        return (bool) $this->values['freeformEditing'];
+    }
+
+    public function setFreeformEditing(bool $on): void
+    {
+        $this->values['freeformEditing'] = $on;
+        $this->persist();
+    }
+
+    /**
+     * @return array{headless: bool, siteName: string, freeformEditing: bool}
      */
     public function toArray(): array
     {
-        return ['headless' => $this->headless(), 'siteName' => $this->siteName()];
+        return [
+            'headless' => $this->headless(),
+            'siteName' => $this->siteName(),
+            'freeformEditing' => $this->freeformEditing(),
+        ];
     }
 
     /**
