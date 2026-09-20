@@ -278,6 +278,9 @@ const getRouteProps = () => {
   if (path === '/admin/users') return { userRole: currentUser.value?.role, currentUsername: currentUser.value?.username };
   if (path === '/admin/plugins') return { userRole: currentUser.value?.role };
   if (path === '/admin/profile' && currentUser.value) return { user: currentUser.value };
+  if (path === '/admin' || path === '/admin/') {
+    return { capabilities: currentUser.value?.capabilities ?? [] };
+  }
   return {};
 };
 

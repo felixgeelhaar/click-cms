@@ -43,6 +43,7 @@ use Click\Cms\Application\Update\UpdateNotice;
 use Click\Cms\Application\Update\UpdateScheduler;
 use Click\Cms\Application\Update\UpdateService;
 use Click\Cms\Http\MarketplaceController;
+use Click\Cms\Http\SeedController;
 use Click\Cms\Http\ThemesController;
 use Click\Cms\Http\UpdatesController;
 use Click\Cms\Application\Collection\BackReferenceService;
@@ -123,6 +124,7 @@ class Application
     private ?UsersController $usersController = null;
     private ?PluginsController $pluginsController = null;
     private ?MarketplaceController $marketplaceController = null;
+    private ?SeedController $seedController = null;
     private ?RedirectsController $redirectsController = null;
     private ?MenusController $menusController = null;
     private ?ThemesController $themesController = null;
@@ -710,6 +712,17 @@ class Application
         // so it is wired here rather than in a plugin that could be disabled.
         $this->pluginsController = new PluginsController($this->pluginManager, $this->urlBase());
         $this->marketplaceController = new MarketplaceController($this->pluginManager, $this->config, $this->basePath);
+
+        // Example-site seeding from the admin. Same SiteSeeder the CLI uses; the
+        // controller only adds authentication and a ManageSettings gate so this
+        // cannot be an anonymous write the way a web-callable bin/ would be.
+        $this->seedController = new SeedController(
+            $this->contentService,
+            $this->config,
+            $this->siteRoot(),
+            $this->basePath,
+            fn (): ?array => $this->getSessionUser(),
+        );
 
         // Identity — login, logout, password changes, the default admin — is its
         // own controller, given the same session store the rest of a request
@@ -1673,6 +1686,17 @@ class Application
             }
 
             return $this->marketplaceController->handle($path, $method);
+        }
+
+        // Load the example site. Authenticated and ManageSettings-gated inside
+        // the controller; CSRF already enforced above. Never overwrites.
+        if ($path === 'seed') {
+            $response = $this->seedController->handle($method);
+            if ($method !== 'GET' && $method !== 'HEAD' && ($response['status'] ?? 200) < 400) {
+                $this->renderCache?->flush();
+            }
+
+            return $response;
         }
 
         // Runtime settings. Reading is available to any signed-in user so the
