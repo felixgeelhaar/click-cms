@@ -91,7 +91,7 @@ final class SettingsTest extends TestCase
         $settings->setHeadless(true);
 
         $this->assertSame(
-            ['headless' => true, 'siteName' => ''],
+            ['headless' => true, 'siteName' => '', 'freeformEditing' => true],
             Settings::load($this->path)->toArray()
         );
     }
@@ -118,5 +118,20 @@ final class SettingsTest extends TestCase
         Settings::load($this->path)->setSiteName('');
 
         $this->assertSame('', Settings::load($this->path)->siteName());
+    }
+
+    public function testFreeformEditingIsOnByDefault(): void
+    {
+        // Upgraded installs must keep today's builder behaviour until an
+        // operator turns it off — absence of the key is on, not off.
+        $this->assertTrue(Settings::load($this->path)->freeformEditing());
+    }
+
+    public function testTurningFreeformEditingOffPersists(): void
+    {
+        Settings::load($this->path)->setFreeformEditing(false);
+
+        $this->assertFalse(Settings::load($this->path)->freeformEditing());
+        $this->assertFalse(Settings::load($this->path)->toArray()['freeformEditing']);
     }
 }

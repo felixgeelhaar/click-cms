@@ -7,6 +7,7 @@ namespace Click\Cms\Http;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Content\PageService;
+use Click\Cms\Application\Editing\FreeformPolicy;
 use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Application\Media\MediaService;
 use Click\Cms\Domain\History\RetentionPolicy;
@@ -76,6 +77,7 @@ final class CoreApiRoutes
         private readonly ?CoreConfig $config = null,
         ?BasePath $urlBase = null,
         private readonly ?string $installRoot = null,
+        private readonly ?FreeformPolicy $freeform = null,
     ) {
         $this->urlBase = $urlBase ?? BasePath::root();
     }
@@ -1127,6 +1129,7 @@ final class CoreApiRoutes
             $this->config?->locales() ?? [],
             null,
             $this->schedules(),
+            $this->freeform,
         );
     }
 

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Click\Cms\Application\Content;
 
 use Click\Cms\Application\Plugin\PublishGate;
+use Click\Cms\Application\Editing\FreeformPolicy;
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Domain\Schema\SectionTypeRepository;
@@ -58,6 +60,9 @@ final class PageService
      *        Null means this installation has none, and every scheduling method
      *        refuses with a 501 rather than accepting a schedule nothing will
      *        ever carry out.
+     * @param ?FreeformPolicy $freeform Whether a `builder` payload is allowed.
+     *        Null keeps the capability-only check so unit tests that never
+     *        heard of site settings still refuse non-admin free-form writes.
      */
     public function __construct(
         private readonly ContentService $content,
@@ -66,6 +71,7 @@ final class PageService
         array $supportedLocales = [],
         private readonly ?PublishGate $publishGate = null,
         private readonly ?ScheduleStore $schedules = null,
+        private readonly ?FreeformPolicy $freeform = null,
     ) {
         $this->supportedLocales = array_values($supportedLocales);
     }
@@ -177,6 +183,11 @@ final class PageService
             return $this->failure('A title, content or sections are required.', 400);
         }
 
+        $refused = $this->refuseBuilderIfNeeded($data, $user);
+        if ($refused !== null) {
+            return $refused;
+        }
+
         // The language may travel in the body as well as the query, because
         // creating a translation is one request and repeating the locale in two
         // places is an invitation to disagree with yourself.
@@ -248,6 +259,11 @@ final class PageService
         $permission = $this->canModify($page->data, $user);
         if ($permission !== true) {
             return $this->failure($permission, 403);
+        }
+
+        $refused = $this->refuseBuilderIfNeeded($data, $user);
+        if ($refused !== null) {
+            return $refused;
         }
 
         $sections = $this->validateSections($data);
@@ -714,6 +730,43 @@ final class PageService
         $data['sections'] = $clean;
 
         return ['data' => $data, 'errors' => $errors];
+    }
+
+    /**
+     * Refuse a write that carries a free-form `builder` when the site or the
+     * account does not allow it.
+     *
+     * Only fires when the key is present: a section-only save must not be
+     * blocked because of a policy about a field it is not touching. Existing
+     * builder data on the page is left alone — turning the site setting off
+     * stops new free-form edits; it does not strip layouts already saved.
+     *
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $user
+     * @return array{page: ?Content, error: ?string, status: int, errors: array<string, string>}|null
+     */
+    private function refuseBuilderIfNeeded(array $data, array $user): ?array
+    {
+        if (!array_key_exists('builder', $data)) {
+            return null;
+        }
+
+        if ($this->freeform !== null) {
+            $reason = $this->freeform->refusal($user);
+            if ($reason !== null) {
+                return $this->failure($reason, 403);
+            }
+
+            return null;
+        }
+
+        // No site policy wired (unit tests): still enforce the role capability
+        // so an editor cannot PUT a builder past the UI by calling the API.
+        if (!Role::fromName($user['role'] ?? null)->can(Capability::UseFreeFormBuilder)) {
+            return $this->failure('You do not have permission to use the free-form builder.', 403);
+        }
+
+        return null;
     }
 
     /**
