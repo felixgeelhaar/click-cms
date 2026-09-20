@@ -41,21 +41,34 @@ final class MarketplaceGuardTest extends TestCase
     {
         $_GET = [];
         $_COOKIE = [];
+        unset($_SERVER['HTTP_X_CLICK_CSRF']);
+        $_FILES = [];
         $this->rrmdir($this->base);
     }
 
     /**
      * Seed a signed-in user of the given role directly into the session store,
      * without going through login or a cookie.
+     *
+     * @return string The CSRF token written into the session, so a test that
+     *                issues an unsafe method can present the matching header.
      */
-    private function signInAs(string $role): void
+    private function signInAs(string $role): string
     {
         $sessions = (new \ReflectionProperty(Application::class, 'sessions'))->getValue($this->app);
         $ref = new ReflectionObject($sessions);
 
         $id = str_repeat('a', 64);
+        $token = str_repeat('b', 64);
         $ref->getProperty('id')->setValue($sessions, $id);
-        $ref->getMethod('writeFile')->invoke($sessions, $id, ['user' => ['username' => 'u', 'role' => $role]]);
+        $ref->getMethod('writeFile')->invoke($sessions, $id, [
+            'user' => ['username' => 'u', 'role' => $role],
+            'csrfToken' => $token,
+            'lastActivity' => time(),
+            'expiresAt' => time() + 3600,
+        ]);
+
+        return $token;
     }
 
     /**
@@ -98,6 +111,58 @@ final class MarketplaceGuardTest extends TestCase
         // a 403.
         $this->assertNotSame(403, $result['status'] ?? null);
         $this->assertArrayHasKey('data', $result);
+        $this->assertFalse($result['data']['registryConfigured']);
+        // Unconfigured must not look like a failure on a fresh install.
+        $this->assertSame([], $result['data']['errors']);
+    }
+
+    public function testUploadWithoutAFileIsABadRequestNotMethodNotAllowed(): void
+    {
+        $token = $this->signInAs('admin');
+        $_SERVER['HTTP_X_CLICK_CSRF'] = $token;
+        $_FILES = [];
+
+        $result = $this->request('marketplace/upload', 'POST');
+
+        $this->assertSame(400, $result['status'] ?? null);
+        $this->assertStringContainsString('uploaded', strtolower((string) ($result['error'] ?? '')));
+    }
+
+    public function testAnEditorCannotUploadAPlugin(): void
+    {
+        $token = $this->signInAs('editor');
+        $_SERVER['HTTP_X_CLICK_CSRF'] = $token;
+
+        $result = $this->request('marketplace/upload', 'POST');
+
+        $this->assertSame(403, $result['status'] ?? null);
+    }
+
+    public function testAnAdminCanUploadAPluginZip(): void
+    {
+        $token = $this->signInAs('admin');
+        $_SERVER['HTTP_X_CLICK_CSRF'] = $token;
+
+        $zip = $this->base . '/data/upload-plugin.zip';
+        $archive = new \ZipArchive();
+        $archive->open($zip, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        $archive->addFromString('demo/plugin.json', json_encode(['name' => 'Demo Plugin', 'version' => '1.0.0']));
+        $archive->addFromString('demo/bootstrap.php', "<?php\n");
+        $archive->close();
+
+        $_FILES['file'] = [
+            'name' => 'demo.zip',
+            'type' => 'application/zip',
+            'tmp_name' => $zip,
+            'error' => UPLOAD_ERR_OK,
+            'size' => (int) filesize($zip),
+        ];
+
+        $result = $this->request('marketplace/upload', 'POST');
+
+        $this->assertSame(201, $result['status'] ?? null, (string) ($result['error'] ?? ''));
+        $this->assertSame('demo-plugin', $result['data']['id'] ?? null);
+        $this->assertFileExists($this->base . '/plugins/demo-plugin/plugin.json');
     }
 
     private function rrmdir(string $dir): void

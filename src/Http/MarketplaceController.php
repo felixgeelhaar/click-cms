@@ -9,17 +9,19 @@ use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Application\Plugin\PluginMarketplace;
 
 /**
- * The plugin marketplace endpoint: browse a registry and install from it.
+ * The plugin marketplace endpoint: browse a registry, install from it, or
+ * upload a ZIP an administrator already has.
  *
  * Installing a plugin means adding executable code, so the kernel gates this
  * surface on a capability before the controller runs: browsing needs
- * ManagePlugins and installing needs InstallPlugins, both administrator-only by
- * default, on top of the authentication and CSRF the request pipeline already
- * enforces. The two install paths are not equally trusted, and that is on
- * purpose: a registry install verifies a signed manifest against a configured
- * public key and checks the package checksum, while an uploaded archive is
- * trusted to the administrator who uploaded it. Both extract defensively —
- * every archive entry is validated against path traversal before a byte lands.
+ * ManagePlugins and installing (or uploading) needs InstallPlugins, both
+ * administrator-only by default, on top of the authentication and CSRF the
+ * request pipeline already enforces. The two install paths are not equally
+ * trusted, and that is on purpose: a registry install verifies a signed
+ * manifest against a configured public key and checks the package checksum,
+ * while an uploaded archive is trusted to the administrator who uploaded it.
+ * Both extract defensively — every archive entry is validated against path
+ * traversal before a byte lands.
  *
  * Pulled out of the kernel because browsing and installing plugins is not the
  * job of the thing that turns requests into responses.
@@ -44,6 +46,10 @@ final class MarketplaceController
 
         if ($method === 'POST' && $action === 'install') {
             return $this->install($marketplace, $registryUrl, $publicKey);
+        }
+
+        if ($method === 'POST' && $action === 'upload') {
+            return $this->upload($marketplace);
         }
 
         if ($method !== 'GET') {
@@ -74,6 +80,26 @@ final class MarketplaceController
     }
 
     /**
+     * Accept a multipart ZIP upload and install it as an unverified plugin.
+     *
+     * @return array<string, mixed>
+     */
+    private function upload(PluginMarketplace $marketplace): array
+    {
+        if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {
+            return ['status' => 400, 'error' => 'No file was uploaded.'];
+        }
+
+        $result = $marketplace->uploadPlugin($_FILES['file']);
+
+        if (!($result['success'] ?? false)) {
+            return ['status' => 400, 'error' => $result['error'] ?? 'Upload failed'];
+        }
+
+        return ['status' => 201, 'data' => $result['plugin'] ?? $result];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function catalog(PluginMarketplace $marketplace, string $registryUrl, string $publicKey): array
@@ -89,15 +115,23 @@ final class MarketplaceController
             $this->plugins->all()
         );
 
+        $registryConfigured = $registryUrl !== '' && $publicKey !== '';
         $catalog = $marketplace->getRegistryCatalog($registryUrl, $publicKey);
+
+        // When nothing is configured the catalogue helper reports that as an
+        // error — useful for callers that always expect a registry, but the
+        // admin screen already has an empty state for it. Surfacing the same
+        // sentence as a red banner made a fresh install look broken.
+        $errors = $registryConfigured ? ($catalog['errors'] ?? []) : [];
 
         return ['data' => [
             'available' => $catalog['available'] ?? [],
-            'errors' => $catalog['errors'] ?? [],
+            'errors' => $errors,
             'installed' => $installed,
+            'registryConfigured' => $registryConfigured,
             'message' => ($catalog['available'] ?? [])
                 ? 'Registry loaded'
-                : 'Marketplace catalog not configured',
+                : ($registryConfigured ? 'Registry has nothing on offer' : 'Marketplace catalog not configured'),
         ]];
     }
 
