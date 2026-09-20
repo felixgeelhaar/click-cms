@@ -215,7 +215,8 @@
         @reload="loadVersions"
       />
 
-      <!-- Review notes for this page. Comments live once the page does. -->
+      <!-- Collaboration: review workflow and notes. Shown once the page exists. -->
+      <ReviewPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" />
       <CommentsPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" />
     </div>
   </div>
@@ -225,6 +226,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import SectionEditor from './SectionEditor.vue';
 import PresenceBar from './collaboration/PresenceBar.vue';
+import ReviewPanel from './collaboration/ReviewPanel.vue';
 import CommentsPanel from './collaboration/CommentsPanel.vue';
 import PagePublication from './PagePublication.vue';
 import PageSchedule from './PageSchedule.vue';
@@ -644,6 +646,8 @@ const publicationAction = async (action) => {
     const body = await res.json().catch(() => ({}));
 
     if (!res.ok) {
+      // The review gate answers publish with 409 and a plain-language reason.
+      // Show that message directly so the editor knows to use the review panel.
       publishError.value = body.error || `Could not ${action} this page (${res.status}).`;
       return;
     }
