@@ -78,7 +78,7 @@ const load = async () => {
     const body = await res.json();
     const data = body.data ?? {};
     available.value = data.available ?? data.plugins ?? [];
-    registryConfigured.value = Boolean(data.registryUrl) || available.value.length > 0;
+    registryConfigured.value = Boolean(data.registryConfigured) || available.value.length > 0;
 
     // Surface registry problems rather than showing an empty list that looks
     // like "nothing available".
@@ -141,7 +141,8 @@ const upload = async (event) => {
       return;
     }
 
-    notice.value = 'Plugin uploaded. Activate it on the Plugins page.';
+    const name = body.data?.name ?? 'Plugin';
+    notice.value = `${name} uploaded. Activate it on the Plugins page.`;
     await load();
   } catch (e) {
     error.value = `Could not upload: ${e.message}`;

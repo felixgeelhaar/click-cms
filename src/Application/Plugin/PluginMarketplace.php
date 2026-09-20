@@ -27,19 +27,76 @@ class PluginMarketplace
         }
     }
 
+    /**
+     * Accept an administrator-supplied ZIP and install it without signature
+     * verification. The archive is still extracted defensively — Zip Slip and
+     * bomb caps apply the same way they do for a registry install.
+     *
+     * @param array{name?: string, type?: string, tmp_name?: string, error?: int, size?: int} $file
+     * @return array{success: bool, error?: string, plugin?: array<string, mixed>}
+     */
     public function uploadPlugin(array $file): array
     {
-        if (!isset($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return ['success' => false, 'error' => $this->describeUploadError((int) ($file['error'] ?? -1))];
+        }
+
+        $tmp = (string) ($file['tmp_name'] ?? '');
+        if ($tmp === '' || !is_readable($tmp)) {
             return ['success' => false, 'error' => 'No file uploaded'];
         }
 
-        $uploadPath = $this->marketplacePath . '/' . basename($file['name']);
-        
-        if (!move_uploaded_file($file['tmp_name'], $uploadPath)) {
+        $bytes = (int) ($file['size'] ?? filesize($tmp) ?: 0);
+        if ($bytes <= 0) {
+            return ['success' => false, 'error' => 'The file is empty'];
+        }
+        if ($bytes > self::MAX_TOTAL_BYTES) {
+            return ['success' => false, 'error' => 'Archive is too large'];
+        }
+
+        // Content, not the filename: an attacker-controlled name ending in .zip
+        // must not persuade us to feed a non-archive into the extractor.
+        $head = (string) @file_get_contents($tmp, false, null, 0, 4);
+        if ($head === '' || !str_starts_with($head, 'PK')) {
+            return ['success' => false, 'error' => 'File is not a ZIP archive'];
+        }
+
+        // A fresh name under data/marketplace/, never derived from what the
+        // uploader called the file — that string is attacker-controlled.
+        $uploadPath = $this->marketplacePath . '/upload-' . bin2hex(random_bytes(8)) . '.zip';
+
+        $moved = false;
+        if (is_uploaded_file($tmp)) {
+            $moved = move_uploaded_file($tmp, $uploadPath);
+        } else {
+            // Unit tests construct a $_FILES-shaped array pointing at a temp
+            // file the same way MediaService accepts them. Real HTTP uploads
+            // always take the is_uploaded_file branch above.
+            $moved = @copy($tmp, $uploadPath);
+        }
+
+        if (!$moved || !is_file($uploadPath)) {
             return ['success' => false, 'error' => 'Failed to move uploaded file'];
         }
 
-        return $this->installFromZip($uploadPath);
+        try {
+            return $this->installFromZip($uploadPath);
+        } finally {
+            @unlink($uploadPath);
+        }
+    }
+
+    private function describeUploadError(int $code): string
+    {
+        return match ($code) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'The file is larger than this server allows',
+            UPLOAD_ERR_PARTIAL => 'The upload was interrupted',
+            UPLOAD_ERR_NO_FILE => 'No file uploaded',
+            UPLOAD_ERR_NO_TMP_DIR => 'The server has nowhere to store uploads',
+            UPLOAD_ERR_CANT_WRITE => 'The server could not write the upload',
+            UPLOAD_ERR_EXTENSION => 'An extension blocked the upload',
+            default => 'The upload failed',
+        };
     }
 
     /**

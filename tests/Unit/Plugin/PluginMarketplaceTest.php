@@ -161,6 +161,66 @@ final class PluginMarketplaceTest extends TestCase
         $this->assertDirectoryDoesNotExist($this->base . '/plugins/sample-plugin');
     }
 
+    /* -------------------------------------------------------- upload path -- */
+
+    /**
+     * Shape a $_FILES-style array around a real temp file, the same way the
+     * media library's unit tests feed MediaService::store.
+     *
+     * @return array{name: string, type: string, tmp_name: string, error: int, size: int}
+     */
+    private function uploaded(string $path, string $name = 'plugin.zip'): array
+    {
+        return [
+            'name' => $name,
+            'type' => 'application/zip',
+            'tmp_name' => $path,
+            'error' => UPLOAD_ERR_OK,
+            'size' => (int) filesize($path),
+        ];
+    }
+
+    public function testUploadPluginInstallsAValidZip(): void
+    {
+        $zip = $this->base . '/data/upload-me.zip';
+        $this->validPluginZip($zip);
+
+        $result = $this->marketplace->uploadPlugin($this->uploaded($zip));
+
+        $this->assertTrue($result['success'], $result['error'] ?? '');
+        $this->assertSame('sample-plugin', $result['plugin']['id']);
+        $this->assertFileExists($this->base . '/plugins/sample-plugin/plugin.json');
+        // The staging copy under data/marketplace/ must not linger after install.
+        $leftovers = glob($this->base . '/data/marketplace/upload-*.zip') ?: [];
+        $this->assertSame([], $leftovers);
+    }
+
+    public function testUploadPluginRefusesANonZip(): void
+    {
+        $path = $this->base . '/data/not-a-zip.txt';
+        file_put_contents($path, 'hello');
+
+        $result = $this->marketplace->uploadPlugin($this->uploaded($path, 'plugin.zip'));
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('not a ZIP', $result['error']);
+        $this->assertDirectoryDoesNotExist($this->base . '/plugins/sample-plugin');
+    }
+
+    public function testUploadPluginRefusesWhenNothingWasSent(): void
+    {
+        $result = $this->marketplace->uploadPlugin([
+            'name' => '',
+            'type' => '',
+            'tmp_name' => '',
+            'error' => UPLOAD_ERR_NO_FILE,
+            'size' => 0,
+        ]);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('No file', $result['error']);
+    }
+
     /* ---------------------------------------------------- registry install -- */
 
     /**
