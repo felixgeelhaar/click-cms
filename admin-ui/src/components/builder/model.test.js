@@ -11,6 +11,8 @@ import {
   setColumnCount,
   findParentId,
   isContainer,
+  cloneSubtree,
+  insertSubtree,
   NODE_TYPES,
   MAX_COLUMNS,
 } from './model.js';
@@ -284,5 +286,86 @@ describe('findParentId', () => {
     const id = addNode(b, 'text', b.root);
     expect(findParentId(b, id)).toBe(b.root);
     expect(findParentId(b, b.root)).toBeNull();
+  });
+});
+
+describe('cloneSubtree', () => {
+  it('returns a deep copy with new ids for every node in the subtree', () => {
+    const b = createEmptyBuilder();
+    const section = addNode(b, 'section', b.root);
+    const text = addNode(b, 'text', section);
+    updateProp(b, text, 'text', 'Keep me');
+    updateStyle(b, text, 'color', '#111');
+
+    const snap = cloneSubtree(b, section);
+    expect(snap).toBeTruthy();
+    expect(snap.root).not.toBe(section);
+    expect(Object.keys(snap.nodes)).toHaveLength(2);
+    expect(snap.nodes[snap.root].type).toBe('section');
+    expect(snap.nodes[section]).toBeUndefined();
+
+    const childId = snap.nodes[snap.root].children[0];
+    expect(childId).not.toBe(text);
+    expect(snap.nodes[childId].props.text).toBe('Keep me');
+    expect(snap.nodes[childId].styles.color).toBe('#111');
+
+    // Mutating the snapshot must not reach the live tree.
+    snap.nodes[childId].props.text = 'changed';
+    expect(b.nodes[text].props.text).toBe('Keep me');
+  });
+
+  it('returns null when the id is missing', () => {
+    const b = createEmptyBuilder();
+    expect(cloneSubtree(b, 'nope')).toBeNull();
+  });
+});
+
+describe('insertSubtree', () => {
+  it('inserts a remapped copy and returns the new root id', () => {
+    const b = createEmptyBuilder();
+    const section = addNode(b, 'section', b.root);
+    const text = addNode(b, 'text', section);
+    updateProp(b, text, 'text', 'Block copy');
+
+    const snap = cloneSubtree(b, section);
+    const inserted = insertSubtree(b, snap, b.root);
+
+    expect(inserted).toBeTruthy();
+    expect(inserted).not.toBe(snap.root);
+    expect(b.nodes[b.root].children).toContain(inserted);
+    expect(b.nodes[inserted].type).toBe('section');
+    const childId = b.nodes[inserted].children[0];
+    expect(b.nodes[childId].props.text).toBe('Block copy');
+    // Snapshot ids must not appear in the document after insert.
+    expect(b.nodes[snap.root]).toBeUndefined();
+  });
+
+  it('places two inserts of the same block with distinct ids', () => {
+    const b = createEmptyBuilder();
+    const leaf = addNode(b, 'text', b.root);
+    updateProp(b, leaf, 'text', 'X');
+    const snap = cloneSubtree(b, leaf);
+
+    const a = insertSubtree(b, snap, b.root);
+    const c = insertSubtree(b, snap, b.root);
+    expect(a).not.toBe(c);
+    expect(b.nodes[a].props.text).toBe('X');
+    expect(b.nodes[c].props.text).toBe('X');
+  });
+
+  it('nests inside a selected container like addNode', () => {
+    const b = createEmptyBuilder();
+    const section = addNode(b, 'section', b.root);
+    const snap = { root: 'r', nodes: { r: { id: 'r', type: 'text', children: [], props: { text: 'in' }, styles: {} } } };
+
+    const id = insertSubtree(b, snap, section);
+    expect(b.nodes[section].children).toContain(id);
+  });
+
+  it('refuses an invalid snapshot', () => {
+    const b = createEmptyBuilder();
+    expect(insertSubtree(b, null, b.root)).toBeNull();
+    expect(insertSubtree(b, { root: 'x', nodes: {} }, b.root)).toBeNull();
+    expect(insertSubtree(b, { root: 'x', nodes: [] }, b.root)).toBeNull();
   });
 });

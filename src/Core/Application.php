@@ -44,6 +44,8 @@ use Click\Cms\Application\Update\UpdateScheduler;
 use Click\Cms\Application\Update\UpdateService;
 use Click\Cms\Http\MarketplaceController;
 use Click\Cms\Http\SeedController;
+use Click\Cms\Application\Builder\BuilderBlockRepository;
+use Click\Cms\Http\BuilderBlocksController;
 use Click\Cms\Http\ThemesController;
 use Click\Cms\Http\UpdatesController;
 use Click\Cms\Application\Collection\BackReferenceService;
@@ -128,6 +130,7 @@ class Application
     private ?RedirectsController $redirectsController = null;
     private ?MenusController $menusController = null;
     private ?ThemesController $themesController = null;
+    private ?BuilderBlocksController $builderBlocksController = null;
     private ?UpdatesController $updatesController = null;
     private ?ThemeRepository $themes = null;
     private ?RenderCache $renderCache = null;
@@ -637,6 +640,13 @@ class Application
         $this->themes = ThemeRepository::forInstallation($this->basePath, '/themes', $this->siteRoot());
         $this->themesController = new ThemesController(
             $this->themes,
+            fn (): array => $this->getSessionUser() ?? [],
+        );
+
+        // Snapshot-only builder blocks: named subtrees authors paste into pages.
+        // Site-owned under data/, gated like free-form editing itself.
+        $this->builderBlocksController = new BuilderBlocksController(
+            new BuilderBlockRepository($this->siteRoot() . '/data/builder-blocks'),
             fn (): array => $this->getSessionUser() ?? [],
         );
 
@@ -1749,6 +1759,7 @@ class Application
             $this->menusController->routes(),
             $this->collectionsController->routes(),
             $this->themesController->routes(),
+            $this->builderBlocksController->routes(),
             $this->updatesController->routes(),
         ];
         foreach ($coreTables as $table) {

@@ -315,3 +315,116 @@ export function updateStyle(builder, id, key, value) {
   }
   node.styles = next;
 }
+
+/**
+ * Deep-copy the subtree at `id` with brand-new ids for every node.
+ *
+ * Used when saving a selection as a reusable block: the snapshot must not share
+ * ids with the page it came from, or a later insert would collide with the
+ * original. Props and styles are JSON-cloned so editing the page after save
+ * cannot mutate the stored block (and vice versa). Returns null when `id` is
+ * missing — there is nothing to snapshot.
+ *
+ * @returns {{ root: string, nodes: Record<string, object> } | null}
+ */
+export function cloneSubtree(builder, id) {
+  if (!builder?.nodes?.[id]) return null;
+  return remappedSubtree(builder.nodes, id);
+}
+
+/**
+ * Insert a block snapshot into `builder` relative to `targetId`.
+ *
+ * Ids are regenerated again here so two inserts of the same saved block never
+ * share node ids inside one document. Placement follows {@link addNode}: nest
+ * inside a selected container, or as the next sibling of a selected leaf.
+ * Returns the new root id, or null when the snapshot is unusable.
+ *
+ * @returns {string | null}
+ */
+export function insertSubtree(builder, snapshot, targetId) {
+  if (!isValidSnapshot(snapshot)) return null;
+
+  const cloned = remappedSubtree(snapshot.nodes, snapshot.root);
+  if (!cloned) return null;
+
+  for (const nodeId of Object.keys(cloned.nodes)) {
+    builder.nodes[nodeId] = cloned.nodes[nodeId];
+  }
+
+  const node = cloned.nodes[cloned.root];
+  placeNode(builder, node.id, node.type, targetId);
+  return cloned.root;
+}
+
+/** Whether a payload is a usable `{ root, nodes }` subtree snapshot. */
+function isValidSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
+  if (typeof snapshot.root !== 'string' || snapshot.root === '') return false;
+  if (!snapshot.nodes || typeof snapshot.nodes !== 'object' || Array.isArray(snapshot.nodes)) {
+    return false;
+  }
+  return !!snapshot.nodes[snapshot.root];
+}
+
+/**
+ * Copy the connected subtree rooted at `rootId` out of a nodes map, assigning
+ * fresh ids and deep-cloning props/styles (and any other fields) so the result
+ * is independent of the source.
+ *
+ * @returns {{ root: string, nodes: Record<string, object> } | null}
+ */
+function remappedSubtree(sourceNodes, rootId) {
+  if (!sourceNodes?.[rootId]) return null;
+
+  const oldIds = collectSubtree({ nodes: sourceNodes }, rootId);
+  const idMap = {};
+  for (const oldId of oldIds) {
+    // Skip dangling child refs that collectSubtree walked but that are absent
+    // from the map — they cannot be remapped into a real node.
+    if (!sourceNodes[oldId]) continue;
+    idMap[oldId] = genId();
+  }
+  if (!idMap[rootId]) return null;
+
+  const nodes = {};
+  for (const oldId of Object.keys(idMap)) {
+    const src = sourceNodes[oldId];
+    const copy = JSON.parse(JSON.stringify(src));
+    const newId = idMap[oldId];
+    copy.id = newId;
+    copy.children = (Array.isArray(src.children) ? src.children : [])
+      .filter((childId) => idMap[childId])
+      .map((childId) => idMap[childId]);
+    if (!copy.props || typeof copy.props !== 'object') copy.props = {};
+    if (!copy.styles || typeof copy.styles !== 'object') copy.styles = {};
+    nodes[newId] = copy;
+  }
+
+  return { root: idMap[rootId], nodes };
+}
+
+/**
+ * Attach an already-built node id into the tree the same way {@link addNode}
+ * would place a freshly created one.
+ */
+function placeNode(builder, nodeId, type, targetId) {
+  let target = targetId ? builder.nodes[targetId] : null;
+  if (target && target.type === 'columns' && type !== 'column' && target.children.length > 0) {
+    target = builder.nodes[target.children[0]] ?? target;
+  }
+
+  if (target && isContainer(target.type)) {
+    target.children.push(nodeId);
+  } else if (target) {
+    const parentId = findParentId(builder, targetId);
+    const parent = parentId ? builder.nodes[parentId] : null;
+    if (parent) {
+      parent.children.splice(parent.children.indexOf(targetId) + 1, 0, nodeId);
+    } else {
+      builder.nodes[builder.root].children.push(nodeId);
+    }
+  } else {
+    builder.nodes[builder.root].children.push(nodeId);
+  }
+}
