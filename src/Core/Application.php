@@ -731,7 +731,12 @@ class Application
         // Plugin management is core — the admin UI's Plugins page depends on it —
         // so it is wired here rather than in a plugin that could be disabled.
         $this->pluginsController = new PluginsController($this->pluginManager, $this->urlBase());
-        $this->marketplaceController = new MarketplaceController($this->pluginManager, $this->config, $this->basePath);
+        $this->marketplaceController = new MarketplaceController(
+            $this->pluginManager,
+            $this->config,
+            $this->basePath,
+            fn (): ?array => $this->getSessionUser(),
+        );
 
         // Example-site seeding from the admin. Same SiteSeeder the CLI uses; the
         // controller only adds authentication and a ManageSettings gate so this
@@ -1688,23 +1693,9 @@ class Application
             }
         }
 
+        // Marketplace enablement and InstallPlugins / ManagePlugins gates live
+        // in the controller — Application only owns the path prefix dispatch.
         if (str_starts_with($path, 'marketplace')) {
-            if (!$this->isMarketplaceEnabled()) {
-                return ['status' => 404, 'error' => 'Marketplace disabled'];
-            }
-
-            // Installing a plugin is running code on the server, so it is gated on
-            // a capability, not merely on being signed in. Authentication and CSRF
-            // are already enforced above; this is the authorization the
-            // marketplace controller's own docstring assumed but nothing applied.
-            // Browsing the catalogue needs the weaker ManagePlugins; the install
-            // POST needs InstallPlugins. Both are administrator-only by default.
-            $role = Role::fromName(($this->getSessionUser() ?? [])['role'] ?? null);
-            $needed = ($method === 'POST') ? Capability::InstallPlugins : Capability::ManagePlugins;
-            if (!$role->can($needed)) {
-                return ['status' => 403, 'error' => 'You do not have permission to manage plugins.'];
-            }
-
             return $this->marketplaceController->handle($path, $method);
         }
 
@@ -2200,11 +2191,6 @@ class Application
     private function isCoreAuthEnabled(): bool
     {
         return $this->config?->authEnabled() ?? true;
-    }
-
-    private function isMarketplaceEnabled(): bool
-    {
-        return $this->config?->marketplaceEnabled() ?? true;
     }
 
     private function isGraphqlEnabled(): bool

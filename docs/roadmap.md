@@ -218,10 +218,16 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     follow without breaking clients that only read `error`. Blank 500s for
     unknown faults stay opaque on purpose.
 
-23. **Kernel / route decomposition.** *(structural)* Continue peeling
+23. **Kernel / route decomposition.** *(in progress)* Continue peeling
     identity, settings and marketplace-sized concerns out of
     `Application.php` / `CoreApiRoutes.php` toward application services — no
-    behaviour change, less accumulation.
+    behaviour change, less accumulation. This cycle: `BuilderBlocksController`,
+    `ThemeInstaller`, and `Http\ApiFault` (themes first) continued the peel
+    pattern; marketplace path dispatch is now only through
+    `MarketplaceController` (enablement + ManagePlugins / InstallPlugins gates
+    moved out of `Application` / `ApiGuard`). Next peel candidates: settings
+    (`handleSettingsRequest` still inline), or further thinning of
+    `CoreApiRoutes` once a similarly sized concern has a controller home.
 
 24. **Admin coverage and smoke.** *(incremental)* Vitest coverage for Users,
     Webhooks and Redirects is started (list / empty / error / write-path

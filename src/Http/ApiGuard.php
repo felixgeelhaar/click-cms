@@ -170,9 +170,9 @@ final class ApiGuard
             return ['status' => 403, 'error' => 'You do not have permission to manage users.'];
         }
 
-        if (str_starts_with($path, 'marketplace') && !$role->can(Capability::InstallPlugins)) {
-            return ['status' => 403, 'error' => 'You do not have permission to install plugins.'];
-        }
+        // Marketplace capability gates (ManagePlugins / InstallPlugins) and the
+        // feature flag live in MarketplaceController, same pattern as Themes and
+        // Seed — this guard only requires a session for the path.
 
         if (str_starts_with($path, 'plugins') && $method !== 'GET' && !$role->can(Capability::ManagePlugins)) {
             return ['status' => 403, 'error' => 'You do not have permission to manage plugins.'];

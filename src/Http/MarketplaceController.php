@@ -7,14 +7,16 @@ namespace Click\Cms\Http;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Application\Plugin\PluginMarketplace;
+use Click\Cms\Domain\Identity\Capability;
+use Click\Cms\Domain\Identity\Role;
 
 /**
  * The plugin marketplace endpoint: browse a registry, install from it, or
  * upload a ZIP an administrator already has.
  *
- * Installing a plugin means adding executable code, so the kernel gates this
- * surface on a capability before the controller runs: browsing needs
- * ManagePlugins and installing (or uploading) needs InstallPlugins, both
+ * Installing a plugin means adding executable code, so this controller gates
+ * the surface on a capability (and on the marketplace feature flag): browsing
+ * needs ManagePlugins and installing (or uploading) needs InstallPlugins, both
  * administrator-only by default, on top of the authentication and CSRF the
  * request pipeline already enforces. The two install paths are not equally
  * trusted, and that is on purpose: a registry install verifies a signed
@@ -24,14 +26,20 @@ use Click\Cms\Application\Plugin\PluginMarketplace;
  * traversal before a byte lands.
  *
  * Pulled out of the kernel because browsing and installing plugins is not the
- * job of the thing that turns requests into responses.
+ * job of the thing that turns requests into responses. Enablement and the
+ * capability checks live here too, so Application only routes the path prefix.
  */
 final class MarketplaceController
 {
+    /**
+     * @param callable(): (?array<string, mixed>) $currentUser Resolves the
+     *        signed-in user for the current request, or null when anonymous.
+     */
     public function __construct(
         private readonly PluginManager $plugins,
         private readonly CoreConfig $config,
         private readonly string $basePath,
+        private readonly mixed $currentUser,
     ) {}
 
     /**
@@ -39,6 +47,22 @@ final class MarketplaceController
      */
     public function handle(string $path, string $method): array
     {
+        if (!$this->config->marketplaceEnabled()) {
+            return ['status' => 404, 'error' => 'Marketplace disabled'];
+        }
+
+        // Installing a plugin is running code on the server, so it is gated on a
+        // capability, not merely on being signed in. Authentication and CSRF
+        // are already enforced by the request pipeline; this is the authorization
+        // step. Browsing the catalogue needs the weaker ManagePlugins; the
+        // install POST needs InstallPlugins. Both are administrator-only by
+        // default.
+        $role = Role::fromName((($this->currentUser)() ?? [])['role'] ?? null);
+        $needed = ($method === 'POST') ? Capability::InstallPlugins : Capability::ManagePlugins;
+        if (!$role->can($needed)) {
+            return ['status' => 403, 'error' => 'You do not have permission to manage plugins.'];
+        }
+
         $action = ltrim(preg_replace('#^marketplace#', '', $path), '/');
         $marketplace = new PluginMarketplace($this->plugins, $this->basePath);
         $registryUrl = $this->config->marketplaceRegistryUrl();
