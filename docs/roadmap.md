@@ -223,18 +223,14 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     without breaking clients that only read `error`. Blank 500s for unknown faults
     stay opaque on purpose.
 
-23. **Kernel / route decomposition.** *(in progress)* Continue peeling
-    identity, settings and marketplace-sized concerns out of
-    `Application.php` / `CoreApiRoutes.php` toward application services — no
-    behaviour change, less accumulation. `SettingsController`, `SiteController`
-    and `AuditController` are peeled: settings, site identity and the audit
-    trail are only reached through their controllers. Earlier this cycle:
-    `BuilderBlocksController`, `ThemeInstaller`, `Http\ApiFault` (themes first)
-    and `MarketplaceController` (enablement + ManagePlugins / InstallPlugins
-    gates moved out of `Application` / `ApiGuard`). Next peel candidates:
-    thinning `CoreApiRoutes` further — `MediaController` owns `/api/media*`;
-    `PagesController` now owns pages CRUD, publication, schedule, versions and
-    preview. `CoreApiRoutes` keeps section-types for this pass.
+23. ~~**Kernel / route decomposition.**~~ *(done for v1.x)* Peeled identity,
+    settings and marketplace-sized concerns out of `Application.php` toward
+    application services — no behaviour change, less accumulation.
+    `SettingsController`, `SiteController`, `AuditController`,
+    `BuilderBlocksController`, `ThemeInstaller`, `Http\ApiFault`,
+    `MarketplaceController`, `MediaController`, `PagesController` and
+    `SectionTypesController` own their routes. The old `CoreApiRoutes` bag is
+    gone; further kernel thinning is parked unless a new concern accumulates.
 
 24. ~~**Admin coverage and smoke.**~~ *(done for v1.x CI)* Vitest coverage for
     Users, Webhooks, Redirects and the admin deep-link `<base>` injector;

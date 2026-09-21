@@ -8,7 +8,7 @@ use Click\Cms\Http\PagesController;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Page management as its own controller, peeled from CoreApiRoutes.
+ * Page management as its own controller (alongside SectionTypesController).
  *
  * Pins the route table and one cheap gate (anonymous preview → 401) without
  * needing GD or a full content tree.
@@ -72,7 +72,7 @@ final class PagesControllerTest extends TestCase
         $this->assertArrayHasKey('POST /api/pages/:slug/versions/:id/restore', $routes);
         $this->assertArrayHasKey('POST /api/pages/:slug/preview', $routes);
 
-        // Section types stay on CoreApiRoutes for this peel.
+        // Section types live on SectionTypesController, not pages.
         $this->assertArrayNotHasKey('GET /api/section-types', $routes);
     }
 

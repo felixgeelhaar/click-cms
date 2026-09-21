@@ -8,7 +8,7 @@ use Click\Cms\Http\MediaController;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Media management as its own controller, peeled from CoreApiRoutes.
+ * Media management as its own controller (alongside SectionTypesController).
  *
  * Pins the route table and one cheap gate (missing id → 404) without needing
  * GD — image-processing coverage stays in the MediaService / MediaLibrary tests.

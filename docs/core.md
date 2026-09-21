@@ -692,7 +692,8 @@ Application\Authentication\LoginThrottle    failure counting and lockout
 Application\Authentication\CsrfGuard        token generation and comparison
 Application\Config\CoreConfig               one name and one default per setting
 Domain\Identity\Role, Capability            who may do what
-Http\CoreApiRoutes                          the management API
+Http\SectionTypesController                 section-type schema for the editor
+Http\PagesController / MediaController      page and media management API
 Application\Content\PageService             page management rules
 ```
 

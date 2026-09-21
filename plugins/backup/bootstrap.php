@@ -116,7 +116,7 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
     /**
      * Build an archive and stream it as a file download.
      *
-     * Shaped exactly like core's own file serving ({@see CoreApiRoutes::serveMediaFile}):
+     * Shaped exactly like core's own file serving ({@see MediaController::serveMediaFile}):
      * the headers and bytes are emitted here, and the handler returns
      * `['raw' => true]` so the kernel does not wrap the response in JSON. No
      * change to the plugin route mechanism is needed — a raw/binary download is

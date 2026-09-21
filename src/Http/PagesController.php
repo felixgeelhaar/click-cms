@@ -25,10 +25,10 @@ use Click\Cms\Infrastructure\Storage\VersioningStorage;
 /**
  * Managing pages: CRUD, publication, schedule, versions, and preview links.
  *
- * Pulled out of {@see CoreApiRoutes} so page management stops accumulating
- * beside schema in one file — behaviour is unchanged. Section types stay on
- * CoreApiRoutes; media on {@see MediaController}. Page responses here still
- * resolve media references for the editor.
+ * Peeled so page management stops accumulating beside schema in one file —
+ * behaviour is unchanged. Section types live on {@see SectionTypesController};
+ * media on {@see MediaController}. Page responses here still resolve media
+ * references for the editor.
  *
  * Note the deliberate split from the `rest-api` plugin. That plugin is the
  * *public delivery* API — the one an external front end consumes — and is

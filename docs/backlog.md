@@ -31,7 +31,7 @@ owns the design.
 from that list and fills the fields in. Validation happens at the HTTP boundary
 and discards anything the schema does not declare, so stored content can only
 ever hold a shape the site's templates were written for. See
-`src/Domain/Schema` and `src/Http/CoreApiRoutes`.
+`src/Domain/Schema` and `src/Http/SectionTypesController`.
 
 **Free-form building — built.** `docs/visual-builder.md` defines the data
 model: a node tree with breakpoints and per-breakpoint style overrides.
@@ -135,8 +135,9 @@ Two different things that were previously one.
 
 **Management** — pages, media, schemas, authentication — is core. The admin UI
 cannot function without it, so it must not be something a site can uninstall.
-Page and media CRUD, publication, history and preview now live in core's
-`CoreApiRoutes`.
+Page and media CRUD, publication, history and preview live in core's
+`PagesController` and `MediaController`; section types in
+`SectionTypesController`.
 
 **Delivery** — how an external front end reads content — should be a plugin, and
 a site that renders its own pages needs none of it.

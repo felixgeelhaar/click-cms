@@ -33,7 +33,7 @@ use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\BasePath;
-use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\SectionTypesController;
 use Click\Cms\Http\ServerEnvironment;
 use Click\Cms\Http\TrustedProxies;
 use Click\Cms\Application\Theme\ThemeInstaller;
@@ -128,7 +128,7 @@ class Application
     private ?EventDispatcher $eventDispatcher = null;
     private ?EventBus $eventBus = null;
     private array $apiRoutes = [];
-    private ?CoreApiRoutes $coreApiRoutes = null;
+    private ?SectionTypesController $sectionTypesController = null;
     private ?PagesController $pagesController = null;
     private ?UsersController $usersController = null;
     private ?PluginsController $pluginsController = null;
@@ -563,8 +563,8 @@ class Application
         $this->history = new HistoryService($storage, $versions);
         $this->auditService = new AuditService($auditLog);
 
-        // Pages — peeled from CoreApiRoutes so CRUD / publication / schedule /
-        // versions / preview stop accumulating beside schema.
+        // Pages — peeled so CRUD / publication / schedule / versions / preview
+        // stop accumulating beside schema.
         $this->pagesController = new PagesController(
             // The site's root, not the installation's: everything this builds —
             // storage, media, versions, schedules — belongs to one site. Schema
@@ -583,8 +583,9 @@ class Application
             ),
         );
 
-        // Section types only — pages and media live on their own controllers.
-        $this->coreApiRoutes = new CoreApiRoutes(
+        // Section-type schema — what remains after pages and media were peeled
+        // out of the old CoreApiRoutes bag.
+        $this->sectionTypesController = new SectionTypesController(
             $this->siteRoot(),
             $this->basePath,
         );
@@ -606,8 +607,8 @@ class Application
         $this->menusController = new MenusController($this->contentService);
         $this->navigationRenderer = new NavigationRenderer($this->urlBase());
 
-        // Media library and file serving — peeled from CoreApiRoutes so media
-        // routes stop accumulating beside pages and schema.
+        // Media library and file serving — peeled so media routes stop
+        // accumulating beside pages and schema.
         $this->mediaController = new MediaController(
             $this->siteRoot(),
             fn (): array => $this->getSessionUser() ?? [],
@@ -1781,7 +1782,7 @@ class Application
         // editable. Users and plugins management were once in the rest-api
         // plugin; they are core now, for exactly this reason.
         $coreTables = [
-            $this->coreApiRoutes->routes(),
+            $this->sectionTypesController->routes(),
             $this->pagesController->routes(),
             $this->usersController->routes(),
             $this->pluginsController->routes(),

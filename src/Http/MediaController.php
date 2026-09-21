@@ -16,8 +16,8 @@ use Click\Cms\Infrastructure\Media\GdImageProcessor;
  * Managing and serving the media library.
  *
  * These endpoints are core rather than a plugin because the admin UI cannot place
- * an image without them. Pulled out of {@see CoreApiRoutes} so media stops
- * accumulating beside pages and schema in one file — behaviour is unchanged.
+ * an image without them. Peeled so media stops accumulating beside pages and
+ * schema in one file — behaviour is unchanged.
  *
  * Listing and bulk delete reuse {@see MediaLibrary}. File serving stays public
  * (see {@see ApiGuard}); everything else is deny-by-default behind the kernel.
