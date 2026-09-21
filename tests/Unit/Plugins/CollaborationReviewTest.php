@@ -132,6 +132,34 @@ final class CollaborationReviewTest extends TestCase
         );
     }
 
+    private function makeEntry(string $type, string $slug, string $owner = 'ada'): void
+    {
+        \Click\Cms\Domain\Publishing\Publishable::register([$type]);
+        $collectionsDir = $this->base . '/config/collections';
+        if (!is_dir($collectionsDir)) {
+            mkdir($collectionsDir, 0o775, true);
+        }
+        $def = $collectionsDir . '/' . $type . '.json';
+        if (!is_file($def)) {
+            file_put_contents($def, json_encode([
+                'label' => ucfirst($type),
+                'titleField' => 'title',
+                'fields' => [['name' => 'title', 'type' => 'text', 'required' => true]],
+            ], JSON_THROW_ON_ERROR));
+        }
+
+        $collections = new \Click\Cms\Application\Collection\CollectionService(
+            $this->content,
+            new \Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository($collectionsDir),
+            new \Click\Cms\Domain\Schema\SectionValidator()
+        );
+        $result = $collections->create($type, [
+            'slug' => $slug,
+            'values' => ['title' => ucfirst($slug)],
+        ], ['username' => $owner, 'role' => 'editor']);
+        $this->assertNull($result['error'], $result['error'] ?? '');
+    }
+
     /** What core would hand the gate when publishing this page. */
     private function askTheGate(string $slug, string $locale = 'en'): ?array
     {
@@ -358,12 +386,44 @@ final class CollaborationReviewTest extends TestCase
         $this->assertNull($this->askTheGate('about'));
     }
 
-    public function testTheGateHasNoOpinionAboutThingsThatAreNotPages(): void
+    public function testTheGateAppliesToCollectionEntriesWithAnOpenReview(): void
     {
         $this->armTheGate();
         $this->signIn(username: 'ada');
+        $this->post('handleRequestReview', [
+            'page' => 'hello-world',
+            'locale' => 'en',
+            'type' => 'post',
+        ]);
+
+        $refusal = $this->plugin->hook_content_before_publish([
+            'key' => 'post:en:hello-world',
+            'type' => 'post',
+            'slug' => 'hello-world',
+            'locale' => 'en',
+            'user' => [],
+        ]);
+
+        $this->assertFalse($refusal['allowed'] ?? true);
+        $this->assertStringContainsString('waiting for review', $refusal['reason'] ?? '');
+    }
+
+    public function testPageReviewsStillUseTheLegacyStorageKey(): void
+    {
+        $this->signIn();
         $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'en']);
 
+        $documents = $this->content->all('collaboration_review');
+        $this->assertCount(1, $documents);
+        // Historical key: collaboration_review:home.en — not page.home.en.
+        $this->assertSame('home.en', $documents[0]->slug());
+
+        $this->armTheGate();
+        $refusal = $this->askTheGate('home');
+        $this->assertFalse($refusal['allowed'] ?? true);
+        $this->assertStringContainsString('waiting for review', $refusal['reason'] ?? '');
+
+        // A collection entry with the same slug must not share that review.
         $this->assertNull($this->plugin->hook_content_before_publish([
             'key' => 'post:en:home',
             'type' => 'post',
@@ -632,5 +692,93 @@ final class CollaborationReviewTest extends TestCase
         ]);
 
         $this->assertCount(1, $response['data']['published']);
+    }
+
+    public function testAReleasePublishesCollectionEntriesAlongsidePages(): void
+    {
+        $this->makePage('home');
+        $this->makeEntry('post', 'hello-world');
+        $this->signIn(username: 'ada');
+
+        $response = $this->post('handlePublishTogether', [
+            'pages' => ['home'],
+            'entries' => [['type' => 'post', 'page' => 'hello-world']],
+            'locale' => 'en',
+        ]);
+
+        $this->assertArrayNotHasKey('error', $response);
+        $this->assertCount(2, $response['data']['published']);
+        $this->assertSame('home', $response['data']['published'][0]['page']);
+        $this->assertArrayNotHasKey('type', $response['data']['published'][0]);
+        $this->assertSame('hello-world', $response['data']['published'][1]['page']);
+        $this->assertSame('post', $response['data']['published'][1]['type']);
+
+        $this->assertNotNull($this->content->page('home'));
+        $this->assertNotNull($this->content->get(
+            \Click\Cms\Domain\ValueObjects\ContentKey::for('post', 'hello-world', 'en')
+        ));
+    }
+
+    public function testAReleaseOfEntriesAloneIsAccepted(): void
+    {
+        $this->makeEntry('post', 'hello-world');
+        $this->signIn(username: 'ada');
+
+        $response = $this->post('handlePublishTogether', [
+            'entries' => [['type' => 'post', 'page' => 'hello-world']],
+            'locale' => 'en',
+        ]);
+
+        $this->assertArrayNotHasKey('error', $response);
+        $this->assertCount(1, $response['data']['published']);
+        $this->assertSame('post', $response['data']['published'][0]['type']);
+    }
+
+    public function testAReleaseIsRefusedWholeWhenAnEntryIsNotApproved(): void
+    {
+        $this->armTheGate();
+        $this->makePage('home');
+        $this->makeEntry('post', 'hello-world');
+
+        $this->signIn(username: 'ada');
+        $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'en']);
+        $this->post('handleRequestReview', [
+            'page' => 'hello-world',
+            'locale' => 'en',
+            'type' => 'post',
+        ]);
+        $this->signIn(username: 'hanna');
+        $this->post('handleReviewDecision', ['page' => 'home', 'locale' => 'en', 'decision' => 'approve']);
+
+        $response = $this->post('handlePublishTogether', [
+            'pages' => ['home'],
+            'entries' => [['type' => 'post', 'page' => 'hello-world']],
+            'locale' => 'en',
+        ]);
+
+        $this->assertSame(409, $response['status'] ?? 200);
+        $this->assertSame([], $response['data']['published']);
+        $this->assertSame('hello-world', $response['data']['refused'][0]['page']);
+        $this->assertSame('post', $response['data']['refused'][0]['type']);
+
+        $this->assertNull($this->content->page('home'));
+        $this->assertNull($this->content->get(
+            \Click\Cms\Domain\ValueObjects\ContentKey::for('post', 'hello-world', 'en')
+        ));
+    }
+
+    public function testAReleaseEntryMustNameACollectionType(): void
+    {
+        $this->signIn(username: 'ada');
+
+        $this->assertSame(400, $this->post('handlePublishTogether', [
+            'entries' => [['page' => 'hello-world']],
+            'locale' => 'en',
+        ])['status'] ?? 200);
+
+        $this->assertSame(400, $this->post('handlePublishTogether', [
+            'entries' => [['type' => 'page', 'page' => 'home']],
+            'locale' => 'en',
+        ])['status'] ?? 200);
     }
 }

@@ -174,3 +174,96 @@ jobs:
       - name: Stop container
         if: always()
         run: docker rm -f click-cms-ci || true
+
+  e2e:
+    name: Playwright smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          extensions: gd, zip, pdo_sqlite
+          coverage: none
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            admin-ui/package-lock.json
+
+      - name: Cache Composer packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Build admin UI into public/admin
+        working-directory: admin-ui
+        run: |
+          npm ci
+          npm run build
+          mkdir -p ../public/admin
+          cp -r dist/* ../public/admin/
+
+      - name: Seed example site
+        run: php bin/click-seed.php
+
+      # Boot creates admin/admin with mustChangePassword; pin a known password
+      # so the smoke can sign in without depending only on the forced-change UI.
+      - name: Reset admin password for e2e
+        env:
+          CLICK_E2E_PASS: admin-demo-pass-99
+        run: |
+          php -r '
+            $path = "content/user/en/admin.json";
+            $doc = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+            $pass = getenv("CLICK_E2E_PASS") ?: "admin-demo-pass-99";
+            $doc["data"]["password"] = password_hash($pass, PASSWORD_DEFAULT);
+            $doc["data"]["mustChangePassword"] = false;
+            $doc["data"]["passwordChangedAt"] = gmdate("c");
+            $doc["updatedAt"] = gmdate("c");
+            file_put_contents($path, json_encode($doc, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+            echo "admin password reset for e2e\n";
+          '
+
+      - name: Start PHP built-in server
+        run: |
+          php -S 127.0.0.1:8080 -t public > /tmp/click-e2e-php.log 2>&1 &
+          echo $! > /tmp/click-e2e-php.pid
+          for i in $(seq 1 30); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/ || true)"
+            [ "$code" = "200" ] && break
+            sleep 1
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:8080/ || { echo "server failed:"; cat /tmp/click-e2e-php.log; exit 1; }
+
+      - name: Install Playwright
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run e2e smoke
+        env:
+          CLICK_E2E: '1'
+          CLICK_E2E_BASE_URL: http://127.0.0.1:8080
+          CLICK_E2E_PASS: admin-demo-pass-99
+          CLICK_E2E_NO_CHANNEL: '1'
+        run: npm run test:e2e
+
+      - name: Stop PHP server
+        if: always()
+        run: |
+          if [ -f /tmp/click-e2e-php.pid ]; then
+            kill "$(cat /tmp/click-e2e-php.pid)" || true
+          fi

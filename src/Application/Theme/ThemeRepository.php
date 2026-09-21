@@ -16,6 +16,12 @@ use Click\Cms\Domain\Theme\Theme;
  * hope the next upgrade does not take it back". A theme placed here survives an
  * update for the same reason a page does: it is the site's, not the CMS's.
  *
+ * Plugins may also ship themes under `plugins/<id>/themes/<theme-id>/`. Those
+ * are discovered alongside disk themes; a disk theme with the same id wins, so a
+ * site can override a packaged design without editing the plugin. Plugin theme
+ * CSS is served through the management API (public GET) because the Apache
+ * `/themes` alias only covers the installation themes directory.
+ *
  * Discovery is a directory scan rather than a registry, which is what makes
  * installing a theme "copy a folder in" — the same move that installs a plugin.
  * Nothing here throws: a site can put whatever it likes in that directory, so a
@@ -24,9 +30,6 @@ use Click\Cms\Domain\Theme\Theme;
  *
  * The active id lives in `data/theme.json`, the writable directory that survives
  * a redeploy, written the same write-then-rename way as settings and content.
- * That matters more here than it looks: this file is read on every public page
- * render, so a reader catching a half-written file would take the site's design
- * off mid-save.
  */
 final class ThemeRepository
 {
@@ -36,13 +39,25 @@ final class ThemeRepository
     private const MANIFEST = 'theme.json';
 
     /**
+     * Extra roots scanned after `themesDir`. Disk always wins on id collision.
+     *
+     * @var list<array{dir: string, pluginId: string}>
+     */
+    private array $pluginRoots = [];
+
+    /**
+     * Where each discovered theme's files live, keyed by id. Filled on the
+     * latest {@see all()} / {@see find()} so stylesheet URLs and asset serving
+     * know whether to use the `/themes` alias or the API passthrough.
+     *
+     * @var array<string, array{dir: string, pluginId: ?string}>
+     */
+    private array $locations = [];
+
+    /**
      * @param string $themesDir Where installed themes live, one directory each.
      * @param string $statePath The JSON file holding the active theme id.
      * @param string $urlPrefix The public URL the themes directory is served at.
-     *        Configurable because how a site exposes those files — an Apache
-     *        alias, a symlink into the document root, a PHP passthrough — is a
-     *        deployment decision, and baking one in here would make the other
-     *        two impossible without editing the CMS.
      */
     public function __construct(
         private readonly string $themesDir,
@@ -54,13 +69,6 @@ final class ThemeRepository
     /**
      * The conventional layout, so the kernel does not have to spell out two
      * paths it has no choice about.
-     *
-     * The two roots are separate arguments because they answer different
-     * questions once an installation serves more than one site. **Which themes
-     * exist** is a property of the installation — they are packages, deployed
-     * with the code, and copying eight identical directories per client would be
-     * absurd. **Which one is active** is a property of the site: an agency's
-     * whole reason for running eight sites is that they do not look alike.
      *
      * `$siteRoot` defaults to `$basePath`, which is the single-site case and
      * every existing caller.
@@ -75,36 +83,56 @@ final class ThemeRepository
     }
 
     /**
+     * Register themes shipped inside a plugin (`plugins/<id>/themes/`).
+     *
+     * Called after plugin discovery so only folders that exist are scanned.
+     * Re-registering the same plugin replaces its previous root.
+     */
+    public function registerPluginThemes(string $pluginId, string $themesDir): void
+    {
+        $pluginId = strtolower(trim($pluginId));
+        if ($pluginId === '' || !is_dir($themesDir)) {
+            return;
+        }
+
+        $this->pluginRoots = array_values(array_filter(
+            $this->pluginRoots,
+            static fn (array $root): bool => $root['pluginId'] !== $pluginId
+        ));
+        $this->pluginRoots[] = ['dir' => rtrim($themesDir, '/'), 'pluginId' => $pluginId];
+        $this->locations = [];
+    }
+
+    /**
      * Every installed theme, ordered by id so the admin list does not reshuffle
      * itself between requests on filesystem whim.
-     *
-     * A directory is skipped when it has no readable manifest, when the manifest
-     * does not describe a usable theme, or when the stylesheet it names is not
-     * actually there. The last check is the one that is easy to leave out and
-     * worth keeping: a theme listed but missing its CSS is a theme that can be
-     * activated to produce an unstyled site and a 404 in the console, which is a
-     * far worse failure than never having appeared.
      *
      * @return list<Theme>
      */
     public function all(): array
     {
-        $entries = @scandir($this->themesDir);
-        if ($entries === false) {
-            // No themes directory at all is the state of a fresh install, not an
-            // error: nothing is installed yet.
-            return [];
+        $this->locations = [];
+        $themes = [];
+
+        foreach ($this->scanDir($this->themesDir) as $theme) {
+            $themes[$theme->id] = $theme;
+            $this->locations[$theme->id] = [
+                'dir' => $this->themesDir . '/' . $theme->id,
+                'pluginId' => null,
+            ];
         }
 
-        $themes = [];
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-
-            $theme = $this->read($entry);
-            if ($theme !== null) {
+        foreach ($this->pluginRoots as $root) {
+            foreach ($this->scanDir($root['dir']) as $theme) {
+                // Disk wins: a site override in themes/ keeps its id.
+                if (isset($themes[$theme->id])) {
+                    continue;
+                }
                 $themes[$theme->id] = $theme;
+                $this->locations[$theme->id] = [
+                    'dir' => $root['dir'] . '/' . $theme->id,
+                    'pluginId' => $root['pluginId'],
+                ];
             }
         }
 
@@ -115,28 +143,50 @@ final class ThemeRepository
 
     public function find(string $id): ?Theme
     {
-        return $this->read($id);
+        foreach ($this->all() as $theme) {
+            if ($theme->id === $id) {
+                return $theme;
+            }
+        }
+
+        return null;
     }
 
     /**
-     * The theme a page should be rendered with.
-     *
-     * Falls back rather than returning null while any theme is installed: a site
-     * that has never opened the Themes screen, or whose stored choice names a
-     * theme somebody has since deleted, must still render with a design. Null
-     * means only what it says — nothing is installed to render with.
+     * Provenance for the admin list: disk themes have no plugin id.
      */
+    public function pluginIdOf(string $id): ?string
+    {
+        if ($this->locations === []) {
+            $this->all();
+        }
+
+        return $this->locations[$id]['pluginId'] ?? null;
+    }
+
+    /**
+     * Absolute directory holding this theme's files, or null if unknown.
+     */
+    public function directoryOf(string $id): ?string
+    {
+        if ($this->locations === []) {
+            $this->all();
+        }
+
+        return $this->locations[$id]['dir'] ?? null;
+    }
+
     public function active(): ?Theme
     {
         $stored = $this->storedId();
         if ($stored !== null) {
-            $theme = $this->read($stored);
+            $theme = $this->find($stored);
             if ($theme !== null) {
                 return $theme;
             }
         }
 
-        $fallback = $this->read(self::FALLBACK_ID);
+        $fallback = $this->find(self::FALLBACK_ID);
         if ($fallback !== null) {
             return $fallback;
         }
@@ -144,15 +194,9 @@ final class ThemeRepository
         return $this->all()[0] ?? null;
     }
 
-    /**
-     * Switch the live theme. False for an id that is not installed — persisting
-     * it would leave `data/theme.json` pointing at nothing, and the next render
-     * would silently fall back while the admin screen insisted the choice had
-     * been saved.
-     */
     public function activate(string $id): bool
     {
-        $theme = $this->read($id);
+        $theme = $this->find($id);
         if ($theme === null) {
             return false;
         }
@@ -163,38 +207,76 @@ final class ThemeRepository
     /**
      * The URL a page links for this theme, carrying a cache-busting version.
      *
-     * The version is the file's mtime where it can be read, and the theme's
-     * declared version otherwise. mtime first because it is the one that changes
-     * when it needs to: a designer editing their stylesheet in place almost
-     * never bumps a version number, and without this every visitor keeps the old
-     * CSS until their browser feels like asking again.
+     * Disk themes use the `/themes` alias. Plugin themes use a public API path
+     * that streams the file, because the alias cannot see into `plugins/`.
      */
     public function stylesheetUrl(Theme $theme): string
     {
-        $path = $this->themesDir . '/' . $theme->id . '/' . $theme->stylesheet();
-        $mtime = @filemtime($path);
+        if ($this->locations === []) {
+            $this->all();
+        }
 
+        $dir = $this->locations[$theme->id]['dir'] ?? ($this->themesDir . '/' . $theme->id);
+        $path = $dir . '/' . $theme->stylesheet();
+        $mtime = @filemtime($path);
         $version = $mtime !== false ? (string) $mtime : $theme->version;
-        $url = rtrim($this->urlPrefix, '/') . '/' . $theme->id . '/' . $theme->stylesheet();
+
+        $pluginId = $this->locations[$theme->id]['pluginId'] ?? null;
+        if ($pluginId !== null) {
+            $url = '/api/themes/' . rawurlencode($theme->id) . '/stylesheet';
+        } else {
+            $url = rtrim($this->urlPrefix, '/') . '/' . $theme->id . '/' . $theme->stylesheet();
+        }
 
         return $version === '' ? $url : $url . '?v=' . rawurlencode($version);
+    }
+
+    /**
+     * Absolute path of a theme's stylesheet on disk, for the public serve route.
+     */
+    public function stylesheetPath(Theme $theme): ?string
+    {
+        $dir = $this->directoryOf($theme->id);
+        if ($dir === null) {
+            return null;
+        }
+
+        $path = $dir . '/' . $theme->stylesheet();
+
+        return is_file($path) ? $path : null;
     }
 
     /* -------------------------------------------------------------- disk -- */
 
     /**
-     * Read one theme directory, by the id it would have. Every path this class
-     * builds runs through here, so the id is validated — by {@see Theme} — before
-     * it is ever concatenated into a path.
+     * @return list<Theme>
      */
-    private function read(string $id): ?Theme
+    private function scanDir(string $themesDir): array
     {
-        $manifestPath = $this->themesDir . '/' . $id . '/' . self::MANIFEST;
+        $entries = @scandir($themesDir);
+        if ($entries === false) {
+            return [];
+        }
 
-        // Checked before reading rather than relying on the id validation alone:
-        // a `..` id would be rejected by Theme, but only after this string had
-        // been handed to the filesystem, and a check that runs second is a check
-        // a refactor can drop.
+        $found = [];
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $theme = $this->readFrom($themesDir, $entry);
+            if ($theme !== null) {
+                $found[] = $theme;
+            }
+        }
+
+        return $found;
+    }
+
+    private function readFrom(string $themesDir, string $id): ?Theme
+    {
+        $manifestPath = $themesDir . '/' . $id . '/' . self::MANIFEST;
+
         if (!$this->isSafeId($id) || !is_file($manifestPath)) {
             return null;
         }
@@ -209,7 +291,7 @@ final class ThemeRepository
             return null;
         }
 
-        if (!is_file($this->themesDir . '/' . $id . '/' . $theme->stylesheet())) {
+        if (!is_file($themesDir . '/' . $id . '/' . $theme->stylesheet())) {
             return null;
         }
 
@@ -237,11 +319,6 @@ final class ThemeRepository
         return $id === '' ? null : $id;
     }
 
-    /**
-     * Write-then-rename, as content and settings do: a page render that reads
-     * this file mid-save sees the old choice or the new one, never a truncated
-     * document that would leave the site unstyled.
-     */
     private function persist(string $id): bool
     {
         $directory = dirname($this->statePath);

@@ -147,7 +147,7 @@ final class AuthController
             return $this->check();
         }
 
-        return ['status' => 404, 'error' => 'Auth endpoint not found'];
+        return $this->fault(404, 'Auth endpoint not found');
     }
 
     /**
@@ -192,7 +192,7 @@ final class AuthController
             // Not announced as a failed sign-in: nothing was attempted against
             // any account, and an event with no username in it is noise an
             // alerting plugin would have to learn to ignore.
-            return ['status' => 400, 'error' => 'Username and password required'];
+            return $this->fault(400, 'Username and password required');
         }
 
         // The site-wide ceiling is consulted before anything touches the named
@@ -272,7 +272,7 @@ final class AuthController
             // throttle as well.
             $this->gate->announceLoginFailed($username, AuthGate::FAILED_INACTIVE);
 
-            return ['status' => 403, 'error' => 'Account is not active'];
+            return $this->fault(403, 'Account is not active');
         }
 
         // The one place a plugin can stop a sign-in. Everything an attacker
@@ -303,7 +303,7 @@ final class AuthController
             // wrong password: the credentials were right, something else is
             // outstanding. Which plugin refused, and for whom, is in the error
             // log and not in the response.
-            return ['status' => 403, 'error' => $refusal];
+            return $this->fault(403, $refusal);
         }
 
         // The password was right. If this account carries a second factor, the
@@ -423,14 +423,14 @@ final class AuthController
     private function completeTwoFactor(): array
     {
         if ($this->twoFactor === null) {
-            return ['status' => 404, 'error' => 'Auth endpoint not found'];
+            return $this->fault(404, 'Auth endpoint not found');
         }
 
         $session = $this->sessions->read();
         $username = $session['pendingTwoFactor'] ?? null;
 
         if (!is_string($username) || $username === '') {
-            return ['status' => 401, 'error' => 'Sign in again.'];
+            return $this->fault(401, 'Sign in again.');
         }
 
         // Absolute, not idle-based. A half-authenticated session left open on a
@@ -438,7 +438,7 @@ final class AuthController
         if ((int) ($session['pendingExpiresAt'] ?? 0) < time()) {
             $this->sessions->clear();
 
-            return ['status' => 401, 'error' => 'That took too long. Sign in again.'];
+            return $this->fault(401, 'That took too long. Sign in again.');
         }
 
         // The same ceiling and the same per-account lockout the password step
@@ -456,14 +456,14 @@ final class AuthController
 
         $code = (string) ($this->jsonBody()['code'] ?? '');
         if (trim($code) === '') {
-            return ['status' => 400, 'error' => 'Enter the code from your authenticator app.'];
+            return $this->fault(400, 'Enter the code from your authenticator app.');
         }
 
         if (!$this->twoFactor->verifyChallenge($username, $code)) {
             $this->gate->announceLoginFailed($username, AuthGate::FAILED_CREDENTIALS);
             $this->recordFailedLogin($username);
 
-            return ['status' => 401, 'error' => 'That code is not right.'];
+            return $this->fault(401, 'That code is not right.');
         }
 
         $account = $this->contentService->user($username);
@@ -471,7 +471,7 @@ final class AuthController
             // The account went away between the two steps. Nothing to sign in to.
             $this->sessions->clear();
 
-            return ['status' => 401, 'error' => 'Sign in again.'];
+            return $this->fault(401, 'Sign in again.');
         }
 
         $remember = (bool) ($session['pendingRemember'] ?? false);
@@ -492,7 +492,7 @@ final class AuthController
     {
         $user = $this->sessions->user();
         if ($user === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return $this->fault(401, 'Not authenticated');
         }
 
         if ($this->twoFactor === null) {
@@ -518,7 +518,7 @@ final class AuthController
     {
         $user = $this->sessions->user();
         if ($user === null || $this->twoFactor === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return $this->fault(401, 'Not authenticated');
         }
 
         $username = (string) ($user['username'] ?? '');
@@ -528,7 +528,7 @@ final class AuthController
             // Already protected. Replacing a confirmed second factor without
             // proof would make it removable by anyone holding a borrowed
             // session, which is the thing it exists to prevent.
-            return ['status' => 409, 'error' => 'Two-factor authentication is already on for this account. Turn it off first.'];
+            return $this->fault(409, 'Two-factor authentication is already on for this account. Turn it off first.');
         }
 
         return ['data' => $enrolment];
@@ -541,14 +541,14 @@ final class AuthController
     {
         $user = $this->sessions->user();
         if ($user === null || $this->twoFactor === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return $this->fault(401, 'Not authenticated');
         }
 
         $code = (string) ($this->jsonBody()['code'] ?? '');
         $username = (string) ($user['username'] ?? '');
 
         if (!$this->twoFactor->confirmEnrolment($username, $code)) {
-            return ['status' => 422, 'error' => 'That code is not right. Check your authenticator app and try again.'];
+            return $this->fault(422, 'That code is not right. Check your authenticator app and try again.');
         }
 
         // The session's own copy of the flag would otherwise say "off" until the
@@ -571,14 +571,14 @@ final class AuthController
     {
         $user = $this->sessions->user();
         if ($user === null || $this->twoFactor === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return $this->fault(401, 'Not authenticated');
         }
 
         $username = (string) ($user['username'] ?? '');
         $password = (string) ($this->jsonBody()['password'] ?? '');
 
         if ($password === '') {
-            return ['status' => 400, 'error' => 'Enter your password to turn this off.'];
+            return $this->fault(400, 'Enter your password to turn this off.');
         }
 
         $account = $this->contentService->user($username);
@@ -587,7 +587,7 @@ final class AuthController
         if (!is_string($hash) || !password_verify($password, $hash)) {
             $this->recordFailedLogin($username, false);
 
-            return ['status' => 403, 'error' => 'That password is not correct.'];
+            return $this->fault(403, 'That password is not correct.');
         }
 
         $this->twoFactor->disable($username);
@@ -612,7 +612,7 @@ final class AuthController
         $this->gate->announceLoginFailed($username, AuthGate::FAILED_CREDENTIALS);
         $this->recordFailedLogin($username);
 
-        return ['status' => 401, 'error' => 'Invalid credentials'];
+        return $this->fault(401, 'Invalid credentials');
     }
 
     /**
@@ -628,7 +628,7 @@ final class AuthController
     {
         $session = $this->sessions->user();
         if ($session === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return $this->fault(401, 'Not authenticated');
         }
 
         $data = $this->jsonBody();
@@ -636,34 +636,34 @@ final class AuthController
         $new = (string) ($data['newPassword'] ?? '');
 
         if ($current === '' || $new === '') {
-            return ['status' => 400, 'error' => 'Both the current and the new password are required.'];
+            return $this->fault(400, 'Both the current and the new password are required.');
         }
 
         $username = (string) ($session['username'] ?? '');
         $account = $this->contentService->user($username);
         if ($account === null) {
-            return ['status' => 404, 'error' => 'Account not found'];
+            return $this->fault(404, 'Account not found');
         }
 
         $hash = $account->data['password'] ?? null;
         if (!is_string($hash) || !password_verify($current, $hash)) {
             $this->recordFailedLogin($username, false);
-            return ['status' => 403, 'error' => 'The current password is not correct.'];
+            return $this->fault(403, 'The current password is not correct.');
         }
 
         $minimum = $this->passwordMinLength();
         if (mb_strlen($new) < $minimum) {
-            return ['status' => 422, 'error' => "The new password must be at least {$minimum} characters."];
+            return $this->fault(422, "The new password must be at least {$minimum} characters.");
         }
 
         if ($new === $current) {
-            return ['status' => 422, 'error' => 'The new password must differ from the current one.'];
+            return $this->fault(422, 'The new password must differ from the current one.');
         }
 
         // The seeded password is published, so it can never be the answer even
         // if it satisfies the length rule.
         if ($new === $this->initialPassword) {
-            return ['status' => 422, 'error' => 'That password cannot be used.'];
+            return $this->fault(422, 'That password cannot be used.');
         }
 
         $account->update([
@@ -726,7 +726,7 @@ final class AuthController
     {
         $user = $this->sessions->user();
         if ($user === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return $this->fault(401, 'Not authenticated');
         }
 
         return ['data' => $user];
@@ -884,5 +884,30 @@ final class AuthController
         $data = json_decode($input, true);
 
         return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Shape a known fault with a stable machine `code` beside `error`.
+     *
+     * @return array{status: int, error: string, code?: string}
+     */
+    private function fault(int $status, string $error): array
+    {
+        $code = match ($status) {
+            400 => 'bad_request',
+            401 => 'unauthenticated',
+            403 => 'forbidden',
+            404 => 'not_found',
+            409 => 'conflict',
+            422 => 'unprocessable',
+            429 => 'too_many_requests',
+            501 => 'not_implemented',
+            502 => 'bad_gateway',
+            default => null,
+        };
+
+        return $code !== null
+            ? ApiFault::of($status, $error, $code)
+            : ['status' => $status, 'error' => $error];
     }
 }

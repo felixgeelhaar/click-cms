@@ -77,3 +77,5 @@ demo/turboscience-web/package-lock.json
 # Local demos — never committed.
 demo/
 docker-compose.turboscience.yml
+test-results/
+playwright-report/

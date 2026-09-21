@@ -125,6 +125,23 @@ describe('selecting a type', () => {
 
     // The badge reflects each entry's derived publication state.
     expect(badges(wrapper)).toEqual(['Live', 'Draft']);
+    expect(wrapper.emitted('navigate')[0]).toEqual(['/admin/collections/blog']);
+  });
+
+  it('opens an entry editor from a deep-link route prop', async () => {
+    global.fetch = makeFetch();
+    const wrapper = mount(Collections, {
+      props: {
+        initialTypeId: 'blog',
+        initialSlug: 'hello-world',
+        initialCreating: false,
+        initialLocale: 'de',
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('.entry-edit').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Edit Blog Posts entry');
   });
 });
 
@@ -342,5 +359,36 @@ describe('publishing an entry', () => {
 
     // The badge in the editor now reflects the live state returned by publish.
     expect(wrapper.find('.publication-bar .status-badge').text()).toBe('Live');
+  });
+
+  it('shows a 409 publish refusal as a warning banner, not an error', async () => {
+    const base = makeFetch();
+    global.fetch = vi.fn(async (url, init = {}) => {
+      const method = (init.method || 'GET').toUpperCase();
+      const path = String(url).split('?')[0];
+      if (method === 'POST' && /\/publish$/.test(path)) {
+        return jsonRes(409, {
+          error: 'This entry has an open review that must be resolved first.',
+          code: 'conflict',
+        });
+      }
+      return base(url, init);
+    });
+
+    const wrapper = mount(Collections);
+    await flushPromises();
+    await wrapper.findAll('.collection-card')[0].trigger('click');
+    await flushPromises();
+    await wrapper.findAll('.btn-edit')[1].trigger('click');
+    await flushPromises();
+
+    await wrapper.find('.btn-publish').trigger('click');
+    await flushPromises();
+
+    const banner = wrapper.find('p.banner.warning[role="alert"]');
+    expect(banner.exists()).toBe(true);
+    expect(banner.classes()).not.toContain('error');
+    expect(banner.text()).toContain('open review');
+    expect(banner.text()).toContain('Open the review panel below');
   });
 });

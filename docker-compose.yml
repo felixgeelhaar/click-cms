@@ -34,6 +34,29 @@ services:
           cpus: "1.0"
           memory: 512M
 
+  # Production helper: `docker compose --profile cron up`
+  # Runs schedule, webhooks, updates and backup without a host crontab.
+  # Shares the same image and the same content/data volumes as the app.
+  click-cron:
+    image: click-cms:${CLICK_CMS_TAG:-local}
+    container_name: ${CLICK_CMS_CRON_NAME:-click-cms-cron}
+    volumes:
+      - ./content:/var/www/html/content
+      - ./data:/var/www/html/data
+    environment:
+      CLICK_CRON_SLEEP: "${CLICK_CRON_SLEEP:-300}"
+    entrypoint: ["/bin/sh", "/var/www/html/docker/cron-loop.sh"]
+    depends_on:
+      - click-cms
+    restart: unless-stopped
+    profiles:
+      - cron
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
   # Development only: `docker compose --profile dev up`
   admin-ui:
     image: node:22-alpine

@@ -7,14 +7,16 @@ namespace Click\Cms\Http;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Application\Plugin\PluginMarketplace;
+use Click\Cms\Domain\Identity\Capability;
+use Click\Cms\Domain\Identity\Role;
 
 /**
  * The plugin marketplace endpoint: browse a registry, install from it, or
  * upload a ZIP an administrator already has.
  *
- * Installing a plugin means adding executable code, so the kernel gates this
- * surface on a capability before the controller runs: browsing needs
- * ManagePlugins and installing (or uploading) needs InstallPlugins, both
+ * Installing a plugin means adding executable code, so this controller gates
+ * the surface on a capability (and on the marketplace feature flag): browsing
+ * needs ManagePlugins and installing (or uploading) needs InstallPlugins, both
  * administrator-only by default, on top of the authentication and CSRF the
  * request pipeline already enforces. The two install paths are not equally
  * trusted, and that is on purpose: a registry install verifies a signed
@@ -24,14 +26,20 @@ use Click\Cms\Application\Plugin\PluginMarketplace;
  * traversal before a byte lands.
  *
  * Pulled out of the kernel because browsing and installing plugins is not the
- * job of the thing that turns requests into responses.
+ * job of the thing that turns requests into responses. Enablement and the
+ * capability checks live here too, so Application only routes the path prefix.
  */
 final class MarketplaceController
 {
+    /**
+     * @param callable(): (?array<string, mixed>) $currentUser Resolves the
+     *        signed-in user for the current request, or null when anonymous.
+     */
     public function __construct(
         private readonly PluginManager $plugins,
         private readonly CoreConfig $config,
         private readonly string $basePath,
+        private readonly mixed $currentUser,
     ) {}
 
     /**
@@ -39,6 +47,22 @@ final class MarketplaceController
      */
     public function handle(string $path, string $method): array
     {
+        if (!$this->config->marketplaceEnabled()) {
+            return ApiFault::of(404, 'Marketplace disabled', 'not_found');
+        }
+
+        // Installing a plugin is running code on the server, so it is gated on a
+        // capability, not merely on being signed in. Authentication and CSRF
+        // are already enforced by the request pipeline; this is the authorization
+        // step. Browsing the catalogue needs the weaker ManagePlugins; the
+        // install POST needs InstallPlugins. Both are administrator-only by
+        // default.
+        $role = Role::fromName((($this->currentUser)() ?? [])['role'] ?? null);
+        $needed = ($method === 'POST') ? Capability::InstallPlugins : Capability::ManagePlugins;
+        if (!$role->can($needed)) {
+            return ApiFault::of(403, 'You do not have permission to manage plugins.', 'forbidden');
+        }
+
         $action = ltrim(preg_replace('#^marketplace#', '', $path), '/');
         $marketplace = new PluginMarketplace($this->plugins, $this->basePath);
         $registryUrl = $this->config->marketplaceRegistryUrl();
@@ -53,7 +77,7 @@ final class MarketplaceController
         }
 
         if ($method !== 'GET') {
-            return ['status' => 405, 'error' => 'Method not allowed'];
+            return ApiFault::of(405, 'Method not allowed', 'method_not_allowed');
         }
 
         return $this->catalog($marketplace, $registryUrl, $publicKey);
@@ -67,13 +91,13 @@ final class MarketplaceController
         $data = $this->jsonBody();
         $pluginId = $data['id'] ?? null;
         if ($pluginId === null) {
-            return ['status' => 400, 'error' => 'Plugin id is required'];
+            return ApiFault::of(400, 'Plugin id is required', 'bad_request');
         }
 
         $result = $marketplace->installFromRegistry($registryUrl, $publicKey, $pluginId, $data['version'] ?? null);
 
         if (!($result['success'] ?? false)) {
-            return ['status' => 400, 'error' => $result['error'] ?? 'Install failed'];
+            return ApiFault::of(400, $result['error'] ?? 'Install failed', 'bad_request');
         }
 
         return ['data' => $result['plugin'] ?? $result];
@@ -87,13 +111,13 @@ final class MarketplaceController
     private function upload(PluginMarketplace $marketplace): array
     {
         if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {
-            return ['status' => 400, 'error' => 'No file was uploaded.'];
+            return ApiFault::of(400, 'No file was uploaded.', 'bad_request');
         }
 
         $result = $marketplace->uploadPlugin($_FILES['file']);
 
         if (!($result['success'] ?? false)) {
-            return ['status' => 400, 'error' => $result['error'] ?? 'Upload failed'];
+            return ApiFault::of(400, $result['error'] ?? 'Upload failed', 'bad_request');
         }
 
         return ['status' => 201, 'data' => $result['plugin'] ?? $result];

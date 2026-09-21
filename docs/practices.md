@@ -37,14 +37,14 @@ changes. That is an entire bounded context — identity — implemented inside t
 HTTP kernel. It should be its own module behind its own interface, leaving the
 kernel to turn requests into responses.
 
-**Authorisation is spread across three layers.** Seven permission checks sit in
-`Application`, one in `CoreApiRoutes`, five in `PageService`. The domain knows
+**Authorisation is spread across layers.** Permission checks sit in
+`Application`, the peeled HTTP controllers, and `PageService`. The domain knows
 what a role may do, but nothing structurally requires a handler to ask, so a new
 endpoint can simply forget. Checks belong beside the operation they guard, not
 at whichever layer noticed first.
 
-**`CoreApiRoutes` is 869 lines** and mixes transport concerns with decisions
-that belong in an application service.
+The old `CoreApiRoutes` bag is gone (`SectionTypesController`, `PagesController`,
+`MediaController`); remaining kernel thinning is about `Application` itself.
 
 These are the same finding twice: the layering is right where it was designed,
 and absent where code accumulated.

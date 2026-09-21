@@ -62,6 +62,32 @@ describe('Sidebar', () => {
     expect(mountSidebar({ showBuilder: true }).find('a[href="/admin/builder"]').exists()).toBe(true);
   });
 
+  it('only shows Reviews under Content when collaboration reviews are available', () => {
+    expect(mountSidebar({ showReviews: false }).find('a[href="/admin/reviews"]').exists()).toBe(false);
+
+    const shown = mountSidebar({ showReviews: true, userRole: 'editor' });
+    const link = shown.find('a[href="/admin/reviews"]');
+    expect(link.exists()).toBe(true);
+    expect(link.text()).toContain('Reviews');
+    // Content, not the admin-only Manage group — an editor still sees it.
+    expect(link.element.closest('ul')).toBe(shown.find('a[href="/admin/pages"]').element.closest('ul'));
+    expect(shown.find('a[href="/admin/users"]').exists()).toBe(false);
+  });
+
+  it('only shows Release under Content after Reviews when release is available', () => {
+    expect(mountSidebar({ showRelease: false }).find('a[href="/admin/release"]').exists()).toBe(false);
+
+    const shown = mountSidebar({ showReviews: true, showRelease: true, userRole: 'editor' });
+    const release = shown.find('a[href="/admin/release"]');
+    expect(release.exists()).toBe(true);
+    expect(release.text()).toContain('Release');
+    expect(release.element.closest('ul')).toBe(shown.find('a[href="/admin/pages"]').element.closest('ul'));
+
+    const hrefs = shown.findAll('a.nav-item').map((a) => a.attributes('href'));
+    expect(hrefs.indexOf('/admin/reviews')).toBeLessThan(hrefs.indexOf('/admin/release'));
+    expect(shown.find('a[href="/admin/users"]').exists()).toBe(false);
+  });
+
   it('collapses and expands a group from its header, with aria-expanded tracking it', async () => {
     const wrapper = mountSidebar();
     const header = wrapper.findAll('button.nav-group-header').find((b) => b.text().includes('Content'));

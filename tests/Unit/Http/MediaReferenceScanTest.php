@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Tests\Unit\Http;
 
-use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\PagesController;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -19,7 +19,7 @@ final class MediaReferenceScanTest extends TestCase
     {
         $sections = [['type' => 'media-text', 'values' => ['image' => 'harbour-crane-a1b2c3d4']]];
 
-        $this->assertSame(['harbour-crane-a1b2c3d4'], CoreApiRoutes::mediaIdsIn($sections));
+        $this->assertSame(['harbour-crane-a1b2c3d4'], PagesController::mediaIdsIn($sections));
     }
 
     public function testFindsIdsEmbeddedInAMarkdownBody(): void
@@ -29,14 +29,14 @@ final class MediaReferenceScanTest extends TestCase
             'values' => ['body' => "## Simulation\n![Simulation](simulation-xl-a64bf155)\n\ntext"],
         ]];
 
-        $this->assertSame(['simulation-xl-a64bf155'], CoreApiRoutes::mediaIdsIn($sections));
+        $this->assertSame(['simulation-xl-a64bf155'], PagesController::mediaIdsIn($sections));
     }
 
     public function testFindsIdsInsideAUrl(): void
     {
         $sections = [['values' => ['body' => '<img src="/api/media/file/hero-poster-9653dc33.jpg">']]];
 
-        $this->assertSame(['hero-poster-9653dc33'], CoreApiRoutes::mediaIdsIn($sections));
+        $this->assertSame(['hero-poster-9653dc33'], PagesController::mediaIdsIn($sections));
     }
 
     public function testCollectsEveryDistinctIdOnceInOrder(): void
@@ -46,7 +46,7 @@ final class MediaReferenceScanTest extends TestCase
             ['values' => ['body' => 'again ![a](one-image-aaaaaaaa)']],
         ];
 
-        $this->assertSame(['one-image-aaaaaaaa', 'two-image-bbbbbbbb'], CoreApiRoutes::mediaIdsIn($sections));
+        $this->assertSame(['one-image-aaaaaaaa', 'two-image-bbbbbbbb'], PagesController::mediaIdsIn($sections));
     }
 
     public function testDoesNotMatchALongerHexRun(): void
@@ -55,13 +55,13 @@ final class MediaReferenceScanTest extends TestCase
         // media id and must not be picked up.
         $sections = [['values' => ['body' => 'commit deadbeef-0123456789abcdef in the notes']]];
 
-        $this->assertSame([], CoreApiRoutes::mediaIdsIn($sections));
+        $this->assertSame([], PagesController::mediaIdsIn($sections));
     }
 
     public function testIgnoresOrdinaryWords(): void
     {
         $sections = [['values' => ['heading' => 'Leistungen', 'body' => 'Vier Kernbereiche.']]];
 
-        $this->assertSame([], CoreApiRoutes::mediaIdsIn($sections));
+        $this->assertSame([], PagesController::mediaIdsIn($sections));
     }
 }

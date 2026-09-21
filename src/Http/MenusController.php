@@ -71,7 +71,7 @@ final class MenusController
         $content = $this->menuContent($id, $locale);
 
         return $content === null
-            ? ['status' => 404, 'error' => 'Menu not found']
+            ? ApiFault::of(404, 'Menu not found', 'not_found')
             : ['data' => $this->menuOf($content)->toArray()];
     }
 
@@ -94,14 +94,14 @@ final class MenusController
                 $this->itemsFromBody($body['items'] ?? []),
             );
         } catch (InvalidArgumentException $e) {
-            return ['status' => 400, 'error' => $e->getMessage()];
+            return ApiFault::of(400, $e->getMessage(), 'bad_request');
         }
 
         // Menu::create has already accepted the id as a slug, so this key is
         // always well-formed — keyFor cannot return null here.
         $key = $this->keyFor($menu->id(), $this->requestedLocale());
         if ($key === null) {
-            return ['status' => 400, 'error' => 'Invalid menu id'];
+            return ApiFault::of(400, 'Invalid menu id', 'bad_request');
         }
         $existing = $this->content->get($key);
 

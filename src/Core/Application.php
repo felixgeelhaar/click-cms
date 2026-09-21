@@ -33,9 +33,10 @@ use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\BasePath;
-use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\SectionTypesController;
 use Click\Cms\Http\ServerEnvironment;
 use Click\Cms\Http\TrustedProxies;
+use Click\Cms\Application\Theme\ThemeInstaller;
 use Click\Cms\Application\Theme\ThemeRepository;
 use Click\Cms\Application\Update\ReleaseFeed;
 use Click\Cms\Application\Update\UpdateInstaller;
@@ -44,6 +45,11 @@ use Click\Cms\Application\Update\UpdateScheduler;
 use Click\Cms\Application\Update\UpdateService;
 use Click\Cms\Http\MarketplaceController;
 use Click\Cms\Http\SeedController;
+use Click\Cms\Http\SettingsController;
+use Click\Cms\Http\SiteController;
+use Click\Cms\Http\AuditController;
+use Click\Cms\Application\Builder\BuilderBlockRepository;
+use Click\Cms\Http\BuilderBlocksController;
 use Click\Cms\Http\ThemesController;
 use Click\Cms\Http\UpdatesController;
 use Click\Cms\Application\Collection\BackReferenceService;
@@ -61,6 +67,8 @@ use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository;
 use Click\Cms\Http\CollectionsController;
 use Click\Cms\Http\MenusController;
+use Click\Cms\Http\MediaController;
+use Click\Cms\Http\PagesController;
 use Click\Cms\Http\NavigationRenderer;
 use Click\Cms\Http\RedirectsController;
 use Click\Cms\Http\PluginsController;
@@ -120,14 +128,20 @@ class Application
     private ?EventDispatcher $eventDispatcher = null;
     private ?EventBus $eventBus = null;
     private array $apiRoutes = [];
-    private ?CoreApiRoutes $coreApiRoutes = null;
+    private ?SectionTypesController $sectionTypesController = null;
+    private ?PagesController $pagesController = null;
     private ?UsersController $usersController = null;
     private ?PluginsController $pluginsController = null;
     private ?MarketplaceController $marketplaceController = null;
     private ?SeedController $seedController = null;
+    private ?SettingsController $settingsController = null;
+    private ?SiteController $siteController = null;
+    private ?AuditController $auditController = null;
     private ?RedirectsController $redirectsController = null;
     private ?MenusController $menusController = null;
+    private ?MediaController $mediaController = null;
     private ?ThemesController $themesController = null;
+    private ?BuilderBlocksController $builderBlocksController = null;
     private ?UpdatesController $updatesController = null;
     private ?ThemeRepository $themes = null;
     private ?RenderCache $renderCache = null;
@@ -549,7 +563,9 @@ class Application
         $this->history = new HistoryService($storage, $versions);
         $this->auditService = new AuditService($auditLog);
 
-        $this->coreApiRoutes = new CoreApiRoutes(
+        // Pages — peeled so CRUD / publication / schedule / versions / preview
+        // stop accumulating beside schema.
+        $this->pagesController = new PagesController(
             // The site's root, not the installation's: everything this builds —
             // storage, media, versions, schedules — belongs to one site. Schema
             // config is looked up separately, below, because a site may share
@@ -565,6 +581,13 @@ class Application
             new \Click\Cms\Application\Editing\FreeformPolicy(
                 $this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json')
             ),
+        );
+
+        // Section-type schema — what remains after pages and media were peeled
+        // out of the old CoreApiRoutes bag.
+        $this->sectionTypesController = new SectionTypesController(
+            $this->siteRoot(),
+            $this->basePath,
         );
 
         // User management is core (the admin UI depends on it); it fires the same
@@ -583,6 +606,15 @@ class Application
         // header, both reading the same stored menu.
         $this->menusController = new MenusController($this->contentService);
         $this->navigationRenderer = new NavigationRenderer($this->urlBase());
+
+        // Media library and file serving — peeled so media routes stop
+        // accumulating beside pages and schema.
+        $this->mediaController = new MediaController(
+            $this->siteRoot(),
+            fn (): array => $this->getSessionUser() ?? [],
+            $this->config,
+            $this->urlBase(),
+        );
 
         // Collections — repeatable content types (posts, team members, …) defined
         // in config/collections. Their entries are ordinary content documents, so
@@ -637,6 +669,19 @@ class Application
         $this->themes = ThemeRepository::forInstallation($this->basePath, '/themes', $this->siteRoot());
         $this->themesController = new ThemesController(
             $this->themes,
+            fn (): array => $this->getSessionUser() ?? [],
+            // Same Zip-Slip defences as plugin upload; themes land under themes/.
+            new ThemeInstaller(
+                $this->basePath . '/themes',
+                $this->siteRoot() . '/data/theme-uploads',
+                $this->themes,
+            ),
+        );
+
+        // Snapshot-only builder blocks: named subtrees authors paste into pages.
+        // Site-owned under data/, gated like free-form editing itself.
+        $this->builderBlocksController = new BuilderBlocksController(
+            new BuilderBlockRepository($this->siteRoot() . '/data/builder-blocks'),
             fn (): array => $this->getSessionUser() ?? [],
         );
 
@@ -695,6 +740,21 @@ class Application
             }
         }
 
+        // Themes shipped inside an active plugin (`plugins/<id>/themes/`). Disk
+        // themes still win on id collision — a site override must not require
+        // editing the plugin.
+        if ($this->themes !== null) {
+            foreach ($plugins as $plugin) {
+                if ($this->pluginManager->isDeactivated($plugin->id)) {
+                    continue;
+                }
+                $this->themes->registerPluginThemes(
+                    (string) $plugin->id,
+                    $plugin->path . '/themes'
+                );
+            }
+        }
+
         // The one extension point that can say no. Publishing is the first act
         // core lets a plugin refuse, and the refusal has to reach `PageService`,
         // which several handlers build for themselves and none of them have a
@@ -714,7 +774,12 @@ class Application
         // Plugin management is core — the admin UI's Plugins page depends on it —
         // so it is wired here rather than in a plugin that could be disabled.
         $this->pluginsController = new PluginsController($this->pluginManager, $this->urlBase());
-        $this->marketplaceController = new MarketplaceController($this->pluginManager, $this->config, $this->basePath);
+        $this->marketplaceController = new MarketplaceController(
+            $this->pluginManager,
+            $this->config,
+            $this->basePath,
+            fn (): ?array => $this->getSessionUser(),
+        );
 
         // Example-site seeding from the admin. Same SiteSeeder the CLI uses; the
         // controller only adds authentication and a ManageSettings gate so this
@@ -724,6 +789,27 @@ class Application
             $this->config,
             $this->siteRoot(),
             $this->basePath,
+            fn (): ?array => $this->getSessionUser(),
+        );
+
+        // Runtime settings. The controller shares the instance loaded at boot so
+        // a PUT is visible to the rest of this process, and flushes the render
+        // cache itself — settings are not content documents, so the storage
+        // decorator never sees the write.
+        $this->settingsController = new SettingsController(
+            $this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json'),
+            fn (): ?array => $this->getSessionUser(),
+            fn () => $this->renderCache?->flush(),
+        );
+
+        // Which site this session is editing, and the audit trail. Both were
+        // inline handlers; peeled so Application only routes the path.
+        $this->siteController = new SiteController(
+            fn (): Site => $this->site(),
+            fn (): SiteRegistry => $this->siteRegistry(),
+        );
+        $this->auditController = new AuditController(
+            $this->auditService,
             fn (): ?array => $this->getSessionUser(),
         );
 
@@ -836,7 +922,7 @@ class Application
     /**
      * Where deferred publications are kept, as the web path opens it.
      *
-     * The same directory {@see CoreApiRoutes} writes to, so a schedule set in
+     * The same directory {@see PagesController} writes to, so a schedule set in
      * the admin is the one the sweeper finds.
      */
     public function getScheduleStore(): FileScheduleStore
@@ -1671,23 +1757,9 @@ class Application
             }
         }
 
+        // Marketplace enablement and InstallPlugins / ManagePlugins gates live
+        // in the controller — Application only owns the path prefix dispatch.
         if (str_starts_with($path, 'marketplace')) {
-            if (!$this->isMarketplaceEnabled()) {
-                return ['status' => 404, 'error' => 'Marketplace disabled'];
-            }
-
-            // Installing a plugin is running code on the server, so it is gated on
-            // a capability, not merely on being signed in. Authentication and CSRF
-            // are already enforced above; this is the authorization the
-            // marketplace controller's own docstring assumed but nothing applied.
-            // Browsing the catalogue needs the weaker ManagePlugins; the install
-            // POST needs InstallPlugins. Both are administrator-only by default.
-            $role = Role::fromName(($this->getSessionUser() ?? [])['role'] ?? null);
-            $needed = ($method === 'POST') ? Capability::InstallPlugins : Capability::ManagePlugins;
-            if (!$role->can($needed)) {
-                return ['status' => 403, 'error' => 'You do not have permission to manage plugins.'];
-            }
-
             return $this->marketplaceController->handle($path, $method);
         }
 
@@ -1706,34 +1778,17 @@ class Application
         // admin UI can show the current mode; changing one is an administrator
         // action. CSRF and authentication have already been enforced above.
         if ($path === 'settings') {
-            return $this->handleSettingsRequest($method);
+            return $this->settingsController->handle($method);
         }
 
-        // Which site this admin session is editing.
-        //
-        // Read by the admin UI so it can say so on screen when an installation
-        // serves more than one. Somebody who looks after eight client sites and
-        // has three tabs open needs the answer visible, not inferable from the
-        // address bar — editing the wrong client's homepage is a mistake with no
-        // warning and an audience.
-        if ($path === 'site' && $method === 'GET') {
-            return ['data' => $this->site()->toArray() + [
-                'multiSite' => $this->siteRegistry()->isMultiSite(),
-            ]];
+        // Which site this admin session is editing — see SiteController.
+        if ($path === 'site') {
+            return $this->siteController->handle($method);
         }
 
-        // The audit trail — who did what, across the whole site. An operator
-        // accountability tool, so the service gates it to administrators; the
-        // handler only needs to have a session (enforced above) and hand the
-        // user to the service, which decides.
+        // The audit trail — see AuditController. Session already enforced above.
         if ($path === 'audit') {
-            $user = $this->getSessionUser() ?? [];
-            $result = $this->auditService?->recent($user, 100)
-                ?? ['entries' => null, 'error' => 'Audit is unavailable.', 'status' => 500];
-
-            return $result['error'] !== null
-                ? ['status' => $result['status'], 'error' => $result['error']]
-                : ['data' => $result['entries']];
+            return $this->auditController->handle($method);
         }
 
         // Core routes first. These are the management endpoints the admin UI
@@ -1742,13 +1797,16 @@ class Application
         // editable. Users and plugins management were once in the rest-api
         // plugin; they are core now, for exactly this reason.
         $coreTables = [
-            $this->coreApiRoutes->routes(),
+            $this->sectionTypesController->routes(),
+            $this->pagesController->routes(),
             $this->usersController->routes(),
             $this->pluginsController->routes(),
             $this->redirectsController->routes(),
             $this->menusController->routes(),
+            $this->mediaController->routes(),
             $this->collectionsController->routes(),
             $this->themesController->routes(),
+            $this->builderBlocksController->routes(),
             $this->updatesController->routes(),
         ];
         foreach ($coreTables as $table) {
@@ -1861,62 +1919,6 @@ class Application
         header('Content-Type: ' . ($contentType ?: 'text/html'));
 
         return ['raw' => true, 'html' => (string) $content, 'status' => $httpCode];
-    }
-
-    /**
-     * Read or change the runtime settings.
-     *
-     * Reading is allowed to any signed-in user, so the admin UI can show the
-     * current mode to everyone who can see the admin. Changing one needs the
-     * settings capability, which only an administrator has — turning a site
-     * headless takes its public pages away, and that is not an editor's call.
-     *
-     * @return array<string, mixed>
-     */
-    private function handleSettingsRequest(string $method): array
-    {
-        $user = $this->getSessionUser();
-        if ($user === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
-        }
-
-        if ($method === 'GET') {
-            return ['data' => ($this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json'))->toArray()];
-        }
-
-        if ($method !== 'PUT') {
-            return ['status' => 405, 'error' => 'Method not allowed'];
-        }
-
-        if (!Role::fromName($user['role'] ?? null)->can(Capability::ManageSettings)) {
-            return ['status' => 403, 'error' => 'You do not have permission to change settings.'];
-        }
-
-        $data = $this->getJsonBody();
-        $settings = $this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json');
-
-        // Only the keys we understand are acted on; an unknown key is ignored
-        // rather than stored, so the settings file cannot accrete arbitrary
-        // content a client decides to post.
-        if (array_key_exists('headless', $data)) {
-            $settings->setHeadless((bool) $data['headless']);
-        }
-        if (array_key_exists('siteName', $data) && is_string($data['siteName'])) {
-            $settings->setSiteName($data['siteName']);
-        }
-        if (array_key_exists('freeformEditing', $data)) {
-            $settings->setFreeformEditing((bool) $data['freeformEditing']);
-        }
-
-        // Settings are not content documents, so the storage decorator that
-        // invalidates the render cache never sees this write. The site name is
-        // the brand in every page's header, and headless mode changes whether
-        // there is a public page at all, so both reach every cached document.
-        // Free-form on/off does not change rendered HTML by itself (existing
-        // builder pages still render), but flushing keeps the rule simple.
-        $this->renderCache?->flush();
-
-        return ['data' => $settings->toArray()];
     }
 
     /**
@@ -2184,11 +2186,6 @@ class Application
         return $this->config?->authEnabled() ?? true;
     }
 
-    private function isMarketplaceEnabled(): bool
-    {
-        return $this->config?->marketplaceEnabled() ?? true;
-    }
-
     private function isGraphqlEnabled(): bool
     {
         return $this->config?->graphqlEnabled() ?? true;
@@ -2208,20 +2205,6 @@ class Application
         }
 
         return false;
-    }
-
-
-    private function getJsonBody(): array
-    {
-        $input = file_get_contents('php://input');
-
-        if (empty($input)) {
-            return $_POST;
-        }
-
-        $data = json_decode($input, true);
-
-        return $data ?? [];
     }
 
     /**

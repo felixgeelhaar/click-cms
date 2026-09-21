@@ -14,7 +14,12 @@
 
     <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
     <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
-    <p v-if="publishError" class="banner error" role="alert">{{ publishError }}</p>
+    <p
+      v-if="publishError"
+      class="banner"
+      :class="publishErrorEditorial ? 'warning' : 'error'"
+      role="alert"
+    >{{ publishError }}</p>
     <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
 
     <div v-if="loading" class="banner">Loading…</div>
@@ -215,7 +220,8 @@
         @reload="loadVersions"
       />
 
-      <!-- Review notes for this page. Comments live once the page does. -->
+      <!-- Collaboration: review workflow and notes. Shown once the page exists. -->
+      <ReviewPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" />
       <CommentsPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" />
     </div>
   </div>
@@ -225,6 +231,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import SectionEditor from './SectionEditor.vue';
 import PresenceBar from './collaboration/PresenceBar.vue';
+import ReviewPanel from './collaboration/ReviewPanel.vue';
 import CommentsPanel from './collaboration/CommentsPanel.vue';
 import PagePublication from './PagePublication.vue';
 import PageSchedule from './PageSchedule.vue';
@@ -282,6 +289,7 @@ const loadError = ref('');
 const saveError = ref('');
 const previewError = ref('');
 const publishError = ref('');
+const publishErrorEditorial = ref(false);
 const notice = ref('');
 const previewUrl = ref('');
 const previewExpiry = ref('');
@@ -633,6 +641,7 @@ const refreshPublication = async () => {
 
 const publicationAction = async (action) => {
   publishError.value = '';
+  publishErrorEditorial.value = false;
   notice.value = '';
   publishBusy.value = action;
 
@@ -644,7 +653,18 @@ const publicationAction = async (action) => {
     const body = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      publishError.value = body.error || `Could not ${action} this page (${res.status}).`;
+      // 409 is an editorial gate (e.g. open review), not a system fault — same
+      // message, distinct banner so it does not read as a crash.
+      let message = body.error || `Could not ${action} this page (${res.status}).`;
+      if (
+        res.status === 409 &&
+        /review/i.test(message) &&
+        !/review panel/i.test(message)
+      ) {
+        message = `${message} Open the review panel below.`;
+      }
+      publishError.value = message;
+      publishErrorEditorial.value = res.status === 409;
       return;
     }
 
@@ -656,6 +676,7 @@ const publicationAction = async (action) => {
     await Promise.all([loadTranslations(), loadVersions(), loadSchedule()]);
   } catch (e) {
     publishError.value = `Could not ${action} this page: ${e.message}`;
+    publishErrorEditorial.value = false;
   } finally {
     publishBusy.value = '';
   }
@@ -796,6 +817,7 @@ const switchLocale = async (code) => {
   previewUrl.value = '';
   notice.value = '';
   publishError.value = '';
+  publishErrorEditorial.value = false;
   saveError.value = '';
   await reload();
 };
@@ -893,6 +915,7 @@ onMounted(async () => {
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin-bottom: 2rem; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
 .banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.warning { color: var(--app-text); border: 1px solid var(--app-border); }
 .banner.notice { border: 1px solid var(--app-border); line-height: 1.5; }
 .edit-form { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: 2rem; }
 .form-group { margin-bottom: 1.5rem; }

@@ -5,6 +5,22 @@ const { title = 'Click CMS Admin' } = Astro.props;
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!--
+      Relative asset URLs (`./_astro/…`) keep one admin build portable across
+      subdirectory installs. A deep link like /admin/pages/edit/home would
+      otherwise resolve those against /admin/pages/edit/ and load HTML as JS —
+      a blank page. This base points at the /admin mount so ./_astro always
+      hits the real assets, whether the CMS sits at / or /2026/cms/.
+    -->
+    <script is:inline>
+      (function () {
+        var match = location.pathname.match(/^(.*?\/admin)(?:\/|$)/);
+        if (!match) return;
+        var base = document.createElement('base');
+        base.href = match[1].charAt(match[1].length - 1) === '/' ? match[1] : match[1] + '/';
+        document.head.insertBefore(base, document.head.firstChild);
+      })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title}</title>

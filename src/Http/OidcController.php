@@ -60,7 +60,7 @@ final class OidcController
             return ['data' => $this->status()];
         }
 
-        return ['status' => 404, 'error' => 'Auth endpoint not found'];
+        return $this->fault(404, 'Auth endpoint not found');
     }
 
     /**
@@ -87,7 +87,7 @@ final class OidcController
     private function start(): array
     {
         if (!$this->settings->enabled || $this->service === null) {
-            return ['status' => 404, 'error' => 'Single sign-on is not configured on this site.'];
+            return $this->fault(404, 'Single sign-on is not configured on this site.');
         }
 
         try {
@@ -95,7 +95,7 @@ final class OidcController
         } catch (Throwable $e) {
             error_log("click-cms sso: could not start a sign-in: {$e->getMessage()}");
 
-            return ['status' => 502, 'error' => 'Single sign-on is not available right now.'];
+            return $this->fault(502, 'Single sign-on is not available right now.');
         }
 
         // The three one-time secrets live in a pending session, server-side.
@@ -115,7 +115,7 @@ final class OidcController
     private function callback(): array
     {
         if (!$this->settings->enabled || $this->service === null) {
-            return ['status' => 404, 'error' => 'Single sign-on is not configured on this site.'];
+            return $this->fault(404, 'Single sign-on is not configured on this site.');
         }
 
         $session = $this->sessions->read();
@@ -210,5 +210,30 @@ final class OidcController
         $base = $this->urlBase?->url('/admin/') ?? '/admin/';
 
         return ['redirect' => $base . '?ssoError=' . rawurlencode($message)];
+    }
+
+    /**
+     * Shape a known fault with a stable machine `code` beside `error`.
+     *
+     * @return array{status: int, error: string, code?: string}
+     */
+    private function fault(int $status, string $error): array
+    {
+        $code = match ($status) {
+            400 => 'bad_request',
+            401 => 'unauthenticated',
+            403 => 'forbidden',
+            404 => 'not_found',
+            409 => 'conflict',
+            422 => 'unprocessable',
+            429 => 'too_many_requests',
+            501 => 'not_implemented',
+            502 => 'bad_gateway',
+            default => null,
+        };
+
+        return $code !== null
+            ? ApiFault::of($status, $error, $code)
+            : ['status' => $status, 'error' => $error];
     }
 }

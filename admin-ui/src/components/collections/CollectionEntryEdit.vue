@@ -4,7 +4,12 @@
 
     <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
     <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
-    <p v-if="publishError" class="banner error" role="alert">{{ publishError }}</p>
+    <p
+      v-if="publishError"
+      class="banner"
+      :class="publishErrorEditorial ? 'warning' : 'error'"
+      role="alert"
+    >{{ publishError }}</p>
     <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
 
     <div v-if="loading" class="banner">Loading…</div>
@@ -157,6 +162,20 @@
           </li>
         </ul>
       </section>
+
+      <!-- Collaboration: review workflow and comments. Shown once the entry exists. -->
+      <ReviewPanel
+        v-if="!isNew && storedSlug"
+        :type="type.id"
+        :page="storedSlug"
+        :locale="locale"
+      />
+      <CommentsPanel
+        v-if="!isNew && storedSlug"
+        :type="type.id"
+        :page="storedSlug"
+        :locale="locale"
+      />
     </div>
   </div>
 </template>
@@ -167,12 +186,16 @@ import RepeaterField from '../fields/RepeaterField.vue';
 import { leafComponent } from '../fields/leafComponent.js';
 import PageLanguages from '../PageLanguages.vue';
 import PageVersions from '../PageVersions.vue';
+import ReviewPanel from '../collaboration/ReviewPanel.vue';
+import CommentsPanel from '../collaboration/CommentsPanel.vue';
 
 const props = defineProps({
   // The full type object, including its `fields` schema.
   type: { type: Object, required: true },
   // The entry being edited, or null/absent when creating a new one.
   slug: { type: String, default: null },
+  // Optional locale from `?locale=` so a deep link opens that translation.
+  initialLocale: { type: String, default: '' },
 });
 
 const emit = defineEmits(['saved', 'cancel', 'deleted']);
@@ -194,6 +217,7 @@ const busy = ref('');
 const loadError = ref('');
 const saveError = ref('');
 const publishError = ref('');
+const publishErrorEditorial = ref(false);
 const notice = ref('');
 
 /* ------------------------------------------------ capabilities & langs -- */
@@ -310,7 +334,12 @@ const loadSiteLocales = async () => {
     const res = await fetch('/api/pages');
     const body = await res.json();
     siteLocales.value = Array.isArray(body.locales) ? body.locales : [];
-    if (!locale.value) locale.value = body.locale || siteLocales.value[0] || '';
+    if (!locale.value) {
+      locale.value = props.initialLocale
+        || body.locale
+        || siteLocales.value[0]
+        || '';
+    }
   } catch {
     siteLocales.value = [];
   }
@@ -474,13 +503,25 @@ const save = async () => {
 
 const publicationAction = async (action) => {
   publishError.value = '';
+  publishErrorEditorial.value = false;
   notice.value = '';
   busy.value = action;
   try {
     const res = await fetch(entryUrl(`/${action}${localeQuery()}`), { method: 'POST' });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      publishError.value = body.error || `Could not ${action} this entry (${res.status}).`;
+      // 409 is an editorial gate (e.g. open review), not a system fault — same
+      // message, distinct banner so it does not read as a crash.
+      let message = body.error || `Could not ${action} this entry (${res.status}).`;
+      if (
+        res.status === 409 &&
+        /review/i.test(message) &&
+        !/review panel/i.test(message)
+      ) {
+        message = `${message} Open the review panel below.`;
+      }
+      publishError.value = message;
+      publishErrorEditorial.value = res.status === 409;
       return;
     }
     publication.value = body.data?.publication ?? publication.value;
@@ -490,6 +531,7 @@ const publicationAction = async (action) => {
     await Promise.all([loadTranslations(), loadVersions(), loadBackReferences()]);
   } catch (e) {
     publishError.value = `Could not ${action} this entry: ${e.message}`;
+    publishErrorEditorial.value = false;
   } finally {
     busy.value = '';
   }
@@ -575,6 +617,7 @@ const switchLocale = async (code) => {
   locale.value = code;
   notice.value = '';
   publishError.value = '';
+  publishErrorEditorial.value = false;
   saveError.value = '';
   await reload();
 };
@@ -611,6 +654,7 @@ onMounted(async () => {
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin-bottom: 1.5rem; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
 .banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.warning { color: var(--app-text); border: 1px solid var(--app-border); }
 .banner.notice { border: 1px solid var(--app-border); }
 .edit-form { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: 2rem; }
 

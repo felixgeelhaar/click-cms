@@ -53,6 +53,13 @@ final class RedirectsController
     public function replace(): array
     {
         $body = $this->jsonBody();
+
+        // A missing list means "clear every redirect". A present non-list is a
+        // client mistake and must not silently wipe the set.
+        if (array_key_exists('redirects', $body) && !is_array($body['redirects'])) {
+            return ApiFault::of(400, 'Redirects must be a list.', 'bad_request');
+        }
+
         $raw = is_array($body['redirects'] ?? null) ? $body['redirects'] : [];
 
         // Normalise through the domain, which drops anything unsafe, then store

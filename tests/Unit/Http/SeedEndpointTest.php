@@ -93,6 +93,7 @@ final class SeedEndpointTest extends TestCase
         $result = $this->request('seed', 'POST');
 
         $this->assertSame(403, $result['status'] ?? null);
+        $this->assertSame('forbidden', $result['code'] ?? null);
     }
 
     public function testGetIsNotAllowed(): void
@@ -102,6 +103,7 @@ final class SeedEndpointTest extends TestCase
         $result = $this->request('seed', 'GET');
 
         $this->assertSame(405, $result['status'] ?? null);
+        $this->assertSame('method_not_allowed', $result['code'] ?? null);
     }
 
     public function testAnAdminCanSeedTheExampleSite(): void

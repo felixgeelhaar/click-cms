@@ -95,4 +95,18 @@ final class RedirectsControllerTest extends TestCase
 
         $this->assertSame(0, $this->redirects->rules()->count());
     }
+
+    public function testANonListRedirectsPayloadIsABadRequest(): void
+    {
+        $this->save([['from' => '/old', 'to' => '/new']]);
+
+        $_POST = ['redirects' => 'not-a-list'];
+        $result = $this->redirects->replace();
+        $_POST = [];
+
+        $this->assertSame(400, $result['status'] ?? 200);
+        $this->assertSame('bad_request', $result['code'] ?? null);
+        // The existing set is untouched — a bad payload must not wipe redirects.
+        $this->assertSame('/new', $this->redirects->rules()->match('/old')?->to);
+    }
 }

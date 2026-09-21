@@ -6,7 +6,7 @@
         type="button"
         class="btn-sm"
         :disabled="loading"
-        aria-label="Reload comments for this page"
+        aria-label="Reload comments for this document"
         @click="load"
       >
         {{ loading ? 'Loading…' : 'Refresh' }}
@@ -18,7 +18,7 @@
     <p v-if="loading && !comments.length" class="comments-empty">Loading…</p>
 
     <p v-else-if="!comments.length && !error" class="comments-empty">
-      No comments yet. Leave a note for whoever reviews this page.
+      No comments yet. Leave a note for whoever reviews this {{ kindLabel }}.
     </p>
 
     <!--
@@ -62,7 +62,7 @@
         v-model="draft"
         class="comment-input"
         rows="3"
-        placeholder="Leave a note for whoever reviews this page…"
+        :placeholder="`Leave a note for whoever reviews this ${kindLabel}…`"
         :disabled="posting"
       ></textarea>
       <div class="comment-form-actions">
@@ -75,13 +75,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps({
-  // The page and language the thread belongs to. Comments are addressed to a
-  // specific document, so both are needed to fetch and to post.
+  // The document and language the thread belongs to. Comments are addressed to a
+  // specific content key, so page + locale (+ optional type) are needed to fetch
+  // and to post.
   page: { type: String, required: true },
   locale: { type: String, default: '' },
+  /** Content type. Defaults to page so existing page-editor mounts stay valid. */
+  type: { type: String, default: 'page' },
 });
 
 const comments = ref([]);
@@ -91,11 +94,21 @@ const posting = ref(false);
 const busyId = ref('');
 const error = ref('');
 
+const kindLabel = computed(() => (props.type && props.type !== 'page' ? 'entry' : 'page'));
+
 const query = () => {
   const params = new URLSearchParams({ page: props.page });
   if (props.locale) params.set('locale', props.locale);
+  if (props.type && props.type !== 'page') params.set('type', props.type);
   return params.toString();
 };
+
+const commentBody = (extra = {}) => ({
+  page: props.page,
+  locale: props.locale || undefined,
+  type: props.type && props.type !== 'page' ? props.type : undefined,
+  ...extra,
+});
 
 const load = async () => {
   if (!props.page) return;
@@ -105,7 +118,7 @@ const load = async () => {
     const res = await fetch(`/api/collaboration/comments?${query()}`);
     if (!res.ok) {
       error.value = res.status === 403
-        ? 'You do not have permission to view comments on this page.'
+        ? `You do not have permission to view comments on this ${kindLabel.value}.`
         : 'Could not load comments. Please try again.';
       comments.value = [];
       return;
@@ -129,7 +142,7 @@ const submit = async () => {
     const res = await fetch('/api/collaboration/comments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ page: props.page, locale: props.locale, body }),
+      body: JSON.stringify(commentBody({ body })),
     });
     if (!res.ok) {
       error.value = 'Could not post the comment. Please try again.';
@@ -173,8 +186,8 @@ const formatWhen = (value) => {
   return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString();
 };
 
-// Follow the editor when they switch page or language.
-watch(() => [props.page, props.locale], load);
+// Follow the editor when they switch document or language.
+watch(() => [props.page, props.locale, props.type], load);
 
 onMounted(load);
 </script>

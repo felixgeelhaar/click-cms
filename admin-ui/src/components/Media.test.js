@@ -369,3 +369,34 @@ describe('a video in the library', () => {
     expect(wrapper.get('.card-meta').text()).toContain('2400×1600');
   });
 });
+
+/**
+ * Declared art-directed crops ride in urls.crops. The library shows them so an
+ * editor can check the focal point kept the subject in each box.
+ */
+describe('art-directed crop previews', () => {
+  it('shows each crop name and dimensions when urls.crops is present', async () => {
+    const wrapper = await mountMedia([item({
+      urls: {
+        original: '/api/media/file/harbour-crane-a1b2c3.jpg',
+        variants: { sm: { url: '/api/media/file/harbour-crane-a1b2c3-sm.jpg', width: 640 } },
+        crops: {
+          hero: { url: '/api/media/file/harbour-crane-a1b2c3-crop-hero.jpg', width: 1600, height: 900 },
+          card: { url: '/api/media/file/harbour-crane-a1b2c3-crop-card.jpg', width: 800, height: 800 },
+        },
+      },
+    })]);
+
+    const previews = wrapper.get('[data-test="crop-previews"]');
+    expect(previews.text()).toContain('hero');
+    expect(previews.text()).toContain('1600×900');
+    expect(previews.text()).toContain('card');
+    expect(previews.text()).toContain('800×800');
+  });
+
+  it('shows no crop preview list when the item has no crops', async () => {
+    const wrapper = await mountMedia([item()]);
+
+    expect(wrapper.find('[data-test="crop-previews"]').exists()).toBe(false);
+  });
+});

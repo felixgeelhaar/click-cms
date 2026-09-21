@@ -101,8 +101,13 @@ final class UpdateEndpointsTest extends TestCase
             fn (): array => ['role' => 'editor'],
         );
 
-        $this->assertSame(403, $controller->status()['status'] ?? null);
-        $this->assertSame(403, $controller->apply()['status'] ?? null);
+        $status = $controller->status();
+        $apply = $controller->apply();
+
+        $this->assertSame(403, $status['status'] ?? null);
+        $this->assertSame('forbidden', $status['code'] ?? null);
+        $this->assertSame(403, $apply['status'] ?? null);
+        $this->assertSame('forbidden', $apply['code'] ?? null);
     }
 
     /**
@@ -130,6 +135,8 @@ final class UpdateEndpointsTest extends TestCase
         $result = $this->controller()->apply();
 
         $this->assertNotSame(true, $result['data']['installed'] ?? null);
+        $this->assertSame(400, $result['status'] ?? null);
         $this->assertArrayHasKey('error', $result);
+        $this->assertSame('bad_request', $result['code'] ?? null);
     }
 }

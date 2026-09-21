@@ -65,7 +65,7 @@
              sets. It is only in the tree while open. -->
         <div v-if="mobileNavOpen" class="sidebar-backdrop" aria-hidden="true" @click="mobileNavOpen = false"></div>
         <aside id="admin-sidebar" class="sidebar-shell" :class="{ collapsed: isCollapsed, 'is-open': mobileNavOpen }">
-          <Sidebar :active-route="currentRoute" :user-role="currentUser?.role" :collapsed="isCollapsed" :show-builder="hasBuilder" :show-webhooks="hasWebhooks" @navigate="handleNavigate" />
+          <Sidebar :active-route="currentRoute" :user-role="currentUser?.role" :collapsed="isCollapsed" :show-builder="hasBuilder" :show-webhooks="hasWebhooks" :show-reviews="hasReviews" :show-release="hasRelease" @navigate="handleNavigate" />
         </aside>
         <main id="admin-main" ref="mainEl" tabindex="-1" class="main-content" :class="{ collapsed: isCollapsed }">
           <!-- Above the page rather than inside it, so it is seen once on
@@ -102,6 +102,8 @@ import Marketplace from './Marketplace.vue';
 import Themes from './Themes.vue';
 import Updates from './Updates.vue';
 import Builder from './Builder.vue';
+import ReviewsInbox from './collaboration/ReviewsInbox.vue';
+import Release from './collaboration/Release.vue';
 import ChangePassword from './ChangePassword.vue';
 import { installCsrfFetch, setCsrfToken } from '../lib/api.js';
 import { currentRoute as routeFromLocation, withBase } from '../lib/base.js';
@@ -142,6 +144,19 @@ const hasBuilder = computed(
 // show a menu item whose every request answers 404.
 const hasWebhooks = computed(
   () => installedPluginIds.value.includes('webhooks') && can('settings.manage')
+);
+
+// Same shape as webhooks: the inbox is offered only when the plugin that
+// serves it is installed, and only to accounts the review API will actually
+// answer — `content.edit.any`, the bar `GET /api/collaboration/review` holds.
+const hasReviews = computed(
+  () => installedPluginIds.value.includes('collaboration') && can('content.edit.any')
+);
+
+// Release publishes a chosen set together; the API needs `content.publish`, so
+// the nav follows that bar rather than the broader review-read capability.
+const hasRelease = computed(
+  () => installedPluginIds.value.includes('collaboration') && can('content.publish')
 );
 
 /** Site allows free-form; default on until settings load (matches server default). */
@@ -254,7 +269,7 @@ const getRouteComponent = () => {
   const path = currentRoute.value.split('?')[0];
   if (path === '/admin' || path === '/admin/') return Dashboard;
   if (path === '/admin/pages') return Pages;
-  if (path === '/admin/collections') return Collections;
+  if (path === '/admin/collections' || path.startsWith('/admin/collections/')) return Collections;
   if (path === '/admin/media') return Media;
   if (path === '/admin/users') return can('users.manage') ? Users : Dashboard;
   if (path === '/admin/profile') return Profile;
@@ -280,6 +295,8 @@ const getRouteComponent = () => {
   if (path === '/admin/submissions') return FormSubmissions;
   if (path === '/admin/builder') return hasBuilder.value ? Builder : Dashboard;
   if (path === '/admin/webhooks') return hasWebhooks.value ? Webhooks : Dashboard;
+  if (path === '/admin/reviews') return hasReviews.value ? ReviewsInbox : Dashboard;
+  if (path === '/admin/release') return hasRelease.value ? Release : Dashboard;
   if (path.startsWith('/admin/pages/edit/')) return PageEdit;
   if (path === '/admin/pages/new') return PageEdit;
   if (path.startsWith('/admin/plugins/')) return PluginDetail;
@@ -299,8 +316,31 @@ const getRouteProps = () => {
     const locale = new URLSearchParams((currentRoute.value.split('?')[1]) || '').get('locale') || '';
     return { initialLocale: locale };
   }
+  if (path === '/admin/collections' || path.startsWith('/admin/collections/')) {
+    // /admin/collections
+    // /admin/collections/{type}
+    // /admin/collections/{type}/entries/new
+    // /admin/collections/{type}/entries/{slug}
+    const locale = new URLSearchParams(query || '').get('locale') || '';
+    const parts = path.replace(/^\/admin\/collections\/?/, '').split('/').filter(Boolean);
+    const typeId = parts[0] ? decodeURIComponent(parts[0]) : '';
+    if (!typeId) return { initialTypeId: '', initialSlug: null, initialCreating: false, initialLocale: locale };
+    if (parts[1] === 'entries' && parts[2] === 'new') {
+      return { initialTypeId: typeId, initialSlug: null, initialCreating: true, initialLocale: locale };
+    }
+    if (parts[1] === 'entries' && parts[2]) {
+      return {
+        initialTypeId: typeId,
+        initialSlug: decodeURIComponent(parts[2]),
+        initialCreating: false,
+        initialLocale: locale,
+      };
+    }
+    return { initialTypeId: typeId, initialSlug: null, initialCreating: false, initialLocale: locale };
+  }
   if (path.startsWith('/admin/plugins/') && path !== '/admin/plugins') return { id: path.replace('/admin/plugins/', '') };
   if (path === '/admin/users') return { userRole: currentUser.value?.role, currentUsername: currentUser.value?.username };
+  if (path === '/admin/reviews') return { currentUsername: currentUser.value?.username };
   if (path === '/admin/plugins') return { userRole: currentUser.value?.role };
   if (path === '/admin/profile' && currentUser.value) return { user: currentUser.value };
   if (path === '/admin' || path === '/admin/') {

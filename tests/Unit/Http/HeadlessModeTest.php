@@ -8,6 +8,7 @@ use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Core\Application;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Http\SettingsController;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -126,6 +127,19 @@ final class HeadlessModeTest extends TestCase
         $_COOKIE[SessionStore::COOKIE] = $id;
     }
 
+    /**
+     * The settings tests used to reflect into Application::handleSettingsRequest.
+     * That method is gone; the controller is the thing under test, given the
+     * same session cookie the kernel would read.
+     */
+    private function settings(): SettingsController
+    {
+        return new SettingsController(
+            $this->base . '/data/settings.json',
+            fn (): ?array => (new SessionStore($this->base . '/data/sessions'))->user(),
+        );
+    }
+
     /* ----------------------------------------------- who may switch -- */
 
     public function testAnEditorCannotChangeSettings(): void
@@ -135,9 +149,15 @@ final class HeadlessModeTest extends TestCase
         // The role gate fires before the body is read, so an empty PUT still
         // proves the boundary: taking a site's public pages away is not an
         // editor's decision.
-        $result = (new \ReflectionMethod($this->app, 'handleSettingsRequest'))->invoke($this->app, 'PUT');
+        $result = $this->settings()->handle('PUT');
 
         $this->assertSame(403, $result['status'] ?? null);
+        $this->assertSame('forbidden', $result['code'] ?? null);
+        // The session file has no CSRF token, so the kernel's gate lets this
+        // through and the controller is what refuses — the same 403, with a code.
+        $viaKernel = $this->app->route('/api/settings', 'PUT');
+        $this->assertSame(403, $viaKernel['status'] ?? null);
+        $this->assertSame('forbidden', $viaKernel['code'] ?? null);
         $this->assertFalse(is_file($this->base . '/data/settings.json'));
     }
 
@@ -145,19 +165,23 @@ final class HeadlessModeTest extends TestCase
     {
         $this->signIn('editor');
 
-        $read = (new \ReflectionMethod($this->app, 'handleSettingsRequest'))->invoke($this->app, 'GET');
+        $read = $this->settings()->handle('GET');
 
         $this->assertSame(
             ['headless' => false, 'siteName' => '', 'freeformEditing' => true],
             $read['data'] ?? null
         );
+
+        $viaKernel = $this->app->route('/api/settings', 'GET');
+        $this->assertSame($read['data'], $viaKernel['data'] ?? null);
     }
 
     public function testAnAnonymousRequestCannotReadSettings(): void
     {
-        $result = (new \ReflectionMethod($this->app, 'handleSettingsRequest'))->invoke($this->app, 'GET');
+        $result = $this->settings()->handle('GET');
 
         $this->assertSame(401, $result['status'] ?? null);
+        $this->assertSame('unauthenticated', $result['code'] ?? null);
     }
 
     /* -------------------------------------------------- the default -- */

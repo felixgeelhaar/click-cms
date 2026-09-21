@@ -13,8 +13,8 @@ use ReflectionObject;
  * Installing a plugin runs code on the server, so the marketplace is gated on a
  * capability rather than merely on being signed in. These drive the kernel the
  * way a request does, with a seeded session, to prove a non-admin is refused and
- * an admin is not — the authorization the controller's docstring assumed but
- * nothing applied until now.
+ * an admin is not — authorization now lives in MarketplaceController (same
+ * peel as Themes / Seed), not inline in Application.
  */
 final class MarketplaceGuardTest extends TestCase
 {
@@ -87,6 +87,7 @@ final class MarketplaceGuardTest extends TestCase
         $result = $this->request('marketplace', 'GET');
 
         $this->assertSame(403, $result['status'] ?? null);
+        $this->assertSame('forbidden', $result['code'] ?? null);
     }
 
     public function testAnAuthorCannotReachTheMarketplace(): void
@@ -98,6 +99,7 @@ final class MarketplaceGuardTest extends TestCase
         $result = $this->request('marketplace', 'GET');
 
         $this->assertSame(403, $result['status'] ?? null);
+        $this->assertSame('forbidden', $result['code'] ?? null);
     }
 
     public function testAnAdminReachesTheMarketplace(): void
@@ -125,6 +127,7 @@ final class MarketplaceGuardTest extends TestCase
         $result = $this->request('marketplace/upload', 'POST');
 
         $this->assertSame(400, $result['status'] ?? null);
+        $this->assertSame('bad_request', $result['code'] ?? null);
         $this->assertStringContainsString('uploaded', strtolower((string) ($result['error'] ?? '')));
     }
 
@@ -136,6 +139,7 @@ final class MarketplaceGuardTest extends TestCase
         $result = $this->request('marketplace/upload', 'POST');
 
         $this->assertSame(403, $result['status'] ?? null);
+        $this->assertSame('forbidden', $result['code'] ?? null);
     }
 
     public function testAnAdminCanUploadAPluginZip(): void

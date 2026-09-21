@@ -80,7 +80,7 @@ final class PluginsController
     {
         $plugin = $this->resolve($id);
         if ($plugin === null) {
-            return ['status' => 404, 'error' => 'Plugin not found'];
+            return ApiFault::of(404, 'Plugin not found', 'not_found');
         }
 
         $dir = $this->plugins->getBasePath() . '/plugins/' . $plugin->id->value;
@@ -194,7 +194,7 @@ final class PluginsController
         try {
             $pluginId = PluginId::fromString($id);
         } catch (Throwable) {
-            return ['status' => 400, 'error' => 'Invalid plugin ID'];
+            return ApiFault::of(400, 'Invalid plugin ID', 'bad_request');
         }
 
         $result = $activate
@@ -202,7 +202,7 @@ final class PluginsController
             : $this->plugins->deactivate($pluginId);
 
         if (!($result['success'] ?? false)) {
-            return ['status' => 400, 'error' => $result['error'] ?? 'Operation failed'];
+            return ApiFault::of(400, $result['error'] ?? 'Operation failed', 'bad_request');
         }
 
         $key = $activate ? 'activated' : 'deactivated';

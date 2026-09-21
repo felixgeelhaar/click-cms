@@ -112,8 +112,8 @@ So the handover is three steps:
 2. **Send them the address.** The whole thing, as you would any link —
    `https://your-site.com/preview/blog/why-we-stopped-staining`. Copying it out
    of your browser's address bar is the way not to mistype it.
-3. **Tell them it is ready.** Entries have no comments box — that is a page
-   feature — so this part happens wherever your team already talks.
+3. **Tell them it is ready.** Leave a note in the entry's comments box (same
+   collaboration panel as pages), or tell them wherever your team already talks.
 
 Three things to know before you rely on it:
 

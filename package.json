@@ -1,5 +1,10 @@
 {
   "dependencies": {
+    "@playwright/test": "^1.61.1",
     "playwright": "^1.61.1"
+  },
+  "scripts": {
+    "test:e2e": "CLICK_E2E=1 playwright test",
+    "test:e2e:check": "playwright test"
   }
 }

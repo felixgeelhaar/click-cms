@@ -122,7 +122,7 @@ final class CollectionsController
     {
         $found = $this->collections->collectionType($type);
         if ($found === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
 
         return ['data' => $found->toArray()];
@@ -134,7 +134,7 @@ final class CollectionsController
     {
         $collectionType = $this->collections->collectionType($type);
         if ($collectionType === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
 
         $locale = $this->localeParam();
@@ -151,12 +151,12 @@ final class CollectionsController
     {
         $collectionType = $this->collections->collectionType($type);
         if ($collectionType === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
 
         $entry = $this->collections->find($type, $slug, $this->localeParam());
         if ($entry === null) {
-            return ['status' => 404, 'error' => 'Entry not found.'];
+            return $this->fault(404, 'Entry not found.');
         }
 
         $response = ['data' => $this->entryView($collectionType, $entry, true)];
@@ -192,7 +192,7 @@ final class CollectionsController
     {
         $result = $this->collections->delete($type, $slug, $this->user(), $this->localeParam());
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         return ['data' => null];
@@ -219,10 +219,10 @@ final class CollectionsController
     public function listEntryVersions(string $type, string $slug): array
     {
         if ($this->collections->collectionType($type) === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
         if ($this->history === null) {
-            return ['status' => 501, 'error' => 'Version history is not available.'];
+            return $this->fault(501, 'Version history is not available.');
         }
 
         // Versions belong to one translation, so the key carries the locale the
@@ -234,7 +234,7 @@ final class CollectionsController
         );
 
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         return ['data' => $result['versions']];
@@ -243,10 +243,10 @@ final class CollectionsController
     public function getEntryVersion(string $type, string $slug, string $id): array
     {
         if ($this->collections->collectionType($type) === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
         if ($this->history === null) {
-            return ['status' => 501, 'error' => 'Version history is not available.'];
+            return $this->fault(501, 'Version history is not available.');
         }
 
         $result = $this->history->get(
@@ -256,7 +256,7 @@ final class CollectionsController
         );
 
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         return ['data' => $result['version']->toArray()];
@@ -266,10 +266,10 @@ final class CollectionsController
     {
         $collectionType = $this->collections->collectionType($type);
         if ($collectionType === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
         if ($this->history === null) {
-            return ['status' => 501, 'error' => 'Version history is not available.'];
+            return $this->fault(501, 'Version history is not available.');
         }
 
         $locale = $this->localeParam();
@@ -280,7 +280,7 @@ final class CollectionsController
         );
 
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         // The entry as it now stands, so the editor sees the result of the
@@ -305,13 +305,13 @@ final class CollectionsController
     public function listBackReferences(string $type, string $slug): array
     {
         if ($this->collections->collectionType($type) === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
         if ($this->backReferences === null) {
-            return ['status' => 501, 'error' => 'Back-references are not available.'];
+            return $this->fault(501, 'Back-references are not available.');
         }
         if ($this->user() === []) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return $this->fault(401, 'Not authenticated');
         }
 
         return ['data' => $this->backReferences->referencesTo($type, $slug, $this->localeParam())];
@@ -330,18 +330,18 @@ final class CollectionsController
     public function createEntryPreviewLink(string $type, string $slug): array
     {
         if ($this->collections->collectionType($type) === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
         if ($this->previewLinks === null) {
-            return ['status' => 501, 'error' => 'Preview links are not available.'];
+            return $this->fault(501, 'Preview links are not available.');
         }
 
         $user = $this->user();
         if ($user === []) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return $this->fault(401, 'Not authenticated');
         }
         if (!Role::fromName($user['role'] ?? null)->can(Capability::PreviewContent)) {
-            return ['status' => 403, 'error' => 'You do not have permission to share a preview of this entry.'];
+            return $this->fault(403, 'You do not have permission to share a preview of this entry.');
         }
 
         $locale = $this->localeParam();
@@ -351,12 +351,12 @@ final class CollectionsController
         // language, no fallback: a link minted for a German draft that does not
         // exist must not verify and then show the English one.
         if ($this->collections->find($type, $slug, $locale) === null) {
-            return ['status' => 404, 'error' => 'Entry not found.'];
+            return $this->fault(404, 'Entry not found.');
         }
 
         $link = $this->previewLinks->issue($key);
         if ($link === null) {
-            return ['status' => 500, 'error' => 'A preview link could not be signed. Check that data/ is writable.'];
+            return ApiFault::of(500, 'A preview link could not be signed. Check that data/ is writable.', 'preview_unsigned');
         }
 
         // The link points at the entry's own preview delivery endpoint. The
@@ -385,7 +385,7 @@ final class CollectionsController
     {
         $collectionType = $this->collections->collectionType($type);
         if ($collectionType === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
 
         $locale = $this->localeParam();
@@ -395,7 +395,7 @@ final class CollectionsController
         $bySignature = $this->previewLinks?->accepts($key, is_string($token) ? $token : null) ?? false;
 
         if (!$bySignature && $this->user() === []) {
-            return ['status' => 404, 'error' => 'Entry not found.'];
+            return $this->fault(404, 'Entry not found.');
         }
 
         // The working copy, in exactly this language with no fallback — the draft
@@ -403,7 +403,7 @@ final class CollectionsController
         // must be absent rather than quietly show another language.
         $entry = $this->collections->find($type, $slug, $locale);
         if ($entry === null) {
-            return ['status' => 404, 'error' => 'Entry not found.'];
+            return $this->fault(404, 'Entry not found.');
         }
 
         // The public delivery shape, with a marker that this is a draft preview
@@ -424,7 +424,7 @@ final class CollectionsController
     {
         $collectionType = $this->collections->collectionType($type);
         if ($collectionType === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
 
         // Filter and page the published set before rendering views, so a blog
@@ -448,12 +448,12 @@ final class CollectionsController
     {
         $collectionType = $this->collections->collectionType($type);
         if ($collectionType === null) {
-            return ['status' => 404, 'error' => 'Unknown collection.'];
+            return $this->fault(404, 'Unknown collection.');
         }
 
         $entry = $this->collections->findPublished($type, $slug, $this->localeParam());
         if ($entry === null) {
-            return ['status' => 404, 'error' => 'Entry not found.'];
+            return $this->fault(404, 'Entry not found.');
         }
 
         return ['data' => $this->entryView($collectionType, $entry, false)];
@@ -467,11 +467,12 @@ final class CollectionsController
     private function writeResult(string $type, array $result): array
     {
         if ($result['error'] !== null) {
-            return [
-                'status' => $result['status'],
-                'error' => $result['error'],
-                'errors' => $result['errors'],
-            ];
+            $response = $this->fault($result['status'], $result['error']);
+            if ($result['errors'] !== []) {
+                $response['errors'] = $result['errors'];
+            }
+
+            return $response;
         }
 
         $collectionType = $this->collections->collectionType($type);
@@ -586,5 +587,27 @@ final class CollectionsController
         $decoded = json_decode($raw, true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Shape a known fault with a stable machine `code` beside `error`.
+     *
+     * @return array{status: int, error: string, code?: string}
+     */
+    private function fault(int $status, string $error): array
+    {
+        $code = match ($status) {
+            400 => 'bad_request',
+            401 => 'unauthenticated',
+            403 => 'forbidden',
+            404 => 'not_found',
+            409 => 'conflict',
+            501 => 'not_implemented',
+            default => null,
+        };
+
+        return $code !== null
+            ? ApiFault::of($status, $error, $code)
+            : ['status' => $status, 'error' => $error];
     }
 }
