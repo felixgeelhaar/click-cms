@@ -230,11 +230,15 @@ added later against a stable record rather than something the workflow was
 designed around.
 
 **Admin UI.** The page editor carries a review panel (request / approve /
-ask-for-changes / cancel) against this API and the publish gate. Still open:
-the requester's own waiting list, an "open reviews" inbox for whoever reviews,
-a publish control that explains a `409` as an editorial state rather than an
-error (the panel already surfaces the refusal reason on publish), and a release
-screen that lists chosen pages with each one's readiness.
+ask-for-changes / cancel) against this API and the publish gate. The
+open-reviews inbox ships as well: `/admin/reviews`, under Content when the
+collaboration plugin is installed and the account may collaborate, lists every
+review still open (page, locale, state, requester, assignee, when it was
+asked) and links each row to the page editor. Still open: the requester's own
+waiting list, a publish control that explains a `409` as an editorial state
+rather than an error (the panel already surfaces the refusal reason on
+publish), and a release screen that lists chosen pages with each one's
+readiness.
 
 **Live cursors.** Still not planned, and not a gap. Polling presence is the
 deliberate ceiling — see the transport argument above.

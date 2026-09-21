@@ -48,16 +48,16 @@ final class SeedController
     public function handle(string $method): array
     {
         if ($method !== 'POST') {
-            return ['status' => 405, 'error' => 'Method not allowed'];
+            return ApiFault::of(405, 'Method not allowed', 'method_not_allowed');
         }
 
         $user = ($this->currentUser)();
         if ($user === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return ApiFault::of(401, 'Not authenticated', 'unauthenticated');
         }
 
         if (!Role::fromName($user['role'] ?? null)->can(Capability::ManageSettings)) {
-            return ['status' => 403, 'error' => 'You do not have permission to load the example site.'];
+            return ApiFault::of(403, 'You do not have permission to load the example site.', 'forbidden');
         }
 
         $pages = new PageService(

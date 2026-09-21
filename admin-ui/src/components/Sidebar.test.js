@@ -62,6 +62,18 @@ describe('Sidebar', () => {
     expect(mountSidebar({ showBuilder: true }).find('a[href="/admin/builder"]').exists()).toBe(true);
   });
 
+  it('only shows Reviews under Content when collaboration reviews are available', () => {
+    expect(mountSidebar({ showReviews: false }).find('a[href="/admin/reviews"]').exists()).toBe(false);
+
+    const shown = mountSidebar({ showReviews: true, userRole: 'editor' });
+    const link = shown.find('a[href="/admin/reviews"]');
+    expect(link.exists()).toBe(true);
+    expect(link.text()).toContain('Reviews');
+    // Content, not the admin-only Manage group — an editor still sees it.
+    expect(link.element.closest('ul')).toBe(shown.find('a[href="/admin/pages"]').element.closest('ul'));
+    expect(shown.find('a[href="/admin/users"]').exists()).toBe(false);
+  });
+
   it('collapses and expands a group from its header, with aria-expanded tracking it', async () => {
     const wrapper = mountSidebar();
     const header = wrapper.findAll('button.nav-group-header').find((b) => b.text().includes('Content'));

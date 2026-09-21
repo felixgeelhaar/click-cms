@@ -45,6 +45,7 @@ use Click\Cms\Application\Update\UpdateScheduler;
 use Click\Cms\Application\Update\UpdateService;
 use Click\Cms\Http\MarketplaceController;
 use Click\Cms\Http\SeedController;
+use Click\Cms\Http\SettingsController;
 use Click\Cms\Application\Builder\BuilderBlockRepository;
 use Click\Cms\Http\BuilderBlocksController;
 use Click\Cms\Http\ThemesController;
@@ -128,6 +129,7 @@ class Application
     private ?PluginsController $pluginsController = null;
     private ?MarketplaceController $marketplaceController = null;
     private ?SeedController $seedController = null;
+    private ?SettingsController $settingsController = null;
     private ?RedirectsController $redirectsController = null;
     private ?MenusController $menusController = null;
     private ?ThemesController $themesController = null;
@@ -747,6 +749,16 @@ class Application
             $this->siteRoot(),
             $this->basePath,
             fn (): ?array => $this->getSessionUser(),
+        );
+
+        // Runtime settings. The controller shares the instance loaded at boot so
+        // a PUT is visible to the rest of this process, and flushes the render
+        // cache itself — settings are not content documents, so the storage
+        // decorator never sees the write.
+        $this->settingsController = new SettingsController(
+            $this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json'),
+            fn (): ?array => $this->getSessionUser(),
+            fn () => $this->renderCache?->flush(),
         );
 
         // Identity — login, logout, password changes, the default admin — is its
@@ -1714,7 +1726,7 @@ class Application
         // admin UI can show the current mode; changing one is an administrator
         // action. CSRF and authentication have already been enforced above.
         if ($path === 'settings') {
-            return $this->handleSettingsRequest($method);
+            return $this->settingsController->handle($method);
         }
 
         // Which site this admin session is editing.
@@ -1870,62 +1882,6 @@ class Application
         header('Content-Type: ' . ($contentType ?: 'text/html'));
 
         return ['raw' => true, 'html' => (string) $content, 'status' => $httpCode];
-    }
-
-    /**
-     * Read or change the runtime settings.
-     *
-     * Reading is allowed to any signed-in user, so the admin UI can show the
-     * current mode to everyone who can see the admin. Changing one needs the
-     * settings capability, which only an administrator has — turning a site
-     * headless takes its public pages away, and that is not an editor's call.
-     *
-     * @return array<string, mixed>
-     */
-    private function handleSettingsRequest(string $method): array
-    {
-        $user = $this->getSessionUser();
-        if ($user === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
-        }
-
-        if ($method === 'GET') {
-            return ['data' => ($this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json'))->toArray()];
-        }
-
-        if ($method !== 'PUT') {
-            return ['status' => 405, 'error' => 'Method not allowed'];
-        }
-
-        if (!Role::fromName($user['role'] ?? null)->can(Capability::ManageSettings)) {
-            return ['status' => 403, 'error' => 'You do not have permission to change settings.'];
-        }
-
-        $data = $this->getJsonBody();
-        $settings = $this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json');
-
-        // Only the keys we understand are acted on; an unknown key is ignored
-        // rather than stored, so the settings file cannot accrete arbitrary
-        // content a client decides to post.
-        if (array_key_exists('headless', $data)) {
-            $settings->setHeadless((bool) $data['headless']);
-        }
-        if (array_key_exists('siteName', $data) && is_string($data['siteName'])) {
-            $settings->setSiteName($data['siteName']);
-        }
-        if (array_key_exists('freeformEditing', $data)) {
-            $settings->setFreeformEditing((bool) $data['freeformEditing']);
-        }
-
-        // Settings are not content documents, so the storage decorator that
-        // invalidates the render cache never sees this write. The site name is
-        // the brand in every page's header, and headless mode changes whether
-        // there is a public page at all, so both reach every cached document.
-        // Free-form on/off does not change rendered HTML by itself (existing
-        // builder pages still render), but flushing keeps the rule simple.
-        $this->renderCache?->flush();
-
-        return ['data' => $settings->toArray()];
     }
 
     /**
@@ -2212,20 +2168,6 @@ class Application
         }
 
         return false;
-    }
-
-
-    private function getJsonBody(): array
-    {
-        $input = file_get_contents('php://input');
-
-        if (empty($input)) {
-            return $_POST;
-        }
-
-        $data = json_decode($input, true);
-
-        return $data ?? [];
     }
 
     /**

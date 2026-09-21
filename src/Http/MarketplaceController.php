@@ -48,7 +48,7 @@ final class MarketplaceController
     public function handle(string $path, string $method): array
     {
         if (!$this->config->marketplaceEnabled()) {
-            return ['status' => 404, 'error' => 'Marketplace disabled'];
+            return ApiFault::of(404, 'Marketplace disabled', 'not_found');
         }
 
         // Installing a plugin is running code on the server, so it is gated on a
@@ -60,7 +60,7 @@ final class MarketplaceController
         $role = Role::fromName((($this->currentUser)() ?? [])['role'] ?? null);
         $needed = ($method === 'POST') ? Capability::InstallPlugins : Capability::ManagePlugins;
         if (!$role->can($needed)) {
-            return ['status' => 403, 'error' => 'You do not have permission to manage plugins.'];
+            return ApiFault::of(403, 'You do not have permission to manage plugins.', 'forbidden');
         }
 
         $action = ltrim(preg_replace('#^marketplace#', '', $path), '/');
@@ -77,7 +77,7 @@ final class MarketplaceController
         }
 
         if ($method !== 'GET') {
-            return ['status' => 405, 'error' => 'Method not allowed'];
+            return ApiFault::of(405, 'Method not allowed', 'method_not_allowed');
         }
 
         return $this->catalog($marketplace, $registryUrl, $publicKey);
@@ -91,13 +91,13 @@ final class MarketplaceController
         $data = $this->jsonBody();
         $pluginId = $data['id'] ?? null;
         if ($pluginId === null) {
-            return ['status' => 400, 'error' => 'Plugin id is required'];
+            return ApiFault::of(400, 'Plugin id is required', 'bad_request');
         }
 
         $result = $marketplace->installFromRegistry($registryUrl, $publicKey, $pluginId, $data['version'] ?? null);
 
         if (!($result['success'] ?? false)) {
-            return ['status' => 400, 'error' => $result['error'] ?? 'Install failed'];
+            return ApiFault::of(400, $result['error'] ?? 'Install failed', 'bad_request');
         }
 
         return ['data' => $result['plugin'] ?? $result];
@@ -111,13 +111,13 @@ final class MarketplaceController
     private function upload(PluginMarketplace $marketplace): array
     {
         if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {
-            return ['status' => 400, 'error' => 'No file was uploaded.'];
+            return ApiFault::of(400, 'No file was uploaded.', 'bad_request');
         }
 
         $result = $marketplace->uploadPlugin($_FILES['file']);
 
         if (!($result['success'] ?? false)) {
-            return ['status' => 400, 'error' => $result['error'] ?? 'Upload failed'];
+            return ApiFault::of(400, $result['error'] ?? 'Upload failed', 'bad_request');
         }
 
         return ['status' => 201, 'data' => $result['plugin'] ?? $result];

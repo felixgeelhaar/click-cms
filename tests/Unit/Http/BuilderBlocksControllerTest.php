@@ -75,14 +75,20 @@ final class BuilderBlocksControllerTest extends TestCase
 
     public function testAnonymousCallersCannotListBlocks(): void
     {
-        $this->assertSame(401, $this->controller([])->list()['status']);
+        $response = $this->controller([])->list();
+
+        $this->assertSame(401, $response['status']);
+        $this->assertSame('unauthenticated', $response['code']);
     }
 
     public function testAnEditorCannotListBlocks(): void
     {
         // Free-form builder is admin-only by default; the palette must not leak
         // saved layouts to accounts that cannot use them.
-        $this->assertSame(403, $this->controller(['role' => 'editor'])->list()['status']);
+        $response = $this->controller(['role' => 'editor'])->list();
+
+        $this->assertSame(403, $response['status']);
+        $this->assertSame('forbidden', $response['code']);
     }
 
     public function testAnAdministratorListsBlocks(): void
@@ -101,7 +107,10 @@ final class BuilderBlocksControllerTest extends TestCase
     {
         $_POST = $this->payload();
 
-        $this->assertSame(401, $this->controller([])->create()['status']);
+        $response = $this->controller([])->create();
+
+        $this->assertSame(401, $response['status']);
+        $this->assertSame('unauthenticated', $response['code']);
         $this->assertSame([], $this->repository()->all());
     }
 
@@ -112,6 +121,7 @@ final class BuilderBlocksControllerTest extends TestCase
         $response = $this->controller(['role' => 'editor'])->create();
 
         $this->assertSame(403, $response['status']);
+        $this->assertSame('forbidden', $response['code']);
         $this->assertSame([], $this->repository()->all());
     }
 
@@ -133,6 +143,7 @@ final class BuilderBlocksControllerTest extends TestCase
         $response = $this->controller(['role' => 'admin'])->create();
 
         $this->assertSame(400, $response['status']);
+        $this->assertSame('bad_request', $response['code']);
     }
 
     public function testCreatingWithARootMissingFromNodesIsRefused(): void
@@ -148,6 +159,7 @@ final class BuilderBlocksControllerTest extends TestCase
         $response = $this->controller(['role' => 'admin'])->create();
 
         $this->assertSame(400, $response['status']);
+        $this->assertSame('bad_request', $response['code']);
         $this->assertSame([], $this->repository()->all());
     }
 
@@ -164,6 +176,7 @@ final class BuilderBlocksControllerTest extends TestCase
         $response = $this->controller(['role' => 'admin'])->create();
 
         $this->assertSame(400, $response['status']);
+        $this->assertSame('bad_request', $response['code']);
     }
 
     /* -------------------------------------------------------------- delete -- */
@@ -184,6 +197,7 @@ final class BuilderBlocksControllerTest extends TestCase
         $response = $this->controller(['role' => 'admin'])->delete('nope');
 
         $this->assertSame(404, $response['status']);
+        $this->assertSame('not_found', $response['code']);
     }
 
     public function testAnEditorCannotDeleteBlocks(): void
@@ -193,6 +207,7 @@ final class BuilderBlocksControllerTest extends TestCase
         $response = $this->controller(['role' => 'editor'])->delete('hero');
 
         $this->assertSame(403, $response['status']);
+        $this->assertSame('forbidden', $response['code']);
         $this->assertNotNull($this->repository()->find('hero'));
     }
 

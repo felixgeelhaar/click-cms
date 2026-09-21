@@ -69,14 +69,14 @@ final class BuilderBlocksController
         $body = $this->jsonBody();
         $name = trim((string) ($body['name'] ?? ''));
         if ($name === '') {
-            return ['status' => 400, 'error' => 'Name the block.'];
+            return ApiFault::of(400, 'Name the block.', 'bad_request');
         }
 
         $root = $body['root'] ?? null;
         $nodes = $body['nodes'] ?? null;
         $invalid = $this->validateSubtree($root, $nodes);
         if ($invalid !== null) {
-            return ['status' => 400, 'error' => $invalid];
+            return ApiFault::of(400, $invalid, 'bad_request');
         }
 
         /** @var array<string, mixed> $nodes */
@@ -86,7 +86,7 @@ final class BuilderBlocksController
             'nodes' => $nodes,
         ]);
         if ($saved === null) {
-            return ['status' => 500, 'error' => 'Could not save the block.'];
+            return ApiFault::of(500, 'Could not save the block.', 'save_failed');
         }
 
         return ['status' => 201, 'data' => $saved];
@@ -103,7 +103,7 @@ final class BuilderBlocksController
         }
 
         if (!$this->blocks->delete($id)) {
-            return ['status' => 404, 'error' => 'Block not found'];
+            return ApiFault::of(404, 'Block not found', 'not_found');
         }
 
         return ['data' => ['deleted' => true, 'id' => $id]];
@@ -120,10 +120,10 @@ final class BuilderBlocksController
     {
         $user = $this->user();
         if ($user === []) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return ApiFault::of(401, 'Not authenticated', 'unauthenticated');
         }
         if (!Role::fromName($user['role'] ?? null)->can(Capability::UseFreeFormBuilder)) {
-            return ['status' => 403, 'error' => 'You do not have permission to manage builder blocks.'];
+            return ApiFault::of(403, 'You do not have permission to manage builder blocks.', 'forbidden');
         }
 
         return null;

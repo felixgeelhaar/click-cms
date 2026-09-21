@@ -153,15 +153,16 @@ final class UpdatesController
         );
 
         if (!$result['attempted']) {
-            return ['status' => 400, 'error' => $result['error'] ?? 'There is no update to install.'];
+            return ApiFault::of(400, $result['error'] ?? 'There is no update to install.', 'bad_request');
         }
 
         if (!$result['success']) {
             // The reason, not a bare 500 — and the reason matters more since the
             // installer learned to admit when a rollback did not work: that
             // message tells an operator the site is part-updated and where the
-            // backup is.
-            return ['status' => 500, 'error' => $result['error'] ?? 'The update could not be installed.'];
+            // backup is. `update_failed` names that known outcome; an unexpected
+            // fault still stays an opaque 500 and must not use ApiFault.
+            return ApiFault::of(500, $result['error'] ?? 'The update could not be installed.', 'update_failed');
         }
 
         // What was remembered describes the version that was running a moment
@@ -226,11 +227,11 @@ final class UpdatesController
     {
         $user = ($this->currentUser)();
         if ($user === []) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return ApiFault::of(401, 'Not authenticated', 'unauthenticated');
         }
 
         if (!Role::fromName($user['role'] ?? null)->can(Capability::InstallPlugins)) {
-            return ['status' => 403, 'error' => 'You do not have permission to update this site.'];
+            return ApiFault::of(403, 'You do not have permission to update this site.', 'forbidden');
         }
 
         return null;
