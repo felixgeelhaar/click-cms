@@ -71,5 +71,5 @@ test('admin can open the home page editor and see Save', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Pages' })).toBeVisible({ timeout: 15_000 });
 
   await page.goto('/admin/pages/edit/home');
-  await expect(page.getByRole('button', { name: 'Save' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible({ timeout: 15_000 });
 });
