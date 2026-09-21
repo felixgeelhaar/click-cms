@@ -71,7 +71,7 @@ final class UsersController
         $user = $this->content->user($username);
 
         return $user === null
-            ? ['status' => 404, 'error' => 'User not found']
+            ? $this->fault(404, 'User not found')
             : ['data' => $this->withoutPassword($user->toArray())];
     }
 
@@ -83,22 +83,22 @@ final class UsersController
         $data = $this->jsonBody();
 
         if (!isset($data['email'])) {
-            return ['status' => 400, 'error' => 'Email required'];
+            return $this->fault(400, 'Email required');
         }
         if (empty($data['password'])) {
-            return ['status' => 400, 'error' => 'Password required'];
+            return $this->fault(400, 'Password required');
         }
 
         $bad = $this->rejectWeakPassword((string) $data['password']);
         if ($bad !== null) {
-            return ['status' => 400, 'error' => $bad];
+            return $this->fault(400, $bad);
         }
 
         $data['password'] = password_hash((string) $data['password'], PASSWORD_DEFAULT);
         $username = $data['username'] ?? $this->slugify((string) $data['email']);
 
         if ($this->content->user($username) !== null) {
-            return ['status' => 409, 'error' => 'User already exists'];
+            return $this->fault(409, 'User already exists');
         }
 
         $content = Content::create($this->content->userKey($username), $data);
@@ -121,7 +121,7 @@ final class UsersController
         $data = $this->jsonBody();
         $user = $this->content->user($username);
         if ($user === null) {
-            return ['status' => 404, 'error' => 'User not found'];
+            return $this->fault(404, 'User not found');
         }
 
         // A blank password field means "leave it alone", not "set an empty
@@ -129,7 +129,7 @@ final class UsersController
         if (isset($data['password']) && $data['password'] !== '') {
             $bad = $this->rejectWeakPassword((string) $data['password']);
             if ($bad !== null) {
-                return ['status' => 400, 'error' => $bad];
+                return $this->fault(400, $bad);
             }
             $data['password'] = password_hash((string) $data['password'], PASSWORD_DEFAULT);
         } else {
@@ -168,7 +168,7 @@ final class UsersController
     public function delete(string $username): array
     {
         if ($this->content->user($username) === null) {
-            return ['status' => 404, 'error' => 'User not found'];
+            return $this->fault(404, 'User not found');
         }
 
         $this->content->delete($this->content->userKey($username));
@@ -237,5 +237,30 @@ final class UsersController
         $data = json_decode($input, true);
 
         return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Shape a known fault with a stable machine `code` beside `error`.
+     *
+     * @return array{status: int, error: string, code?: string}
+     */
+    private function fault(int $status, string $error): array
+    {
+        $code = match ($status) {
+            400 => 'bad_request',
+            401 => 'unauthenticated',
+            403 => 'forbidden',
+            404 => 'not_found',
+            409 => 'conflict',
+            422 => 'unprocessable',
+            429 => 'too_many_requests',
+            501 => 'not_implemented',
+            502 => 'bad_gateway',
+            default => null,
+        };
+
+        return $code !== null
+            ? ApiFault::of($status, $error, $code)
+            : ['status' => $status, 'error' => $error];
     }
 }

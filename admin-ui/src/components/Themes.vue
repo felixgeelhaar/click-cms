@@ -23,7 +23,8 @@
     <p class="upload-hint muted">
       A ZIP with a <code>theme.json</code> and its stylesheet. Uploads are not
       signature-verified — install one only if you trust where it came from.
-      You can still copy a folder into <code>themes/</code> on disk.
+      You can still copy a folder into <code>themes/</code> on disk, or ship one
+      inside a plugin under <code>plugins/&lt;id&gt;/themes/</code>.
     </p>
 
     <div v-if="loading" class="loading">Loading...</div>
@@ -38,6 +39,7 @@
           <p class="theme-meta">
             <span v-if="theme.version">v{{ theme.version }}</span>
             <span v-if="theme.author">{{ theme.author }}</span>
+            <span v-if="theme.source === 'plugin'" class="theme-source">From plugin {{ theme.pluginId }}</span>
           </p>
           <p>{{ theme.description || 'No description' }}</p>
         </div>
@@ -156,7 +158,8 @@ onMounted(load);
 .theme-card.active { border-color: var(--color-primary-600); }
 .theme-info h2 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
 .theme-info p { color: var(--app-text-muted); font-size: 0.875rem; }
-.theme-meta { display: flex; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.75rem; }
+.theme-meta { display: flex; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.75rem; flex-wrap: wrap; }
+.theme-source { color: var(--app-text-muted); }
 .theme-actions { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
 .status { font-size: 0.75rem; text-transform: uppercase; font-weight: 500; }
 .status.active { color: var(--color-success-text, #15803d); }

@@ -48,9 +48,40 @@ final class ThemesController
     {
         return [
             'GET /api/themes' => [$this, 'list'],
+            'GET /api/themes/:id/stylesheet' => [$this, 'serveStylesheet'],
             'POST /api/themes/activate' => [$this, 'activate'],
             'POST /api/themes/upload' => [$this, 'upload'],
         ];
+    }
+
+    /**
+     * Stream a theme's stylesheet for public pages.
+     *
+     * Disk themes normally load through the `/themes` alias; this route exists
+     * so a theme shipped inside a plugin — which that alias cannot see — still
+     * has a stable, cache-bustable URL. Marked public in {@see ApiGuard}.
+     *
+     * @return array<string, mixed>
+     */
+    public function serveStylesheet(string $id): array
+    {
+        $theme = $this->themes->find($id);
+        if ($theme === null) {
+            return ApiFault::of(404, 'Theme not found', 'not_found');
+        }
+
+        $path = $this->themes->stylesheetPath($theme);
+        if ($path === null) {
+            return ApiFault::of(404, 'Stylesheet not found', 'not_found');
+        }
+
+        $mtime = @filemtime($path) ?: time();
+        header('Content-Type: text/css; charset=utf-8');
+        header('Cache-Control: public, max-age=86400');
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
+        readfile($path);
+
+        return ['raw' => true];
     }
 
     /**
@@ -74,6 +105,8 @@ final class ThemesController
                         // all, so the admin can show what it will serve rather than
                         // rebuilding the rule in JavaScript and drifting from it.
                         'stylesheetUrl' => $this->themes->stylesheetUrl($theme),
+                        'source' => $this->themes->pluginIdOf($theme->id) === null ? 'disk' : 'plugin',
+                        'pluginId' => $this->themes->pluginIdOf($theme->id),
                     ],
                     $this->themes->all()
                 ),

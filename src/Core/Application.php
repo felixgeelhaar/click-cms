@@ -740,6 +740,21 @@ class Application
             }
         }
 
+        // Themes shipped inside an active plugin (`plugins/<id>/themes/`). Disk
+        // themes still win on id collision — a site override must not require
+        // editing the plugin.
+        if ($this->themes !== null) {
+            foreach ($plugins as $plugin) {
+                if ($this->pluginManager->isDeactivated($plugin->id)) {
+                    continue;
+                }
+                $this->themes->registerPluginThemes(
+                    (string) $plugin->id,
+                    $plugin->path . '/themes'
+                );
+            }
+        }
+
         // The one extension point that can say no. Publishing is the first act
         // core lets a plugin refuse, and the refusal has to reach `PageService`,
         // which several handlers build for themselves and none of them have a

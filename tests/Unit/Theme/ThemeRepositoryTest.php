@@ -247,6 +247,52 @@ final class ThemeRepositoryTest extends TestCase
         $this->assertStringStartsWith('/assets/themes/default/theme.css?v=', $repository->stylesheetUrl($theme));
     }
 
+    /* --------------------------------------------------- plugin-supplied -- */
+
+    public function testItDiscoversThemesShippedInsideAPlugin(): void
+    {
+        $this->installTheme('default');
+        $pluginThemes = $this->base . '/plugins/brandkit/themes';
+        mkdir($pluginThemes . '/brand', 0o775, true);
+        file_put_contents($pluginThemes . '/brand/theme.json', json_encode([
+            'name' => 'Brand',
+            'version' => '2.0.0',
+        ]));
+        file_put_contents($pluginThemes . '/brand/theme.css', 'body{color:navy}');
+
+        $repo = $this->repository();
+        $repo->registerPluginThemes('brandkit', $pluginThemes);
+
+        $this->assertSame(['brand', 'default'], $this->ids($repo));
+        $this->assertSame('brandkit', $repo->pluginIdOf('brand'));
+        $this->assertNull($repo->pluginIdOf('default'));
+
+        $brand = $repo->find('brand');
+        $this->assertNotNull($brand);
+        $this->assertStringStartsWith('/api/themes/brand/stylesheet?v=', $repo->stylesheetUrl($brand));
+    }
+
+    public function testADiskThemeWinsOverAPluginThemeWithTheSameId(): void
+    {
+        $this->installTheme('brand', ['name' => 'Site Brand']);
+        $pluginThemes = $this->base . '/plugins/brandkit/themes';
+        mkdir($pluginThemes . '/brand', 0o775, true);
+        file_put_contents($pluginThemes . '/brand/theme.json', json_encode([
+            'name' => 'Plugin Brand',
+            'version' => '9.0.0',
+        ]));
+        file_put_contents($pluginThemes . '/brand/theme.css', 'body{}');
+
+        $repo = $this->repository();
+        $repo->registerPluginThemes('brandkit', $pluginThemes);
+
+        $theme = $repo->find('brand');
+        $this->assertNotNull($theme);
+        $this->assertSame('Site Brand', $theme->name);
+        $this->assertNull($repo->pluginIdOf('brand'));
+        $this->assertStringStartsWith('/themes/brand/theme.css?v=', $repo->stylesheetUrl($theme));
+    }
+
     /* ------------------------------------------------------------- helpers -- */
 
     private function rrmdir(string $dir): void

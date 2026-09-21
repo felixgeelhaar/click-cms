@@ -92,6 +92,11 @@ final class ApiGuard
             return true;
         }
 
+        // A theme stylesheet shipped inside a plugin (disk themes use /themes).
+        if (preg_match('#^themes/[^/]+/stylesheet$#', $path) === 1) {
+            return true;
+        }
+
         // Full-text search over published pages, for a front end with no account.
         // The search plugin reads only published documents, so this is a read of
         // public content, safe to answer anonymously like /api/pages.
@@ -145,11 +150,8 @@ final class ApiGuard
         // future, can be reached while the seeded password is still in place.
         $session = $this->sessions->user();
         if ($session !== null && ($session['mustChangePassword'] ?? false)) {
-            return [
-                'status' => 403,
-                'error' => 'Set a new password before continuing.',
-                'mustChangePassword' => true,
-            ];
+            return $this->fault(403, 'Set a new password before continuing.')
+                + ['mustChangePassword' => true];
         }
 
         if ($this->isPublic($path, $method)) {
@@ -158,7 +160,7 @@ final class ApiGuard
 
         $user = $this->sessions->user();
         if ($user === null) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return $this->fault(401, 'Not authenticated');
         }
 
         // Asked as capability questions rather than role comparisons, so the
@@ -167,7 +169,7 @@ final class ApiGuard
         $role = Role::fromName($user['role'] ?? null);
 
         if (str_starts_with($path, 'users') && !$role->can(Capability::ManageUsers)) {
-            return ['status' => 403, 'error' => 'You do not have permission to manage users.'];
+            return $this->fault(403, 'You do not have permission to manage users.');
         }
 
         // Marketplace capability gates (ManagePlugins / InstallPlugins) and the
@@ -175,7 +177,7 @@ final class ApiGuard
         // Seed — this guard only requires a session for the path.
 
         if (str_starts_with($path, 'plugins') && $method !== 'GET' && !$role->can(Capability::ManagePlugins)) {
-            return ['status' => 403, 'error' => 'You do not have permission to manage plugins.'];
+            return $this->fault(403, 'You do not have permission to manage plugins.');
         }
 
         // A first pass only. HistoryService asks the same question again against
@@ -183,7 +185,7 @@ final class ApiGuard
         // one cannot see whose page it is, and exists so a role without the
         // capability is turned away before any handler runs.
         if (str_ends_with($path, '/restore') && !$role->can(Capability::RestoreContent)) {
-            return ['status' => 403, 'error' => 'You do not have permission to restore a previous version.'];
+            return $this->fault(403, 'You do not have permission to restore a previous version.');
         }
 
         return null;
@@ -229,9 +231,34 @@ final class ApiGuard
         }
 
         if (!CsrfGuard::matches($expected, CsrfGuard::tokenFromRequest($server))) {
-            return ['status' => 403, 'error' => 'Missing or invalid CSRF token.'];
+            return $this->fault(403, 'Missing or invalid CSRF token.');
         }
 
         return null;
+    }
+
+    /**
+     * Shape a known fault with a stable machine `code` beside `error`.
+     *
+     * @return array{status: int, error: string, code?: string}
+     */
+    private function fault(int $status, string $error): array
+    {
+        $code = match ($status) {
+            400 => 'bad_request',
+            401 => 'unauthenticated',
+            403 => 'forbidden',
+            404 => 'not_found',
+            409 => 'conflict',
+            422 => 'unprocessable',
+            429 => 'too_many_requests',
+            501 => 'not_implemented',
+            502 => 'bad_gateway',
+            default => null,
+        };
+
+        return $code !== null
+            ? ApiFault::of($status, $error, $code)
+            : ['status' => $status, 'error' => $error];
     }
 }
