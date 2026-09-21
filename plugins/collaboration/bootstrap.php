@@ -5,13 +5,16 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../src/Application/Plugin/BasePlugin.php';
 
 use Click\Cms\Application\Authentication\SessionStore;
+use Click\Cms\Application\Collection\CollectionService;
 use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Content\PageService;
 use Click\Cms\Application\Plugin\PublishGate;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
+use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Domain\ValueObjects\ContentKey;
+use Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 
 /**
@@ -147,6 +150,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
 
     /** Built on demand: the release path is the only thing that needs it. */
     private ?PageService $pages = null;
+    private ?CollectionService $collections = null;
 
     public function getPluginId(): string
     {
@@ -990,8 +994,20 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             return ['status' => 500, 'error' => 'Publishing is not available to this plugin.'];
         }
 
+        $needsCollections = false;
+        foreach ($requested['targets'] as $target) {
+            if (($target['type'] ?? 'page') !== 'page') {
+                $needsCollections = true;
+                break;
+            }
+        }
+        $collections = $needsCollections ? $this->collectionService() : null;
+        if ($needsCollections && $collections === null) {
+            return ['status' => 500, 'error' => 'Collection publishing is not available to this plugin.'];
+        }
+
         // Pass one asks every question that can be asked without changing
-        // anything. All of them, for all pages, before a single publish — the
+        // anything. All of them, for all targets, before a single publish — the
         // whole value of a release is that it is refused as a unit, and a
         // pre-flight that stopped at the first problem would report one reason
         // when the editor needs the list.
@@ -999,14 +1015,14 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         foreach ($requested['targets'] as $target) {
             $reason = $this->releaseObjectionTo($target, $user);
             if ($reason !== null) {
-                $refusals[] = ['page' => $target['page'], 'locale' => $target['locale'], 'reason' => $reason];
+                $refusals[] = $this->releaseRow($target, $reason);
             }
         }
 
         if ($refusals !== []) {
             return [
                 'status' => 409,
-                'error' => 'This release was not published because some of its pages are not ready.',
+                'error' => 'This release was not published because some of its items are not ready.',
                 'data' => ['refused' => $refusals, 'published' => []],
             ];
         }
@@ -1017,27 +1033,28 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         $published = [];
         $failed = [];
         foreach ($requested['targets'] as $target) {
-            $result = $pages->publish(
-                $target['page'],
-                $user,
-                $target['locale'] !== '' ? $target['locale'] : null
-            );
+            $type = $target['type'] ?? 'page';
+            $locale = $target['locale'] !== '' ? $target['locale'] : null;
+
+            $result = $type === 'page'
+                ? $pages->publish($target['page'], $user, $locale)
+                : $collections->publish($type, $target['page'], $user, $locale);
 
             if ($result['error'] !== null) {
-                $failed[] = ['page' => $target['page'], 'locale' => $target['locale'], 'reason' => $result['error']];
+                $failed[] = $this->releaseRow($target, $result['error']);
                 continue;
             }
 
-            $published[] = ['page' => $target['page'], 'locale' => $target['locale']];
+            $published[] = $this->releaseRow($target);
         }
 
         $release = $this->recordRelease($user, $published, $failed);
 
         if ($failed !== []) {
             // Nothing is rolled back, and that is a decision rather than an
-            // omission. Every page in this set passed the pre-flight, so a
-            // failure here is storage failing mid-write; un-publishing the pages
-            // that succeeded would take down pages that were live and correct
+            // omission. Every item in this set passed the pre-flight, so a
+            // failure here is storage failing mid-write; un-publishing the items
+            // that succeeded would take down content that was live and correct
             // before the release began, turning a partial update into an outage.
             // What the editor gets instead is the exact list of what did and did
             // not go out, so the remainder can be published again.
@@ -1052,20 +1069,55 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     }
 
     /**
-     * Why this one page cannot go out in a release, or null.
+     * One row in a release response — pages omit `type` so older clients keep
+     * reading `{page, locale}` unchanged.
      *
-     * @param array{page: string, locale: string} $target
+     * @param array{type?: string, page: string, locale: string} $target
+     * @return array<string, mixed>
+     */
+    private function releaseRow(array $target, ?string $reason = null): array
+    {
+        $row = [
+            'page' => $target['page'],
+            'locale' => $target['locale'],
+        ];
+        $type = $target['type'] ?? 'page';
+        if ($type !== 'page') {
+            $row['type'] = $type;
+        }
+        if ($reason !== null) {
+            $row['reason'] = $reason;
+        }
+
+        return $row;
+    }
+
+    /**
+     * Why this one target cannot go out in a release, or null.
+     *
+     * @param array{type?: string, page: string, locale: string} $target
      * @param array<string, mixed> $user
      */
     private function releaseObjectionTo(array $target, array $user): ?string
     {
+        $type = $this->reviewType($target['type'] ?? 'page');
         $contentService = $this->pluginManager->getContentService();
-        $draft = $contentService instanceof ContentService
-            ? $contentService->draftPage($target['page'], $target['locale'] !== '' ? $target['locale'] : null)
-            : null;
+
+        $draft = null;
+        if ($contentService instanceof ContentService) {
+            $draft = $type === 'page'
+                ? $contentService->draftPage($target['page'], $target['locale'] !== '' ? $target['locale'] : null)
+                : $contentService->draft(ContentKey::for(
+                    $type,
+                    $target['page'],
+                    $target['locale'] !== '' ? $target['locale'] : null
+                ));
+        }
 
         if ($draft === null) {
-            return 'There is no such page in this language.';
+            return $type === 'page'
+                ? 'There is no such page in this language.'
+                : 'There is no such entry in this language.';
         }
 
         // The same ownership rule a single publish is held to. A release must not
@@ -1076,73 +1128,117 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             is_string($draft->data['owner'] ?? null) ? $draft->data['owner'] : null,
             is_string($user['username'] ?? null) ? $user['username'] : null
         )) {
-            return 'You do not have permission to publish this page.';
+            return $type === 'page'
+                ? 'You do not have permission to publish this page.'
+                : 'You do not have permission to publish this entry.';
         }
 
         // This plugin's own rule, asked directly rather than through the hook:
         // it owns the review state and should not depend on having been wired
         // back to itself to know its own mind.
-        $refusal = $this->reviewRefusalFor($target['page'], $target['locale']);
+        $refusal = $this->reviewRefusalFor($target['page'], $target['locale'], $type);
         if ($refusal !== null) {
             return $refusal;
         }
 
         // And then everybody else's. Asked through the process-wide gate so a
         // second gating plugin — an embargo, a legal hold — is not bypassed by
-        // publishing as a release rather than one page at a time.
-        return PublishGate::ambient()->refusalFor(
-            ContentKey::page($target['page'], $target['locale'] !== '' ? $target['locale'] : null),
-            $user
-        );
+        // publishing as a release rather than one document at a time.
+        $key = $type === 'page'
+            ? ContentKey::page($target['page'], $target['locale'] !== '' ? $target['locale'] : null)
+            : ContentKey::for($type, $target['page'], $target['locale'] !== '' ? $target['locale'] : null);
+
+        return PublishGate::ambient()->refusalFor($key, $user);
     }
 
     /**
-     * The pages a release names, normalised and de-duplicated.
+     * The documents a release names, normalised and de-duplicated.
      *
-     * Accepts `{"pages": [{"page": "home", "locale": "en"}, ...]}` and the
-     * shorthand `{"pages": ["home", "about"], "locale": "en"}`, because a release
-     * of four translations and a release of four pages in one language are both
-     * ordinary and neither should have to be written the long way.
+     * Accepts page-only payloads unchanged:
+     * `{"pages": [{"page": "home", "locale": "en"}, ...]}` and
+     * `{"pages": ["home", "about"], "locale": "en"}`.
+     *
+     * Collection entries are additive:
+     * `{"entries": [{"type": "post", "page": "hello", "locale": "en"}, ...]}`
+     * (slug field stays `page`, matching the review API).
      *
      * @param array<string, mixed> $input
-     * @return array{targets: list<array{page: string, locale: string}>, error: ?string}
+     * @return array{targets: list<array{type: string, page: string, locale: string}>, error: ?string}
      */
     private function releaseTargets(array $input): array
     {
         $pages = $input['pages'] ?? null;
-        if (!is_array($pages) || $pages === []) {
-            return ['targets' => [], 'error' => 'A release needs at least one page.'];
+        $entries = $input['entries'] ?? null;
+        $hasPages = is_array($pages) && $pages !== [];
+        $hasEntries = is_array($entries) && $entries !== [];
+
+        if (!$hasPages && !$hasEntries) {
+            return ['targets' => [], 'error' => 'A release needs at least one page or entry.'];
         }
 
         $fallbackLocale = $this->reviewLocale($this->safeLocaleRef($this->stringField($input, 'locale')));
 
         $targets = [];
         $seen = [];
-        foreach ($pages as $entry) {
-            if (is_string($entry)) {
-                $entry = ['page' => $entry];
-            }
-            if (!is_array($entry)) {
-                return ['targets' => [], 'error' => 'Every page in a release must name a page.'];
-            }
 
-            $page = $this->safePageRef($this->stringField($entry, 'page'));
-            if ($page === '') {
-                return ['targets' => [], 'error' => 'Every page in a release must name a page.'];
+        if ($hasPages) {
+            foreach ($pages as $entry) {
+                if (is_string($entry)) {
+                    $entry = ['page' => $entry];
+                }
+                if (!is_array($entry)) {
+                    return ['targets' => [], 'error' => 'Every page in a release must name a page.'];
+                }
+
+                $page = $this->safePageRef($this->stringField($entry, 'page'));
+                if ($page === '') {
+                    return ['targets' => [], 'error' => 'Every page in a release must name a page.'];
+                }
+
+                $locale = $this->safeLocaleRef($this->stringField($entry, 'locale'));
+                $locale = $locale !== '' ? $this->reviewLocale($locale) : $fallbackLocale;
+
+                $id = 'page:' . $page . ':' . $locale;
+                if (isset($seen[$id])) {
+                    continue;
+                }
+                $seen[$id] = true;
+
+                $targets[] = ['type' => 'page', 'page' => $page, 'locale' => $locale];
             }
+        }
 
-            $locale = $this->safeLocaleRef($this->stringField($entry, 'locale'));
-            $locale = $locale !== '' ? $this->reviewLocale($locale) : $fallbackLocale;
+        if ($hasEntries) {
+            foreach ($entries as $entry) {
+                if (!is_array($entry)) {
+                    return ['targets' => [], 'error' => 'Every entry in a release must name a type and a page.'];
+                }
 
-            // Naming the same document twice is a mistake in the caller, not an
-            // instruction to publish it twice.
-            $id = $page . ':' . $locale;
-            if (isset($seen[$id])) {
-                continue;
+                $type = $this->reviewType($this->stringField($entry, 'type'));
+                if ($type === '' || $type === 'page') {
+                    return ['targets' => [], 'error' => 'Every entry in a release must name a collection type.'];
+                }
+
+                $page = $this->safePageRef($this->stringField($entry, 'page'));
+                if ($page === '') {
+                    return ['targets' => [], 'error' => 'Every entry in a release must name a page.'];
+                }
+
+                $locale = $this->safeLocaleRef($this->stringField($entry, 'locale'));
+                $locale = $locale !== '' ? $this->reviewLocale($locale) : $fallbackLocale;
+
+                $id = $type . ':' . $page . ':' . $locale;
+                if (isset($seen[$id])) {
+                    continue;
+                }
+                $seen[$id] = true;
+
+                $targets[] = ['type' => $type, 'page' => $page, 'locale' => $locale];
             }
-            $seen[$id] = true;
+        }
 
-            $targets[] = ['page' => $page, 'locale' => $locale];
+        if ($targets === []) {
+            return ['targets' => [], 'error' => 'A release needs at least one page or entry.'];
         }
 
         return ['targets' => $targets, 'error' => null];
@@ -1456,6 +1552,27 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     }
 
     /**
+     * Collection entry publishing for releases that include non-page targets.
+     */
+    private function collectionService(): ?CollectionService
+    {
+        if ($this->collections !== null) {
+            return $this->collections;
+        }
+
+        $contentService = $this->pluginManager->getContentService();
+        if (!$contentService instanceof ContentService || !class_exists(JsonCollectionTypeRepository::class)) {
+            return null;
+        }
+
+        return $this->collections = new CollectionService(
+            $contentService,
+            new JsonCollectionTypeRepository($this->collectionTypesPath()),
+            new SectionValidator()
+        );
+    }
+
+    /**
      * Where this site's section types are declared.
      *
      * A site's own `config/sections/` when it has one, the installation's
@@ -1468,6 +1585,13 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         $own = $this->pluginManager->getSiteRoot() . '/config/sections';
 
         return is_dir($own) ? $own : $this->pluginManager->getBasePath() . '/config/sections';
+    }
+
+    private function collectionTypesPath(): string
+    {
+        $own = $this->pluginManager->getSiteRoot() . '/config/collections';
+
+        return is_dir($own) ? $own : $this->pluginManager->getBasePath() . '/config/collections';
     }
 
     private function timestamp(): string

@@ -207,7 +207,9 @@ Everything else you rely on with pages is here too:
   kept, **Unpublish** it instead.
 
 What is *not* here is a comments box. Pages have one for leaving a note to
-whoever reviews them; entries do not.
+whoever reviews them; entries do not. Reviews themselves *are* available on
+entries when the collaboration plugin is installed — the same request / approve
+flow as pages, and entries can be included in a release.
 
 ### Looking at an entry before it is published
 

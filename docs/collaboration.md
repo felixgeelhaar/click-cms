@@ -194,24 +194,33 @@ outlives the current values.
 
 ### Publishing together
 
-Publication is per page and per language, so a change spanning four documents
-goes live in four acts and the site is half-updated in between. A release
-narrows that to one request over an explicit set.
+Publication is per document and per language, so a change spanning four
+documents goes live in four acts and the site is half-updated in between. A
+release narrows that to one request over an explicit set of pages and, optionally,
+collection entries.
+
+The payload stays backwards-compatible for page-only clients:
+`{"pages": ["home", "about"], "locale": "en"}`. Collection entries are additive:
+`{"entries": [{"type": "post", "page": "hello-world", "locale": "en"}, ...]}`
+(the slug field is still `page`, matching the review API). A release may name
+either list, or both.
 
 The important part is what it does when the set is not ready: **it refuses the
-whole set**, naming every page that is not ready rather than the first, and
+whole set**, naming every item that is not ready rather than the first, and
 publishes none of them. Publishing the approved half of a release is exactly the
 half-updated site above, not a partial success. Pre-flight asks every question
-that can be asked without changing anything — the page exists, the caller may
-publish it, no plugin objects — for every page, before the first publish.
+that can be asked without changing anything — the document exists, the caller may
+publish it, no plugin objects — for every target, before the first publish.
 
-Then it publishes through `PageService::publish()`, the same path a single
-publish takes, so another gating plugin's veto is not bypassed by calling this
-endpoint instead.
+Then it publishes through `PageService::publish()` or
+`CollectionService::publish()`, the same paths a single publish takes, so another
+gating plugin's veto is not bypassed by calling this endpoint instead. Page rows
+in the response omit `type` so older clients keep reading `{page, locale}`;
+entry rows include `type`.
 
-**Nothing is rolled back if a publish fails mid-set.** Every page passed the
-pre-flight, so a failure there is storage failing, and un-publishing the pages
-that already succeeded would take down pages that were live and correct before
+**Nothing is rolled back if a publish fails mid-set.** Every item passed the
+pre-flight, so a failure there is storage failing, and un-publishing the items
+that already succeeded would take down content that was live and correct before
 the release started — turning a partial update into an outage. What comes back
 instead is the exact list of what did and did not go out.
 
@@ -238,14 +247,15 @@ asked) and links each row to the page editor. The requester's waiting list is
 a filter on that inbox ("All open" / "Requested by me"), matching
 `requestedBy` to the signed-in username the same way the plugin sanitises
 identity keys. The release screen also ships: `/admin/release`, under Content
-when the account may publish, lists pages with each one's readiness against
-open reviews and publishes a chosen set together through
-`POST /api/collaboration/release`, explaining a `409` as editorial blockers.
-The page editor and collection entry editor treat a publish `409` as an
-editorial warning banner (not a system fault), and point at the review panel
-when the refusal mentions a review. Collection entries use the same review
-API with an optional `type` (default `page`); page reviews keep their
-historical storage keys so existing sites do not lose open reviews.
+when the account may publish, lists pages and collection entries with each
+item's readiness against open reviews and publishes a chosen set together
+through `POST /api/collaboration/release` (pages and optional `entries`),
+explaining a `409` as editorial blockers. The page editor and collection
+entry editor treat a publish `409` as an editorial warning banner (not a
+system fault), and point at the review panel when the refusal mentions a
+review. Collection entries use the same review API with an optional `type`
+(default `page`); page reviews keep their historical storage keys so existing
+sites do not lose open reviews.
 
 **Live cursors.** Still not planned, and not a gap. Polling presence is the
 deliberate ceiling — see the transport argument above.

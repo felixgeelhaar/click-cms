@@ -3,13 +3,13 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">Release</h1>
-        <p class="page-subtitle">Publish a chosen set of pages together.</p>
+        <p class="page-subtitle">Publish a chosen set of pages and collection entries together.</p>
       </div>
       <button
         type="button"
         class="btn-sm"
         :disabled="loading"
-        aria-label="Reload pages and review readiness"
+        aria-label="Reload pages, entries, and review readiness"
         @click="load"
       >
         {{ loading ? 'Loading…' : 'Refresh' }}
@@ -21,7 +21,7 @@
 
     <p v-if="loading && !loaded" class="loading">Loading…</p>
 
-    <template v-else-if="!error || pages.length > 0">
+    <template v-else-if="!error || pages.length > 0 || entries.length > 0">
       <div class="locale-row">
         <label class="locale-label" for="release-locale">Locale</label>
         <input
@@ -34,67 +34,117 @@
           aria-describedby="release-locale-hint"
         >
         <p id="release-locale-hint" class="locale-hint">
-          Defaults to the site language. Publishing uses this locale for every selected page.
+          Defaults to the site language. Publishing uses this locale for every selected item.
         </p>
       </div>
 
-      <p v-if="pages.length === 0" class="empty">
-        No pages yet. Create pages first, then choose which ones to publish together.
+      <p v-if="pages.length === 0 && entries.length === 0" class="empty">
+        Nothing to release yet. Create pages or collection entries first, then choose which ones to publish together.
       </p>
 
-      <div v-else class="table-wrap">
-        <table class="release-table">
-          <thead>
-            <tr>
-              <th scope="col" class="col-check">
-                <span class="visually-hidden">Include</span>
-              </th>
-              <th scope="col">Page</th>
-              <th scope="col">Title</th>
-              <th scope="col">Readiness</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="page in pages" :key="page.slug">
-              <td class="col-check">
-                <input
-                  :id="`release-page-${page.slug}`"
-                  v-model="selected"
-                  type="checkbox"
-                  :value="page.slug"
-                >
-              </td>
-              <td>
-                <label :for="`release-page-${page.slug}`" class="page-slug">{{ page.slug }}</label>
-              </td>
-              <td>{{ page.title }}</td>
-              <td>
-                <span
-                  v-if="page.review"
-                  class="review-badge"
-                  :class="`is-${page.review.state || 'none'}`"
-                >{{ stateLabel(page.review) }}</span>
-                <span v-else class="review-badge is-ready">Ready</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <template v-else>
+        <section v-if="pages.length > 0" class="release-section" aria-labelledby="release-pages-heading">
+          <h2 id="release-pages-heading" class="section-title">Pages</h2>
+          <div class="table-wrap">
+            <table class="release-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="col-check">
+                    <span class="visually-hidden">Include</span>
+                  </th>
+                  <th scope="col">Page</th>
+                  <th scope="col">Title</th>
+                  <th scope="col">Readiness</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="page in pages" :key="`page:${page.slug}`">
+                  <td class="col-check">
+                    <input
+                      :id="`release-page-${page.slug}`"
+                      v-model="selectedPages"
+                      type="checkbox"
+                      :value="page.slug"
+                    >
+                  </td>
+                  <td>
+                    <label :for="`release-page-${page.slug}`" class="page-slug">{{ page.slug }}</label>
+                  </td>
+                  <td>{{ page.title }}</td>
+                  <td>
+                    <span
+                      v-if="page.review"
+                      class="review-badge"
+                      :class="`is-${page.review.state || 'none'}`"
+                    >{{ stateLabel(page.review) }}</span>
+                    <span v-else class="review-badge is-ready">Ready</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section v-if="entries.length > 0" class="release-section" aria-labelledby="release-entries-heading">
+          <h2 id="release-entries-heading" class="section-title">Collection entries</h2>
+          <div class="table-wrap">
+            <table class="release-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="col-check">
+                    <span class="visually-hidden">Include</span>
+                  </th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Entry</th>
+                  <th scope="col">Title</th>
+                  <th scope="col">Readiness</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in entries" :key="entryKey(entry)">
+                  <td class="col-check">
+                    <input
+                      :id="`release-entry-${entryKey(entry)}`"
+                      v-model="selectedEntries"
+                      type="checkbox"
+                      :value="entryKey(entry)"
+                    >
+                  </td>
+                  <td>{{ entry.typeLabel }}</td>
+                  <td>
+                    <label :for="`release-entry-${entryKey(entry)}`" class="page-slug">{{ entry.slug }}</label>
+                  </td>
+                  <td>{{ entry.title }}</td>
+                  <td>
+                    <span
+                      v-if="entry.review"
+                      class="review-badge"
+                      :class="`is-${entry.review.state || 'none'}`"
+                    >{{ stateLabel(entry.review) }}</span>
+                    <span v-else class="review-badge is-ready">Ready</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <p class="readiness-note">
-          Ready means this page is not in an open review. Publish may still refuse for other
+          Ready means this item is not in an open review. Publish may still refuse for other
           reasons — the response will explain.
         </p>
-      </div>
 
-      <div class="actions">
-        <button
-          type="button"
-          class="btn-primary"
-          :disabled="busy || selected.length === 0"
-          @click="publish"
-        >
-          {{ busy ? 'Publishing…' : 'Publish together' }}
-        </button>
-      </div>
+        <div class="actions">
+          <button
+            type="button"
+            class="btn-primary"
+            :disabled="busy || selectionCount === 0"
+            @click="publish"
+          >
+            {{ busy ? 'Publishing…' : 'Publish together' }}
+          </button>
+        </div>
+      </template>
     </template>
 
     <div v-if="blockers.length > 0" class="result blockers" role="alert">
@@ -102,7 +152,7 @@
       <p class="result-detail">Nothing was published. Fix these, then try again.</p>
       <ul class="result-list">
         <li v-for="(item, i) in blockers" :key="`block-${i}`">
-          <strong>{{ item.page }}</strong>
+          <strong>{{ itemLabel(item) }}</strong>
           <span v-if="item.locale"> ({{ item.locale }})</span>
           — {{ item.reason }}
         </li>
@@ -113,7 +163,7 @@
       <h2 class="result-title">Published</h2>
       <ul class="result-list">
         <li v-for="(item, i) in published" :key="`pub-${i}`">
-          <strong>{{ item.page }}</strong>
+          <strong>{{ itemLabel(item) }}</strong>
           <span v-if="item.locale"> ({{ item.locale }})</span>
         </li>
       </ul>
@@ -123,7 +173,7 @@
       <h2 class="result-title">Could not publish</h2>
       <ul class="result-list">
         <li v-for="(item, i) in failed" :key="`fail-${i}`">
-          <strong>{{ item.page }}</strong>
+          <strong>{{ itemLabel(item) }}</strong>
           <span v-if="item.locale"> ({{ item.locale }})</span>
           — {{ item.reason }}
         </li>
@@ -133,7 +183,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 
 defineEmits(['navigate']);
 
@@ -143,7 +193,9 @@ const STATE_LABELS = {
 };
 
 const pages = ref([]);
-const selected = ref([]);
+const entries = ref([]);
+const selectedPages = ref([]);
+const selectedEntries = ref([]);
 const locale = ref('en');
 const loading = ref(false);
 const loaded = ref(false);
@@ -154,18 +206,41 @@ const blockers = ref([]);
 const published = ref([]);
 const failed = ref([]);
 
+const selectionCount = computed(
+  () => selectedPages.value.length + selectedEntries.value.length,
+);
+
 const slugOf = (page) => page.slug ?? String(page.key ?? '').split(':').pop();
+
+const entryKey = (entry) => `${entry.type}:${entry.slug}`;
+
+const entryTitle = (entry, type) => {
+  const field = type?.titleField || 'title';
+  const values = entry?.data?.values;
+  if (values && typeof values === 'object' && values[field]) {
+    return String(values[field]);
+  }
+  return entry.slug ?? String(entry.key ?? '').split(':').pop();
+};
 
 const stateLabel = (item) => STATE_LABELS[item?.state] ?? (item?.state || 'Not ready');
 
+const itemLabel = (item) => {
+  const type = item?.type && item.type !== 'page' ? item.type : null;
+  return type ? `${type}/${item.page}` : item.page;
+};
+
 /**
- * Match an open review to a page for the release locale. A review in another
- * language does not block this release's readiness column.
+ * Match an open review to a document for the release locale. A review in another
+ * language or on a different content type does not block this readiness column.
  */
-const reviewFor = (slug, releaseLocale, open) => {
+const reviewFor = (slug, releaseLocale, open, type = 'page') => {
   const want = String(releaseLocale || '').toLowerCase();
+  const wantType = type || 'page';
   return open.find((item) => {
     if ((item.page || '') !== slug) return false;
+    const itemType = item.type || 'page';
+    if (itemType !== wantType) return false;
     const itemLocale = String(item.locale || '').toLowerCase();
     return !want || !itemLocale || itemLocale === want;
   }) ?? null;
@@ -176,13 +251,15 @@ const load = async () => {
   error.value = '';
   notice.value = '';
   try {
-    const [pagesRes, reviewRes] = await Promise.all([
+    const [pagesRes, reviewRes, collectionsRes] = await Promise.all([
       fetch('/api/pages'),
       fetch('/api/collaboration/review'),
+      fetch('/api/collections'),
     ]);
 
     if (!pagesRes.ok) {
       pages.value = [];
+      entries.value = [];
       error.value = 'Could not load pages. Please try again.';
       return;
     }
@@ -205,15 +282,52 @@ const load = async () => {
       return {
         slug,
         title: page.data?.title || slug,
-        review: reviewFor(slug, releaseLocale, open),
+        review: reviewFor(slug, releaseLocale, open, 'page'),
       };
     });
 
+    const nextEntries = [];
+    if (collectionsRes.ok) {
+      const collectionsBody = await collectionsRes.json();
+      const types = Array.isArray(collectionsBody.data) ? collectionsBody.data : [];
+      const entryLists = await Promise.all(types.map(async (type) => {
+        const id = type?.id;
+        if (!id) return [];
+        try {
+          const res = await fetch(`/api/collections/${encodeURIComponent(id)}/entries`);
+          if (!res.ok) return [];
+          const body = await res.json();
+          const rows = Array.isArray(body.data) ? body.data : [];
+          return rows.map((entry) => {
+            const slug = entry.slug ?? String(entry.key ?? '').split(':').pop();
+            return {
+              type: id,
+              typeLabel: type.label || id,
+              slug,
+              title: entryTitle(entry, type),
+              review: reviewFor(slug, releaseLocale, open, id),
+            };
+          });
+        } catch {
+          return [];
+        }
+      }));
+      for (const batch of entryLists) {
+        nextEntries.push(...batch);
+      }
+    } else if (collectionsRes.status !== 403 && notice.value === '') {
+      notice.value = 'Could not load collection entries; only pages are listed.';
+    }
+    entries.value = nextEntries;
+
     // Drop selections that no longer exist after a refresh.
     const slugs = new Set(pages.value.map((p) => p.slug));
-    selected.value = selected.value.filter((s) => slugs.has(s));
+    selectedPages.value = selectedPages.value.filter((s) => slugs.has(s));
+    const keys = new Set(entries.value.map(entryKey));
+    selectedEntries.value = selectedEntries.value.filter((k) => keys.has(k));
   } catch {
     pages.value = [];
+    entries.value = [];
     error.value = 'Could not load pages. Please try again.';
   } finally {
     loading.value = false;
@@ -222,7 +336,7 @@ const load = async () => {
 };
 
 const publish = async () => {
-  if (selected.value.length === 0 || busy.value) return;
+  if (selectionCount.value === 0 || busy.value) return;
 
   busy.value = true;
   error.value = '';
@@ -232,19 +346,32 @@ const publish = async () => {
   failed.value = [];
 
   try {
+    const payload = {
+      locale: locale.value || 'en',
+    };
+    if (selectedPages.value.length > 0) {
+      payload.pages = [...selectedPages.value];
+    }
+    if (selectedEntries.value.length > 0) {
+      payload.entries = selectedEntries.value.map((key) => {
+        const colon = key.indexOf(':');
+        return {
+          type: key.slice(0, colon),
+          page: key.slice(colon + 1),
+        };
+      });
+    }
+
     const res = await fetch('/api/collaboration/release', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        pages: [...selected.value],
-        locale: locale.value || 'en',
-      }),
+      body: JSON.stringify(payload),
     });
     const body = await res.json().catch(() => ({}));
 
     if (res.status === 409) {
       blockers.value = Array.isArray(body.data?.refused) ? body.data.refused : [];
-      error.value = body.error || 'This release was not published because some of its pages are not ready.';
+      error.value = body.error || 'This release was not published because some of its items are not ready.';
       return;
     }
 
@@ -288,7 +415,9 @@ onMounted(load);
 .locale-label { display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--app-text-muted); margin-bottom: 0.35rem; }
 .locale-input { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--control-border); border-radius: 6px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .locale-hint { margin: 0.35rem 0 0; font-size: 0.8125rem; color: var(--app-text-muted); }
-.table-wrap { overflow-x: auto; margin-bottom: 1rem; }
+.release-section { margin-bottom: 1.5rem; }
+.section-title { margin: 0 0 0.75rem; font-size: 1.125rem; font-weight: 600; color: var(--app-text); }
+.table-wrap { overflow-x: auto; margin-bottom: 0.25rem; }
 .release-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
 .release-table th { text-align: left; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--app-text-muted); padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--app-border); }
 .release-table td { padding: 0.75rem; border-bottom: 1px solid var(--app-border); color: var(--app-text); vertical-align: middle; }
