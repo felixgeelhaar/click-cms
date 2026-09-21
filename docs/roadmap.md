@@ -206,7 +206,8 @@ marked *shipped in this cycle* are recorded so this list stays honest.
 
 19. ~~**Theme install from admin.**~~ *(done)* Upload a theme ZIP into `themes/`
     with the same Zip-Slip defences the marketplace uses; activate remains as
-    today. Plugin-supplied themes stay later.
+    today. Plugins may also ship themes under `plugins/<id>/themes/` (disk wins
+    on id collision; plugin CSS via `GET /api/themes/:id/stylesheet`).
 
 20. ~~**Media crop previews.**~~ *(done)* Show declared art-directed crop thumbs
     on each media library card (`urls.crops` already exists).

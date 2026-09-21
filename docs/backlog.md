@@ -183,10 +183,9 @@ comes from config.
 ## Plugin system
 
 Hooks, events, lifecycle and route registration, discovered from `plugins/`.
-Working, with one sharp edge: a directory without a `plugin.json` is skipped in
-silence. Thirty directories were in that state and had never executed. Discovery
-should report a directory that contains `bootstrap.php` but no manifest, rather
-than ignoring it.
+Working. Invalid `plugin.json` files and directories that contain
+`bootstrap.php` without a manifest are reported on `GET /api/plugins` and shown
+on the Plugins page (roadmap item 16) — discovery no longer skips them in silence.
 
 Plugins should be things a site can genuinely run without. Anything the admin UI
 depends on belongs in core.
@@ -332,8 +331,9 @@ application owns:
 `PageShell` falls back to it when a site has no themes directory at all. It is
 dead once a site has themes and can be removed in a later release.
 
-Still open: no way to *install* a theme from the admin (they are placed on disk),
-and no plugin-supplied themes.
+Theme ZIP upload from the admin is built (`POST /api/themes/upload`). Plugins
+may also ship themes under `plugins/<id>/themes/`; disk themes win on id
+collision, and plugin CSS is served through `GET /api/themes/:id/stylesheet`.
 
 ---
 

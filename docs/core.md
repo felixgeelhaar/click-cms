@@ -721,67 +721,27 @@ sitting next to the one the application actually loads. The single real setting
 in it moved to `core.storage` in `config/core.json`; the rest was fiction and was
 deleted rather than implemented.
 
-Still open:
+Still open (honest leftovers):
 
-- **Nothing enforces capabilities at the storage layer.** A handler that forgets
-  to ask is still able to act. Checks belong closer to the operation.
-- **No way to migrate content between storage backends.** Both are now
-  selectable and both are proven against one shared contract, but switching
-  `core.storage.backend` points the CMS at an empty store rather than moving
-  what is already there. Until there is a command for it, changing backend on a
-  site with content is a manual job.
-- **Media reports nothing about quality.** See above. The ladder silently
-  produces fewer variants for a small upload.
-- **No history or preview.** Capabilities 11 and 12, neither started.
-  Languages (capability 10) is done: a locale is part of `ContentKey`, flat-file
-  storage is `{type}/{locale}/{slug}.json`, and a request that cannot be
-  answered in the language it asked for is answered in the default language and
-  says so rather than pretending. Documents in the pre-languages layout are
-  still read, and migrate the next time they are saved.
-- **No languages or preview.** Capabilities 10 and 12, neither started.
-- **No languages or history.** Capabilities 10 and 11, neither started.
-  `ContentKey` is `type/slug` with no locale dimension, which is the specific
-  thing that has to change first.
-- **History is in.** Capability 11. Storage is wrapped in a decorator, so every
-  write leaves a snapshot behind whichever backend is underneath, and deleting a
-  page retains the state it removed rather than being the one operation with no
-  way back. Versions live under `data/versions`, outside the content directory,
-  because they hold unpublished drafts and must not be reachable as content;
-  their layout is derived from the key's own string form, so a key that gains a
-  dimension gains a directory level rather than a migration. Restoring writes
-  forward — the restored state becomes the newest version — so a restore of the
-  wrong version is itself undoable. Retention keeps the newest
-  `core.history.retainVersions` (twenty by default) per document, oldest
-  discarded first, with two exemptions: the newest version, which is now the
-  working copy, and the version a publish recorded, which is what the live site
-  is serving. That said "no exemptions" until draft-and-publish landed, at which
-  point it became a data-loss bug — twenty-one edits without publishing would
-  have discarded the version the public was reading, leaving the site serving a
-  state nothing could name or put back.
-- **Preview shows the stored document, not an unsaved edit.** Capability 12 is
-  built: a signed, expiring link renders any page through the same
-  `SectionRenderer` the public site uses, per language — the token signs the
-  document's full identity, so a link to one translation cannot open another,
-  and a preview of a translation that does not exist is a 404 rather than a
-  quiet fallback to the language that does.
-
-  It now also shows a change to an *already published* page without publishing
-  it, which it could not do while a page had one stored document and saving that
-  document was publishing it. The decision that gap was waiting on has been
-  made — see **Draft and publish** above — and preview reads the working copy,
-  saying on the page itself when what is shown is not what the public is
-  reading.
-- **No audit trail.** Who changed what, and when, is not recorded anywhere.
+- **Capability checks still rely on handlers asking.** `AuthorizingStorage`
+  refuses unauthorized writes at the storage layer for the type-blind question,
+  but a handler that forgets a finer-grained check can still act within what
+  storage allows. Checks belong beside the operation they guard.
+- **Concurrent editors are unmodelled.** Two people editing one page produce two
+  draft chains with no rule for which wins — see `collaboration.md` (presence
+  and review help; live cursors stay parked).
 - **The two install paths are not equally trusted.** Registry installs verify a
-  signed manifest with `openssl_verify` against a configured public key, which
-  is sound. Uploading a ZIP verifies nothing. That asymmetry matches what
-  WordPress does and is defensible for an administrator-only action, but it
-  should be a stated decision rather than an accident, and the UI should say
-  which path is verified.
-- **`serveAdminUi()`** proxies a development server on hardcoded
-  `localhost:4321`. Development convenience in the production path.
-- **`loadLegacyAdminUser()`** reads a path no current code writes. Dead
-  compatibility shim.
+  signed manifest; uploading a ZIP verifies nothing. That asymmetry is
+  defensible for an administrator-only action, but the UI should say which path
+  is verified.
+- **`serveAdminUi()`** may still proxy a development server on hardcoded
+  `localhost:4321` in some setups — development convenience in the production
+  path if left enabled.
+
+The following that once sat here are **built**: storage migration
+(`php bin/click-migrate-storage.php`), media quality reporting (`ImageQuality`),
+history, preview, languages, draft-and-publish, and the audit trail. Do not
+re-open them from older copies of this list.
 
 ## Order of work
 
@@ -793,42 +753,32 @@ CRUD in core, extracting authentication, the capability model — is done.
 
 Five of the twelve capabilities are now built and reachable by an editor:
 **languages**, **history**, **preview**, **media quality reporting** and
-**draft-and-publish**, with the second storage backend selectable. The page
+**draft-and-publish**, with multiple storage backends selectable. The page
 editor and page list expose publication state, language switching, version
 history and restore; the capability model refuses an author the publish control
 rather than letting the server's 403 be the interface.
 
 What remains:
 
-1. **Move users and plugins management into core.** After the delivery-plugin
-   cleanup, `rest-api` holds no delivery surface — only user CRUD, plugin
-   management and `/api/info`, all of which the admin UI depends on. A plugin
-   named "delivery API" holding account management together is the fake
-   optionality this document exists to prevent. Move it to core and delete the
-   plugin. Security-sensitive (passwords, plugin activation); wants its own
-   verified pass. Related: plugin deactivation does not persist across a restart.
-2. **Extract identity out of `Application`.** The kernel is ~1,560 lines, of
-   which some 39 methods are authentication, sessions, throttling, CSRF and
-   password changes — an entire bounded context living inside the HTTP entry
-   point, and the largest DDD violation in the codebase. This is the pure-refactor
-   centrepiece and should be done test-first.
-3. **History covers pages only.** Media and user documents are versioned at the
-   storage layer, but nothing exposes those versions.
-4. **Extracting the kernel is largely done.** Health, the security gate
-   (`ApiGuard`), authentication (`AuthController`), user and plugin management,
-   delivery CORS and the marketplace are each their own tested unit now, and
-   `Application` has gone from ~1660 lines to ~1170. What remains in it is the
-   kernel's real job — routing, boot composition and page rendering — plus
-   config loading, which the settings-out-of-files work will revisit.
+1. ~~**Move users and plugins management into core.**~~ Done —
+   `UsersController` and `PluginsController` are core; the old `rest-api`
+   delivery plugin no longer owns account management.
+2. **Extract identity further out of `Application`.** Auth lives in
+   `AuthController` / session services; further kernel thinning only when a new
+   concern accumulates (roadmap item 23).
+3. **History UI covers pages and collection entries primarily.** Media and user
+   documents are versioned at the storage layer, but nothing exposes those
+   versions in the admin.
+4. **Extracting the kernel is largely done.** Health, `ApiGuard`,
+   `AuthController`, users, plugins, delivery CORS, marketplace, media, pages,
+   section types and settings are each their own tested unit. What remains in
+   `Application` is routing, boot composition and page rendering — plus config
+   loading.
 5. **Settings out of files.** Bootstrap stays on disk because storage
    configuration cannot live in storage; everything else becomes a document,
    edited in the admin UI.
-6. ~~No audit trail.~~ Done: an append-only trail records who did what
-   (created, updated, deleted, published, unpublished, restored), as a storage
-   decorator wrapping versioning, readable by an administrator at `GET /api/audit`.
-7. **Concurrent editors are unmodelled.** Two people editing one page produce two
-   draft chains with no rule for which wins. Draft-and-publish makes this
-   visible where immediate saves hid it. See `collaboration.md`.
+6. ~~No audit trail.~~ Done: an append-only trail at `GET /api/audit`.
+7. **Concurrent editors are unmodelled.** See `collaboration.md`.
 
 Only then go through the plugins one at a time. Each should have to justify
 itself against the test at the top of this document, and anything that fails it

@@ -241,9 +241,9 @@ identity keys. The release screen also ships: `/admin/release`, under Content
 when the account may publish, lists pages with each one's readiness against
 open reviews and publishes a chosen set together through
 `POST /api/collaboration/release`, explaining a `409` as editorial blockers.
-Still open: a publish control on the editor that explains a `409` as an
-editorial state rather than an error (the panel already surfaces the refusal
-reason on publish).
+The page editor and collection entry editor treat a publish `409` as an
+editorial warning banner (not a system fault), and point at the review panel
+when the refusal mentions a review.
 
 **Live cursors.** Still not planned, and not a gap. Polling presence is the
 deliberate ceiling — see the transport argument above.
