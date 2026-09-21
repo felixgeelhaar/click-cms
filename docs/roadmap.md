@@ -202,7 +202,9 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     (request, approve, request-changes, cancel), an open-reviews inbox at
     `/admin/reviews` when the collaboration plugin is installed (including a
     "Requested by me" waiting-list filter), and a release screen at
-    `/admin/release` for accounts with `content.publish`.
+    `/admin/release` for accounts with `content.publish`. Collection entry
+    editors use the same panel with `type=<collection>`; page review storage
+    keys are unchanged for backwards compatibility.
 
 19. ~~**Theme install from admin.**~~ *(done)* Upload a theme ZIP into `themes/`
     with the same Zip-Slip defences the marketplace uses; activate remains as
