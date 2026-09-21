@@ -81,6 +81,7 @@ final class PagesControllerTest extends TestCase
         $response = $this->controller()->createPreviewLink('home');
 
         $this->assertSame(401, $response['status']);
+        $this->assertSame('unauthenticated', $response['code']);
         $this->assertSame('Not authenticated', $response['error']);
     }
 
@@ -89,6 +90,7 @@ final class PagesControllerTest extends TestCase
         $response = $this->controller()->getPage('does-not-exist');
 
         $this->assertSame(404, $response['status']);
+        $this->assertSame('not_found', $response['code']);
         $this->assertSame('Page not found', $response['error']);
     }
 }

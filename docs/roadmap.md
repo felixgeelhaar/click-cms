@@ -216,12 +216,12 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     on a loop (`docker/cron-loop.sh`) so production is not "remember to install
     cron on the host".
 
-22. ~~**Structured API error envelope.**~~ *(started, additive — further along)* Known
+22. ~~**Structured API error envelope.**~~ *(done for known faults — additive)* Known
     faults MAY include a machine `code` beside the existing human `error` string
-    (`Http\ApiFault`). Themes opted in first; Seed, BuilderBlocks, Marketplace,
-    Updates, Settings, Menus and Plugins now do too. Other controllers can follow
-    without breaking clients that only read `error`. Blank 500s for unknown faults
-    stay opaque on purpose.
+    (`Http\ApiFault`). Themes, Seed, BuilderBlocks, Marketplace, Updates,
+    Settings, Menus, Plugins, Media, SectionTypes and Pages opt in. Other
+    controllers can follow without breaking clients that only read `error`.
+    Blank 500s for unknown faults stay opaque on purpose.
 
 23. ~~**Kernel / route decomposition.**~~ *(done for v1.x)* Peeled identity,
     settings and marketplace-sized concerns out of `Application.php` toward

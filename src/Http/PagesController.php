@@ -27,8 +27,8 @@ use Click\Cms\Infrastructure\Storage\VersioningStorage;
  *
  * Peeled so page management stops accumulating beside schema in one file —
  * behaviour is unchanged. Section types live on {@see SectionTypesController};
- * media on {@see MediaController}. Page responses here still resolve media
- * references for the editor.
+ * media on {@see MediaController}. Known faults use {@see ApiFault}. Page
+ * responses here still resolve media references for the editor.
  *
  * Note the deliberate split from the `rest-api` plugin. That plugin is the
  * *public delivery* API — the one an external front end consumes — and is
@@ -161,7 +161,7 @@ final class PagesController
     {
         $locale = $this->requestedLocale();
         if ($locale['error'] !== null) {
-            return ['status' => 400, 'error' => $locale['error']];
+            return $this->fault(400, $locale['error']);
         }
 
         // Anonymous callers see published pages only.
@@ -214,7 +214,7 @@ final class PagesController
     {
         $requested = $this->requestedLocale();
         if ($requested['error'] !== null) {
-            return ['status' => 400, 'error' => $requested['error']];
+            return $this->fault(400, $requested['error']);
         }
 
         $signedIn = $this->currentUser() !== [];
@@ -246,7 +246,7 @@ final class PagesController
             );
 
         if ($resolved === null) {
-            return ['status' => 404, 'error' => 'Page not found'];
+            return $this->fault(404, 'Page not found');
         }
 
         $page = $resolved->content;
@@ -382,7 +382,7 @@ final class PagesController
         $result = $this->pages()->delete($slug, $this->currentUser(), $locale);
 
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         return ['data' => [
@@ -462,7 +462,7 @@ final class PagesController
         $result = $this->pages()->pendingSchedules($this->currentUser());
 
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         return ['data' => $result['schedules']];
@@ -475,7 +475,7 @@ final class PagesController
     private function scheduleResponse(array $result): array
     {
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         return ['data' => $result['schedule']];
@@ -498,7 +498,7 @@ final class PagesController
     private function publicationResponse(string $slug, array $result): array
     {
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         // The state afterwards rather than a bare "done". The editor's next
@@ -564,16 +564,16 @@ final class PagesController
         // the `pages` prefix, which is otherwise readable without a session.
         // Not re-asserting it here would depend on a rule stated somewhere else.
         if ($user === []) {
-            return ['status' => 401, 'error' => 'Not authenticated'];
+            return $this->fault(401, 'Not authenticated');
         }
 
         if (!Role::fromName($user['role'] ?? null)->can(Capability::PreviewContent)) {
-            return ['status' => 403, 'error' => 'You do not have permission to share a preview of this page.'];
+            return $this->fault(403, 'You do not have permission to share a preview of this page.');
         }
 
         $locale = $this->requestedLocale();
         if ($locale['error'] !== null) {
-            return ['status' => 400, 'error' => $locale['error']];
+            return $this->fault(400, $locale['error']);
         }
 
         $key = ContentKey::page($slug, $locale['locale']);
@@ -588,14 +588,15 @@ final class PagesController
         // English one, which is how a translation gets approved without anybody
         // having read it.
         if ($this->contentService()->draft($key) === null) {
-            return ['status' => 404, 'error' => 'Page not found'];
+            return $this->fault(404, 'Page not found');
         }
 
         $link = $this->previewLinks()->issue($key, $this->config?->defaultLocale());
 
         if ($link === null) {
             // Better to say so than to return a link that will not verify.
-            return ['status' => 500, 'error' => 'A preview link could not be signed. Check that data/ is writable.'];
+            // Known operational fault — not a blank unexpected 500.
+            return ApiFault::of(500, 'A preview link could not be signed. Check that data/ is writable.', 'preview_unsigned');
         }
 
         return ['data' => [
@@ -617,7 +618,7 @@ final class PagesController
     private function pageResponse(array $result): array
     {
         if ($result['error'] !== null) {
-            $response = ['status' => $result['status'], 'error' => $result['error']];
+            $response = $this->fault($result['status'], $result['error']);
 
             // Field-level messages are keyed "<sectionIndex>.<fieldName>" so the
             // editor can put each one against the input that caused it.
@@ -644,13 +645,13 @@ final class PagesController
         // English working copy.
         $locale = $this->requestedLocale();
         if ($locale['error'] !== null) {
-            return ['status' => 400, 'error' => $locale['error']];
+            return $this->fault(400, $locale['error']);
         }
 
         $result = $this->history()->all(ContentKey::page($slug, $locale['locale']), $this->currentUser());
 
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         return ['data' => $result['versions']];
@@ -663,13 +664,13 @@ final class PagesController
     {
         $locale = $this->requestedLocale();
         if ($locale['error'] !== null) {
-            return ['status' => 400, 'error' => $locale['error']];
+            return $this->fault(400, $locale['error']);
         }
 
         $result = $this->history()->get(ContentKey::page($slug, $locale['locale']), $id, $this->currentUser());
 
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         return ['data' => $result['version']->toArray()];
@@ -682,7 +683,7 @@ final class PagesController
     {
         $locale = $this->requestedLocale();
         if ($locale['error'] !== null) {
-            return ['status' => 400, 'error' => $locale['error']];
+            return $this->fault(400, $locale['error']);
         }
 
         $result = $this->history()->restore(
@@ -692,7 +693,7 @@ final class PagesController
         );
 
         if ($result['error'] !== null) {
-            return ['status' => $result['status'], 'error' => $result['error']];
+            return $this->fault($result['status'], $result['error']);
         }
 
         // The page as it now stands, so the editor sees the result of the
@@ -714,6 +715,27 @@ final class PagesController
                 'warnings' => $result['warnings']?->toArray(),
             ],
         ];
+    }
+
+    /**
+     * Shape a known fault with a stable machine `code` beside `error`.
+     *
+     * @return array{status: int, error: string, code?: string}
+     */
+    private function fault(int $status, string $error): array
+    {
+        $code = match ($status) {
+            400 => 'bad_request',
+            401 => 'unauthenticated',
+            403 => 'forbidden',
+            404 => 'not_found',
+            409 => 'conflict',
+            default => null,
+        };
+
+        return $code !== null
+            ? ApiFault::of($status, $error, $code)
+            : ['status' => $status, 'error' => $error];
     }
 
     /**
