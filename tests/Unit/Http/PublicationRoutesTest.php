@@ -9,7 +9,7 @@ use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
-use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\PagesController;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
 use Click\Cms\Infrastructure\Storage\VersioningStorage;
@@ -27,7 +27,7 @@ use PHPUnit\Framework\TestCase;
 final class PublicationRoutesTest extends TestCase
 {
     private string $base;
-    private CoreApiRoutes $api;
+    private PagesController $api;
     private ContentService $content;
 
     protected function setUp(): void
@@ -43,7 +43,7 @@ final class PublicationRoutesTest extends TestCase
             new JsonStorage($this->base . '/content'),
             new JsonVersionStore($this->base . '/data/versions'),
         ));
-        $this->api = new CoreApiRoutes($this->base, $this->content);
+        $this->api = new PagesController($this->base, $this->content);
     }
 
     protected function tearDown(): void

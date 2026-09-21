@@ -50,6 +50,7 @@ const installFetch = ({
   pages = {},
   versions = {},
   createdSlug = 'home',
+  publishConflict = null,
 } = {}) => {
   global.fetch = vi.fn(async (url, init = {}) => {
     const method = (init.method || 'GET').toUpperCase();
@@ -77,6 +78,13 @@ const installFetch = ({
 
     const actionMatch = path.match(/^\/api\/pages\/([^/]+)\/(publish|unpublish)$/);
     if (actionMatch && method === 'POST') {
+      if (publishConflict && actionMatch[2] === 'publish') {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({ error: publishConflict }),
+        };
+      }
       const state = pages[locale];
       return ok({ data: { publication: state?.publication ?? null } });
     }
@@ -333,5 +341,26 @@ describe('saving is not publishing', () => {
     const notice = wrapper.find('p.banner.notice[role="status"]');
     expect(notice.exists()).toBe(true);
     expect(notice.text()).toBe('Saved. This is not on the public site until you publish.');
+  });
+});
+
+/* ------------------------------------- 6. publish 409 is editorial -- */
+
+describe('publish conflict as editorial state', () => {
+  it('shows a 409 publish refusal as a warning banner, not an error', async () => {
+    const wrapper = await mountEdit({
+      capabilities: ['content.publish'],
+      pages: { en: { title: 'Home', sections: [], publication: PENDING } },
+      publishConflict: 'This page has an open review that must be resolved first.',
+    });
+
+    await wrapper.vm.publishPage();
+    await flushPromises();
+
+    const banner = wrapper.find('p.banner.warning[role="alert"]');
+    expect(banner.exists()).toBe(true);
+    expect(banner.classes()).not.toContain('error');
+    expect(banner.text()).toContain('open review');
+    expect(banner.text()).toContain('Open the review panel below');
   });
 });

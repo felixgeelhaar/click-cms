@@ -232,7 +232,9 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     `BuilderBlocksController`, `ThemeInstaller`, `Http\ApiFault` (themes first)
     and `MarketplaceController` (enablement + ManagePlugins / InstallPlugins
     gates moved out of `Application` / `ApiGuard`). Next peel candidates:
-    thinning `CoreApiRoutes` further — `MediaController` now owns `/api/media*`.
+    thinning `CoreApiRoutes` further — `MediaController` owns `/api/media*`;
+    `PagesController` now owns pages CRUD, publication, schedule, versions and
+    preview. `CoreApiRoutes` keeps section-types for this pass.
 
 24. ~~**Admin coverage and smoke.**~~ *(done for v1.x CI)* Vitest coverage for
     Users, Webhooks, Redirects and the admin deep-link `<base>` injector;
@@ -240,8 +242,8 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     tour of every sidebar screen was exercised manually; deep-link blank pages
     (`/admin/pages/edit/…`) were fixed by injecting `<base href="…/admin/">`
     so relative `./_astro` assets resolve after a hard refresh. Optional local
-    Playwright via `CLICK_E2E=1` (`npm run test:e2e`); CI is still deferred —
-    there is no browser job. Complements the axe suite.
+    Playwright via `CLICK_E2E=1` (`npm run test:e2e`); CI also runs an `e2e`
+    job (seed + built admin + chromium smoke). Complements the axe suite.
 
 25. ~~**Doc honesty.**~~ *(done)* Prune stale backlog claims; `admin-ui/README.md`
     matches what ships (Astro + Vue 3, Sora / Source Sans 3 — no D3, no Inter,

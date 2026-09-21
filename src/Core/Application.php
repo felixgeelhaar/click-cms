@@ -68,6 +68,7 @@ use Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository;
 use Click\Cms\Http\CollectionsController;
 use Click\Cms\Http\MenusController;
 use Click\Cms\Http\MediaController;
+use Click\Cms\Http\PagesController;
 use Click\Cms\Http\NavigationRenderer;
 use Click\Cms\Http\RedirectsController;
 use Click\Cms\Http\PluginsController;
@@ -128,6 +129,7 @@ class Application
     private ?EventBus $eventBus = null;
     private array $apiRoutes = [];
     private ?CoreApiRoutes $coreApiRoutes = null;
+    private ?PagesController $pagesController = null;
     private ?UsersController $usersController = null;
     private ?PluginsController $pluginsController = null;
     private ?MarketplaceController $marketplaceController = null;
@@ -561,7 +563,9 @@ class Application
         $this->history = new HistoryService($storage, $versions);
         $this->auditService = new AuditService($auditLog);
 
-        $this->coreApiRoutes = new CoreApiRoutes(
+        // Pages — peeled from CoreApiRoutes so CRUD / publication / schedule /
+        // versions / preview stop accumulating beside schema.
+        $this->pagesController = new PagesController(
             // The site's root, not the installation's: everything this builds —
             // storage, media, versions, schedules — belongs to one site. Schema
             // config is looked up separately, below, because a site may share
@@ -577,6 +581,12 @@ class Application
             new \Click\Cms\Application\Editing\FreeformPolicy(
                 $this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json')
             ),
+        );
+
+        // Section types only — pages and media live on their own controllers.
+        $this->coreApiRoutes = new CoreApiRoutes(
+            $this->siteRoot(),
+            $this->basePath,
         );
 
         // User management is core (the admin UI depends on it); it fires the same
@@ -896,7 +906,7 @@ class Application
     /**
      * Where deferred publications are kept, as the web path opens it.
      *
-     * The same directory {@see CoreApiRoutes} writes to, so a schedule set in
+     * The same directory {@see PagesController} writes to, so a schedule set in
      * the admin is the one the sweeper finds.
      */
     public function getScheduleStore(): FileScheduleStore
@@ -1772,6 +1782,7 @@ class Application
         // plugin; they are core now, for exactly this reason.
         $coreTables = [
             $this->coreApiRoutes->routes(),
+            $this->pagesController->routes(),
             $this->usersController->routes(),
             $this->pluginsController->routes(),
             $this->redirectsController->routes(),

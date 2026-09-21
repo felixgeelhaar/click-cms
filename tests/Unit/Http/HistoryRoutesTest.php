@@ -6,7 +6,7 @@ namespace Click\Cms\Tests\Unit\Http;
 
 use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Http\ApiGuard;
-use Click\Cms\Http\CoreApiRoutes;
+use Click\Cms\Http\PagesController;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 
@@ -15,7 +15,7 @@ final class HistoryRoutesTest extends TestCase
     /** @return array<string, callable> */
     private function routes(): array
     {
-        return (new CoreApiRoutes(sys_get_temp_dir() . '/click-cms-no-such-base'))->routes();
+        return (new PagesController(sys_get_temp_dir() . '/click-cms-no-such-base'))->routes();
     }
 
     public function testHistoryIsPartOfTheManagementApi(): void
