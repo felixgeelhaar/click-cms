@@ -4,7 +4,12 @@
 
     <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
     <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
-    <p v-if="publishError" class="banner error" role="alert">{{ publishError }}</p>
+    <p
+      v-if="publishError"
+      class="banner"
+      :class="publishErrorEditorial ? 'warning' : 'error'"
+      role="alert"
+    >{{ publishError }}</p>
     <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
 
     <div v-if="loading" class="banner">Loading…</div>
@@ -194,6 +199,7 @@ const busy = ref('');
 const loadError = ref('');
 const saveError = ref('');
 const publishError = ref('');
+const publishErrorEditorial = ref(false);
 const notice = ref('');
 
 /* ------------------------------------------------ capabilities & langs -- */
@@ -474,13 +480,25 @@ const save = async () => {
 
 const publicationAction = async (action) => {
   publishError.value = '';
+  publishErrorEditorial.value = false;
   notice.value = '';
   busy.value = action;
   try {
     const res = await fetch(entryUrl(`/${action}${localeQuery()}`), { method: 'POST' });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      publishError.value = body.error || `Could not ${action} this entry (${res.status}).`;
+      // 409 is an editorial gate (e.g. open review), not a system fault — same
+      // message, distinct banner so it does not read as a crash.
+      let message = body.error || `Could not ${action} this entry (${res.status}).`;
+      if (
+        res.status === 409 &&
+        /review/i.test(message) &&
+        !/review panel/i.test(message)
+      ) {
+        message = `${message} Open the review panel below.`;
+      }
+      publishError.value = message;
+      publishErrorEditorial.value = res.status === 409;
       return;
     }
     publication.value = body.data?.publication ?? publication.value;
@@ -490,6 +508,7 @@ const publicationAction = async (action) => {
     await Promise.all([loadTranslations(), loadVersions(), loadBackReferences()]);
   } catch (e) {
     publishError.value = `Could not ${action} this entry: ${e.message}`;
+    publishErrorEditorial.value = false;
   } finally {
     busy.value = '';
   }
@@ -575,6 +594,7 @@ const switchLocale = async (code) => {
   locale.value = code;
   notice.value = '';
   publishError.value = '';
+  publishErrorEditorial.value = false;
   saveError.value = '';
   await reload();
 };
@@ -611,6 +631,7 @@ onMounted(async () => {
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin-bottom: 1.5rem; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
 .banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.warning { color: var(--app-text); border: 1px solid var(--app-border); }
 .banner.notice { border: 1px solid var(--app-border); }
 .edit-form { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: 2rem; }
 

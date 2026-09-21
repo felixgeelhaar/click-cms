@@ -219,8 +219,8 @@ marked *shipped in this cycle* are recorded so this list stays honest.
 22. ~~**Structured API error envelope.**~~ *(done for known faults — additive)* Known
     faults MAY include a machine `code` beside the existing human `error` string
     (`Http\ApiFault`). Themes, Seed, BuilderBlocks, Marketplace, Updates,
-    Settings, Menus, Plugins, Media, SectionTypes and Pages opt in. Other
-    controllers can follow without breaking clients that only read `error`.
+    Settings, Menus, Plugins, Media, SectionTypes, Pages and Collections opt in.
+    Other controllers can follow without breaking clients that only read `error`.
     Blank 500s for unknown faults stay opaque on purpose.
 
 23. ~~**Kernel / route decomposition.**~~ *(done for v1.x)* Peeled identity,

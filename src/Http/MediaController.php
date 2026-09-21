@@ -159,7 +159,7 @@ final class MediaController
         $result = $this->media()->store($_FILES['file']);
 
         if ($result['item'] === null) {
-            return ['status' => 422, 'error' => $result['error']];
+            return ApiFault::of(422, $result['error'] ?? 'Upload could not be stored.', 'unprocessable');
         }
 
         return ['status' => 201, 'data' => $result['item']->toArray(null, $this->mediaBaseUrl())];
@@ -192,7 +192,7 @@ final class MediaController
                     (float) ($point['y'] ?? 0.5)
                 );
             } catch (\InvalidArgumentException $e) {
-                return ['status' => 422, 'error' => $e->getMessage()];
+                return ApiFault::of(422, $e->getMessage(), 'unprocessable');
             }
         }
 
