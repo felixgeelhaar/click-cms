@@ -14,13 +14,10 @@ use Click\Cms\Domain\History\RetentionPolicy;
 use Click\Cms\Application\Preview\PreviewLinks;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
-use Click\Cms\Domain\Media\ImageSize;
-use Click\Cms\Domain\Media\UploadPolicy;
 use Click\Cms\Domain\Schema\SectionType;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
-use Click\Cms\Infrastructure\Media\GdImageProcessor;
 use Click\Cms\Infrastructure\Publishing\FileScheduleStore;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
@@ -31,7 +28,8 @@ use Click\Cms\Infrastructure\Storage\VersioningStorage;
  *
  * These are core rather than plugins because the admin UI stops working the
  * moment they are absent: an editor cannot choose a section design without the
- * schema endpoints, and cannot place an image without the media endpoints.
+ * schema endpoints. Media management lives on {@see MediaController}; page
+ * responses here still resolve media references for the editor.
  * Anything a site can genuinely run without stays a plugin.
  *
  * Note the deliberate split from the `rest-api` plugin. That plugin is the
@@ -43,7 +41,6 @@ final class CoreApiRoutes
 {
     private ?JsonSectionTypeRepository $sectionTypes = null;
     private ?MediaService $media = null;
-    private ?MediaLibrary $mediaLibrary = null;
     private ?PageService $pages = null;
     private ?ContentService $contentService = null;
     private ?VersioningStorage $storage = null;
@@ -159,14 +156,7 @@ final class CoreApiRoutes
             'GET /api/section-types' => [$this, 'listSectionTypes'],
             'GET /api/section-types/:id' => [$this, 'getSectionType'],
 
-            'GET /api/media' => [$this, 'listMedia'],
-            'POST /api/media' => [$this, 'uploadMedia'],
-            'POST /api/media/bulk-delete' => [$this, 'bulkDeleteMedia'],
-            'GET /api/media/capabilities' => [$this, 'mediaCapabilities'],
-            'GET /api/media/file/:filename' => [$this, 'serveMediaFile'],
-            'GET /api/media/:id' => [$this, 'getMedia'],
-            'PUT /api/media/:id' => [$this, 'updateMedia'],
-            'DELETE /api/media/:id' => [$this, 'deleteMedia'],
+            // Media routes live on MediaController.
         ];
     }
 
@@ -823,292 +813,6 @@ final class CoreApiRoutes
             'values' => $result->values,
             'errors' => $result->errors,
         ];
-    }
-
-    /* ------------------------------------------------------------- media -- */
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function mediaCapabilities(): array
-    {
-        return [
-            'data' => [
-                'acceptedMimeTypes' => UploadPolicy::acceptedMimeTypes(),
-                'maxBytes' => UploadPolicy::MAX_BYTES,
-                'resizingAvailable' => GdImageProcessor::isAvailable(),
-                'variants' => array_map(
-                    static fn (ImageSize $s): array => [
-                        'name' => $s->value,
-                        'label' => $s->label(),
-                        'width' => $s->width(),
-                    ],
-                    ImageSize::ladder()
-                ),
-            ],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function listMedia(): array
-    {
-        // Search, virtual-folder filtering, and the display-width verdict (an
-        // image field declares the width it displays at, so the "too small for
-        // this slot" wording comes from the domain rather than each client) all
-        // live in MediaLibrary now, so the query string is handed straight to it.
-        return $this->mediaLibrary()->list($_GET);
-    }
-
-    /**
-     * Delete several media items at once. A management action — MediaLibrary
-     * enforces the capability itself against the caller's role and reports every
-     * requested id, so an already-gone id is a no-op rather than an error.
-     */
-    public function bulkDeleteMedia(): array
-    {
-        $ids = $this->jsonBody()['ids'] ?? [];
-
-        return $this->mediaLibrary()->bulkDelete(is_array($ids) ? $ids : []);
-    }
-
-    private function mediaLibrary(): MediaLibrary
-    {
-        // The role is resolved per request rather than captured, so a handler
-        // that runs after a session change still sees the current caller.
-        return $this->mediaLibrary ??= new MediaLibrary(
-            $this->media(),
-            fn (): Role => Role::fromName($this->currentUser()['role'] ?? null),
-            $this->mediaBaseUrl(),
-        );
-    }
-
-    /**
-     * The display width a client asked media to be judged against, if any.
-     *
-     * Anything unparseable or non-positive is treated as absent: a bad query
-     * string should fall back to the general verdict, never to a wrong one.
-     */
-    private function requestedDisplayWidth(): ?int
-    {
-        $raw = $_GET['displayWidth'] ?? null;
-
-        if (!is_string($raw) && !is_int($raw)) {
-            return null;
-        }
-
-        $width = (int) $raw;
-
-        return $width > 0 ? $width : null;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function getMedia(string $id): array
-    {
-        $item = $this->media()->find($id);
-
-        return $item === null
-            ? ['status' => 404, 'error' => 'Media not found']
-            : ['data' => $item->toArray($this->requestedDisplayWidth(), $this->mediaBaseUrl())];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function uploadMedia(): array
-    {
-        if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {
-            return ['status' => 400, 'error' => 'No file was uploaded.'];
-        }
-
-        $result = $this->media()->store($_FILES['file']);
-
-        if ($result['item'] === null) {
-            return ['status' => 422, 'error' => $result['error']];
-        }
-
-        return ['status' => 201, 'data' => $result['item']->toArray(null, $this->mediaBaseUrl())];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function updateMedia(string $id): array
-    {
-        $body = json_decode(file_get_contents('php://input') ?: '[]', true);
-        $body = is_array($body) ? $body : [];
-
-        if ($this->media()->find($id) === null) {
-            return ['status' => 404, 'error' => 'Media not found'];
-        }
-
-        // Each field is applied only when it is present, so a request that sets
-        // just the focal point does not blank the alt text it did not mention,
-        // and the reverse. Updating one thing must not erase another.
-        $item = null;
-        if (array_key_exists('alt', $body)) {
-            $item = $this->media()->updateAlt($id, (string) $body['alt']);
-        }
-
-        if (isset($body['focalPoint']) && is_array($body['focalPoint'])) {
-            $point = $body['focalPoint'];
-            try {
-                $item = $this->media()->updateFocalPoint(
-                    $id,
-                    (float) ($point['x'] ?? 0.5),
-                    (float) ($point['y'] ?? 0.5)
-                );
-            } catch (\InvalidArgumentException $e) {
-                // A focal point outside the image is a client bug, not a server
-                // one — say what was wrong rather than storing nonsense.
-                return ['status' => 422, 'error' => $e->getMessage()];
-            }
-        }
-
-        // Nothing recognised to change: return the item as it stands rather than
-        // treating an empty update as an error.
-        $item ??= $this->media()->find($id);
-
-        return ['data' => $item?->toArray(null, $this->mediaBaseUrl())];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function deleteMedia(string $id): array
-    {
-        return $this->media()->delete($id)
-            ? ['data' => ['deleted' => true]]
-            : ['status' => 404, 'error' => 'Media not found'];
-    }
-
-    /**
-     * Stream a stored file.
-     *
-     * Only names the library could itself have generated resolve to a path, so
-     * a crafted filename cannot reach anything outside the media directory.
-     *
-     * @return array<string, mixed>
-     */
-    public function serveMediaFile(string $filename): array
-    {
-        // `?w=` asks for a width the ladder may not hold. The width is snapped to
-        // a fixed set before anything is rendered — an unbounded width parameter
-        // is a denial-of-service vector, since each distinct value would cost a
-        // decode, a resample and a cache entry. An absent or nonsensical value
-        // simply serves the original.
-        $transform = \Click\Cms\Domain\Media\TransformRequest::fromQuery($_GET['w'] ?? null);
-        $path = $this->media()->pathForFileAtWidth($filename, $transform);
-
-        if ($path === null) {
-            return ['status' => 404, 'error' => 'File not found'];
-        }
-
-        $extension = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
-
-        $info = @getimagesize($path);
-        $mimeType = is_array($info) ? ($info['mime'] ?? '') : '';
-
-        // getimagesize cannot read SVG or video, so those resolve to an empty
-        // mime and would 404. Their name was validated by pathForFile and their
-        // type is fixed by the stored extension, so they are served as that
-        // declared type rather than being sniffed.
-        $isSvg = $mimeType === '' && $extension === 'svg';
-        if ($isSvg) {
-            $mimeType = 'image/svg+xml';
-        }
-
-        $isVideo = $mimeType === '' && UploadPolicy::isVideoExtension($extension);
-        if ($isVideo) {
-            $mimeType = $extension === 'webm' ? 'video/webm' : 'video/mp4';
-        }
-
-        if (!UploadPolicy::isAccepted($mimeType)) {
-            return ['status' => 404, 'error' => 'File not found'];
-        }
-
-        header('Content-Type: ' . $mimeType);
-        header('X-Content-Type-Options: nosniff');
-        header('Content-Disposition: inline');
-        // Stored names carry random bytes and content never changes under a
-        // given name, so this can be cached hard.
-        header('Cache-Control: public, max-age=31536000, immutable');
-
-        if ($isSvg) {
-            // Defence in depth. The sanitiser is the real boundary, but an SVG
-            // is a same-origin document when served inline, so a strict policy
-            // makes any gap the sanitiser ever has non-executable rather than
-            // trusting it alone.
-            header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox");
-        }
-
-        // Video is served with byte-range support so a browser can seek and
-        // start playback before the whole file arrives — Safari in particular
-        // will not play a video that ignores its Range request.
-        if ($isVideo) {
-            $this->serveWithRanges($path);
-            return ['raw' => true, 'html' => ''];
-        }
-
-        header('Content-Length: ' . (string) filesize($path));
-        readfile($path);
-
-        return ['raw' => true, 'html' => ''];
-    }
-
-    /**
-     * Stream a file, honouring a single HTTP Range request with a 206 response
-     * so a video can be sought and progressively played. A malformed or absent
-     * Range falls back to the whole file.
-     */
-    private function serveWithRanges(string $path): void
-    {
-        $size = filesize($path) ?: 0;
-        header('Accept-Ranges: bytes');
-
-        $range = $_SERVER['HTTP_RANGE'] ?? '';
-        $start = 0;
-        $end = $size - 1;
-
-        if (is_string($range) && preg_match('/^bytes=(\d*)-(\d*)$/', $range, $m) === 1 && $size > 0) {
-            if ($m[1] !== '') {
-                $start = (int) $m[1];
-            }
-            if ($m[2] !== '') {
-                $end = (int) $m[2];
-            }
-            // An unsatisfiable range is answered as such rather than served wrong.
-            if ($start > $end || $start >= $size) {
-                http_response_code(416);
-                header("Content-Range: bytes */{$size}");
-                return;
-            }
-            $end = min($end, $size - 1);
-            http_response_code(206);
-            header("Content-Range: bytes {$start}-{$end}/{$size}");
-        }
-
-        $length = $end - $start + 1;
-        header('Content-Length: ' . (string) $length);
-
-        $handle = fopen($path, 'rb');
-        if ($handle === false) {
-            return;
-        }
-        fseek($handle, $start);
-        $remaining = $length;
-        while ($remaining > 0 && !feof($handle)) {
-            $chunk = fread($handle, (int) min(8192, $remaining));
-            if ($chunk === false) {
-                break;
-            }
-            echo $chunk;
-            $remaining -= strlen($chunk);
-        }
-        fclose($handle);
     }
 
     /* ------------------------------------------------------------ wiring -- */

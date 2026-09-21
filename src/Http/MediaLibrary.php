@@ -13,7 +13,7 @@ use Closure;
 /**
  * Finding and managing media once a library has grown past a screenful.
  *
- * The existing endpoints ({@see CoreApiRoutes::listMedia()} and friends) return
+ * The existing endpoints ({@see MediaController::listMedia()} and friends) return
  * the whole library and delete one item at a time. That is fine for a handful of
  * uploads and unworkable for hundreds: there is no way to search, no way to
  * group, and clearing out a batch means one round-trip per file. This adds the

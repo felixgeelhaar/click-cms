@@ -9,6 +9,7 @@ import ReviewsInbox from './ReviewsInbox.vue';
  *  - each row shows page, locale, state, requester, assignee and when it was
  *    asked, and links to the page editor;
  *  - an empty list is an empty state, not a blank table;
+ *  - "Requested by me" filters on sanitised `requestedBy` vs the signed-in user;
  *  - a failed fetch is an error banner.
  */
 
@@ -25,7 +26,7 @@ const review = (overrides = {}) => ({
 });
 
 const server = ({ open = [review()], ok = true, status = 200, fail = false } = {}) => {
-  global.fetch = vi.fn(async (url) => {
+  global.fetch = vi.fn(async () => {
     if (fail) throw new Error('network down');
     return {
       ok,
@@ -35,9 +36,12 @@ const server = ({ open = [review()], ok = true, status = 200, fail = false } = {
   });
 };
 
-const mountInbox = async (opts) => {
-  server(opts);
-  const wrapper = mount(ReviewsInbox);
+const mountInbox = async (opts = {}) => {
+  const { currentUsername, ...serverOpts } = opts;
+  server(serverOpts);
+  const wrapper = mount(ReviewsInbox, {
+    props: { currentUsername: currentUsername ?? 'ada' },
+  });
   await flushPromises();
   return wrapper;
 };
@@ -96,6 +100,40 @@ describe('ReviewsInbox', () => {
     expect(wrapper.text().toLowerCase()).toContain('no open reviews');
     expect(wrapper.find('table').exists()).toBe(false);
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+  });
+
+  it('filters to reviews requested by the current user', async () => {
+    const wrapper = await mountInbox({
+      currentUsername: 'Ada Lovelace!',
+      open: [
+        review({ requestedBy: 'AdaLovelace', page: 'mine' }),
+        review({ requestedBy: 'charles', page: 'theirs' }),
+      ],
+    });
+
+    expect(wrapper.findAll('tbody tr')).toHaveLength(2);
+
+    const mineTab = wrapper.findAll('.filter-tabs button').find((b) => b.text() === 'Requested by me');
+    expect(mineTab).toBeTruthy();
+    await mineTab.trigger('click');
+
+    const rows = wrapper.findAll('tbody tr');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text()).toContain('mine');
+    expect(rows[0].text()).not.toContain('theirs');
+  });
+
+  it('shows a mine-only empty state when open reviews exist but none are yours', async () => {
+    const wrapper = await mountInbox({
+      currentUsername: 'ada',
+      open: [review({ requestedBy: 'charles', page: 'theirs' })],
+    });
+
+    await wrapper.findAll('.filter-tabs button').find((b) => b.text() === 'Requested by me').trigger('click');
+
+    expect(wrapper.find('table').exists()).toBe(false);
+    expect(wrapper.find('.empty').text().toLowerCase()).toContain('requested by you');
+    expect(wrapper.text().toLowerCase()).not.toContain('no open reviews');
   });
 
   it('shows an error banner when the fetch fails', async () => {

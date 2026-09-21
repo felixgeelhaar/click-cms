@@ -67,6 +67,7 @@ use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository;
 use Click\Cms\Http\CollectionsController;
 use Click\Cms\Http\MenusController;
+use Click\Cms\Http\MediaController;
 use Click\Cms\Http\NavigationRenderer;
 use Click\Cms\Http\RedirectsController;
 use Click\Cms\Http\PluginsController;
@@ -136,6 +137,7 @@ class Application
     private ?AuditController $auditController = null;
     private ?RedirectsController $redirectsController = null;
     private ?MenusController $menusController = null;
+    private ?MediaController $mediaController = null;
     private ?ThemesController $themesController = null;
     private ?BuilderBlocksController $builderBlocksController = null;
     private ?UpdatesController $updatesController = null;
@@ -593,6 +595,15 @@ class Application
         // header, both reading the same stored menu.
         $this->menusController = new MenusController($this->contentService);
         $this->navigationRenderer = new NavigationRenderer($this->urlBase());
+
+        // Media library and file serving — peeled from CoreApiRoutes so media
+        // routes stop accumulating beside pages and schema.
+        $this->mediaController = new MediaController(
+            $this->siteRoot(),
+            fn (): array => $this->getSessionUser() ?? [],
+            $this->config,
+            $this->urlBase(),
+        );
 
         // Collections — repeatable content types (posts, team members, …) defined
         // in config/collections. Their entries are ordinary content documents, so
@@ -1765,6 +1776,7 @@ class Application
             $this->pluginsController->routes(),
             $this->redirectsController->routes(),
             $this->menusController->routes(),
+            $this->mediaController->routes(),
             $this->collectionsController->routes(),
             $this->themesController->routes(),
             $this->builderBlocksController->routes(),

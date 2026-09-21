@@ -16,11 +16,38 @@
       </button>
     </div>
 
+    <div
+      v-if="!error && (loaded || reviews.length > 0)"
+      class="filter-tabs"
+      role="group"
+      aria-label="Filter open reviews"
+    >
+      <button
+        type="button"
+        :class="['tab', { active: filter === 'all' }]"
+        :aria-pressed="filter === 'all'"
+        @click="filter = 'all'"
+      >
+        All open
+      </button>
+      <button
+        type="button"
+        :class="['tab', { active: filter === 'mine' }]"
+        :aria-pressed="filter === 'mine'"
+        @click="filter = 'mine'"
+      >
+        Requested by me
+      </button>
+    </div>
+
     <p v-if="error" class="banner error" role="alert">{{ error }}</p>
 
     <p v-if="loading && !loaded" class="loading">Loading…</p>
     <p v-else-if="!error && reviews.length === 0" class="empty">
       No open reviews. When someone asks for a look at a page, it shows up here.
+    </p>
+    <p v-else-if="!error && filter === 'mine' && visibleReviews.length === 0" class="empty">
+      None of the open reviews were requested by you. Switch to All open to see every waiting review.
     </p>
     <div v-else-if="!error" class="table-wrap">
       <table class="review-table">
@@ -35,7 +62,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in reviews" :key="rowKey(item)">
+          <tr v-for="item in visibleReviews" :key="rowKey(item)">
             <td>
               <a
                 class="page-link"
@@ -61,8 +88,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { withBase } from '../../lib/base.js';
+
+const props = defineProps({
+  currentUsername: { type: String, default: '' },
+});
 
 const emit = defineEmits(['navigate']);
 
@@ -72,9 +103,28 @@ const STATE_LABELS = {
 };
 
 const reviews = ref([]);
+const filter = ref('all');
 const loading = ref(false);
 const loaded = ref(false);
 const error = ref('');
+
+/**
+ * Same sanitisation the collaboration plugin uses for `requestedBy`
+ * (PHP `identityKey`): keep only `[A-Za-z0-9._-]`.
+ */
+const identityKey = (username) => {
+  const key = String(username ?? '').replace(/[^A-Za-z0-9._-]/g, '');
+  return key !== '' ? key : '';
+};
+
+const myKey = computed(() => identityKey(props.currentUsername));
+
+const visibleReviews = computed(() => {
+  if (filter.value !== 'mine') return reviews.value;
+  const mine = myKey.value;
+  if (mine === '') return [];
+  return reviews.value.filter((item) => identityKey(item.requestedBy) === mine);
+});
 
 const rowKey = (item) => `${item.page ?? ''}:${item.locale ?? ''}:${item.requestedAt ?? ''}`;
 
@@ -140,6 +190,9 @@ onMounted(load);
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.5rem; }
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin: 0 0 0.5rem; }
 .page-subtitle { color: var(--app-text-muted); margin: 0 0 1rem; }
+.filter-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.tab { padding: 0.5rem 1rem; background: none; border: none; border-radius: 8px; cursor: pointer; color: var(--app-text-muted); font-weight: 500; font: inherit; }
+.tab.active { background: var(--sidebar-active); color: var(--sidebar-active-text); }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 1rem; }
 .banner.error { color: var(--color-danger-600, #dc2626); background: var(--app-surface-strong); border: 1px solid var(--color-danger-600, #dc2626); }
 .loading { text-align: center; padding: 3rem; color: var(--app-text-muted); }

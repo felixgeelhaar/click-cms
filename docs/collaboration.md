@@ -234,13 +234,16 @@ ask-for-changes / cancel) against this API and the publish gate. The
 open-reviews inbox ships as well: `/admin/reviews`, under Content when the
 collaboration plugin is installed and the account may collaborate, lists every
 review still open (page, locale, state, requester, assignee, when it was
-asked) and links each row to the page editor. The release screen also ships:
-`/admin/release`, under Content when the account may publish, lists pages with
-each one's readiness against open reviews and publishes a chosen set together
-through `POST /api/collaboration/release`, explaining a `409` as editorial
-blockers. Still open: the requester's own waiting list, and a publish control
-on the editor that explains a `409` as an editorial state rather than an error
-(the panel already surfaces the refusal reason on publish).
+asked) and links each row to the page editor. The requester's waiting list is
+a filter on that inbox ("All open" / "Requested by me"), matching
+`requestedBy` to the signed-in username the same way the plugin sanitises
+identity keys. The release screen also ships: `/admin/release`, under Content
+when the account may publish, lists pages with each one's readiness against
+open reviews and publishes a chosen set together through
+`POST /api/collaboration/release`, explaining a `409` as editorial blockers.
+Still open: a publish control on the editor that explains a `409` as an
+editorial state rather than an error (the panel already surfaces the refusal
+reason on publish).
 
 **Live cursors.** Still not planned, and not a gap. Polling presence is the
 deliberate ceiling — see the transport argument above.

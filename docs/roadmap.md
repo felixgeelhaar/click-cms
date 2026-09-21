@@ -124,13 +124,14 @@ Every item here holds the lines v1 was built on, because they are the product:
    17). Templates beyond that remain open if a site wants live references.
 
 9. ~~**Collaboration review workflow.**~~ *(medium)* **Done for the editor
-   panel, the open-reviews inbox, and the release screen.** Request → approve →
-   request-changes → cancel sits on the page editor against the existing
-   collaboration API and publish gate; `/admin/reviews` lists every review still
-   open; `/admin/release` publishes a chosen set together for accounts with
-   `content.publish`. **Live cursors are explicitly not planned:**
-   they need a real-time transport (SSE/WebSocket) that conflicts with the
-   zero-dependency, shared-hosting constraint. Polling presence is the
+   panel, the open-reviews inbox (with a requester waiting-list filter), and the
+   release screen.** Request → approve → request-changes → cancel sits on the
+   page editor against the existing collaboration API and publish gate;
+   `/admin/reviews` lists every review still open and can narrow to those
+   requested by the signed-in account; `/admin/release` publishes a chosen set
+   together for accounts with `content.publish`. **Live cursors are explicitly
+   not planned:** they need a real-time transport (SSE/WebSocket) that conflicts
+   with the zero-dependency, shared-hosting constraint. Polling presence is the
    deliberate ceiling, not a stepping stone.
 
 10. **Adoption and DX.** *(varies)* ~~A second theme beyond the default~~ (done —
@@ -199,8 +200,9 @@ marked *shipped in this cycle* are recorded so this list stays honest.
 
 18. ~~**Collaboration review UI.**~~ *(done)* Review panel on the page editor
     (request, approve, request-changes, cancel), an open-reviews inbox at
-    `/admin/reviews` when the collaboration plugin is installed, and a release
-    screen at `/admin/release` for accounts with `content.publish`.
+    `/admin/reviews` when the collaboration plugin is installed (including a
+    "Requested by me" waiting-list filter), and a release screen at
+    `/admin/release` for accounts with `content.publish`.
 
 19. ~~**Theme install from admin.**~~ *(done)* Upload a theme ZIP into `themes/`
     with the same Zip-Slip defences the marketplace uses; activate remains as
@@ -230,15 +232,16 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     `BuilderBlocksController`, `ThemeInstaller`, `Http\ApiFault` (themes first)
     and `MarketplaceController` (enablement + ManagePlugins / InstallPlugins
     gates moved out of `Application` / `ApiGuard`). Next peel candidates:
-    thinning `CoreApiRoutes`.
+    thinning `CoreApiRoutes` further — `MediaController` now owns `/api/media*`.
 
 24. ~~**Admin coverage and smoke.**~~ *(done for v1.x CI)* Vitest coverage for
     Users, Webhooks, Redirects and the admin deep-link `<base>` injector;
     PHPUnit smoke for every admin surface's read API plus publish. A full GUI
     tour of every sidebar screen was exercised manually; deep-link blank pages
     (`/admin/pages/edit/…`) were fixed by injecting `<base href="…/admin/">`
-    so relative `./_astro` assets resolve after a hard refresh. Playwright in
-    CI is still deferred — there is no browser job. Complements the axe suite.
+    so relative `./_astro` assets resolve after a hard refresh. Optional local
+    Playwright via `CLICK_E2E=1` (`npm run test:e2e`); CI is still deferred —
+    there is no browser job. Complements the axe suite.
 
 25. ~~**Doc honesty.**~~ *(done)* Prune stale backlog claims; `admin-ui/README.md`
     matches what ships (Astro + Vue 3, Sora / Source Sans 3 — no D3, no Inter,
