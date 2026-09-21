@@ -953,11 +953,14 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         // The reason names the state, because "not allowed" tells an editor
         // nothing about what to do next and this tells them exactly who they are
         // waiting for.
+        $type = $this->reviewType($type);
+        $kind = $type === 'page' ? 'page' : 'entry';
+
         return match ($state) {
             self::STATE_IN_REVIEW
-                => 'This page is waiting for review and has not been approved yet.',
+                => "This {$kind} is waiting for review and has not been approved yet.",
             self::STATE_CHANGES_REQUESTED
-                => 'A reviewer asked for changes on this page. It has to be approved before it can be published.',
+                => "A reviewer asked for changes on this {$kind}. It has to be approved before it can be published.",
             default => null,
         };
     }
