@@ -6,8 +6,8 @@ import ReviewsInbox from './ReviewsInbox.vue';
  * The open-reviews inbox. Worth pinning:
  *
  *  - it loads `GET /api/collaboration/review` with no page (that is the list);
- *  - each row shows page, locale, state, requester, assignee and when it was
- *    asked, and links to the page editor;
+ *  - each row shows content, type, locale, state, requester, assignee and when
+ *    it was asked, and links to the page or collection entry editor;
  *  - an empty list is an empty state, not a blank table;
  *  - "Requested by me" filters on sanitised `requestedBy` vs the signed-in user;
  *  - a failed fetch is an error banner.
@@ -16,6 +16,7 @@ import ReviewsInbox from './ReviewsInbox.vue';
 const review = (overrides = {}) => ({
   page: 'home',
   locale: 'en',
+  type: 'page',
   state: 'in_review',
   open: true,
   requestedBy: 'ada',
@@ -51,12 +52,13 @@ beforeEach(() => {
 });
 
 describe('ReviewsInbox', () => {
-  it('lists open reviews from the API and links each row to the page editor', async () => {
+  it('lists open reviews from the API and links each row to the right editor', async () => {
     const wrapper = await mountInbox({
       open: [
         review(),
         review({
-          page: 'about',
+          page: 'hello-world',
+          type: 'post',
           locale: 'de',
           state: 'changes_requested',
           requestedBy: 'charles',
@@ -74,6 +76,7 @@ describe('ReviewsInbox', () => {
     expect(rows).toHaveLength(2);
 
     expect(rows[0].text()).toContain('home');
+    expect(rows[0].text()).toContain('Page');
     expect(rows[0].text()).toContain('en');
     expect(rows[0].text()).toContain('Waiting for review');
     expect(rows[0].text()).toContain('Ada Lovelace');
@@ -83,11 +86,14 @@ describe('ReviewsInbox', () => {
     const home = rows[0].find('a.page-link');
     expect(home.attributes('href')).toBe('/admin/pages/edit/home?locale=en');
 
-    expect(rows[1].text()).toContain('about');
+    expect(rows[1].text()).toContain('hello-world');
+    expect(rows[1].text()).toContain('post');
     expect(rows[1].text()).toContain('de');
     expect(rows[1].text()).toContain('Changes requested');
     expect(rows[1].text()).toContain('charles');
-    expect(rows[1].find('a.page-link').attributes('href')).toBe('/admin/pages/edit/about?locale=de');
+    expect(rows[1].find('a.page-link').attributes('href')).toBe(
+      '/admin/collections/post/entries/hello-world?locale=de',
+    );
 
     await home.trigger('click');
     expect(wrapper.emitted('navigate')[0]).toEqual(['/admin/pages/edit/home?locale=en']);

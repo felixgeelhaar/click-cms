@@ -1,25 +1,25 @@
 <template>
   <div class="collections">
     <!--
-      One screen, three views, driven by internal state rather than a route each:
-      the collection types, one type's entries, and an entry editor. AdminApp
-      wires a single /admin/collections route and this coordinates the rest, the
-      same way the page editor lives under the Pages screen.
+      Three views under deep-linkable routes:
+      /admin/collections
+      /admin/collections/{type}
+      /admin/collections/{type}/entries/{slug|new}
+      AdminApp parses the path into props; this screen emits navigate so the
+      address bar stays in sync when the editor moves between views.
     -->
 
-    <!-- Entry editor. Keyed so switching between "new" and a specific entry
-         mounts a fresh editor rather than reusing one with stale field values. -->
     <CollectionEntryEdit
       v-if="selectedType && (creating || editingSlug !== null)"
       :key="editingSlug ?? 'new'"
       :type="selectedType"
       :slug="editingSlug"
+      :initial-locale="initialLocale"
       @saved="onEntrySaved"
       @cancel="closeEditor"
       @deleted="onEntryDeleted"
     />
 
-    <!-- Entries of the selected type. -->
     <CollectionEntries
       v-else-if="selectedType"
       :type="selectedType"
@@ -28,7 +28,6 @@
       @back="closeType"
     />
 
-    <!-- The list of collection types. -->
     <template v-else>
       <div class="page-header">
         <div>
@@ -64,17 +63,27 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import CollectionEntries from './collections/CollectionEntries.vue';
 import CollectionEntryEdit from './collections/CollectionEntryEdit.vue';
+
+const props = defineProps({
+  /** Collection type id from `/admin/collections/{type}/…`, or empty for the type list. */
+  initialTypeId: { type: String, default: '' },
+  /** Entry slug from `/…/entries/{slug}`, or null when listing / creating. */
+  initialSlug: { type: String, default: null },
+  /** True for `/…/entries/new`. */
+  initialCreating: { type: Boolean, default: false },
+  /** Optional `?locale=` so a translation opens as that language. */
+  initialLocale: { type: String, default: '' },
+});
+
+const emit = defineEmits(['navigate']);
 
 const types = ref([]);
 const loading = ref(true);
 const error = ref('');
 
-// The full type object once one is chosen — it already carries `fields`,
-// `titleField` and `label` from the list response, so the entries screen and the
-// editor need no second request to describe the type.
 const selectedType = ref(null);
 const editingSlug = ref(null);
 const creating = ref(false);
@@ -82,6 +91,37 @@ const creating = ref(false);
 const entryCountLabel = (type) => {
   const n = Number(type.entryCount ?? 0);
   return `${n} ${n === 1 ? 'entry' : 'entries'}`;
+};
+
+const typeHref = (typeId) => `/admin/collections/${encodeURIComponent(typeId)}`;
+const entryHref = (typeId, slug) => `${typeHref(typeId)}/entries/${encodeURIComponent(slug)}`;
+const newHref = (typeId) => `${typeHref(typeId)}/entries/new`;
+
+const applyRoute = () => {
+  const typeId = props.initialTypeId || '';
+  if (!typeId) {
+    selectedType.value = null;
+    editingSlug.value = null;
+    creating.value = false;
+    return;
+  }
+
+  const type = types.value.find((t) => t.id === typeId) || null;
+  selectedType.value = type;
+  if (!type) {
+    editingSlug.value = null;
+    creating.value = false;
+    return;
+  }
+
+  if (props.initialCreating) {
+    creating.value = true;
+    editingSlug.value = null;
+    return;
+  }
+
+  creating.value = false;
+  editingSlug.value = props.initialSlug || null;
 };
 
 const loadTypes = async () => {
@@ -92,6 +132,10 @@ const loadTypes = async () => {
     if (!res.ok) throw new Error(`Request failed (${res.status})`);
     const body = await res.json();
     types.value = Array.isArray(body.data) ? body.data : [];
+    applyRoute();
+    if (props.initialTypeId && !selectedType.value) {
+      error.value = 'That collection type was not found.';
+    }
   } catch (e) {
     error.value = 'Could not load collections.';
   } finally {
@@ -103,24 +147,60 @@ const openType = (type) => {
   selectedType.value = type;
   creating.value = false;
   editingSlug.value = null;
+  emit('navigate', typeHref(type.id));
 };
 
-// Returning to the type list refreshes the counts, which a save or delete under
-// the selected type may have moved.
 const closeType = () => {
   selectedType.value = null;
+  creating.value = false;
+  editingSlug.value = null;
+  emit('navigate', '/admin/collections');
   loadTypes();
 };
 
-const openNew = () => { creating.value = true; editingSlug.value = null; };
-const openEdit = (slug) => { editingSlug.value = slug; creating.value = false; };
+const openNew = () => {
+  if (!selectedType.value) return;
+  creating.value = true;
+  editingSlug.value = null;
+  emit('navigate', newHref(selectedType.value.id));
+};
 
-// Leaving the editor drops back to the entries list, which re-fetches on mount.
-const closeEditor = () => { creating.value = false; editingSlug.value = null; };
+const openEdit = (slug) => {
+  if (!selectedType.value) return;
+  creating.value = false;
+  editingSlug.value = slug;
+  emit('navigate', entryHref(selectedType.value.id, slug));
+};
+
+const closeEditor = () => {
+  creating.value = false;
+  editingSlug.value = null;
+  if (!selectedType.value) {
+    emit('navigate', '/admin/collections');
+    return;
+  }
+  emit('navigate', typeHref(selectedType.value.id));
+};
+
 const onEntryDeleted = () => closeEditor();
+
 // A save keeps the editor open — publishing a freshly-created entry needs it to
-// stay put, now addressing the entry it just created rather than a blank form.
-const onEntrySaved = () => {};
+// stay put. Once create returns a slug, point the address at that entry so a
+// refresh does not reopen a blank form.
+const onEntrySaved = (slug) => {
+  const next = typeof slug === 'string' && slug !== '' ? slug : editingSlug.value;
+  if (!selectedType.value || !next) return;
+  creating.value = false;
+  editingSlug.value = next;
+  emit('navigate', entryHref(selectedType.value.id, next));
+};
+
+watch(
+  () => [props.initialTypeId, props.initialSlug, props.initialCreating],
+  () => {
+    if (types.value.length > 0 || !loading.value) applyRoute();
+  },
+);
 
 onMounted(loadTypes);
 </script>

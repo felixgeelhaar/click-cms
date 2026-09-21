@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">Reviews</h1>
-        <p class="page-subtitle">Pages waiting on a review decision.</p>
+        <p class="page-subtitle">Pages and collection entries waiting on a review decision.</p>
       </div>
       <button
         type="button"
@@ -44,7 +44,7 @@
 
     <p v-if="loading && !loaded" class="loading">Loading…</p>
     <p v-else-if="!error && reviews.length === 0" class="empty">
-      No open reviews. When someone asks for a look at a page, it shows up here.
+      No open reviews. When someone asks for a look at a page or entry, it shows up here.
     </p>
     <p v-else-if="!error && filter === 'mine' && visibleReviews.length === 0" class="empty">
       None of the open reviews were requested by you. Switch to All open to see every waiting review.
@@ -53,7 +53,8 @@
       <table class="review-table">
         <thead>
           <tr>
-            <th>Page</th>
+            <th>Content</th>
+            <th>Type</th>
             <th>Locale</th>
             <th>State</th>
             <th>Requester</th>
@@ -70,6 +71,7 @@
                 @click="go($event, editorHref(item))"
               >{{ item.page }}</a>
             </td>
+            <td>{{ typeLabel(item) }}</td>
             <td>{{ item.locale || '—' }}</td>
             <td>
               <span class="review-badge" :class="`is-${stateKey(item)}`">{{ stateLabel(item) }}</span>
@@ -90,6 +92,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { withBase } from '../../lib/base.js';
+import { contentEditorHref } from '../../lib/contentHref.js';
 
 const props = defineProps({
   currentUsername: { type: String, default: '' },
@@ -126,25 +129,26 @@ const visibleReviews = computed(() => {
   return reviews.value.filter((item) => identityKey(item.requestedBy) === mine);
 });
 
-const rowKey = (item) => `${item.page ?? ''}:${item.locale ?? ''}:${item.requestedAt ?? ''}`;
+const rowKey = (item) => `${item.type || 'page'}:${item.page ?? ''}:${item.locale ?? ''}:${item.requestedAt ?? ''}`;
 
 const stateKey = (item) => item.state || 'none';
 
 const stateLabel = (item) => STATE_LABELS[item.state] ?? (item.state || '—');
 
+const typeLabel = (item) => {
+  const type = item?.type || 'page';
+  return type === 'page' ? 'Page' : type;
+};
+
 const requester = (item) => item.requestedByName || item.requestedBy || '—';
 
 const assignee = (item) => item.reviewer || '—';
 
-/**
- * The page editor route AdminApp already matches: `/admin/pages/edit/{slug}`,
- * with `?locale=` so a translation opens as that language rather than the default.
- */
-const editorHref = (item) => {
-  const slug = encodeURIComponent(item.page || '');
-  const path = `/admin/pages/edit/${slug}`;
-  return item.locale ? `${path}?locale=${encodeURIComponent(item.locale)}` : path;
-};
+const editorHref = (item) => contentEditorHref({
+  type: item?.type || 'page',
+  page: item?.page || '',
+  locale: item?.locale || '',
+});
 
 const go = (event, href) => {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;

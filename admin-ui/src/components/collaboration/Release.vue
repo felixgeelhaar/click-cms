@@ -68,7 +68,11 @@
                     >
                   </td>
                   <td>
-                    <label :for="`release-page-${page.slug}`" class="page-slug">{{ page.slug }}</label>
+                    <a
+                      class="page-slug page-link"
+                      :href="withBase(pageHref(page))"
+                      @click="go($event, pageHref(page))"
+                    >{{ page.slug }}</a>
                   </td>
                   <td>{{ page.title }}</td>
                   <td>
@@ -112,7 +116,11 @@
                   </td>
                   <td>{{ entry.typeLabel }}</td>
                   <td>
-                    <label :for="`release-entry-${entryKey(entry)}`" class="page-slug">{{ entry.slug }}</label>
+                    <a
+                      class="page-slug page-link"
+                      :href="withBase(entryHref(entry))"
+                      @click="go($event, entryHref(entry))"
+                    >{{ entry.slug }}</a>
                   </td>
                   <td>{{ entry.title }}</td>
                   <td>
@@ -152,7 +160,9 @@
       <p class="result-detail">Nothing was published. Fix these, then try again.</p>
       <ul class="result-list">
         <li v-for="(item, i) in blockers" :key="`block-${i}`">
-          <strong>{{ itemLabel(item) }}</strong>
+          <a class="page-link" :href="withBase(resultHref(item))" @click="go($event, resultHref(item))">
+            <strong>{{ itemLabel(item) }}</strong>
+          </a>
           <span v-if="item.locale"> ({{ item.locale }})</span>
           — {{ item.reason }}
         </li>
@@ -163,7 +173,9 @@
       <h2 class="result-title">Published</h2>
       <ul class="result-list">
         <li v-for="(item, i) in published" :key="`pub-${i}`">
-          <strong>{{ itemLabel(item) }}</strong>
+          <a class="page-link" :href="withBase(resultHref(item))" @click="go($event, resultHref(item))">
+            <strong>{{ itemLabel(item) }}</strong>
+          </a>
           <span v-if="item.locale"> ({{ item.locale }})</span>
         </li>
       </ul>
@@ -173,7 +185,9 @@
       <h2 class="result-title">Could not publish</h2>
       <ul class="result-list">
         <li v-for="(item, i) in failed" :key="`fail-${i}`">
-          <strong>{{ itemLabel(item) }}</strong>
+          <a class="page-link" :href="withBase(resultHref(item))" @click="go($event, resultHref(item))">
+            <strong>{{ itemLabel(item) }}</strong>
+          </a>
           <span v-if="item.locale"> ({{ item.locale }})</span>
           — {{ item.reason }}
         </li>
@@ -184,8 +198,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { withBase } from '../../lib/base.js';
+import { contentEditorHref } from '../../lib/contentHref.js';
 
-defineEmits(['navigate']);
+const emit = defineEmits(['navigate']);
 
 const STATE_LABELS = {
   in_review: 'Waiting for review',
@@ -213,6 +229,24 @@ const selectionCount = computed(
 const slugOf = (page) => page.slug ?? String(page.key ?? '').split(':').pop();
 
 const entryKey = (entry) => `${entry.type}:${entry.slug}`;
+
+const pageHref = (page) => contentEditorHref({ type: 'page', page: page.slug, locale: locale.value });
+const entryHref = (entry) => contentEditorHref({
+  type: entry.type,
+  page: entry.slug,
+  locale: locale.value,
+});
+const resultHref = (item) => contentEditorHref({
+  type: item?.type || 'page',
+  page: item?.page || '',
+  locale: item?.locale || locale.value,
+});
+
+const go = (event, href) => {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+  event.preventDefault();
+  emit('navigate', href);
+};
 
 const entryTitle = (entry, type) => {
   const field = type?.titleField || 'title';
@@ -423,6 +457,8 @@ onMounted(load);
 .release-table td { padding: 0.75rem; border-bottom: 1px solid var(--app-border); color: var(--app-text); vertical-align: middle; }
 .col-check { width: 2.5rem; }
 .page-slug { font-weight: 600; cursor: pointer; }
+.page-link { color: var(--color-primary-700, var(--color-primary-600, #4338ca)); text-decoration: none; }
+.page-link:hover { text-decoration: underline; }
 .readiness-note { margin: 0.75rem 0 0; font-size: 0.8125rem; color: var(--app-text-muted); }
 .review-badge { display: inline-block; padding: 0.2rem 0.55rem; font-size: 0.8125rem; font-weight: 600; border-radius: 999px; border: 1px solid var(--app-border); background: var(--app-surface-strong); color: var(--app-text); white-space: nowrap; }
 .review-badge.is-ready { color: var(--color-success-800, #166534); border-color: var(--color-success-600, #16a34a); background: color-mix(in srgb, var(--color-success-600, #16a34a) 10%, transparent); }
@@ -442,7 +478,8 @@ onMounted(load);
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+a:focus-visible {
   outline: 2px solid var(--focus-ring, #0f766e);
   outline-offset: 2px;
   border-radius: 6px;

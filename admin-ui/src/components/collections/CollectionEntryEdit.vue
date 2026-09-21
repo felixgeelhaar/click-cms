@@ -187,6 +187,8 @@ const props = defineProps({
   type: { type: Object, required: true },
   // The entry being edited, or null/absent when creating a new one.
   slug: { type: String, default: null },
+  // Optional locale from `?locale=` so a deep link opens that translation.
+  initialLocale: { type: String, default: '' },
 });
 
 const emit = defineEmits(['saved', 'cancel', 'deleted']);
@@ -325,7 +327,12 @@ const loadSiteLocales = async () => {
     const res = await fetch('/api/pages');
     const body = await res.json();
     siteLocales.value = Array.isArray(body.locales) ? body.locales : [];
-    if (!locale.value) locale.value = body.locale || siteLocales.value[0] || '';
+    if (!locale.value) {
+      locale.value = props.initialLocale
+        || body.locale
+        || siteLocales.value[0]
+        || '';
+    }
   } catch {
     siteLocales.value = [];
   }

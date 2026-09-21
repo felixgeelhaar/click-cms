@@ -269,7 +269,7 @@ const getRouteComponent = () => {
   const path = currentRoute.value.split('?')[0];
   if (path === '/admin' || path === '/admin/') return Dashboard;
   if (path === '/admin/pages') return Pages;
-  if (path === '/admin/collections') return Collections;
+  if (path === '/admin/collections' || path.startsWith('/admin/collections/')) return Collections;
   if (path === '/admin/media') return Media;
   if (path === '/admin/users') return can('users.manage') ? Users : Dashboard;
   if (path === '/admin/profile') return Profile;
@@ -315,6 +315,28 @@ const getRouteProps = () => {
   if (path === '/admin/pages/new') {
     const locale = new URLSearchParams((currentRoute.value.split('?')[1]) || '').get('locale') || '';
     return { initialLocale: locale };
+  }
+  if (path === '/admin/collections' || path.startsWith('/admin/collections/')) {
+    // /admin/collections
+    // /admin/collections/{type}
+    // /admin/collections/{type}/entries/new
+    // /admin/collections/{type}/entries/{slug}
+    const locale = new URLSearchParams(query || '').get('locale') || '';
+    const parts = path.replace(/^\/admin\/collections\/?/, '').split('/').filter(Boolean);
+    const typeId = parts[0] ? decodeURIComponent(parts[0]) : '';
+    if (!typeId) return { initialTypeId: '', initialSlug: null, initialCreating: false, initialLocale: locale };
+    if (parts[1] === 'entries' && parts[2] === 'new') {
+      return { initialTypeId: typeId, initialSlug: null, initialCreating: true, initialLocale: locale };
+    }
+    if (parts[1] === 'entries' && parts[2]) {
+      return {
+        initialTypeId: typeId,
+        initialSlug: decodeURIComponent(parts[2]),
+        initialCreating: false,
+        initialLocale: locale,
+      };
+    }
+    return { initialTypeId: typeId, initialSlug: null, initialCreating: false, initialLocale: locale };
   }
   if (path.startsWith('/admin/plugins/') && path !== '/admin/plugins') return { id: path.replace('/admin/plugins/', '') };
   if (path === '/admin/users') return { userRole: currentUser.value?.role, currentUsername: currentUser.value?.username };

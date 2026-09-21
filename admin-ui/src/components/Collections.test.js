@@ -125,6 +125,23 @@ describe('selecting a type', () => {
 
     // The badge reflects each entry's derived publication state.
     expect(badges(wrapper)).toEqual(['Live', 'Draft']);
+    expect(wrapper.emitted('navigate')[0]).toEqual(['/admin/collections/blog']);
+  });
+
+  it('opens an entry editor from a deep-link route prop', async () => {
+    global.fetch = makeFetch();
+    const wrapper = mount(Collections, {
+      props: {
+        initialTypeId: 'blog',
+        initialSlug: 'hello-world',
+        initialCreating: false,
+        initialLocale: 'de',
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('.entry-edit').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Edit Blog Posts entry');
   });
 });
 

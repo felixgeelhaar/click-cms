@@ -135,11 +135,17 @@ describe('Release', () => {
     expect(pageTableRows[1].text()).toContain('about');
     expect(pageTableRows[1].text()).toContain('Waiting for review');
 
+    const homeLink = pageTableRows[0].find('a.page-link');
+    expect(homeLink.attributes('href')).toBe('/admin/pages/edit/home?locale=en');
+
     const entryRows = tables[1].findAll('tbody tr');
     expect(entryRows).toHaveLength(1);
     expect(entryRows[0].text()).toContain('Posts');
     expect(entryRows[0].text()).toContain('hello-world');
     expect(entryRows[0].text()).toContain('Waiting for review');
+    expect(entryRows[0].find('a.page-link').attributes('href')).toBe(
+      '/admin/collections/post/entries/hello-world?locale=en',
+    );
 
     expect(wrapper.find('#release-locale').element.value).toBe('en');
   });
@@ -221,5 +227,6 @@ describe('Release', () => {
     expect(wrapper.text()).toContain('waiting for review');
     expect(wrapper.text()).toContain('post/hello-world');
     expect(wrapper.text()).toContain('asked for changes');
+    expect(wrapper.find('.blockers a.page-link').attributes('href')).toBe('/admin/pages/edit/home?locale=en');
   });
 });

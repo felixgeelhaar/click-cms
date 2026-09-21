@@ -204,8 +204,9 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     "Requested by me" waiting-list filter), and a release screen at
     `/admin/release` for accounts with `content.publish`. Collection entry
     editors use the same panel with `type=<collection>`; the release endpoint
-    and screen accept optional `entries` alongside `pages`; page review storage
-    keys are unchanged for backwards compatibility.
+    and screen accept optional `entries` alongside `pages`; inbox and release
+    rows deep-link to `/admin/collections/{type}/entries/{slug}`; page review
+    storage keys are unchanged for backwards compatibility.
 
 19. ~~**Theme install from admin.**~~ *(done)* Upload a theme ZIP into `themes/`
     with the same Zip-Slip defences the marketplace uses; activate remains as
