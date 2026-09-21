@@ -358,12 +358,44 @@ final class CollaborationReviewTest extends TestCase
         $this->assertNull($this->askTheGate('about'));
     }
 
-    public function testTheGateHasNoOpinionAboutThingsThatAreNotPages(): void
+    public function testTheGateAppliesToCollectionEntriesWithAnOpenReview(): void
     {
         $this->armTheGate();
         $this->signIn(username: 'ada');
+        $this->post('handleRequestReview', [
+            'page' => 'hello-world',
+            'locale' => 'en',
+            'type' => 'post',
+        ]);
+
+        $refusal = $this->plugin->hook_content_before_publish([
+            'key' => 'post:en:hello-world',
+            'type' => 'post',
+            'slug' => 'hello-world',
+            'locale' => 'en',
+            'user' => [],
+        ]);
+
+        $this->assertFalse($refusal['allowed'] ?? true);
+        $this->assertStringContainsString('waiting for review', $refusal['reason'] ?? '');
+    }
+
+    public function testPageReviewsStillUseTheLegacyStorageKey(): void
+    {
+        $this->signIn();
         $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'en']);
 
+        $documents = $this->content->all('collaboration_review');
+        $this->assertCount(1, $documents);
+        // Historical key: collaboration_review:home.en — not page.home.en.
+        $this->assertSame('home.en', $documents[0]->slug());
+
+        $this->armTheGate();
+        $refusal = $this->askTheGate('home');
+        $this->assertFalse($refusal['allowed'] ?? true);
+        $this->assertStringContainsString('waiting for review', $refusal['reason'] ?? '');
+
+        // A collection entry with the same slug must not share that review.
         $this->assertNull($this->plugin->hook_content_before_publish([
             'key' => 'post:en:home',
             'type' => 'post',

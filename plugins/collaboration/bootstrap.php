@@ -223,10 +223,11 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
      */
     public function hook_content_before_publish(array $params): ?array
     {
-        // Pages only. Collections and anything else publishable have their own
-        // editorial life and no review documents; refusing them on the strength
-        // of a page's state would be nonsense.
-        if (($params['type'] ?? null) !== 'page') {
+        // Any publishable content type may have a review — pages historically,
+        // and collection entries once an editor asks for one from the entry
+        // screen. An empty or hostile type is silence, not a blanket refuse.
+        $type = $this->safeTypeRef((string) ($params['type'] ?? ''));
+        if ($type === '') {
             return null;
         }
 
@@ -235,7 +236,11 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             return null;
         }
 
-        $refusal = $this->reviewRefusalFor($page, $this->safeLocaleRef((string) ($params['locale'] ?? '')));
+        $refusal = $this->reviewRefusalFor(
+            $page,
+            $this->safeLocaleRef((string) ($params['locale'] ?? '')),
+            $type
+        );
 
         return $refusal === null ? null : ['allowed' => false, 'reason' => $refusal];
     }
@@ -253,7 +258,8 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
      */
     public function hook_content_published(array $params): void
     {
-        if (($params['type'] ?? null) !== 'page') {
+        $type = $this->safeTypeRef((string) ($params['type'] ?? ''));
+        if ($type === '') {
             return;
         }
 
@@ -265,7 +271,8 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         $this->closeReview(
             $page,
             $this->safeLocaleRef((string) ($params['locale'] ?? '')),
-            is_array($params['user'] ?? null) ? $params['user'] : []
+            is_array($params['user'] ?? null) ? $params['user'] : [],
+            $type
         );
     }
 
@@ -661,12 +668,13 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         $input = $this->readBody();
         $page = $this->safePageRef($this->stringField($input, 'page'));
         $locale = $this->reviewLocale($this->safeLocaleRef($this->stringField($input, 'locale')));
+        $type = $this->reviewType($this->stringField($input, 'type'));
 
         if ($page === '') {
             return ['status' => 400, 'error' => 'A page is required to request a review.'];
         }
 
-        $existing = $this->reviewFor($page, $locale);
+        $existing = $this->reviewFor($page, $locale, $type);
         if (($existing['state'] ?? '') === self::STATE_IN_REVIEW) {
             // Refused rather than quietly overwritten. A second request would
             // replace the first request's note and named reviewer, and the
@@ -680,6 +688,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         return ['data' => $this->writeReview($page, $locale, [
             'page' => $page,
             'locale' => $locale,
+            'type' => $type,
             'state' => self::STATE_IN_REVIEW,
             'requestedBy' => $this->identityKey($user),
             'requestedByName' => $this->displayName($user),
@@ -702,7 +711,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
                 'at' => $now,
                 'note' => $note,
             ]),
-        ])];
+        ], $type)];
     }
 
     /**
@@ -720,6 +729,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         $input = $this->readBody();
         $page = $this->safePageRef($this->stringField($input, 'page'));
         $locale = $this->reviewLocale($this->safeLocaleRef($this->stringField($input, 'locale')));
+        $type = $this->reviewType($this->stringField($input, 'type'));
         $decision = strtolower(trim($this->stringField($input, 'decision')));
 
         if ($page === '') {
@@ -729,7 +739,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             return ['status' => 400, 'error' => 'A decision must be either "approve" or "changes".'];
         }
 
-        $review = $this->reviewFor($page, $locale);
+        $review = $this->reviewFor($page, $locale, $type);
         if (($review['state'] ?? '') !== self::STATE_IN_REVIEW) {
             // Deciding on a page nobody asked about would create an approval out
             // of nothing, which is exactly what the gate must not let through.
@@ -768,7 +778,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             'note' => $note,
         ]);
 
-        return ['data' => $this->writeReview($page, $locale, $review)];
+        return ['data' => $this->writeReview($page, $locale, $review, $type)];
     }
 
     /**
@@ -792,12 +802,13 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         $input = $this->readBody();
         $page = $this->safePageRef($this->stringField($input, 'page'));
         $locale = $this->reviewLocale($this->safeLocaleRef($this->stringField($input, 'locale')));
+        $type = $this->reviewType($this->stringField($input, 'type'));
 
         if ($page === '') {
             return ['status' => 400, 'error' => 'A page is required to cancel a review.'];
         }
 
-        $review = $this->reviewFor($page, $locale);
+        $review = $this->reviewFor($page, $locale, $type);
         if (!$this->isOpen($review['state'] ?? '')) {
             return ['status' => 409, 'error' => 'There is no open review on this page.'];
         }
@@ -822,7 +833,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             'note' => $note,
         ]);
 
-        return ['data' => $this->writeReview($page, $locale, $review)];
+        return ['data' => $this->writeReview($page, $locale, $review, $type)];
     }
 
     /**
@@ -851,7 +862,8 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
 
         return ['data' => $this->reviewFor(
             $page,
-            $this->reviewLocale($this->safeLocaleRef((string) ($_GET['locale'] ?? '')))
+            $this->reviewLocale($this->safeLocaleRef((string) ($_GET['locale'] ?? ''))),
+            $this->reviewType((string) ($_GET['type'] ?? ''))
         )];
     }
 
@@ -926,13 +938,13 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
      * ask it — core through the hook, and the release endpoint, which asks about
      * every page in a set before publishing any of them.
      */
-    public function reviewRefusalFor(string $page, string $locale): ?string
+    public function reviewRefusalFor(string $page, string $locale, string $type = 'page'): ?string
     {
         if (!$this->reviewGateEnabled()) {
             return null;
         }
 
-        $state = $this->reviewFor($page, $this->reviewLocale($locale))['state'] ?? '';
+        $state = $this->reviewFor($page, $this->reviewLocale($locale), $type)['state'] ?? '';
 
         // The reason names the state, because "not allowed" tells an editor
         // nothing about what to do next and this tells them exactly who they are
@@ -1174,16 +1186,17 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
      *
      * @return array<string, mixed>
      */
-    public function reviewFor(string $page, string $locale): array
+    public function reviewFor(string $page, string $locale, string $type = 'page'): array
     {
+        $type = $this->reviewType($type);
         $contentService = $this->pluginManager->getContentService();
-        $document = $contentService?->get($this->reviewKey($page, $locale));
+        $document = $contentService?->get($this->reviewKey($page, $locale, $type));
 
         if ($document === null) {
-            return $this->emptyReview($page, $locale);
+            return $this->emptyReview($page, $locale, $type);
         }
 
-        return $this->presentReview($document->data, $page, $locale);
+        return $this->presentReview($document->data, $page, $locale, $type);
     }
 
     /**
@@ -1204,10 +1217,16 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             if (!$this->isOpen(is_string($data['state'] ?? null) ? $data['state'] : '')) {
                 continue;
             }
+            // Legacy page reviews have no type field; treat them as pages so the
+            // open list still names them correctly for dashboards and notifiers.
+            $type = is_string($data['type'] ?? null) && $data['type'] !== ''
+                ? $this->reviewType($data['type'])
+                : 'page';
             $out[] = $this->presentReview(
                 $data,
                 is_string($data['page'] ?? null) ? $data['page'] : '',
-                is_string($data['locale'] ?? null) ? $data['locale'] : ''
+                is_string($data['locale'] ?? null) ? $data['locale'] : '',
+                $type
             );
         }
 
@@ -1226,10 +1245,11 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
      *
      * @param array<string, mixed> $user
      */
-    private function closeReview(string $page, string $locale, array $user): void
+    private function closeReview(string $page, string $locale, array $user, string $type = 'page'): void
     {
         $locale = $this->reviewLocale($locale);
-        $review = $this->reviewFor($page, $locale);
+        $type = $this->reviewType($type);
+        $review = $this->reviewFor($page, $locale, $type);
         $state = $review['state'] ?? '';
 
         if ($state === '' || $state === self::STATE_PUBLISHED) {
@@ -1245,21 +1265,23 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             'note' => '',
         ]);
 
-        $this->writeReview($page, $locale, $review);
+        $this->writeReview($page, $locale, $review, $type);
     }
 
     /**
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function writeReview(string $page, string $locale, array $data): array
+    private function writeReview(string $page, string $locale, array $data, string $type = 'page'): array
     {
+        $type = $this->reviewType($type);
         $contentService = $this->pluginManager->getContentService();
-        $key = $this->reviewKey($page, $locale);
+        $key = $this->reviewKey($page, $locale, $type);
         $existing = $contentService->get($key);
 
         $data['page'] = $page;
         $data['locale'] = $locale;
+        $data['type'] = $type;
 
         // Derived, never stored: `open` is a reading of `state`, and keeping a
         // copy of it on disk would be a second answer able to disagree with the
@@ -1271,7 +1293,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             $existing !== null ? $existing->update($data) : Content::create($key, $data)
         );
 
-        return $this->presentReview($data, $page, $locale);
+        return $this->presentReview($data, $page, $locale, $type);
     }
 
     /**
@@ -1292,16 +1314,18 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function presentReview(array $data, string $page, string $locale): array
+    private function presentReview(array $data, string $page, string $locale, string $type = 'page'): array
     {
         $string = static fn (string $field): ?string
             => is_string($data[$field] ?? null) ? $data[$field] : null;
 
         $state = $string('state') ?? '';
+        $type = $this->reviewType($type !== '' ? $type : ($string('type') ?? 'page'));
 
         return [
             'page' => $page,
             'locale' => $locale,
+            'type' => $type,
             // The empty string, not a made-up state name: "there is no review"
             // is the absence of one, and inventing a word for it would give the
             // gate a fifth thing to have an opinion about.
@@ -1323,9 +1347,9 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     /**
      * @return array<string, mixed>
      */
-    private function emptyReview(string $page, string $locale): array
+    private function emptyReview(string $page, string $locale, string $type = 'page'): array
     {
-        return $this->presentReview([], $page, $locale);
+        return $this->presentReview([], $page, $locale, $type);
     }
 
     /** The two states that are waiting on somebody, and therefore block. */
@@ -1346,11 +1370,42 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         return ($settings?->data['enabled'] ?? false) === true;
     }
 
-    private function reviewKey(string $page, string $locale): ContentKey
+    private function reviewKey(string $page, string $locale, string $type = 'page'): ContentKey
     {
-        $slug = $page . ($locale !== '' ? '.' . $locale : '');
+        $type = $this->reviewType($type);
+
+        // Pages keep the historical key so existing reviews continue to resolve.
+        // Every other content type prefixes the type so `post:home` and
+        // `page:home` cannot share a review document.
+        $slug = $type === 'page'
+            ? $page . ($locale !== '' ? '.' . $locale : '')
+            : $type . '.' . $page . ($locale !== '' ? '.' . $locale : '');
 
         return ContentKey::fromString(self::REVIEW_TYPE . ':' . $slug);
+    }
+
+    /**
+     * The content type a review is filed under. Defaults to `page` so callers
+     * that pre-date typed reviews — and the page editor, which never sends one —
+     * keep hitting the same documents they always did.
+     */
+    private function reviewType(string $type): string
+    {
+        $type = $this->safeTypeRef($type);
+
+        return $type !== '' ? $type : 'page';
+    }
+
+    /**
+     * Reduce a content-type reference to a safe slug segment, or empty.
+     * Same character set as page and locale refs: a type becomes a key segment,
+     * so it must not smuggle a path or a second key part.
+     */
+    private function safeTypeRef(string $type): string
+    {
+        $type = trim($type);
+
+        return preg_match('/^[A-Za-z0-9._-]+$/', $type) === 1 ? $type : '';
     }
 
     /**

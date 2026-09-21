@@ -243,7 +243,9 @@ open reviews and publishes a chosen set together through
 `POST /api/collaboration/release`, explaining a `409` as editorial blockers.
 The page editor and collection entry editor treat a publish `409` as an
 editorial warning banner (not a system fault), and point at the review panel
-when the refusal mentions a review.
+when the refusal mentions a review. Collection entries use the same review
+API with an optional `type` (default `page`); page reviews keep their
+historical storage keys so existing sites do not lose open reviews.
 
 **Live cursors.** Still not planned, and not a gap. Polling presence is the
 deliberate ceiling — see the transport argument above.

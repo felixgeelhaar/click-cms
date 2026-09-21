@@ -87,6 +87,7 @@ final class ThemesControllerTest extends TestCase
         $routes = $this->controller(['role' => 'admin'])->routes();
 
         $this->assertArrayHasKey('GET /api/themes', $routes);
+        $this->assertArrayHasKey('GET /api/themes/:id/stylesheet', $routes);
         $this->assertArrayHasKey('POST /api/themes/activate', $routes);
         $this->assertArrayHasKey('POST /api/themes/upload', $routes);
     }

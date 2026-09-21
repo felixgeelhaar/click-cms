@@ -145,6 +145,8 @@ import { ref, computed, onMounted, watch } from 'vue';
 const props = defineProps({
   page: { type: String, required: true },
   locale: { type: String, default: '' },
+  /** Content type under review. Defaults to page so existing mounts stay valid. */
+  type: { type: String, default: 'page' },
 });
 
 const emptyReview = () => ({
@@ -175,8 +177,16 @@ const cancelNote = ref('');
 const query = () => {
   const params = new URLSearchParams({ page: props.page });
   if (props.locale) params.set('locale', props.locale);
+  if (props.type && props.type !== 'page') params.set('type', props.type);
   return params.toString();
 };
+
+const reviewBody = (extra = {}) => ({
+  page: props.page,
+  locale: props.locale || undefined,
+  type: props.type && props.type !== 'page' ? props.type : undefined,
+  ...extra,
+});
 
 const stateKey = computed(() => {
   const state = review.value.state || 'none';
@@ -260,11 +270,9 @@ const requestReview = async () => {
     const res = await fetch('/api/collaboration/review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        page: props.page,
-        locale: props.locale,
+      body: JSON.stringify(reviewBody({
         note: requestNote.value.trim(),
-      }),
+      })),
     });
     if (!res.ok) {
       error.value = await readError(res) || 'Could not request a review. Please try again.';
@@ -287,12 +295,10 @@ const submitDecision = async (decision) => {
     const res = await fetch('/api/collaboration/review/decision', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        page: props.page,
-        locale: props.locale,
+      body: JSON.stringify(reviewBody({
         decision,
         note: decisionNote.value.trim(),
-      }),
+      })),
     });
     if (!res.ok) {
       error.value = await readError(res) || 'Could not record the decision. Please try again.';
@@ -315,11 +321,9 @@ const cancelReview = async () => {
     const res = await fetch('/api/collaboration/review/cancel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        page: props.page,
-        locale: props.locale,
+      body: JSON.stringify(reviewBody({
         note: cancelNote.value.trim(),
-      }),
+      })),
     });
     if (!res.ok) {
       error.value = await readError(res) || 'Could not cancel the review. Please try again.';
@@ -339,7 +343,7 @@ const formatWhen = (value) => {
   return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString();
 };
 
-watch(() => [props.page, props.locale], () => {
+watch(() => [props.page, props.locale, props.type], () => {
   loaded.value = false;
   load();
 });

@@ -162,6 +162,14 @@
           </li>
         </ul>
       </section>
+
+      <!-- Collaboration: review workflow. Shown once the entry exists. -->
+      <ReviewPanel
+        v-if="!isNew && storedSlug"
+        :type="type.id"
+        :page="storedSlug"
+        :locale="locale"
+      />
     </div>
   </div>
 </template>
@@ -172,6 +180,7 @@ import RepeaterField from '../fields/RepeaterField.vue';
 import { leafComponent } from '../fields/leafComponent.js';
 import PageLanguages from '../PageLanguages.vue';
 import PageVersions from '../PageVersions.vue';
+import ReviewPanel from '../collaboration/ReviewPanel.vue';
 
 const props = defineProps({
   // The full type object, including its `fields` schema.
