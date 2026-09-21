@@ -232,12 +232,13 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     gates moved out of `Application` / `ApiGuard`). Next peel candidates:
     thinning `CoreApiRoutes`, or the still-inline audit and site handlers.
 
-24. **Admin coverage and smoke.** *(incremental)* Vitest coverage for Users,
-    Webhooks and Redirects is done (list / empty / error / write-path specs),
-    and a PHPUnit publish smoke covers the login-adjacent publish path at the
-    service/API layer (save a draft, admin session, publish, public read).
-    Playwright (login → edit → publish in a browser) is still deferred — there
-    is no browser CI. Complements the existing PHPUnit and axe suites.
+24. ~~**Admin coverage and smoke.**~~ *(done for v1.x CI)* Vitest coverage for
+    Users, Webhooks, Redirects and the admin deep-link `<base>` injector;
+    PHPUnit smoke for every admin surface's read API plus publish. A full GUI
+    tour of every sidebar screen was exercised manually; deep-link blank pages
+    (`/admin/pages/edit/…`) were fixed by injecting `<base href="…/admin/">`
+    so relative `./_astro` assets resolve after a hard refresh. Playwright in
+    CI is still deferred — there is no browser job. Complements the axe suite.
 
 25. ~~**Doc honesty.**~~ *(done)* Prune stale backlog claims; `admin-ui/README.md`
     matches what ships (Astro + Vue 3, Sora / Source Sans 3 — no D3, no Inter,

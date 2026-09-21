@@ -1,0 +1,14 @@
+# The admin UI is a single-page app: only index.html exists on disk. A deep
+# link such as /admin/pages/new must be served that same document so the
+# client can route it. Without this, the request falls through to PHP and
+# the editor never loads.
+#
+# Pair with the <base> tag in AdminLayout: relative ./_astro assets still
+# resolve to /admin/_astro/… after a deep-link refresh.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /admin/
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . index.html [L]
+</IfModule>
