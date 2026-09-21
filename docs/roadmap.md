@@ -203,10 +203,11 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     `/admin/reviews` when the collaboration plugin is installed (including a
     "Requested by me" waiting-list filter), and a release screen at
     `/admin/release` for accounts with `content.publish`. Collection entry
-    editors use the same panel with `type=<collection>`; the release endpoint
-    and screen accept optional `entries` alongside `pages`; inbox and release
-    rows deep-link to `/admin/collections/{type}/entries/{slug}`; page review
-    storage keys are unchanged for backwards compatibility.
+    editors use the same review and comments panels with `type=<collection>`;
+    the release endpoint and screen accept optional `entries` alongside `pages`;
+    inbox and release rows deep-link to `/admin/collections/{type}/entries/{slug}`;
+    page review and comment storage keys are unchanged for backwards
+    compatibility.
 
 19. ~~**Theme install from admin.**~~ *(done)* Upload a theme ZIP into `themes/`
     with the same Zip-Slip defences the marketplace uses; activate remains as
@@ -225,8 +226,8 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     faults MAY include a machine `code` beside the existing human `error` string
     (`Http\ApiFault`). Themes, Seed, BuilderBlocks, Marketplace, Updates,
     Settings, Menus, Plugins, Media, SectionTypes, Pages, Collections, Users,
-    Auth, Oidc and ApiGuard opt in. Blank 500s for unknown faults stay opaque
-    on purpose.
+    Auth, Oidc, ApiGuard and Redirects opt in. Blank 500s for unknown faults stay
+    opaque on purpose.
 
 23. ~~**Kernel / route decomposition.**~~ *(done for v1.x)* Peeled identity,
     settings and marketplace-sized concerns out of `Application.php` toward

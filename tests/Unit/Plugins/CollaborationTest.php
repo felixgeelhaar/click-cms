@@ -117,9 +117,12 @@ final class CollaborationTest extends TestCase
     /**
      * @return list<array<string, mixed>>
      */
-    private function listComments(string $page, string $locale = ''): array
+    private function listComments(string $page, string $locale = '', string $type = 'page'): array
     {
         $_GET = ['page' => $page, 'locale' => $locale];
+        if ($type !== '' && $type !== 'page') {
+            $_GET['type'] = $type;
+        }
         $response = $this->plugin->handleListComments();
         $_GET = [];
 
@@ -140,6 +143,7 @@ final class CollaborationTest extends TestCase
 
         $this->assertArrayNotHasKey('error', $response);
         $this->assertArrayHasKey('data', $response);
+        $this->assertSame('page', $response['data']['type']);
 
         // Stored through the content service as a collaboration_comment document,
         // so it inherits storage, backups and the version trail.
@@ -165,6 +169,57 @@ final class CollaborationTest extends TestCase
         $home = $this->listComments('home', 'en');
         $this->assertCount(1, $home);
         $this->assertSame('about home', $home[0]['body']);
+    }
+
+    public function testACollectionEntryCommentDoesNotShareAPageThread(): void
+    {
+        $this->signIn();
+
+        $this->postComment(['page' => 'home', 'locale' => 'en', 'body' => 'page note']);
+        $this->postComment([
+            'page' => 'home',
+            'locale' => 'en',
+            'type' => 'post',
+            'body' => 'entry note',
+        ]);
+
+        $pageThread = $this->listComments('home', 'en');
+        $this->assertCount(1, $pageThread);
+        $this->assertSame('page note', $pageThread[0]['body']);
+        $this->assertSame('page', $pageThread[0]['type']);
+
+        $entryThread = $this->listComments('home', 'en', 'post');
+        $this->assertCount(1, $entryThread);
+        $this->assertSame('entry note', $entryThread[0]['body']);
+        $this->assertSame('post', $entryThread[0]['type']);
+    }
+
+    public function testLegacyCommentsWithoutTypeStayOnThePageThread(): void
+    {
+        $this->signIn();
+
+        // A comment written before typed comments existed has no type field.
+        $this->content->save(\Click\Cms\Domain\Content\Content::create(
+            \Click\Cms\Domain\ValueObjects\ContentKey::fromString('collaboration_comment:legacy.one'),
+            [
+                'page' => 'home',
+                'locale' => 'en',
+                'author' => 'ada',
+                'authorName' => 'Ada Lovelace',
+                'body' => 'legacy note',
+                'resolved' => false,
+                'postedAt' => '2026-01-01T00:00:00.000000+00:00',
+                'resolvedAt' => null,
+                'resolvedBy' => null,
+            ]
+        ));
+
+        $pageThread = $this->listComments('home', 'en');
+        $this->assertCount(1, $pageThread);
+        $this->assertSame('legacy note', $pageThread[0]['body']);
+        $this->assertSame('page', $pageThread[0]['type']);
+
+        $this->assertSame([], $this->listComments('home', 'en', 'post'));
     }
 
     public function testResolvingFlipsTheCommentState(): void

@@ -449,7 +449,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     /* ------------------------------------------------------------ comments -- */
 
     /**
-     * Post a comment against a page.
+     * Post a comment against a page or collection entry.
      *
      * @return array<string, mixed>
      */
@@ -463,6 +463,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         $input = $this->readBody();
         $page = $this->safePageRef($this->stringField($input, 'page'));
         $locale = $this->safeLocaleRef($this->stringField($input, 'locale'));
+        $type = $this->reviewType($this->stringField($input, 'type'));
         $body = trim($this->stringField($input, 'body'));
 
         if ($page === '') {
@@ -475,6 +476,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         $comment = $this->storeComment(
             $page,
             $locale,
+            $type,
             $this->identityKey($user),
             $this->displayName($user),
             $body,
@@ -484,7 +486,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     }
 
     /**
-     * List a page's comment thread, oldest first.
+     * List a document's comment thread, oldest first.
      *
      * @return array<string, mixed>
      */
@@ -497,12 +499,13 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
 
         $page = $this->safePageRef((string) ($_GET['page'] ?? ''));
         $locale = $this->safeLocaleRef((string) ($_GET['locale'] ?? ''));
+        $type = $this->reviewType((string) ($_GET['type'] ?? ''));
 
         if ($page === '') {
             return ['status' => 400, 'error' => 'A page is required to list comments.'];
         }
 
-        return ['data' => $this->commentsFor($page, $locale)];
+        return ['data' => $this->commentsFor($page, $locale, $type)];
     }
 
     /**
@@ -554,11 +557,13 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     private function storeComment(
         string $page,
         string $locale,
+        string $type,
         string $author,
         string $authorName,
         string $body
     ): array {
         $contentService = $this->pluginManager->getContentService();
+        $type = $this->reviewType($type);
 
         $now = new \DateTimeImmutable();
         $key = ContentKey::fromString(self::COMMENT_TYPE . ':' . $this->slug($now));
@@ -566,6 +571,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         $comment = Content::create($key, [
             'page' => $page,
             'locale' => $locale,
+            'type' => $type,
             'author' => $author,
             'authorName' => $authorName,
             // The editor's text, kept exactly as typed. Not escaped here:
@@ -589,14 +595,23 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     /**
      * @return list<array<string, mixed>>
      */
-    private function commentsFor(string $page, string $locale): array
+    private function commentsFor(string $page, string $locale, string $type = 'page'): array
     {
         $contentService = $this->pluginManager->getContentService();
+        $type = $this->reviewType($type);
 
         $out = [];
         foreach ($contentService->all(self::COMMENT_TYPE) as $comment) {
             $data = $comment->data;
             if (($data['page'] ?? '') !== $page) {
+                continue;
+            }
+            // Legacy comments have no type field; treat them as pages so existing
+            // threads stay attached to the page they were written on.
+            $commentType = is_string($data['type'] ?? null) && $data['type'] !== ''
+                ? $this->reviewType($data['type'])
+                : 'page';
+            if ($commentType !== $type) {
                 continue;
             }
             // An empty locale filter means "any language", so a caller that does
@@ -620,11 +635,15 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     private function presentComment(Content $comment): array
     {
         $data = $comment->data;
+        $type = is_string($data['type'] ?? null) && $data['type'] !== ''
+            ? $this->reviewType($data['type'])
+            : 'page';
 
         return [
             'id' => $comment->slug(),
             'page' => is_string($data['page'] ?? null) ? $data['page'] : '',
             'locale' => is_string($data['locale'] ?? null) ? $data['locale'] : '',
+            'type' => $type,
             'author' => is_string($data['author'] ?? null) ? $data['author'] : '',
             'authorName' => is_string($data['authorName'] ?? null) ? $data['authorName'] : '',
             // Handed back as data, the exact bytes stored. The reader escapes it.

@@ -239,12 +239,14 @@ added later against a stable record rather than something the workflow was
 designed around.
 
 **Admin UI.** The page editor carries a review panel (request / approve /
-ask-for-changes / cancel) against this API and the publish gate; collection
-entry editors use the same panel with `type=<collection>`. The open-reviews
-inbox ships as well: `/admin/reviews`, under Content when the collaboration
-plugin is installed and the account may collaborate, lists every review still
-open (content, type, locale, state, requester, assignee, when it was asked)
-and links each row to the page editor or
+ask-for-changes / cancel) and a comments thread against this API and the
+publish gate; collection entry editors use the same panels with
+`type=<collection>`. Comments accept an optional `type` the same way reviews
+do (default `page`); legacy comments without a type stay on the page thread.
+The open-reviews inbox ships as well: `/admin/reviews`, under Content when the
+collaboration plugin is installed and the account may collaborate, lists every
+review still open (content, type, locale, state, requester, assignee, when it
+was asked) and links each row to the page editor or
 `/admin/collections/{type}/entries/{slug}`. The requester's waiting list is
 a filter on that inbox ("All open" / "Requested by me"), matching
 `requestedBy` to the signed-in username the same way the plugin sanitises
@@ -255,9 +257,8 @@ publishes a chosen set together through `POST /api/collaboration/release`
 (pages and optional `entries`), explaining a `409` as editorial blockers. The
 page editor and collection entry editor treat a publish `409` as an editorial
 warning banner (not a system fault), and point at the review panel when the
-refusal mentions a review. Collection entries use the same review API with an
-optional `type` (default `page`); page reviews keep their historical storage
-keys so existing sites do not lose open reviews.
+refusal mentions a review. Page reviews keep their historical storage keys so
+existing sites do not lose open reviews.
 
 **Live cursors.** Still not planned, and not a gap. Polling presence is the
 deliberate ceiling — see the transport argument above.

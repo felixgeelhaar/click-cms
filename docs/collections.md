@@ -206,10 +206,11 @@ Everything else you rely on with pages is here too:
   entry? This cannot be undone.* If you want an entry off the public site but
   kept, **Unpublish** it instead.
 
-What is *not* here is a comments box. Pages have one for leaving a note to
-whoever reviews them; entries do not. Reviews themselves *are* available on
-entries when the collaboration plugin is installed — the same request / approve
-flow as pages, and entries can be included in a release.
+What is here for collaboration (when the collaboration plugin is installed):
+a **review panel** and a **comments** box — the same request / approve flow and
+note thread as pages, keyed with `type=<collection>` so a post and a page with
+the same slug never share a review or a comment. Entries can also be included
+in a release.
 
 ### Looking at an entry before it is published
 

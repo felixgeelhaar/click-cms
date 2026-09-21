@@ -163,8 +163,14 @@
         </ul>
       </section>
 
-      <!-- Collaboration: review workflow. Shown once the entry exists. -->
+      <!-- Collaboration: review workflow and comments. Shown once the entry exists. -->
       <ReviewPanel
+        v-if="!isNew && storedSlug"
+        :type="type.id"
+        :page="storedSlug"
+        :locale="locale"
+      />
+      <CommentsPanel
         v-if="!isNew && storedSlug"
         :type="type.id"
         :page="storedSlug"
@@ -181,6 +187,7 @@ import { leafComponent } from '../fields/leafComponent.js';
 import PageLanguages from '../PageLanguages.vue';
 import PageVersions from '../PageVersions.vue';
 import ReviewPanel from '../collaboration/ReviewPanel.vue';
+import CommentsPanel from '../collaboration/CommentsPanel.vue';
 
 const props = defineProps({
   // The full type object, including its `fields` schema.

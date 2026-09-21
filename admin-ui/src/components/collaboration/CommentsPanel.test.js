@@ -88,7 +88,32 @@ describe('rendering the thread', () => {
     const url = String(global.fetch.mock.calls[0][0]);
     expect(url).toContain('page=about');
     expect(url).toContain('locale=de');
+    expect(url).not.toContain('type=');
     expect(wrapper.exists()).toBe(true);
+  });
+
+  it('includes type when commenting on a collection entry', async () => {
+    const { wrapper, posts } = await mountPanel(
+      { thread: [] },
+      { page: 'hello-world', locale: 'en', type: 'post' },
+    );
+
+    const url = String(global.fetch.mock.calls[0][0]);
+    expect(url).toContain('page=hello-world');
+    expect(url).toContain('type=post');
+    expect(wrapper.text().toLowerCase()).toContain('this entry');
+
+    await wrapper.find('textarea').setValue('Check the excerpt');
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+
+    const create = posts.find((p) => p.url.endsWith('/api/collaboration/comments'));
+    expect(create.body).toMatchObject({
+      page: 'hello-world',
+      locale: 'en',
+      type: 'post',
+      body: 'Check the excerpt',
+    });
   });
 
   it('shows an error state when the request fails', async () => {
