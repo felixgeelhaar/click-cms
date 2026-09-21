@@ -124,10 +124,11 @@ Every item here holds the lines v1 was built on, because they are the product:
    17). Templates beyond that remain open if a site wants live references.
 
 9. ~~**Collaboration review workflow.**~~ *(medium)* **Done for the editor
-   panel and the open-reviews inbox.** Request → approve → request-changes →
-   cancel sits on the page editor against the existing collaboration API and
-   publish gate; `/admin/reviews` lists every review still open. A dedicated
-   release UI can still follow. **Live cursors are explicitly not planned:**
+   panel, the open-reviews inbox, and the release screen.** Request → approve →
+   request-changes → cancel sits on the page editor against the existing
+   collaboration API and publish gate; `/admin/reviews` lists every review still
+   open; `/admin/release` publishes a chosen set together for accounts with
+   `content.publish`. **Live cursors are explicitly not planned:**
    they need a real-time transport (SSE/WebSocket) that conflicts with the
    zero-dependency, shared-hosting constraint. Polling presence is the
    deliberate ceiling, not a stepping stone.
@@ -197,9 +198,9 @@ marked *shipped in this cycle* are recorded so this list stays honest.
     saved block must not rewrite pages that already used it.
 
 18. ~~**Collaboration review UI.**~~ *(done)* Review panel on the page editor
-    (request, approve, request-changes, cancel) and an open-reviews inbox at
-    `/admin/reviews` when the collaboration plugin is installed. A dedicated
-    release UI can still follow.
+    (request, approve, request-changes, cancel), an open-reviews inbox at
+    `/admin/reviews` when the collaboration plugin is installed, and a release
+    screen at `/admin/release` for accounts with `content.publish`.
 
 19. ~~**Theme install from admin.**~~ *(done)* Upload a theme ZIP into `themes/`
     with the same Zip-Slip defences the marketplace uses; activate remains as
@@ -216,21 +217,20 @@ marked *shipped in this cycle* are recorded so this list stays honest.
 22. ~~**Structured API error envelope.**~~ *(started, additive — further along)* Known
     faults MAY include a machine `code` beside the existing human `error` string
     (`Http\ApiFault`). Themes opted in first; Seed, BuilderBlocks, Marketplace,
-    Updates and Settings now do too. Other controllers can follow without
-    breaking clients that only read `error`. Blank 500s for unknown faults stay
-    opaque on purpose.
+    Updates, Settings, Menus and Plugins now do too. Other controllers can follow
+    without breaking clients that only read `error`. Blank 500s for unknown faults
+    stay opaque on purpose.
 
 23. **Kernel / route decomposition.** *(in progress)* Continue peeling
     identity, settings and marketplace-sized concerns out of
     `Application.php` / `CoreApiRoutes.php` toward application services — no
-    behaviour change, less accumulation. `SettingsController` is peeled:
-    `handleSettingsRequest` is gone, and settings are only reached through the
-    controller (GET for any signed-in user, PUT needs ManageSettings, only
-    `headless` / `siteName` / `freeformEditing`). Earlier this cycle:
+    behaviour change, less accumulation. `SettingsController`, `SiteController`
+    and `AuditController` are peeled: settings, site identity and the audit
+    trail are only reached through their controllers. Earlier this cycle:
     `BuilderBlocksController`, `ThemeInstaller`, `Http\ApiFault` (themes first)
     and `MarketplaceController` (enablement + ManagePlugins / InstallPlugins
     gates moved out of `Application` / `ApiGuard`). Next peel candidates:
-    thinning `CoreApiRoutes`, or the still-inline audit and site handlers.
+    thinning `CoreApiRoutes`.
 
 24. ~~**Admin coverage and smoke.**~~ *(done for v1.x CI)* Vitest coverage for
     Users, Webhooks, Redirects and the admin deep-link `<base>` injector;

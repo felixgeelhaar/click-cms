@@ -46,6 +46,8 @@ use Click\Cms\Application\Update\UpdateService;
 use Click\Cms\Http\MarketplaceController;
 use Click\Cms\Http\SeedController;
 use Click\Cms\Http\SettingsController;
+use Click\Cms\Http\SiteController;
+use Click\Cms\Http\AuditController;
 use Click\Cms\Application\Builder\BuilderBlockRepository;
 use Click\Cms\Http\BuilderBlocksController;
 use Click\Cms\Http\ThemesController;
@@ -130,6 +132,8 @@ class Application
     private ?MarketplaceController $marketplaceController = null;
     private ?SeedController $seedController = null;
     private ?SettingsController $settingsController = null;
+    private ?SiteController $siteController = null;
+    private ?AuditController $auditController = null;
     private ?RedirectsController $redirectsController = null;
     private ?MenusController $menusController = null;
     private ?ThemesController $themesController = null;
@@ -759,6 +763,17 @@ class Application
             $this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json'),
             fn (): ?array => $this->getSessionUser(),
             fn () => $this->renderCache?->flush(),
+        );
+
+        // Which site this session is editing, and the audit trail. Both were
+        // inline handlers; peeled so Application only routes the path.
+        $this->siteController = new SiteController(
+            fn (): Site => $this->site(),
+            fn (): SiteRegistry => $this->siteRegistry(),
+        );
+        $this->auditController = new AuditController(
+            $this->auditService,
+            fn (): ?array => $this->getSessionUser(),
         );
 
         // Identity — login, logout, password changes, the default admin — is its
@@ -1729,31 +1744,14 @@ class Application
             return $this->settingsController->handle($method);
         }
 
-        // Which site this admin session is editing.
-        //
-        // Read by the admin UI so it can say so on screen when an installation
-        // serves more than one. Somebody who looks after eight client sites and
-        // has three tabs open needs the answer visible, not inferable from the
-        // address bar — editing the wrong client's homepage is a mistake with no
-        // warning and an audience.
-        if ($path === 'site' && $method === 'GET') {
-            return ['data' => $this->site()->toArray() + [
-                'multiSite' => $this->siteRegistry()->isMultiSite(),
-            ]];
+        // Which site this admin session is editing — see SiteController.
+        if ($path === 'site') {
+            return $this->siteController->handle($method);
         }
 
-        // The audit trail — who did what, across the whole site. An operator
-        // accountability tool, so the service gates it to administrators; the
-        // handler only needs to have a session (enforced above) and hand the
-        // user to the service, which decides.
+        // The audit trail — see AuditController. Session already enforced above.
         if ($path === 'audit') {
-            $user = $this->getSessionUser() ?? [];
-            $result = $this->auditService?->recent($user, 100)
-                ?? ['entries' => null, 'error' => 'Audit is unavailable.', 'status' => 500];
-
-            return $result['error'] !== null
-                ? ['status' => $result['status'], 'error' => $result['error']]
-                : ['data' => $result['entries']];
+            return $this->auditController->handle($method);
         }
 
         // Core routes first. These are the management endpoints the admin UI

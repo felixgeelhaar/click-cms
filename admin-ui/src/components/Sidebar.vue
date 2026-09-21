@@ -46,7 +46,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { withBase } from '../lib/base.js';
-const props = defineProps({ activeRoute: String, userRole: String, collapsed: Boolean, showBuilder: Boolean, showWebhooks: Boolean, showReviews: Boolean });
+const props = defineProps({ activeRoute: String, userRole: String, collapsed: Boolean, showBuilder: Boolean, showWebhooks: Boolean, showReviews: Boolean, showRelease: Boolean });
 const emit = defineEmits(['navigate']);
 
 const iconPaths = {
@@ -68,6 +68,8 @@ const iconPaths = {
   webhooks: ['M4 4h8', 'M4 4v8', 'M4 4l7 7', 'M14 10h6a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-6'],
   // A clipboard: a list of pages waiting on a decision.
   reviews: ['M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2', 'M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z', 'M9 12h6', 'M9 16h4'],
+  // A stack of pages with a check — publishing a chosen set together.
+  release: ['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', 'M14 2v6h6', 'M9 15l2 2 4-4'],
   // A download arrow into a tray: new code arriving.
   updates: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3'],
   settings: ['M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'],
@@ -92,6 +94,7 @@ const navGroups = computed(() => {
   // Only when collaboration is installed, like Webhooks under Manage: a menu
   // item whose every request answers 404 is worse than no menu item.
   if (props.showReviews) content.push({ href: '/admin/reviews', icon: 'reviews', label: 'Reviews' });
+  if (props.showRelease) content.push({ href: '/admin/release', icon: 'release', label: 'Release' });
   content.push(
     { href: '/admin/collections', icon: 'collections', label: 'Collections' },
     { href: '/admin/media', icon: 'media', label: 'Media' },

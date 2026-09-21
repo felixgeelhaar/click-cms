@@ -65,7 +65,7 @@
              sets. It is only in the tree while open. -->
         <div v-if="mobileNavOpen" class="sidebar-backdrop" aria-hidden="true" @click="mobileNavOpen = false"></div>
         <aside id="admin-sidebar" class="sidebar-shell" :class="{ collapsed: isCollapsed, 'is-open': mobileNavOpen }">
-          <Sidebar :active-route="currentRoute" :user-role="currentUser?.role" :collapsed="isCollapsed" :show-builder="hasBuilder" :show-webhooks="hasWebhooks" :show-reviews="hasReviews" @navigate="handleNavigate" />
+          <Sidebar :active-route="currentRoute" :user-role="currentUser?.role" :collapsed="isCollapsed" :show-builder="hasBuilder" :show-webhooks="hasWebhooks" :show-reviews="hasReviews" :show-release="hasRelease" @navigate="handleNavigate" />
         </aside>
         <main id="admin-main" ref="mainEl" tabindex="-1" class="main-content" :class="{ collapsed: isCollapsed }">
           <!-- Above the page rather than inside it, so it is seen once on
@@ -103,6 +103,7 @@ import Themes from './Themes.vue';
 import Updates from './Updates.vue';
 import Builder from './Builder.vue';
 import ReviewsInbox from './collaboration/ReviewsInbox.vue';
+import Release from './collaboration/Release.vue';
 import ChangePassword from './ChangePassword.vue';
 import { installCsrfFetch, setCsrfToken } from '../lib/api.js';
 import { currentRoute as routeFromLocation, withBase } from '../lib/base.js';
@@ -150,6 +151,12 @@ const hasWebhooks = computed(
 // answer — `content.edit.any`, the bar `GET /api/collaboration/review` holds.
 const hasReviews = computed(
   () => installedPluginIds.value.includes('collaboration') && can('content.edit.any')
+);
+
+// Release publishes a chosen set together; the API needs `content.publish`, so
+// the nav follows that bar rather than the broader review-read capability.
+const hasRelease = computed(
+  () => installedPluginIds.value.includes('collaboration') && can('content.publish')
 );
 
 /** Site allows free-form; default on until settings load (matches server default). */
@@ -289,6 +296,7 @@ const getRouteComponent = () => {
   if (path === '/admin/builder') return hasBuilder.value ? Builder : Dashboard;
   if (path === '/admin/webhooks') return hasWebhooks.value ? Webhooks : Dashboard;
   if (path === '/admin/reviews') return hasReviews.value ? ReviewsInbox : Dashboard;
+  if (path === '/admin/release') return hasRelease.value ? Release : Dashboard;
   if (path.startsWith('/admin/pages/edit/')) return PageEdit;
   if (path === '/admin/pages/new') return PageEdit;
   if (path.startsWith('/admin/plugins/')) return PluginDetail;

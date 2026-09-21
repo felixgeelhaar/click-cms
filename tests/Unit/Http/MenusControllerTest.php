@@ -132,8 +132,10 @@ final class MenusControllerTest extends TestCase
         ]]);
 
         $this->assertSame(400, $r['status']);
+        $this->assertSame('bad_request', $r['code']);
         // Refused before storage: the document must not exist at all.
         $this->assertSame(404, $this->menus->get('main')['status']);
+        $this->assertSame('not_found', $this->menus->get('main')['code']);
     }
 
     public function testAJavascriptTargetInAChildIsAlsoRejected(): void
@@ -145,11 +147,14 @@ final class MenusControllerTest extends TestCase
         ]]);
 
         $this->assertSame(400, $r['status']);
+        $this->assertSame('bad_request', $r['code']);
     }
 
     public function testAnInvalidMenuIdIsRejected(): void
     {
-        $this->assertSame(400, $this->put('Not An Id', ['name' => 'x', 'items' => []])['status']);
+        $r = $this->put('Not An Id', ['name' => 'x', 'items' => []]);
+        $this->assertSame(400, $r['status']);
+        $this->assertSame('bad_request', $r['code']);
     }
 
     /* ------------------------------------------------------- resolution -- */
@@ -226,7 +231,9 @@ final class MenusControllerTest extends TestCase
 
     public function testGettingAMissingMenuIs404(): void
     {
-        $this->assertSame(404, $this->menus->get('nope')['status']);
+        $r = $this->menus->get('nope');
+        $this->assertSame(404, $r['status']);
+        $this->assertSame('not_found', $r['code']);
     }
 
     /* ---------------------------------------------- anchors -- */
@@ -270,6 +277,7 @@ final class MenusControllerTest extends TestCase
         // 400, as for any other target the domain refuses — the anchor is not
         // a special case, which is the point.
         $this->assertSame(400, $result['status'] ?? null);
+        $this->assertSame('bad_request', $result['code'] ?? null);
     }
 
     /* ------------------------------------------- one menu per language -- */
