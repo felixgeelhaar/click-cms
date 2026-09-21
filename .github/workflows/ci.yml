@@ -222,6 +222,8 @@ jobs:
       # Boot creates admin/admin with mustChangePassword; pin a known password
       # so the smoke can sign in without depending only on the forced-change UI.
       - name: Reset admin password for e2e
+        env:
+          CLICK_E2E_PASS: admin-demo-pass-99
         run: |
           php -r '
             $path = "content/user/en/admin.json";
