@@ -15,19 +15,10 @@ declare(strict_types=1);
  *
  *   17 3 * * *  cd /var/www/html && php bin/click-update.php >> data/updates/cron.log 2>&1
  *
- * ## Why this is a CLI command and not something the web request does
- *
- * Installing a release replaces `src/` underneath the running process. In a web
- * request that is genuinely dangerous: PHP loads class files lazily, so a swap
- * mid-request can leave a half-served page unable to autoload the class it needs
- * next, and an opcode cache can then hold a mix of both releases. A CLI run has
- * no page in flight and exits immediately afterwards, so the next request starts
- * cleanly on the new code.
- *
- * That is the whole reason there is no "update on request tail" mode. WordPress
- * can do it because it loads nearly everything up front; this does not, and
- * pretending otherwise would trade a rare visible failure for a rare invisible
- * one.
+ * Optional on shared hosting: ordinary CMS reads also schedule updates, before
+ * Application boots. Both paths use the request barrier and signed release
+ * policy. This CLI exits on completion; it cannot reset a separate web PHP
+ * pool's OPcache, so that pool needs timestamp validation or host cache control.
  *
  * Exit codes: 0 nothing to do or update installed, 1 something failed. Cron
  * mails on non-zero, which is the notification.
@@ -80,7 +71,7 @@ $service = new UpdateService(
     // The state directory switches on rollback protection: without it a
     // replayed older feed would be believed.
     new ReleaseFeed($root . '/data/updates'),
-    new UpdateInstaller($root),
+    new UpdateInstaller($root, null, $config->updatePublicRoot()),
     Application::VERSION,
 );
 
@@ -141,7 +132,7 @@ $outcome = $scheduler->withLock(static function () use ($service, $scheduler, $f
 
     if (($result['success'] ?? false) !== true) {
         return ['status' => 'error', 'message' => 'Update to ' . $version . ' failed: '
-            . ($result['error'] ?? 'unknown error') . ' (the site was left as it was)'];
+            . ($result['error'] ?? 'unknown error')];
     }
 
     return ['status' => 'ok', 'message' => 'Installed ' . $version

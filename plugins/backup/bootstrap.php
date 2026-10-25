@@ -22,6 +22,7 @@ use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Application\Backup\BackupException;
 use Click\Cms\Application\Backup\BackupService;
 use Click\Cms\Application\Backup\BackupStore;
+use Click\Cms\Application\Backup\BackupSource;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
@@ -337,7 +338,7 @@ class Plugin_backup extends \Click\Cms\Application\Plugin\BasePlugin
 
     private function storage(CoreConfig $config): StorageInterface
     {
-        return StorageFactory::create($config, $this->siteRoot());
+        return BackupSource::create($config, $this->siteRoot(), $this->basePath());
     }
 
     /* ---------------------------------------------------------- who is asking -- */

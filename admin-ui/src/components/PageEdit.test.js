@@ -31,7 +31,7 @@ const version = (reason) => ({
   recordedAt: '2026-07-01T10:00:00+00:00',
 });
 
-const ok = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+const ok = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
 const notFound = () => ({ ok: false, status: 404, json: async () => ({ error: 'Page not found' }) });
 
 /**
@@ -50,6 +50,7 @@ const installFetch = ({
   pages = {},
   versions = {},
   createdSlug = 'home',
+  draftPreviewHtml = '<!doctype html><html><body><h1>Unsaved preview</h1></body></html>',
   publishConflict = null,
 } = {}) => {
   global.fetch = vi.fn(async (url, init = {}) => {
@@ -59,7 +60,7 @@ const installFetch = ({
     const locale = u.searchParams.get('locale') || defaultLocale;
 
     if (path === '/api/auth/check') {
-      return ok({ data: { user: { capabilities } } });
+      return ok({ data: { user: { username: 'editor', capabilities } } });
     }
     if (path === '/api/section-types') {
       return ok({ data: [], warnings: {} });
@@ -94,10 +95,15 @@ const installFetch = ({
       return ok({ data: { url: `/preview/token`, expiresAt: 1893456000 } });
     }
 
+    const draftRenderMatch = path.match(/^\/api\/pages\/([^/]+)\/preview\/render$/);
+    if (draftRenderMatch && method === 'POST') {
+      return { ok: true, status: 200, text: async () => draftPreviewHtml, json: async () => ({}) };
+    }
+
     const pageMatch = path.match(/^\/api\/pages\/([^/]+)$/);
     if (pageMatch && (method === 'GET' || method === 'PUT')) {
       const slug = pageMatch[1];
-      if (method === 'PUT') return ok({ data: { slug } });
+      if (method === 'PUT') return ok({ data: { slug, revision: 'rev-2' } });
 
       const state = pages[locale];
       if (!state) return notFound();
@@ -107,6 +113,7 @@ const installFetch = ({
           slug,
           locale,
           data: { title: state.title, sections: state.sections ?? [] },
+          revision: state.revision ?? 'rev-1',
         },
         locale,
         publication: state.publication ?? null,
@@ -132,8 +139,40 @@ const publishCalls = () =>
     /\/publish$/.test(new URL(String(url), 'http://localhost').pathname) &&
     (init?.method || 'GET').toUpperCase() === 'POST');
 
+describe('in-memory live draft preview', () => {
+  it('renders current unsaved fields in a sandbox without saving them', async () => {
+    const wrapper = await mountEdit({
+      capabilities: ['content.preview'],
+      pages: { en: { title: 'Saved title', sections: [], publication: PENDING } },
+      draftPreviewHtml: '<!doctype html><html><body><h1>Unsaved title</h1></body></html>',
+    });
+    await wrapper.get('#page-title').setValue('Unsaved title');
+    const liveButton = wrapper.findAll('button').find((candidate) => candidate.text() === 'Live preview');
+    await liveButton.trigger('click');
+    await flushPromises();
+
+    const request = global.fetch.mock.calls.find(([url, init]) =>
+      new URL(String(url), 'http://localhost').pathname === '/api/pages/home/preview/render'
+      && init?.method === 'POST');
+    expect(request).toBeTruthy();
+    expect(JSON.parse(request[1].body)).toMatchObject({ title: 'Unsaved title', sections: [] });
+    expect(global.fetch.mock.calls.some(([url, init]) => new URL(String(url), 'http://localhost').pathname === '/api/pages/home' && init?.method === 'PUT')).toBe(false);
+    expect(publishCalls()).toHaveLength(0);
+    expect(wrapper.get('iframe').attributes('srcdoc')).toContain('Unsaved title');
+    expect(wrapper.get('iframe').attributes('sandbox')).toBe('');
+  });
+});
+
 beforeEach(() => {
   vi.restoreAllMocks();
+  const values = new Map();
+  Object.defineProperty(window, 'localStorage', { configurable: true, value: {
+    get length() { return values.size; },
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key),
+    clear: () => values.clear(),
+  } });
   window.confirm = vi.fn(() => true);
 });
 
@@ -342,6 +381,190 @@ describe('saving is not publishing', () => {
     expect(notice.exists()).toBe(true);
     expect(notice.text()).toBe('Saved. This is not on the public site until you publish.');
   });
+
+  it('sends the loaded revision and preserves local edits after a conflict', async () => {
+    const wrapper = await mountEdit({
+      pages: { en: { title: 'Home', sections: [], revision: 'rev-7', publication: PENDING } },
+    });
+    await wrapper.get('#page-title').setValue('My local title');
+    global.fetch.mockImplementation(async (url, init = {}) => {
+      if ((init.method || 'GET').toUpperCase() === 'PUT') return ok({ error: 'This page changed remotely.' }, 409);
+      return ok({ data: [], locale: 'en', locales: ['en'] });
+    });
+
+    await wrapper.vm.savePage();
+    await flushPromises();
+
+    const put = global.fetch.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(put[1].body).expectedRevision).toBe('rev-7');
+    expect(wrapper.get('#page-title').element.value).toBe('My local title');
+    expect(wrapper.get('[role="alert"]').text()).toContain('changed remotely');
+    expect(wrapper.get('.btn-reload-conflict').exists()).toBe(true);
+  });
+
+  it('compares local edits with the latest server copy after a conflict', async () => {
+    const wrapper = await mountEdit({
+      pages: { en: { title: 'Home', sections: [], revision: 'rev-7', publication: PENDING } },
+    });
+    await wrapper.get('#page-title').setValue('My local title');
+    global.fetch.mockImplementation(async (url, init = {}) => {
+      const path = new URL(String(url), 'http://localhost').pathname;
+      if ((init.method || 'GET').toUpperCase() === 'PUT') return ok({ error: 'This page changed remotely.' }, 409);
+      if (path === '/api/pages/home') {
+        return ok({ data: { slug: 'home', locale: 'en', data: { title: 'Remote title', sections: [] }, revision: 'rev-8' }, publication: PENDING });
+      }
+      if (path === '/api/pages') return ok({ locale: 'en', locales: ['en'] });
+      return ok({ data: [] });
+    });
+    await wrapper.vm.savePage();
+    await wrapper.vm.compareConflict();
+    await flushPromises();
+    expect(wrapper.find('.draft-comparison').text()).toContain('Remote title');
+    expect(wrapper.find('.draft-comparison').text()).toContain('My local title');
+  });
+
+  it('applies a non-overlapping merge locally and uses the latest server revision on an explicit save', async () => {
+    const wrapper = await mountEdit({
+      pages: { en: { title: 'Home', sections: [{ type: 'text', values: { body: 'Base body' } }], revision: 'rev-7', publication: PENDING } },
+    });
+    await wrapper.get('#page-title').setValue('My local title');
+    global.fetch.mockImplementation(async (url, init = {}) => {
+      const path = new URL(String(url), 'http://localhost').pathname;
+      if ((init.method || 'GET').toUpperCase() === 'PUT') return ok({ error: 'This page changed remotely.' }, 409);
+      if (path === '/api/pages/home') {
+        return ok({ data: { slug: 'home', locale: 'en', data: { title: 'Home', sections: [{ type: 'text', values: { body: 'Server body' } }] }, revision: 'rev-8' }, publication: PENDING });
+      }
+      if (path === '/api/pages') return ok({ locale: 'en', locales: ['en'] });
+      return ok({ data: [] });
+    });
+    await wrapper.vm.savePage();
+    await wrapper.vm.compareConflict();
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: 'DraftMerge' }).exists()).toBe(true);
+    await wrapper.get('[data-testid="apply-merge"]').trigger('click');
+    expect(wrapper.get('#page-title').element.value).toBe('My local title');
+    expect(wrapper.vm.page.sections[0].values.body).toBe('Server body');
+    expect(wrapper.text()).toContain('Review the merged draft and save when ready');
+    expect(global.fetch.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(1);
+
+    await wrapper.vm.savePage();
+    const puts = global.fetch.mock.calls.filter(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(puts[1][1].body)).toMatchObject({ expectedRevision: 'rev-8', title: 'My local title' });
+    expect(JSON.parse(puts[1][1].body).sections[0].values.body).toBe('Server body');
+    expect(publishCalls()).toHaveLength(0);
+  });
+
+  it('ignores a conflict comparison response after changing locale', async () => {
+    const wrapper = await mountEdit({
+      locales: ['en', 'de'],
+      pages: {
+        en: { title: 'English', sections: [], revision: 'rev-en', publication: PENDING },
+        de: { title: 'Deutsch', sections: [], revision: 'rev-de', publication: PENDING },
+      },
+    });
+    await wrapper.get('#page-title').setValue('Local English');
+    let resolveEnglish;
+    let deferredUsed = false;
+    global.fetch.mockImplementation(async (url, init = {}) => {
+      const path = new URL(String(url), 'http://localhost').pathname;
+      const requestedLocale = new URL(String(url), 'http://localhost').searchParams.get('locale') || 'en';
+      if (path === '/api/pages/home' && requestedLocale === 'en' && !deferredUsed) {
+        deferredUsed = true;
+        return new Promise((resolve) => { resolveEnglish = resolve; });
+      }
+      if (path === '/api/pages/home') return ok({ data: { slug: 'home', locale: 'de', data: { title: 'Deutsche saved', sections: [] }, revision: 'rev-de-latest' }, locale: 'de' });
+      if (path === '/api/pages' && (init.method || 'GET').toUpperCase() === 'GET') return ok({ locale: 'en', locales: ['en', 'de'] });
+      return ok({ data: [] });
+    });
+    const comparison = wrapper.vm.compareConflict();
+    await flushPromises();
+    window.confirm = vi.fn(() => true);
+    await wrapper.vm.switchLocale('de');
+    resolveEnglish(ok({ data: { slug: 'home', locale: 'en', data: { title: 'Remote English', sections: [] }, revision: 'rev-en-latest' }, locale: 'en' }));
+    await Promise.all([comparison, flushPromises()]);
+
+    expect(wrapper.get('#page-title').element.value).toBe('Deutsche saved');
+    expect(wrapper.findComponent({ name: 'DraftMerge' }).exists()).toBe(false);
+  });
+
+  it('blocks saving an existing page when its read has no revision', async () => {
+    const wrapper = await mountEdit({ pages: { en: { title: 'Home', sections: [], revision: '', publication: LIVE } } });
+    global.fetch.mockClear();
+    await wrapper.vm.savePage();
+    await flushPromises();
+    expect(global.fetch.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false);
+    expect(wrapper.get('[role="alert"]').text()).toContain('Reload this page');
+  });
+
+  it('asks before cancelling when there are unsaved edits', async () => {
+    const wrapper = await mountEdit({ pages: { en: { title: 'Home', sections: [], publication: LIVE } } });
+    await wrapper.get('#page-title').setValue('Unsaved');
+    window.confirm = vi.fn(() => false);
+    await wrapper.get('.actions .btn-secondary').trigger('click');
+    expect(wrapper.emitted('cancel')).toBeUndefined();
+  });
+
+  it('tracks unsaved edits for browser reload protection', async () => {
+    const wrapper = await mountEdit({ pages: { en: { title: 'Home', sections: [], publication: LIVE } } });
+    const event = new Event('beforeunload', { cancelable: true });
+    await wrapper.get('#page-title').setValue('Unsaved');
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('stores recovery only after opt-in and offers an explicit restore after reload', async () => {
+    const scenario = { pages: { en: { title: 'Home', sections: [], publication: LIVE } } };
+    const wrapper = await mountEdit(scenario);
+    expect(window.localStorage.length).toBe(0);
+    await wrapper.get('.recovery-opt-in input').setValue(true);
+    await wrapper.get('#page-title').setValue('Recovered title');
+    await flushPromises();
+    expect(window.localStorage.length).toBe(1);
+    wrapper.unmount();
+
+    const reopened = await mountEdit(scenario);
+    expect(reopened.find('.recovery-banner').text()).toContain('local recovery copy is available');
+    expect(reopened.get('#page-title').element.value).toBe('Home');
+    await reopened.get('.recovery-banner .btn-secondary').trigger('click');
+    expect(reopened.get('#page-title').element.value).toBe('Recovered title');
+    expect(reopened.find('.draft-comparison').exists()).toBe(true);
+  });
+
+  it('keeps edits typed during a save marked dirty', async () => {
+    let resolveWrite;
+    const wrapper = await mountEdit({ pages: { en: { title: 'Home', sections: [], revision: 'rev-1', publication: LIVE } } });
+    global.fetch.mockImplementation(async (url, init = {}) => {
+      if ((init.method || 'GET').toUpperCase() === 'PUT') {
+        return await new Promise((resolve) => { resolveWrite = resolve; });
+      }
+      const path = new URL(String(url), 'http://localhost').pathname;
+      if (path === '/api/pages') return ok({ locale: 'en', locales: ['en'] });
+      if (path.endsWith('/versions')) return ok({ data: [] });
+      if (path.endsWith('/schedule')) return ok({ data: { publishAt: null, unpublishAt: null } });
+      return ok({ data: { slug: 'home', revision: 'rev-1' } });
+    });
+    const saving = wrapper.vm.savePage();
+    await flushPromises();
+    await wrapper.get('#page-title').setValue('Typed while saving');
+    resolveWrite(ok({ data: { slug: 'home', revision: 'rev-2' } }));
+    await saving;
+    await flushPromises();
+    expect(wrapper.get('#page-title').element.value).toBe('Typed while saving');
+    expect(wrapper.vm.dirty).toBe(true);
+  });
+});
+
+it('replaces the new-page route after the first save and preserves its language', async () => {
+  const wrapper = await mountEdit({ locales: ['en', 'de'], createdSlug: 'neue-seite' }, { slug: '', initialLocale: 'de' });
+  await wrapper.get('#page-title').setValue('Neue Seite');
+  await wrapper.get('#page-slug').setValue('neue-seite');
+  await wrapper.vm.savePage();
+  await flushPromises();
+  expect(wrapper.emitted('replace-route')).toEqual([['/admin/pages/edit/neue-seite?locale=de']]);
+  await wrapper.vm.savePage();
+  await flushPromises();
+  expect(wrapper.emitted('replace-route')).toHaveLength(1);
 });
 
 /* ------------------------------------- 6. publish 409 is editorial -- */

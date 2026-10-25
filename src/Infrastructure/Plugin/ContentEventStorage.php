@@ -10,6 +10,8 @@ use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\History\Version;
 use Click\Cms\Domain\Publishing\PublicationState;
 use Click\Cms\Domain\Publishing\PublishingStorage;
+use Click\Cms\Domain\Publishing\ConditionalPublishingStorage;
+use Click\Cms\Domain\Storage\ConditionalStorage;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Closure;
@@ -69,7 +71,7 @@ use Closure;
  * plugin set are not stored through this port, so nothing here fires for them —
  * see `docs/core.md` for what that leaves out and why it was not faked.
  */
-final class ContentEventStorage implements PublishingStorage
+final class ContentEventStorage implements ConditionalPublishingStorage, ConditionalStorage
 {
     /** @var Closure(): array<string, mixed> */
     private readonly Closure $actor;
@@ -177,6 +179,43 @@ final class ContentEventStorage implements PublishingStorage
         }
     }
 
+    public function saveIfUnchanged(Content $content, string $expectedRevision): bool
+    {
+        if (!$this->inner instanceof ConditionalStorage) {
+            throw new \RuntimeException('Conditional saves are not supported by the wrapped storage.');
+        }
+
+        $veto = $this->gate->listensTo(ContentGate::BEFORE_SAVE);
+        $announce = $this->gate->listensTo(ContentGate::SAVED);
+        if (!$veto && !$announce) {
+            return $this->inner->saveIfUnchanged($content, $expectedRevision);
+        }
+
+        $key = $content->key;
+        $user = ($this->actor)();
+        $facts = [
+            'created' => $expectedRevision === '',
+            'reason' => Version::REASON_SAVE,
+        ];
+
+        if ($veto) {
+            $refusal = $this->gate->refusalForSave($key, $user, $facts);
+            if ($refusal !== null) {
+                throw ContentRefusedException::refused(ContentGate::BEFORE_SAVE, $key, $refusal);
+            }
+        }
+
+        if (!$this->inner->saveIfUnchanged($content, $expectedRevision)) {
+            return false;
+        }
+
+        if ($announce) {
+            $this->gate->announceSaved($key, $user, $facts);
+        }
+
+        return true;
+    }
+
     public function delete(ContentKey $key): bool
     {
         $veto = $this->gate->listensTo(ContentGate::BEFORE_DELETE);
@@ -206,6 +245,15 @@ final class ContentEventStorage implements PublishingStorage
         }
 
         return $deleted;
+    }
+
+    public function publishIfUnchanged(ContentKey $key, string $expectedRevision): Content|false|null
+    {
+        if (!$this->inner instanceof ConditionalPublishingStorage) {
+            throw new \RuntimeException('Conditional publication is not supported by the wrapped storage.');
+        }
+        $published = $this->inner->publishIfUnchanged($key, $expectedRevision);
+        return $published;
     }
 
     public function publish(ContentKey $key): ?Content

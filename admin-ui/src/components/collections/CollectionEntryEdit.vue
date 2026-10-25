@@ -4,12 +4,11 @@
 
     <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
     <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
-    <p
-      v-if="publishError"
-      class="banner"
-      :class="publishErrorEditorial ? 'warning' : 'error'"
-      role="alert"
-    >{{ publishError }}</p>
+<p v-if="conflict" class="banner error" role="alert">
+      This entry changed remotely. Your edits are still here. Reload to review the latest version.
+      <button type="button" class="btn-reload-conflict" @click="reloadConflict">Reload to review</button>
+    </p>
+    <p v-if="publishError" class="banner" :class="publishErrorEditorial ? 'warning' : 'error'" role="alert">{{ publishError }}</p>
     <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
 
     <div v-if="loading" class="banner">Loading…</div>
@@ -112,7 +111,7 @@
       <p v-if="previewError" class="banner error" role="alert">{{ previewError }}</p>
 
       <div class="actions">
-        <button type="button" class="btn-secondary" :disabled="saving" @click="$emit('cancel')">Cancel</button>
+        <button type="button" class="btn-secondary" :disabled="saving" @click="cancel">Cancel</button>
         <button
           v-if="!isNew && !translationMissing"
           type="button"
@@ -181,7 +180,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import RepeaterField from '../fields/RepeaterField.vue';
 import { leafComponent } from '../fields/leafComponent.js';
 import PageLanguages from '../PageLanguages.vue';
@@ -216,6 +215,9 @@ const saving = ref(false);
 const busy = ref('');
 const loadError = ref('');
 const saveError = ref('');
+const conflict = ref(false);
+const revision = ref('');
+const savedSnapshot = ref('');
 const publishError = ref('');
 const publishErrorEditorial = ref(false);
 const notice = ref('');
@@ -291,6 +293,11 @@ const setValue = (name, value) => {
   values.value = { ...values.value, [name]: value };
 };
 
+const snapshot = () => JSON.stringify({ slug: slugInput.value, values: values.value });
+const dirty = computed(() => savedSnapshot.value !== '' && savedSnapshot.value !== snapshot());
+
+const markLoaded = () => { savedSnapshot.value = snapshot(); };
+
 /* -------------------------------------------------------- publication -- */
 
 const STATES = {
@@ -361,16 +368,20 @@ const loadEntry = async () => {
       // this one — an empty form to translate into, not an error.
       values.value = blankValues();
       publication.value = null;
+      revision.value = '';
       translationMissing.value = true;
+      markLoaded();
       return;
     }
     if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
 
     const data = body.data ?? {};
+    revision.value = data.revision ?? '';
     // Merge over a blank so a field absent from stored data still has its schema
     // shape — an empty repeater stays an array rather than becoming undefined.
     values.value = { ...blankValues(), ...(data.data ?? {}) };
     publication.value = data.publication ?? null;
+    markLoaded();
   } catch (e) {
     loadError.value = `Could not load this entry: ${e.message}`;
   } finally {
@@ -454,6 +465,13 @@ const save = async () => {
   // language: entries are separate documents per locale, so a PUT to a missing
   // one is a 404 by design rather than an upsert.
   const creating = isNew.value || translationMissing.value;
+  if (!creating && !revision.value) {
+    saveError.value = 'This entry has no revision token. Reload this entry before saving.';
+    saving.value = false;
+    return;
+  }
+  conflict.value = false;
+  const submittedSnapshot = snapshot();
   const base = `/api/collections/${encodeURIComponent(props.type.id)}/entries`;
   const url = creating
     ? `${base}${localeQuery()}`
@@ -471,7 +489,7 @@ const save = async () => {
     const res = await fetch(url, {
       method: creating ? 'POST' : 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, ...(!creating ? { expectedRevision: revision.value } : {}) }),
     });
     const body = await res.json().catch(() => ({}));
 
@@ -479,6 +497,7 @@ const save = async () => {
       // 422 returns per-field messages keyed by field name, so each is shown
       // against the input that produced it.
       fieldErrors.value = body.errors ?? {};
+      conflict.value = res.status === 409;
       saveError.value = body.error
         || (Object.keys(fieldErrors.value).length
           ? 'Some fields need attention before this entry can be saved.'
@@ -488,10 +507,15 @@ const save = async () => {
 
     const data = body.data ?? {};
     storedSlug.value = data.slug || storedSlug.value || slugInput.value;
-    if (data.data) values.value = { ...blankValues(), ...data.data };
+    revision.value = data.revision ?? '';
+    const unchangedDuringSave = snapshot() === submittedSnapshot;
+    if (unchangedDuringSave && data.data) values.value = { ...blankValues(), ...data.data };
+    savedSnapshot.value = unchangedDuringSave ? snapshot() : submittedSnapshot;
     publication.value = data.publication ?? publication.value;
     translationMissing.value = false;
-    notice.value = 'Saved. This is not on the public site until you publish.';
+    notice.value = dirty.value
+      ? 'Submitted edits were saved. Newer edits still need saving.'
+      : 'Saved. This is not on the public site until you publish.';
     emit('saved', storedSlug.value);
     await Promise.all([loadTranslations(), loadVersions(), loadBackReferences()]);
   } catch (e) {
@@ -539,6 +563,7 @@ const publicationAction = async (action) => {
 
 // Confirmation happens inside PageVersions, in the product's own voice.
 const restoreVersion = async (version) => {
+  if (dirty.value && !window.confirm('Restore this version and discard your unsaved edits?')) return;
   restoringId.value = version.id;
   versionsError.value = '';
   notice.value = '';
@@ -614,12 +639,39 @@ const copyPreviewLink = async () => {
 
 const switchLocale = async (code) => {
   if (code === locale.value) return;
+  if (dirty.value && !window.confirm(
+    `Switch to ${languageName(code)}? Unsaved changes to the ${languageName(locale.value)} version will be lost.`
+  )) return;
   locale.value = code;
   notice.value = '';
   publishError.value = '';
   publishErrorEditorial.value = false;
   saveError.value = '';
   await reload();
+};
+
+const confirmDiscard = (destination) => !dirty.value || window.confirm(
+  `Leave this entry for ${destination}? Unsaved changes will be lost.`
+);
+
+const beforeUnload = (event) => {
+  if (!dirty.value) return;
+  event.preventDefault();
+  event.returnValue = '';
+};
+
+const beforeNavigate = (event) => {
+  if (!confirmDiscard('another screen')) event.preventDefault();
+};
+
+const reloadConflict = async () => {
+  if (!window.confirm('Reload the latest entry? Your local edits will be discarded.')) return;
+  conflict.value = false;
+  await reload();
+};
+
+const cancel = () => {
+  if (confirmDiscard('the entries list')) emit('cancel');
 };
 
 const remove = async () => {
@@ -633,6 +685,8 @@ const remove = async () => {
 };
 
 onMounted(async () => {
+  window.addEventListener('beforeunload', beforeUnload);
+  window.addEventListener('click:before-navigate', beforeNavigate);
   loading.value = true;
   try {
     await Promise.all([loadCapabilities(), loadSiteLocales()]);
@@ -642,10 +696,16 @@ onMounted(async () => {
       await Promise.all([loadTranslations(), loadVersions(), loadBackReferences()]);
     } else {
       values.value = blankValues();
+      markLoaded();
     }
   } finally {
     loading.value = false;
   }
+});
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', beforeUnload);
+  window.removeEventListener('click:before-navigate', beforeNavigate);
 });
 </script>
 

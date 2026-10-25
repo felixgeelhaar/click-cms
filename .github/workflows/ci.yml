@@ -9,6 +9,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 # A newer push to the same branch or PR cancels the run already in flight —
 # nobody waits on results for code that has been superseded.
 concurrency:
@@ -21,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Matches the runtime image (Dockerfile: php:8.5-apache), so the suite runs
       # on the version production actually serves. gd/zip/pdo_sqlite are the
@@ -40,7 +43,7 @@ jobs:
           coverage: none
 
       - name: Cache Composer packages
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.composer/cache
           key: composer-${{ hashFiles('composer.lock') }}
@@ -51,6 +54,9 @@ jobs:
 
       - name: Run test suite
         run: vendor/bin/phpunit --no-progress
+
+      - name: Verify isolated backup restoration
+        run: php scripts/security/restore-drill.php
 
       # The documentation site is generated at deploy time, so a generator that
       # stopped working would be discovered by GitHub Pages rather than by CI —
@@ -67,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # composer.json says `php: >=8.1`, the README badge says 8.1+, and every
       # entry in the signed update feed advertises `requiresPhp: "8.1"` — which
@@ -91,9 +97,9 @@ jobs:
       - name: Every shipped file parses
         run: |
           fail=0
-          for f in $(find src plugins bin public -name '*.php'); do
+          while IFS= read -r -d '' f; do
             php -l "$f" > /dev/null || { echo "does not parse on 8.1: $f"; fail=1; }
-          done
+          done < <(find src plugins bin public -name '*.php' -print0)
           exit $fail
 
       # Parsing is not booting. This seeds a site and asks for a real page,
@@ -104,7 +110,7 @@ jobs:
           composer dump-autoload --no-interaction
           php bin/click-seed.php
           php -S 127.0.0.1:9111 -t public &
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             sleep 1
             code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9111/ || true)"
             [ "$code" = "200" ] && break
@@ -121,13 +127,13 @@ jobs:
         working-directory: admin-ui
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # 22 matches the admin-ui build stage in the Dockerfile.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: admin-ui/package-lock.json
 
@@ -142,7 +148,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Building the image proves the multi-stage build still assembles: Composer
       # deps, the admin UI build, the extension check, and the file layout. The
@@ -158,7 +164,7 @@ jobs:
 
       - name: Wait for health
         run: |
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             body="$(curl -fsS http://127.0.0.1:8080/health.php || true)"
             echo "$body"
             if printf '%s' "$body" | grep -q '"status":"ok"'; then
@@ -171,16 +177,48 @@ jobs:
           docker logs click-cms-ci >&2
           exit 1
 
-      - name: Stop container
+      - name: Build hardened image
+        run: docker build --target hardened -t click-cms:hardened-ci .
+
+      - name: Run hardened container
+        run: >-
+          docker run -d --name click-cms-hardened-ci -p 8081:8080
+          --read-only --cap-drop ALL --security-opt no-new-privileges:true
+          --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777
+          --tmpfs /var/run/apache2:rw,noexec,nosuid,size=1m,uid=33,gid=33
+          --tmpfs /var/lock/apache2:rw,noexec,nosuid,size=1m,uid=33,gid=33
+          --mount type=volume,destination=/var/www/html/content
+          --mount type=volume,destination=/var/www/html/data
+          click-cms:hardened-ci
+
+      - name: Verify hardened runtime
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8081/health.php | grep -q '"status":"ok"'; then
+              docker exec click-cms-hardened-ci php -r '
+                if (posix_geteuid() === 0) { exit(1); }
+                if (getenv("CLICK_DEPLOYMENT_MANAGED") !== "1") { exit(2); }
+                if (@file_put_contents("/var/www/html/src/write-probe", "x") !== false) { exit(3); }
+                if (file_put_contents("/var/www/html/data/write-probe", "x") !== 1) { exit(4); }
+                unlink("/var/www/html/data/write-probe");
+              '
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs click-cms-hardened-ci >&2
+          exit 1
+
+      - name: Stop containers
         if: always()
-        run: docker rm -f click-cms-ci || true
+        run: docker rm -fv click-cms-ci click-cms-hardened-ci || true
 
   e2e:
     name: Playwright smoke
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
@@ -190,16 +228,16 @@ jobs:
           coverage: none
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: |
             package-lock.json
             admin-ui/package-lock.json
 
       - name: Cache Composer packages
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.composer/cache
           key: composer-${{ hashFiles('composer.lock') }}
@@ -225,6 +263,8 @@ jobs:
         env:
           CLICK_E2E_PASS: admin-demo-pass-99
         run: |
+          # PHP variables must remain literal for PHP.
+          # shellcheck disable=SC2016
           php -r '
             $path = "content/user/en/admin.json";
             $doc = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
@@ -241,7 +281,7 @@ jobs:
         run: |
           php -S 127.0.0.1:8080 -t public > /tmp/click-e2e-php.log 2>&1 &
           echo $! > /tmp/click-e2e-php.pid
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/ || true)"
             [ "$code" = "200" ] && break
             sleep 1

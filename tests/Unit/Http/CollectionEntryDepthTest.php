@@ -90,6 +90,34 @@ final class CollectionEntryDepthTest extends TestCase
         $this->assertContains('de', $en['availableLocales']);
     }
 
+    public function testEntryEditorReadExposesARevision(): void
+    {
+        $this->saveEntry('hello', ['title' => 'Hello'], null);
+
+        $response = $this->controller->getEntry('post', 'hello');
+
+        $this->assertIsString($response['data']['revision'] ?? null);
+    }
+
+    public function testStaleEntryUpdateReturns409AndKeepsTheSavedDraft(): void
+    {
+        $this->saveEntry('hello', ['title' => 'Original', 'body' => 'Body'], null);
+        $revision = $this->controller->getEntry('post', 'hello')['data']['revision'];
+
+        $_POST = ['values' => ['title' => 'Winner', 'body' => 'Body'], 'expectedRevision' => $revision];
+        $first = $this->controller->updateEntry('post', 'hello');
+        $this->assertSame(200, $first['status']);
+        $this->assertIsString($first['data']['revision']);
+
+        $_POST = ['values' => ['title' => 'Stale overwrite', 'body' => 'Stale'], 'expectedRevision' => $revision];
+        $stale = $this->controller->updateEntry('post', 'hello');
+        $_POST = [];
+
+        $this->assertSame(409, $stale['status']);
+        $this->assertSame('Winner', $this->controller->getEntry('post', 'hello')['data']['title']);
+        $this->assertArrayNotHasKey('expectedRevision', $this->controller->getEntry('post', 'hello')['data']['data']);
+    }
+
     public function testHistoryAccumulatesAndRestoreBringsBackAnEarlierEntry(): void
     {
         $this->saveEntry('hello', ['title' => 'First'], null);

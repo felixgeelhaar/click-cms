@@ -1,0 +1,93 @@
+name: Security audit
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nox:
+    name: Nox security scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Test the report completeness gate
+        run: python3 -m unittest discover -s scripts/security -p 'test_*.py'
+
+      - name: Scan source, secrets, dependencies and infrastructure
+        id: nox
+        uses: Nox-HQ/nox@f2436fa5f6d2fbc3459f120178b253aa3c05ba12 # v1.48.1
+        with:
+          version: '1.48.1'
+          format: json,sarif
+          output: .nox/reports/full
+          fail-on-findings: 'true'
+          annotate: 'false'
+          pr-comment: 'false'
+
+      # Missing/malformed reports and failed checks block the job. Advisory
+      # notices about globally installed, unselected plugins stay visible.
+      - name: Require a complete scan report
+        if: always()
+        run: python3 scripts/security/nox_check.py --report .nox/reports/full/findings.json
+
+      - name: Retain Nox reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: nox-security-reports
+          path: .nox/reports/full/
+          if-no-files-found: error
+          retention-days: 14
+
+  composer-audit:
+    name: Composer dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up PHP and Composer
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          coverage: none
+
+      # Audits the lock file, including require-dev packages. Composer has no
+      # runtime packages today, but its test tooling is still part of the
+      # repository's dependency surface and should remain visible in the report.
+      - name: Audit locked Composer dependencies
+        run: composer audit --locked --no-interaction
+
+  admin-npm-audit:
+    name: Admin npm dependency audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-ui
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: admin-ui/package-lock.json
+
+      # npm audit reads the lockfile and includes production and development
+      # dependencies by default. No install or automatic remediation is run.
+      - name: Audit locked npm dependencies
+        run: npm audit --package-lock-only

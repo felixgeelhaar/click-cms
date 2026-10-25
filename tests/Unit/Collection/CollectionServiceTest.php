@@ -6,6 +6,7 @@ namespace Click\Cms\Tests\Unit\Collection;
 
 use Click\Cms\Application\Collection\CollectionService;
 use Click\Cms\Application\Content\ContentService;
+use Click\Cms\Domain\Content\ContentRevision;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Infrastructure\Collection\JsonCollectionTypeRepository;
@@ -128,6 +129,33 @@ final class CollectionServiceTest extends TestCase
         $this->assertArrayNotHasKey('colour', $entry->data);
         // Ownership is recorded for the per-author permission checks.
         $this->assertSame('ed', $entry->data['owner']);
+    }
+
+    public function testUpdateRejectsAStaleRevisionWithoutReplacingTheDraft(): void
+    {
+        $this->service->create('post', ['slug' => 'hello', 'values' => [
+            'title' => 'First',
+            'body' => 'Original body',
+        ]], $this->editor());
+        $draftLoadedByBothEditors = $this->service->find('post', 'hello');
+        $this->assertNotNull($draftLoadedByBothEditors);
+        $revision = ContentRevision::of($draftLoadedByBothEditors);
+
+        $first = $this->service->update('post', 'hello', ['values' => [
+            'title' => 'Winner',
+            'body' => 'Updated body',
+        ], 'expectedRevision' => $revision], $this->editor());
+        $this->assertSame(200, $first['status']);
+
+        $stale = $this->service->update('post', 'hello', ['values' => [
+            'title' => 'Stale overwrite',
+            'body' => 'Stale body',
+        ], 'expectedRevision' => $revision], $this->editor());
+
+        $this->assertSame(409, $stale['status']);
+        $this->assertSame('Winner', $this->service->find('post', 'hello')?->data['title']);
+        $this->assertSame('Updated body', $this->service->find('post', 'hello')?->data['body']);
+        $this->assertArrayNotHasKey('expectedRevision', $this->service->find('post', 'hello')?->data ?? []);
     }
 
     public function testARequiredFieldMissingIsA422WithFieldErrors(): void

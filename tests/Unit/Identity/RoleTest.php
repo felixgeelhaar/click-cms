@@ -82,6 +82,14 @@ final class RoleTest extends TestCase
         $this->assertTrue(Role::Author->can(Capability::UseSectionEditor));
     }
 
+    public function testOnlyAdminsMayManageSharedSectionPresets(): void
+    {
+        self::assertTrue(Role::Admin->can(Capability::ManageSectionPresets));
+        self::assertFalse(Role::Editor->can(Capability::ManageSectionPresets));
+        self::assertFalse(Role::Author->can(Capability::ManageSectionPresets));
+        self::assertTrue(Role::Editor->can(Capability::UseSectionEditor));
+    }
+
     /**
      * Preview hands unpublished work to whoever holds the link, so it is
      * granted to the roles that write and reviewed — and withheld from the one

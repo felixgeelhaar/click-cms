@@ -8,6 +8,7 @@ use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\History\RetentionPolicy;
 use Click\Cms\Domain\History\Version;
 use Click\Cms\Domain\History\VersionStoreInterface;
+use Click\Cms\Domain\History\SynchronizedVersionStoreInterface;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use DateTimeImmutable;
@@ -36,7 +37,7 @@ use RuntimeException;
  * the content store does: a half-written version is worse than no version,
  * because it looks like a recovery point and is not one.
  */
-final class JsonVersionStore implements VersionStoreInterface
+final class JsonVersionStore implements SynchronizedVersionStoreInterface
 {
     /** Key parts become path segments, so they must not be able to escape. */
     private const SAFE_SEGMENT = '/^[A-Za-z0-9._-]+$/';
@@ -46,6 +47,9 @@ final class JsonVersionStore implements VersionStoreInterface
 
     private readonly RetentionPolicy $retention;
 
+    /** @var array<string, int> Re-entrant locks held by this store instance. */
+    private array $activeLocks = [];
+
     public function __construct(
         private readonly string $versionsDir,
         ?RetentionPolicy $retention = null,
@@ -53,11 +57,64 @@ final class JsonVersionStore implements VersionStoreInterface
         $this->retention = $retention ?? RetentionPolicy::default();
     }
 
+    /**
+     * Serialize changes to a version chain across PHP workers sharing this
+     * filesystem. This lock is local-filesystem coordination, not a cluster lock.
+     */
+    public function synchronize(ContentKey $key, callable $operation): mixed
+    {
+        if ($this->dirFor($key) === null) {
+            throw new InvalidArgumentException('Cannot lock an unsafe content key.');
+        }
+
+        $lockDir = dirname($this->versionsDir) . '/.' . basename($this->versionsDir) . '-locks';
+        if (!is_dir($lockDir) && !@mkdir($lockDir, 0o775, true) && !is_dir($lockDir)) {
+            throw new RuntimeException("Unable to create version lock directory: {$lockDir}");
+        }
+
+        $lockId = $key->toString();
+        if (($this->activeLocks[$lockId] ?? 0) > 0) {
+            $this->activeLocks[$lockId]++;
+            try {
+                return $operation();
+            } finally {
+                $this->activeLocks[$lockId]--;
+            }
+        }
+
+        $path = $lockDir . '/' . hash('sha256', $lockId) . '.lock';
+        $handle = @fopen($path, 'c');
+        if ($handle === false) {
+            throw new RuntimeException("Unable to open version lock: {$path}");
+        }
+
+        try {
+            if (!flock($handle, LOCK_EX)) {
+                throw new RuntimeException("Unable to acquire version lock: {$path}");
+            }
+
+            $this->activeLocks[$lockId] = 1;
+            return $operation();
+        } finally {
+            unset($this->activeLocks[$lockId]);
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
+    }
+
     public function record(
         Content $content,
         ?string $author = null,
         string $reason = Version::REASON_SAVE,
     ): Version {
+        return $this->synchronize(
+            $content->key,
+            fn (): Version => $this->recordUnlocked($content, $author, $reason),
+        );
+    }
+
+    private function recordUnlocked(Content $content, ?string $author, string $reason): Version
+    {
         $dir = $this->dirFor($content->key);
 
         if ($dir === null) {

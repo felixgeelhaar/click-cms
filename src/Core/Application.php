@@ -24,6 +24,7 @@ use Click\Cms\Application\Plugin\AuthGate;
 use Click\Cms\Application\Plugin\ContentGate;
 use Click\Cms\Application\Plugin\ContentRefusedException;
 use Click\Cms\Application\Plugin\PluginManager;
+use Click\Cms\Application\Plugin\PluginExecutionPolicy;
 use Click\Cms\Application\Plugin\PublishGate;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Event\EventDispatcher;
@@ -33,8 +34,10 @@ use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Click\Cms\Http\BasePath;
+use Click\Cms\Http\SecurityHealthController;
 use Click\Cms\Http\SectionTypesController;
 use Click\Cms\Http\ServerEnvironment;
+use Click\Cms\Http\SensitiveResponseCache;
 use Click\Cms\Http\TrustedProxies;
 use Click\Cms\Application\Theme\ThemeInstaller;
 use Click\Cms\Application\Theme\ThemeRepository;
@@ -97,7 +100,7 @@ class Application
      * signed feed offers, so it is the single answer to "what is running here?"
      * — bumping it is part of cutting a release, not an afterthought.
      */
-    public const VERSION = '1.8.0';
+    public const VERSION = '1.9.0';
 
     /**
      * The password the installer seeds. Published in the documentation and
@@ -128,6 +131,8 @@ class Application
     private ?EventDispatcher $eventDispatcher = null;
     private ?EventBus $eventBus = null;
     private array $apiRoutes = [];
+    private ?SecurityHealthController $securityHealthController = null;
+    private ?PluginExecutionPolicy $pluginExecutionPolicy = null;
     private ?SectionTypesController $sectionTypesController = null;
     private ?PagesController $pagesController = null;
     private ?UsersController $usersController = null;
@@ -331,6 +336,15 @@ class Application
             (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')
         );
 
+        // Response headers apply equally to JSON, HTML and redirects. Keeping
+        // this outside the JSON branch is essential for admin shells and SSO.
+        if (isset($response['headers']) && is_array($response['headers'])) {
+            foreach ($response['headers'] as $name => $value) {
+                header($name . ': ' . $value);
+            }
+            unset($response['headers']);
+        }
+
         if (isset($response['raw']) && $response['raw']) {
             // Raw HTML response.
             //
@@ -350,17 +364,6 @@ class Application
         } else {
             // JSON response
             header('Content-Type: application/json; charset=utf-8');
-
-            // A handler may ask for extra response headers — a preview delivery
-            // marking itself no-store, for instance — by returning a `headers`
-            // map. It is applied here and removed from the body, so it directs
-            // the response rather than being serialised into it.
-            if (isset($response['headers']) && is_array($response['headers'])) {
-                foreach ($response['headers'] as $name => $value) {
-                    header($name . ': ' . $value);
-                }
-                unset($response['headers']);
-            }
 
             http_response_code($response['status'] ?? 200);
             echo json_encode($response);
@@ -388,7 +391,19 @@ class Application
         // Then take off the prefix this installation is served under, so every
         // route below matches `/api/…` and knows nothing about where the site is
         // installed. At the domain root this changes nothing.
-        return $this->handleRequest($this->urlBase()->strip($path), $method);
+        $routedPath = $this->urlBase()->strip($path);
+        $response = $this->handleRequest($routedPath, $method);
+
+        $cacheHeaders = (new SensitiveResponseCache($this->apiGuard))->headersFor(
+            $routedPath,
+            $method,
+            authenticated: $this->getSessionUser() !== null,
+        );
+        if ($cacheHeaders !== []) {
+            $response['headers'] = array_merge($response['headers'] ?? [], $cacheHeaders);
+        }
+
+        return $response;
     }
 
     /**
@@ -578,13 +593,15 @@ class Application
             // The installation's root, so schema config falls back to the one
             // every site shares when this site declares none of its own.
             $this->basePath,
-            new \Click\Cms\Application\Editing\FreeformPolicy(
+            freeformPolicy: new \Click\Cms\Application\Editing\FreeformPolicy(
                 $this->settings ?? Settings::load($this->siteRoot() . '/data/settings.json')
             ),
+            previewRenderer: fn (Content $page): string => $this->renderPageHtml($page, $page->locale(), preview: true),
         );
-
-        // Section-type schema — what remains after pages and media were peeled
-        // out of the old CoreApiRoutes bag.
+        $this->securityHealthController = new SecurityHealthController(
+            $this->config,
+            $this->pluginExecutionPolicy ??= PluginExecutionPolicy::fromEnvironment(),
+        );
         $this->sectionTypesController = new SectionTypesController(
             $this->siteRoot(),
             $this->basePath,
@@ -691,7 +708,7 @@ class Application
             new UpdateService(
                 $this->basePath,
                 new ReleaseFeed($this->basePath . '/data/updates'),
-                new UpdateInstaller($this->basePath),
+                new UpdateInstaller($this->basePath, null, $this->config->updatePublicRoot()),
                 self::VERSION,
             ),
             $this->config,
@@ -705,7 +722,8 @@ class Application
         // this class, so each can be understood and tested on its own.
         $this->sessions = new SessionStore(
             $this->siteRoot() . '/data/sessions',
-            $this->getIdleTimeoutSeconds()
+            $this->getIdleTimeoutSeconds(),
+            fn (string $username): ?array => $this->contentService->user($username)?->data,
         );
         $this->apiGuard = new ApiGuard($this->sessions);
         $this->deliveryCors = new DeliveryCors($this->config->deliveryAllowedOrigins(), $this->apiGuard);
@@ -723,7 +741,8 @@ class Application
             $this->basePath . '/plugins',
             $this->siteRoot() . '/data',
             $excludedIds,
-            $excludedDirs
+            $excludedDirs,
+            $this->pluginExecutionPolicy ??= PluginExecutionPolicy::fromEnvironment(),
         );
         $this->pluginManager->setEventDispatcher($this->eventDispatcher);
         $this->pluginManager->setContentService($this->contentService);
@@ -1799,6 +1818,7 @@ class Application
         $coreTables = [
             $this->sectionTypesController->routes(),
             $this->pagesController->routes(),
+            ['GET /api/security/health' => [$this->securityHealthController, 'show']],
             $this->usersController->routes(),
             $this->pluginsController->routes(),
             $this->redirectsController->routes(),
@@ -1877,20 +1897,25 @@ class Application
     /**
      * Serve the admin UI.
      *
-     * In a built image the UI is static files under the document root, so
-     * Apache answers before PHP is reached and this never runs. It exists for
-     * development, where the UI is a Vite dev server on another port.
-     *
-     * The proxy only runs when CLICK_ADMIN_DEV_URL is set. Previously it always
-     * ran against a hardcoded localhost:4321, which meant a production
-     * deployment without the built assets silently tried to reach a developer's
-     * machine and served a blank page.
+     * Existing assets are served by the web server. Nested SPA addresses reach
+     * PHP on Apache, so return the same built shell for those routes too.
+     * CLICK_ADMIN_DEV_URL explicitly opts into the development proxy.
      */
     private function serveAdminUi(string $uri): array
     {
         $devUrl = getenv('CLICK_ADMIN_DEV_URL') ?: '';
 
         if ($devUrl === '') {
+            // Never answer a missing script or stylesheet with HTML.
+            if (pathinfo((string) parse_url($uri, PHP_URL_PATH), PATHINFO_EXTENSION) !== '') {
+                return ['status' => 404, 'error' => 'Admin asset not found'];
+            }
+            $publicRoot = $this->config?->updatePublicRoot() ?? $this->basePath . '/public';
+            $index = rtrim($publicRoot, '/') . '/admin/index.html';
+            if (is_file($index) && is_readable($index)) {
+                header('Content-Type: text/html; charset=utf-8');
+                return ['raw' => true, 'html' => (string) file_get_contents($index), 'status' => 200];
+            }
             return [
                 'status' => 404,
                 'error' => 'The admin UI is not available. Build it into public/admin, '
@@ -2256,11 +2281,11 @@ class Application
         return null;
     }
 
-    private function executeHandler(array $handler, array $params): array
+    private function executeHandler(callable $handler, array $params): array
     {
-        [$object, $method] = $handler;
-        
-        $reflection = new \ReflectionMethod($object, $method);
+        $reflection = is_array($handler)
+            ? new \ReflectionMethod($handler[0], $handler[1])
+            : new \ReflectionFunction(\Closure::fromCallable($handler));
         $args = [];
         
         foreach ($reflection->getParameters() as $param) {
@@ -2276,7 +2301,7 @@ class Application
         }
         
         try {
-            return $object->$method(...$args);
+            return $handler(...$args);
         } catch (ContentRefusedException $refused) {
             // A plugin said no. That is an answer, not a fault — and until this
             // caught it, a plugin refusing a save produced a 500 and a stack

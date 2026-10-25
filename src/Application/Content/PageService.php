@@ -7,6 +7,7 @@ namespace Click\Cms\Application\Content;
 use Click\Cms\Application\Plugin\PublishGate;
 use Click\Cms\Application\Editing\FreeformPolicy;
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Content\ContentRevision;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\Schema\SectionValidator;
@@ -197,7 +198,7 @@ final class PageService
             return $this->failure($parsed['error'], 400);
         }
         $locale = $parsed['locale'];
-        unset($data['locale']);
+        unset($data['locale'], $data['revision'], $data['expectedRevision']);
 
         $slug = $this->slugify((string) ($data['slug'] ?? '')) ?: $this->slugify((string) ($data['title'] ?? ''));
         if ($slug === '') {
@@ -228,7 +229,13 @@ final class PageService
         unset($data['status']);
 
         $page = Content::create(ContentKey::page($slug, $locale), $data);
-        $this->content->save($page);
+        $saved = $this->content->saveIfUnchanged($page, '');
+        if ($saved === false) {
+            return $this->failure('A page with that address already exists.', 409);
+        }
+        if ($saved === null) {
+            $this->content->save($page);
+        }
 
         return ['page' => $page, 'error' => null, 'status' => 201, 'errors' => []];
     }
@@ -239,6 +246,13 @@ final class PageService
      */
     public function update(string $slug, array $data, array $user, string|Locale|null $locale = null): array
     {
+        $hasExpectedRevision = array_key_exists('expectedRevision', $data);
+        $expectedRevision = $data['expectedRevision'] ?? null;
+        if ($hasExpectedRevision && (!is_string($expectedRevision)
+            || preg_match('/^[A-Za-z0-9_-]{43}$/D', $expectedRevision) !== 1)) {
+            return $this->failure('Expected revision is invalid.', 400);
+        }
+
         $parsed = $this->parseLocale(is_string($locale) ? $locale : $locale?->code);
         if ($parsed['error'] !== null) {
             return $this->failure($parsed['error'], 400);
@@ -280,10 +294,20 @@ final class PageService
         // one would recreate exactly the two-sources-of-truth problem this
         // change removed: a page claiming to be published while the public gets
         // a 404, with nothing able to say which was right.
-        unset($data['slug'], $data['locale'], $data['status']);
+        unset($data['slug'], $data['locale'], $data['status'], $data['revision'], $data['expectedRevision']);
 
         $page->update($data);
-        $this->content->save($page);
+        if ($hasExpectedRevision) {
+            $saved = $this->content->saveIfUnchanged($page, $expectedRevision);
+            if ($saved === null) {
+                return $this->failure('Conditional saves are not available for this storage backend.', 501);
+            }
+            if (!$saved) {
+                return $this->failure('Content has changed since it was loaded.', 409);
+            }
+        } else {
+            $this->content->save($page);
+        }
 
         return ['page' => $page, 'error' => null, 'status' => 200, 'errors' => []];
     }
@@ -355,6 +379,10 @@ final class PageService
 
         // Asked after permission, so an account that may not publish at all is
         // never told about an editorial state it has no business seeing.
+        if (!$this->content->supportsConditionalPublication()) {
+            return $this->failure('This storage cannot safely publish a revision-checked page.', 501);
+        }
+        $checkedRevision = ContentRevision::of($page);
         $refusal = $this->publishGate()->refusalFor($key, $user);
         if ($refusal !== null) {
             // 409 rather than 403: the request is well formed and the caller is
@@ -364,7 +392,10 @@ final class PageService
             return $this->failure($refusal, 409);
         }
 
-        $published = $this->content->publish($key);
+        $published = $this->content->publishIfUnchanged($key, $checkedRevision);
+        if ($published === false) {
+            return $this->failure('The page changed while publication was being checked. Review the latest draft and try again.', 409);
+        }
 
         if ($published === null) {
             // The working copy was there a moment ago, so this is a storage
@@ -376,7 +407,7 @@ final class PageService
         // Only now, and only once it landed: whoever was gating this publish
         // gets to close its own record, and cannot close it for a publish that
         // never happened.
-        $this->publishGate()->announcePublished($key, $user);
+        $this->publishGate()->announcePublished($key, $user, ContentRevision::of($published));
 
         return ['page' => $published, 'error' => null, 'status' => 200, 'errors' => []];
     }
@@ -730,6 +761,12 @@ final class PageService
         $data['sections'] = $clean;
 
         return ['data' => $data, 'errors' => $errors];
+    }
+
+    /** @param array<string, mixed> $data @return array{data: array<string, mixed>, errors: array<string, string>} */
+    public function validateForPreview(array $data): array
+    {
+        return $this->validateSections($data);
     }
 
     /**

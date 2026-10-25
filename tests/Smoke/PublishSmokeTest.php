@@ -86,6 +86,9 @@ final class PublishSmokeTest extends TestCase
 
     private function signInAsAdmin(): string
     {
+        $content = (new ReflectionProperty(Application::class, 'contentService'))->getValue($this->app);
+        $account = ['password' => 'test-hash', 'role' => 'admin', 'status' => 'active'];
+        $content->save(\Click\Cms\Domain\Content\Content::create($content->userKey('ada'), $account));
         $sessions = (new ReflectionProperty(Application::class, 'sessions'))->getValue($this->app);
         $ref = new ReflectionObject($sessions);
 
@@ -93,7 +96,9 @@ final class PublishSmokeTest extends TestCase
         $token = str_repeat('b', 64);
         $ref->getProperty('id')->setValue($sessions, $id);
         $ref->getMethod('writeFile')->invoke($sessions, $id, [
+            'username' => 'ada',
             'user' => $this->admin(),
+            'accountFingerprint' => hash('sha256', serialize([$account['password'], $account['role'], $account['status'], null])),
             'csrfToken' => $token,
             'lastActivity' => time(),
             'expiresAt' => time() + 3600,

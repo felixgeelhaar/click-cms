@@ -127,6 +127,20 @@ final class PublicationRoutesTest extends TestCase
         $this->assertNotContains('secret', array_column($this->api->listPages()['data'], 'slug'));
     }
 
+    public function testOnlyAnEditorReadOfTheDraftExposesItsRevision(): void
+    {
+        $this->createPage('home', 'Draft text');
+        $this->signIn('editor');
+
+        $editorRead = $this->api->getPage('home');
+        $this->assertIsString($editorRead['data']['revision'] ?? null);
+
+        $this->api->publishPage('home');
+        $_COOKIE = [];
+        $publicRead = $this->api->getPage('home');
+        $this->assertArrayNotHasKey('revision', $publicRead['data']);
+    }
+
     public function testUnpublishingTakesThePageBackOutOfThePublicApi(): void
     {
         $this->createPage('offer');

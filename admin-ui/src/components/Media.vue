@@ -443,12 +443,22 @@ const onDrop = (event) => {
 };
 
 const saveAlt = async (item, alt) => {
-  await fetch(`/api/media/${item.id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ alt }),
-  });
-  item.alt = alt;
+  errors.value = [];
+  try {
+    const res = await fetch(`/api/media/${item.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alt }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      errors.value = [`Could not save the description for ${item.originalName}: ${body.error ?? `request failed (${res.status})`}`];
+      return;
+    }
+    item.alt = alt;
+  } catch (e) {
+    errors.value = [`Could not save the description for ${item.originalName}: ${e.message}`];
+  }
 };
 
 // Fractions of the image, so the mark holds for the original and every variant
@@ -520,10 +530,18 @@ const nudgeFocal = (item, event) => {
 };
 
 const remove = async (item) => {
-  const res = await fetch(`/api/media/${item.id}`, { method: 'DELETE' });
-  if (res.ok) {
+  errors.value = [];
+  try {
+    const res = await fetch(`/api/media/${item.id}`, { method: 'DELETE' });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      errors.value = [body.error ?? `Could not delete ${item.originalName} (${res.status}).`];
+      return;
+    }
     items.value = items.value.filter((i) => i.id !== item.id);
     selectedIds.value = selectedIds.value.filter((id) => id !== item.id);
+  } catch (e) {
+    errors.value = [`Could not delete ${item.originalName}: ${e.message}`];
   }
 };
 

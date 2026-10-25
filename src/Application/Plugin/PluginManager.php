@@ -23,6 +23,7 @@ class PluginManager
     private array $listenerCache = [];
     private ?EventDispatcher $eventDispatcher = null;
     private ?object $contentService = null;
+    private readonly PluginExecutionPolicy $executionPolicy;
 
     /**
      * Directories under plugins/ that discover() could not load, with why.
@@ -45,10 +46,12 @@ class PluginManager
         string $pluginsPath,
         ?string $dataPath = null,
         array $excludedIds = [],
-        array $excludedDirs = []
+        array $excludedDirs = [],
+        ?PluginExecutionPolicy $executionPolicy = null
     )
     {
         $this->pluginsPath = rtrim($pluginsPath, '/');
+        $this->executionPolicy = $executionPolicy ?? PluginExecutionPolicy::fromEnvironment();
 
         // The state file's fallback is exactly what it always was —
         // `<installation>/plugin-state.json`, not `<installation>/data/`.
@@ -216,6 +219,10 @@ class PluginManager
         
         if ($plugin === null) {
             return ['success' => false, 'error' => 'Plugin not found'];
+        }
+
+        if (!$this->executionPolicy->allows($id->value)) {
+            return ['success' => false, 'error' => 'Plugin blocked by deployment policy'];
         }
 
         if ($plugin->state === $PluginState::ACTIVATED) {
@@ -467,6 +474,9 @@ class PluginManager
 
     private function loadBootstrap(Plugin $plugin): ?object
     {
+        if (!$this->executionPolicy->allows($plugin->id->value)) {
+            return null;
+        }
         $bootstrapFile = $plugin->path . '/bootstrap.php';
         
         if (!file_exists($bootstrapFile)) {

@@ -133,6 +133,8 @@ final class CollectionService
      */
     public function create(string $typeId, array $body, array $user, string|Locale|null $locale = null): array
     {
+        unset($body['expectedRevision'], $body['revision']);
+
         $type = $this->types->find($typeId);
         if ($type === null) {
             return $this->failure('Unknown collection.', 404);
@@ -148,6 +150,7 @@ final class CollectionService
             return $this->failure('Some fields are invalid.', 422, $validated['errors']);
         }
         $values = $validated['values'];
+        unset($values['revision'], $values['expectedRevision']);
 
         $slug = $this->slugify((string) ($body['slug'] ?? ''))
             ?: $this->slugify((string) ($values[$type->titleField] ?? ''));
@@ -167,7 +170,13 @@ final class CollectionService
         $values['owner'] = $user['username'] ?? 'unknown';
 
         $entry = Content::create(ContentKey::for($typeId, $slug, $locale), $values);
-        $this->content->save($entry);
+        $saved = $this->content->saveIfUnchanged($entry, '');
+        if ($saved === false) {
+            return $this->failure('An entry with that address already exists.', 409);
+        }
+        if ($saved === null) {
+            $this->content->save($entry);
+        }
 
         return ['entry' => $entry, 'error' => null, 'status' => 201, 'errors' => []];
     }
@@ -179,6 +188,13 @@ final class CollectionService
      */
     public function update(string $typeId, string $slug, array $body, array $user, string|Locale|null $locale = null): array
     {
+        $hasExpectedRevision = array_key_exists('expectedRevision', $body);
+        $expectedRevision = $body['expectedRevision'] ?? null;
+        if ($hasExpectedRevision && (!is_string($expectedRevision)
+            || preg_match('/^[A-Za-z0-9_-]{43}$/D', $expectedRevision) !== 1)) {
+            return $this->failure('Expected revision is invalid.', 400);
+        }
+
         $type = $this->types->find($typeId);
         if ($type === null) {
             return $this->failure('Unknown collection.', 404);
@@ -203,10 +219,20 @@ final class CollectionService
         // rewrite them here would orphan every link to it or hand it to someone
         // else. Publication is not a field either — it is presence in content/.
         $values = $validated['values'];
-        unset($values['slug'], $values['locale'], $values['owner'], $values['status']);
+        unset($values['slug'], $values['locale'], $values['owner'], $values['status'], $values['revision'], $values['expectedRevision']);
 
         $entry->update($values);
-        $this->content->save($entry);
+        if ($hasExpectedRevision) {
+            $saved = $this->content->saveIfUnchanged($entry, $expectedRevision);
+            if ($saved === null) {
+                return $this->failure('Conditional saves are not available for this storage backend.', 501);
+            }
+            if (!$saved) {
+                return $this->failure('Content has changed since it was loaded.', 409);
+            }
+        } else {
+            $this->content->save($entry);
+        }
 
         return ['entry' => $entry, 'error' => null, 'status' => 200, 'errors' => []];
     }

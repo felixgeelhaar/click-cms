@@ -52,15 +52,19 @@ export function installCsrfFetch() {
   const original = window.fetch.bind(window);
 
   window.fetch = (input, init = {}) => {
-    const method = (init.method || 'GET').toUpperCase();
+    const target = withInstallationPrefix(input);
+    const request = typeof Request !== 'undefined' && input instanceof Request ? input : null;
+    const method = (init.method || request?.method || 'GET').toUpperCase();
+    const destination = new URL(request?.url ?? String(target), window.location.href);
+    const sameOrigin = destination.origin === window.location.origin;
 
-    if (csrfToken && !SAFE_METHODS.has(method)) {
-      const headers = new Headers(init.headers || {});
+    if (csrfToken && sameOrigin && !SAFE_METHODS.has(method)) {
+      const headers = new Headers(init.headers ?? request?.headers ?? {});
       headers.set('X-Click-CSRF', csrfToken);
       init = { ...init, headers };
     }
 
-    return original(withInstallationPrefix(input), init);
+    return original(target, init);
   };
 }
 

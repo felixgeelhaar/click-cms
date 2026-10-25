@@ -68,6 +68,9 @@ cd admin-ui && npm run dev
 
 **[Full installation guide →](docs/install.md)**
 
+For vulnerability reporting and dependency-audit details, see
+[Security](SECURITY.md).
+
 ## Storage
 
 Content is stored as flat JSON files by default — no database, nothing to

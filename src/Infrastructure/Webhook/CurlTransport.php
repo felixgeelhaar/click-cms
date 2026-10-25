@@ -28,6 +28,8 @@ final class CurlTransport implements HttpTransport
             $formatted[] = "{$name}: {$value}";
         }
 
+        $receivedBytes = 0;
+        $overLimit = false;
         curl_setopt_array($handle, [
             CURLOPT_URL => $url,
             CURLOPT_POST => true,
@@ -55,17 +57,26 @@ final class CurlTransport implements HttpTransport
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
 
-            // The body is discarded — nothing here reads it — but it still has
-            // to be received for the request to complete. Capping it stops a
-            // receiver answering with a gigabyte from taking the process down.
-            CURLOPT_BUFFERSIZE => 16384,
+            // Discard each chunk instead of accumulating a response string.
+            CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$receivedBytes, &$overLimit): int {
+                $receivedBytes += strlen($chunk);
+                if ($receivedBytes > 65536) {
+                    $overLimit = true;
+                    return 0;
+                }
+                return strlen($chunk);
+            },
         ]);
 
         $response = curl_exec($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         $error = curl_error($handle);
 
-        curl_close($handle);
+        unset($handle);
+
+        if ($overLimit) {
+            return TransportResult::failed('The webhook response exceeded the 64 KiB limit.');
+        }
 
         if ($response === false || $status === 0) {
             return TransportResult::failed($error !== '' ? $error : 'The request did not complete.');

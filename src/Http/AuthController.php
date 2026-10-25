@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Click\Cms\Http;
 
+use Click\Cms\Application\Authentication\PasswordInput;
+
 use Click\Cms\Application\Authentication\CsrfGuard;
 use Click\Cms\Application\Authentication\LoginSprayGuard;
 use Click\Cms\Application\Authentication\LoginThrottle;
@@ -474,6 +476,11 @@ final class AuthController
             return $this->fault(401, 'Sign in again.');
         }
 
+        if (($account->data['status'] ?? 'active') !== 'active') {
+            $this->sessions->clear();
+            return ['status' => 403, 'error' => 'Account is not active'];
+        }
+
         $remember = (bool) ($session['pendingRemember'] ?? false);
         $established = $this->establishSession($username, $account->data, $remember);
 
@@ -651,6 +658,11 @@ final class AuthController
             return $this->fault(403, 'The current password is not correct.');
         }
 
+        $hashingError = PasswordInput::hashingError($new);
+        if ($hashingError !== null) {
+            return ['status' => 422, 'error' => $hashingError];
+        }
+
         $minimum = $this->passwordMinLength();
         if (mb_strlen($new) < $minimum) {
             return $this->fault(422, "The new password must be at least {$minimum} characters.");
@@ -666,6 +678,7 @@ final class AuthController
             return $this->fault(422, 'That password cannot be used.');
         }
 
+        $currentSession = $this->sessions->read();
         $account->update([
             'password' => password_hash($new, PASSWORD_DEFAULT),
             'mustChangePassword' => null,
@@ -674,25 +687,13 @@ final class AuthController
         $this->contentService->save($account);
 
         $this->clearFailedLogin($username);
-        $this->refreshSessionUser($username);
+        // Rotate this session against the new password; every other session
+        // retains the old fingerprint and is refused on its next request.
+        $currentSession['user']['mustChangePassword'] = false;
+        $this->sessions->clear();
+        $this->sessions->start($currentSession, (bool) ($currentSession['remember'] ?? false));
 
         return ['data' => ['success' => true]];
-    }
-
-    /**
-     * Re-read the account into the session after it changes, so a stale flag
-     * cannot keep an account locked out of the rest of the API.
-     */
-    private function refreshSessionUser(string $username): void
-    {
-        $account = $this->contentService->user($username);
-        if ($account === null) {
-            return;
-        }
-
-        $this->sessions->merge([
-            'user' => ['mustChangePassword' => (bool) ($account->data['mustChangePassword'] ?? false)],
-        ]);
     }
 
     /**

@@ -25,6 +25,8 @@ final class SessionStore
     public function __construct(
         private readonly string $directory,
         private readonly int $idleTimeoutSeconds = 1800,
+        // Resolve from the site's account store; null keeps standalone stores usable.
+        private readonly ?\Closure $accountFor = null,
     ) {}
 
     /**
@@ -53,6 +55,14 @@ final class SessionStore
             return [];
         }
 
+        if ($this->accountFor !== null && (isset($decoded['user']) || isset($decoded['pendingTwoFactor']))) {
+            $fingerprint = $this->accountFingerprint((string) ($decoded['username'] ?? $decoded['user']['username'] ?? $decoded['pendingTwoFactor'] ?? ''));
+            if ($fingerprint === null || !hash_equals($fingerprint, (string) ($decoded['accountFingerprint'] ?? ''))) {
+                $this->clear();
+                return [];
+            }
+        }
+
         return $decoded;
     }
 
@@ -63,6 +73,11 @@ final class SessionStore
      */
     public function start(array $session, bool $remember = false): void
     {
+        if ($this->accountFor !== null && (isset($session['user']) || isset($session['pendingTwoFactor']))) {
+            $session['accountFingerprint'] = $this->accountFingerprint(
+                (string) ($session['username'] ?? $session['user']['username'] ?? $session['pendingTwoFactor'] ?? '')
+            );
+        }
         $this->id = bin2hex(random_bytes(32));
         $this->writeFile($this->id, $session);
         $this->sendCookie($this->id, $remember ? time() + 2_592_000 : 0);
@@ -151,6 +166,22 @@ final class SessionStore
         }
 
         return $this->id = $candidate;
+    }
+
+    private function accountFingerprint(string $username): ?string
+    {
+        $account = ($this->accountFor)($username);
+        if ($account === null || ($account['status'] ?? 'active') !== 'active') {
+            return null;
+        }
+        // Compare security state on every read, including auth/check and previews.
+        // Existing sessions without a fingerprint must sign in once after upgrade.
+        return hash('sha256', serialize([
+            $account['password'] ?? null,
+            $account['role'] ?? 'editor',
+            $account['status'] ?? 'active',
+            $account['ssoSubject'] ?? null,
+        ]));
     }
 
     private function pathFor(string $id): string

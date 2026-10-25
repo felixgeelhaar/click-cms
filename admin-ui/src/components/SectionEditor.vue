@@ -7,6 +7,65 @@
       </p>
     </div>
 
+    <section class="template-tools" aria-label="Starter templates">
+      <label for="section-template-picker">Starter template</label>
+      <div class="template-row">
+        <select id="section-template-picker" v-model="selectedTemplateId" :disabled="templates.length === 0">
+          <option value="">{{ templates.length ? 'Choose a saved starter…' : 'No saved starters yet' }}</option>
+          <option v-for="template in templates" :key="template.selectionId" :value="template.selectionId">
+            {{ template.name }}{{ template.source === 'shared' ? ` · shared · v${template.currentVersion}` : template.source === 'starter' ? ` · approved starter · v${template.currentVersion}` : '' }}
+          </option>
+        </select>
+        <button type="button" data-testid="replace-shared-preset" :disabled="!adoptableTemplate" @click="applyTemplate('replace')">Replace sections</button>
+        <button type="button" data-testid="append-shared-preset" :disabled="!adoptableTemplate" @click="applyTemplate('append')">Append sections</button>
+        <button
+          type="button" class="icon-btn danger"
+          :disabled="busySharedPreset || !selectedTemplate || selectedTemplate.source === 'builtin' || selectedTemplate.source === 'starter' || (selectedTemplate.source === 'shared' && !canManagePresets)"
+          :aria-label="`Delete starter ${selectedTemplate?.name ?? ''}`" @click="removeTemplate"
+        >Delete</button>
+      </div>
+      <p v-if="isSharedPreset(selectedTemplate)" class="template-help">
+        Version {{ selectedTemplate.currentVersion }} · {{ selectedTemplate.versions?.length ?? 1 }} retained versions.
+        Adoption copies these sections into this page; later preset edits do not change this page.
+      </p>
+      <div v-if="isSharedPreset(selectedTemplate)" class="template-history">
+        <label for="shared-preset-version">Adopt retained version</label>
+        <select id="shared-preset-version" v-model.number="selectedPresetVersion" :disabled="loadingPresetVersion || busySharedPreset">
+          <option v-for="version in [...(selectedTemplate.versions ?? [])].reverse()" :key="version.version" :value="version.version">
+            v{{ version.version }} · {{ version.updatedAt }} · {{ version.updatedBy }}
+          </option>
+        </select>
+        <p v-if="loadingPresetVersion" class="template-help">Loading version…</p>
+        <p v-else-if="selectedSnapshot" class="template-help">Preview of v{{ selectedSnapshot.version }}: {{ selectedSnapshot.sections.length }} sections.</p>
+        <ul v-if="selectedSnapshot" class="template-preview" aria-label="Selected preset version preview">
+          <li v-for="(section, index) in selectedSnapshot.sections" :key="`${index}-${section.type}`">
+            {{ index + 1 }}. {{ labelFor(section.type) }}
+          </li>
+        </ul>
+        <p v-if="selectedSnapshotError" class="template-notice" role="alert">{{ selectedSnapshotError }}</p>
+      </div>
+      <p v-if="newerVersionAvailable" class="template-notice" role="status">Your adopted v{{ appliedSharedVersions[selectedTemplate.id] }} is older. Select v{{ selectedTemplate.currentVersion }} above, then Append or Replace to adopt it.</p>
+      <p v-if="selectedSnapshot && !selectedSnapshot.compatible" class="template-notice" role="alert">This snapshot no longer matches the site's section schema and cannot be adopted. {{ Object.values(selectedSnapshot.compatibilityErrors ?? {}).join(' ') }}</p>
+      <div class="template-row">
+        <span class="template-help">Shared library</span>
+        <button type="button" data-testid="refresh-shared-presets" :disabled="loadingSharedPresets" @click="loadSharedPresets">{{ loadingSharedPresets ? 'Refreshing…' : 'Refresh library' }}</button>
+      </div>
+      <p v-if="sharedPresetError" class="template-notice" role="status">{{ sharedPresetError }}</p>
+      <form v-if="canManagePresets" class="template-row" @submit.prevent="selectedTemplate?.source === 'shared' && selectedTemplate.editable !== false ? updateSharedPreset() : createSharedPreset()">
+        <label class="sr-only" for="shared-preset-name">Shared preset name</label>
+        <input id="shared-preset-name" v-model="sharedPresetName" maxlength="80" placeholder="Name a shared preset" required>
+        <button v-if="selectedTemplate?.source === 'shared' && selectedTemplate.editable !== false" type="submit" data-testid="update-shared-preset" :disabled="busySharedPreset || !sections.length">Save new version</button>
+        <button v-else type="submit" data-testid="create-shared-preset" :disabled="busySharedPreset || !sections.length">Create shared preset</button>
+      </form>
+      <form class="template-row" @submit.prevent="saveTemplate">
+        <label class="sr-only" for="section-template-name">Save current sections as a starter</label>
+        <input id="section-template-name" v-model="templateName" maxlength="80" placeholder="Name this page starter" required>
+        <button type="submit" :disabled="sections.length === 0 || !templateScope?.account || !templateScope?.site">Save personal starter</button>
+      </form>
+      <p class="template-help">Personal starters stay in this browser and are scoped to your account and site. Shared presets are versioned for this site.</p>
+      <p v-if="templateNotice" class="template-notice" role="status">{{ templateNotice }}</p>
+    </section>
+
     <p v-if="typesError" class="banner error" role="alert">{{ typesError }}</p>
 
     <p v-else-if="loadingTypes" class="banner">Loading section types…</p>
@@ -128,12 +187,16 @@ import { computed, onMounted, ref, watch } from 'vue';
 import RepeaterField from './fields/RepeaterField.vue';
 import { leafComponent } from './fields/leafComponent.js';
 import { moveItem, useDragReorder } from '../lib/dragReorder.js';
+import { cloneTemplateSections, deleteSectionTemplate, listSectionTemplates, saveSectionTemplate } from '../lib/sectionTemplates.js';
+import businessSiteStarter from '../data/businessSiteStarter.json';
 
 const props = defineProps({
   // [{ type: 'card-grid', values: { ... } }]
   modelValue: { type: Array, default: () => [] },
   // { '0.heading': 'Heading is required.' } — server-side validation errors.
   errors: { type: Object, default: () => ({}) },
+  templateScope: { type: Object, default: null },
+  canManagePresets: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -143,6 +206,55 @@ const typeWarnings = ref({});
 const loadingTypes = ref(true);
 const typesError = ref('');
 const pendingType = ref('');
+const templates = ref([]);
+const sharedPresets = ref([]);
+const selectedTemplateId = ref('');
+const templateName = ref('');
+const sharedPresetName = ref('');
+const templateNotice = ref('');
+const sharedPresetError = ref('');
+const loadingSharedPresets = ref(true);
+const busySharedPreset = ref(false);
+const selectedPresetVersion = ref(null);
+const historicalSnapshot = ref(null);
+const loadingPresetVersion = ref(false);
+const selectedSnapshotError = ref('');
+const appliedSharedVersions = ref({});
+const selectedTemplate = computed(() => templates.value.find((item) => item.selectionId === selectedTemplateId.value) ?? null);
+const isSharedPreset = (template) => template?.source === 'shared' || template?.source === 'starter';
+const selectedSnapshot = computed(() => !isSharedPreset(selectedTemplate.value)
+  ? selectedTemplate.value
+  : selectedPresetVersion.value === selectedTemplate.value.currentVersion
+    ? { ...selectedTemplate.value, version: selectedTemplate.value.currentVersion }
+    : historicalSnapshot.value);
+const adoptableTemplate = computed(() => selectedSnapshot.value?.compatible && !loadingPresetVersion.value && !selectedSnapshotError.value);
+const newerVersionAvailable = computed(() => selectedTemplate.value?.source === 'shared'
+  && appliedSharedVersions.value[selectedTemplate.value.id] !== undefined
+  && selectedTemplate.value.currentVersion > appliedSharedVersions.value[selectedTemplate.value.id]);
+const refreshTemplates = () => {
+  templates.value = [
+    ...(!loadingSharedPresets.value && !sharedPresets.value.some((item) => item.id === 'starter-business-site')
+      ? [{ ...businessSiteStarter, selectionId: `builtin:${businessSiteStarter.id}`, source: 'builtin', compatible: true }]
+      : []),
+    ...listSectionTemplates(props.templateScope).map((item) => ({ ...item, selectionId: `personal:${item.id}`, source: 'personal', compatible: true })),
+    ...sharedPresets.value.map((item) => ({ ...item, selectionId: `${item.editable === false ? 'starter' : 'shared'}:${item.id}`, source: item.editable === false ? 'starter' : 'shared' })),
+  ];
+};
+refreshTemplates();
+watch(() => props.templateScope, () => { refreshTemplates(); loadSharedPresets(); }, { deep: true });
+watch(selectedTemplate, (template) => {
+  sharedPresetName.value = isSharedPreset(template) ? template.name : '';
+  selectedPresetVersion.value = isSharedPreset(template) ? template.currentVersion : null;
+  historicalSnapshot.value = null;
+  selectedSnapshotError.value = '';
+});
+watch(selectedPresetVersion, (version) => {
+  const template = selectedTemplate.value;
+  historicalSnapshot.value = null;
+  selectedSnapshotError.value = '';
+  loadingPresetVersion.value = false;
+  if (isSharedPreset(template) && version && version !== template.currentVersion) loadPresetVersion(template, version);
+});
 
 // Local copy carrying UI-only keys (_uid, _collapsed). They are stripped before
 // emitting so they never reach the API or storage.
@@ -247,7 +359,137 @@ const toggle = (index) => {
   sections.value[index]._collapsed = !sections.value[index]._collapsed;
 };
 
+const loadSharedPresets = async () => {
+  loadingSharedPresets.value = true;
+  sharedPresetError.value = '';
+  try {
+    const response = await fetch('/api/section-presets');
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
+    sharedPresets.value = Array.isArray(body.data) ? body.data : [];
+    refreshTemplates();
+  } catch (error) {
+    sharedPresetError.value = error.message.includes('401') || error.message.toLowerCase().includes('sign in')
+      ? 'Sign in to load shared presets.'
+      : `Could not load shared presets: ${error.message}`;
+  } finally {
+    loadingSharedPresets.value = false;
+    refreshTemplates();
+  }
+};
+
+const loadPresetVersion = async (template, version) => {
+  loadingPresetVersion.value = true;
+  const selectedId = template.id;
+  try {
+    const response = await fetch(`/api/section-presets/${encodeURIComponent(selectedId)}/versions/${version}`);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
+    if (selectedTemplate.value?.id !== selectedId || selectedPresetVersion.value !== version) return;
+    historicalSnapshot.value = body.data;
+  } catch (error) {
+    if (selectedTemplate.value?.id === selectedId && selectedPresetVersion.value === version) {
+      selectedSnapshotError.value = `Could not load version: ${error.message}`;
+    }
+  } finally {
+    if (selectedTemplate.value?.id === selectedId && selectedPresetVersion.value === version) loadingPresetVersion.value = false;
+  }
+};
+
+const applyTemplate = (mode = 'replace') => {
+  if (!adoptableTemplate.value) return;
+  const template = selectedSnapshot.value;
+  const name = selectedTemplate.value.name;
+  const snapshot = cloneTemplateSections(template);
+  const adopted = mode === 'append' ? [...strip(), ...snapshot] : snapshot;
+  hydrate(adopted);
+  commit();
+  if (selectedTemplate.value.source === 'shared') appliedSharedVersions.value = { ...appliedSharedVersions.value, [selectedTemplate.value.id]: template.version };
+  templateNotice.value = `Applied “${name}”${template.version ? ` v${template.version}` : ''}. Adopted a snapshot (${mode}); later library edits do not change this page.`;
+};
+
+const saveTemplate = () => {
+  try {
+    const saved = saveSectionTemplate(templateName.value, strip(), props.templateScope);
+    refreshTemplates();
+    selectedTemplateId.value = `personal:${saved.id}`;
+    templateName.value = '';
+    templateNotice.value = `Saved “${saved.name}”.`;
+  } catch (error) {
+    templateNotice.value = error.message;
+  }
+};
+
+const createSharedPreset = async () => {
+  if (!props.canManagePresets) return;
+  await mutateSharedPreset('/api/section-presets', 'POST', { name: sharedPresetName.value, sections: strip() }, 'Created shared preset');
+};
+
+const updateSharedPreset = async () => {
+  const template = selectedTemplate.value;
+  if (!props.canManagePresets || template?.source !== 'shared' || template.editable === false) return;
+  await mutateSharedPreset(`/api/section-presets/${encodeURIComponent(template.id)}`, 'PUT', {
+    name: sharedPresetName.value,
+    sections: strip(),
+    expectedVersion: template.currentVersion,
+  }, 'Saved new shared preset version');
+};
+
+const mutateSharedPreset = async (url, method, payload, success) => {
+  busySharedPreset.value = true;
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      await loadSharedPresets();
+      throw new Error(body.error || `Request failed (${response.status})`);
+    }
+    if (body.data?.id) selectedTemplateId.value = `shared:${body.data.id}`;
+    await loadSharedPresets();
+    templateNotice.value = `${success} “${payload.name}”. The current page keeps its own snapshot until you adopt a version.`;
+  } catch (error) {
+    templateNotice.value = error.message;
+  } finally {
+    busySharedPreset.value = false;
+  }
+};
+
+const removeTemplate = async () => {
+  if (!selectedTemplate.value) return;
+  const template = selectedTemplate.value;
+  const name = template.name;
+  if (template.source === 'builtin' || template.source === 'starter') return;
+  if (template.source === 'personal') {
+    deleteSectionTemplate(template.id, props.templateScope);
+    refreshTemplates();
+  } else if (template.source === 'shared' && props.canManagePresets) {
+    busySharedPreset.value = true;
+    try {
+      const response = await fetch(`/api/section-presets/${encodeURIComponent(template.id)}`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: template.currentVersion }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
+      await loadSharedPresets();
+    } catch (error) {
+      templateNotice.value = error.message;
+      await loadSharedPresets();
+      return;
+    } finally {
+      busySharedPreset.value = false;
+    }
+  } else return;
+  selectedTemplateId.value = '';
+  templateNotice.value = `Deleted “${name}”.`;
+};
+
 onMounted(async () => {
+  loadSharedPresets();
   try {
     const res = await fetch('/api/section-types');
     if (!res.ok) throw new Error(`Request failed (${res.status})`);
@@ -265,6 +507,17 @@ onMounted(async () => {
 
 <style scoped>
 .section-editor { margin-top: 2rem; }
+.template-tools { display: grid; gap: 0.5rem; padding: 0.9rem; border: 1px solid var(--app-border); border-radius: 10px; }
+.template-tools > label { font-weight: 600; }
+.template-row { display: flex; gap: 0.5rem; align-items: center; }
+.template-history { display: grid; gap: 0.35rem; padding: 0.65rem; border: 1px solid var(--app-border); border-radius: 8px; }
+.template-history > label { font-weight: 600; }
+.template-history select { width: 100%; padding: 0.5rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.template-preview { margin: 0; padding-left: 1.25rem; color: var(--app-text-muted); font-size: 0.875rem; }
+.template-row select, .template-row input { flex: 1; min-width: 0; padding: 0.55rem 0.65rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.template-row button { padding: 0.55rem 0.8rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); cursor: pointer; }
+.template-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+.template-notice { margin: 0; color: var(--app-text-muted); font-size: 0.875rem; }
 .editor-head { margin-bottom: 1rem; }
 .editor-title { font-size: 1.125rem; font-weight: 600; margin: 0; }
 .editor-subtitle { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--app-text-muted); }

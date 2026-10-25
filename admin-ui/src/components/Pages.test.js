@@ -39,15 +39,22 @@ const respondWith = (rows, locales = ['en']) => {
   }));
 };
 
-const mountPages = async (rows, locales) => {
+const mountPages = async (rows, locales, extraProps = {}) => {
   respondWith(rows, locales);
-  const wrapper = mount(Pages);
+  const wrapper = mount(Pages, { props: { capabilities: ['content.view', 'content.create', 'content.edit.any', 'content.delete.any'], ...extraProps } });
   await flushPromises();
   return wrapper;
 };
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  const storage = new Map();
+  Object.defineProperty(window, 'localStorage', { configurable: true, value: {
+    getItem: (key) => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, String(value)),
+    removeItem: (key) => storage.delete(key),
+    clear: () => storage.clear(),
+  } });
   window.confirm = vi.fn(() => true);
 });
 
@@ -129,5 +136,89 @@ describe('deleting', () => {
     const deleteCall = global.fetch.mock.calls.find(([, init]) => init?.method === 'DELETE');
     expect(deleteCall, 'a DELETE request should have been sent').toBeTruthy();
     expect(String(deleteCall[0])).toContain('locale=');
+  });
+});
+
+describe('request failures', () => {
+  it('shows a load failure instead of presenting an empty site', async () => {
+    global.fetch = vi.fn(async () => ({ ok: false, status: 503, json: async () => ({ error: 'Service unavailable' }) }));
+    const wrapper = mount(Pages);
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('Service unavailable');
+    expect(wrapper.find('.empty-state').exists()).toBe(false);
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Retry')).toBe(true);
+  });
+
+  it('keeps the page and reports a rejected deletion', async () => {
+    const wrapper = await mountPages([page('home', LIVE)]);
+    global.fetch.mockImplementation(async () => ({ ok: false, status: 403, json: async () => ({ error: 'You cannot delete this page.' }) }));
+    await wrapper.get('button.btn-danger').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('You cannot delete this page.');
+    expect(wrapper.findAll('.page-card')).toHaveLength(1);
+    expect(global.fetch.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1);
+  });
+
+  it('does not describe an unavailable translation as untranslated', async () => {
+    global.fetch = vi.fn(async (url) => String(url).includes('locale=de')
+      ? { ok: false, status: 503, json: async () => ({ error: 'Unavailable' }) }
+      : { ok: true, json: async () => ({ data: [page('home', LIVE)], locale: 'en', locales: ['en', 'de'] }) });
+    const wrapper = mount(Pages);
+    await flushPromises();
+    expect(wrapper.text()).toContain('Status unavailable');
+    expect(wrapper.text()).not.toContain('Not translated');
+  });
+});
+
+describe('finding and sorting pages', () => {
+  it('searches by page title or slug and sorts by title', async () => {
+    const wrapper = await mountPages([
+      { ...page('zebra', LIVE), data: { title: 'About the team' } },
+      { ...page('contact-us', LIVE), data: { title: 'Reach us' } },
+      { ...page('landing', LIVE), data: { title: 'Welcome home' } },
+    ]);
+    await wrapper.get('#pages-search').setValue('reach');
+    expect(wrapper.findAll('.page-card')).toHaveLength(1);
+    expect(wrapper.text()).toContain('contact-us');
+    await wrapper.get('#pages-search').setValue('zebra');
+    expect(wrapper.findAll('.page-card')).toHaveLength(1);
+    await wrapper.get('#pages-search').setValue('');
+    await wrapper.get('#pages-sort').setValue('title');
+    expect(wrapper.findAll('.page-card h2').map((heading) => heading.text())).toEqual(['About the team', 'Reach us', 'Welcome home']);
+  });
+
+  it('does not persist private search text and remembers only filters per site', async () => {
+    const rows = [page('one', LIVE), page('two', PENDING), page('three', LIVE)];
+    window.localStorage.setItem('click-admin-pages-filters', JSON.stringify({ search: 'legacy private title' }));
+    let wrapper = await mountPages(rows, undefined, { siteId: 'site-a' });
+    await wrapper.get('#pages-search').setValue('two');
+    await wrapper.get('#pages-sort').setValue('slug');
+    await wrapper.findAll('.filter-tabs button')[2].trigger('click');
+    expect(window.localStorage.getItem('click-admin-pages-filters')).toBeNull();
+    expect(window.localStorage.getItem('click-admin-pages-filters:site-a')).not.toContain('two');
+    wrapper.unmount();
+
+    wrapper = await mountPages(rows, undefined, { siteId: 'site-a' });
+    expect(wrapper.get('#pages-search').element.value).toBe('');
+    expect(wrapper.get('#pages-sort').element.value).toBe('slug');
+    expect(wrapper.get('.filter-tabs button.active').text()).toContain('Edits pending');
+    expect(wrapper.findAll('.page-card h2').map((heading) => heading.text())).toEqual(['two']);
+
+    wrapper.unmount();
+    wrapper = await mountPages(rows, undefined, { siteId: 'site-b' });
+    expect(wrapper.get('#pages-sort').element.value).toBe('recent');
+    expect(wrapper.get('.filter-tabs button.active').text()).toContain('All');
+  });
+});
+
+describe('capability-aware workspace', () => {
+  it('keeps viewer workspaces read-only and hides page creation and deletion', async () => {
+    respondWith([page('home', LIVE)]);
+    const wrapper = mount(Pages, { props: { capabilities: ['content.view'] } });
+    await flushPromises();
+    expect(wrapper.find('.page-header .btn-primary').exists()).toBe(false);
+    expect(wrapper.find('.page-actions a').exists()).toBe(false);
+    expect(wrapper.find('.page-actions button').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Read only');
   });
 });

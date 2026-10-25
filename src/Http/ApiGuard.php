@@ -168,6 +168,15 @@ final class ApiGuard
         // `=== 'admin'` in the codebase.
         $role = Role::fromName($user['role'] ?? null);
 
+        if (preg_match('#^pages/[^/]+/preview/render$#', $path) === 1
+            && !$role->can(Capability::PreviewContent)) {
+            return ['status' => 403, 'error' => 'You do not have permission to preview this page.'];
+        }
+
+        if ($path === 'security/health' && !$role->can(Capability::ManageSettings)) {
+            return ['status' => 403, 'error' => 'You do not have permission to view security health.'];
+        }
+
         if (str_starts_with($path, 'users') && !$role->can(Capability::ManageUsers)) {
             return $this->fault(403, 'You do not have permission to manage users.');
         }

@@ -158,7 +158,9 @@ final class BackupTest extends TestCase
 
         $manifest = json_decode((string) $zip->getFromName('manifest.json'), true);
         $this->assertSame('sqlite', $manifest['sourceBackend']);
-        $this->assertSame(1, $manifest['counts']['documents']);
+        $this->assertSame(2, $manifest['counts']['documents']);
+        $this->assertStringContainsString('Welcome home', (string) $zip->getFromName('drafts/content/page/en/home.json'));
+        $this->assertSame('draft', $manifest['documents'][1]['publication']);
         $zip->close();
         @unlink($path);
     }
@@ -189,7 +191,7 @@ final class BackupTest extends TestCase
         $this->assertTrue($result['data']['enabled']);
         $this->assertSame(7, $result['data']['keep']);
         $this->assertCount(1, $result['data']['backups']);
-        $this->assertSame(1, $result['data']['backups'][0]['documents']);
+        $this->assertSame(2, $result['data']['backups'][0]['documents']); // Live and recoverable working copy.
     }
 
     public function testListingIsEmptyBeforeAnyBackupHasBeenTaken(): void
@@ -211,7 +213,7 @@ final class BackupTest extends TestCase
 
         $result = $this->plugin->handleCreate();
 
-        $this->assertSame(1, $result['data']['documents']);
+        $this->assertSame(2, $result['data']['documents']); // Live and recoverable working copy.
         $this->assertSame(1, $result['data']['media']);
         $this->assertSame('json', $result['data']['sourceBackend']);
         $this->assertFileExists($this->base . '/data/backups/' . $result['data']['name']);

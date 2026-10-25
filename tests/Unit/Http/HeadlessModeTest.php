@@ -113,18 +113,18 @@ final class HeadlessModeTest extends TestCase
 
     private function signIn(string $role): void
     {
-        $id = bin2hex(random_bytes(32));
-        mkdir($this->base . '/data/sessions', 0o700, true);
-        file_put_contents(
-            $this->base . '/data/sessions/' . $id . '.json',
-            json_encode([
-                'username' => 'ann',
-                'expiresAt' => time() + 3600,
-                'lastActivity' => time(),
-                'user' => ['username' => 'ann', 'role' => $role],
-            ])
-        );
-        $_COOKIE[SessionStore::COOKIE] = $id;
+        $content = (new \ReflectionMethod($this->app, 'getContentService'))->invoke($this->app);
+        $content->save(\Click\Cms\Domain\Content\Content::create($content->userKey('ann'), [
+            'password' => 'test-hash', 'role' => $role, 'status' => 'active',
+        ]));
+        $sessions = (new \ReflectionProperty(Application::class, 'sessions'))->getValue($this->app);
+        $sessions->start([
+            'username' => 'ann', 'expiresAt' => time() + 3600, 'lastActivity' => time(),
+            'user' => ['username' => 'ann', 'role' => $role],
+        ]);
+        // setcookie() does not populate $_COOKIE during an in-process request.
+        // Present the identifier the store issued, just as the browser would.
+        $_COOKIE[SessionStore::COOKIE] = (new \ReflectionProperty(SessionStore::class, 'id'))->getValue($sessions);
     }
 
     /**

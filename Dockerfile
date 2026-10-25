@@ -12,7 +12,7 @@
 # is exactly equivalent to building it per architecture, and avoids running
 # Composer under emulation for the non-native half of a multi-arch build.
 # ---------------------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM composer:2 AS vendor
+FROM --platform=$BUILDPLATFORM composer:2@sha256:b6dcd72ca98fa19d0e5b8476de179859704891fad06dd9e0b96833d4c430a5fc AS vendor
 
 WORKDIR /app
 COPY composer.json composer.lock ./
@@ -49,7 +49,7 @@ RUN composer install \
 # whatever the CPU. If this stage ever produces a native binary, this line has
 # to go.
 # ---------------------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM node:22-alpine AS admin-ui
+FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS admin-ui
 
 # The repository layout is mirrored rather than flattened into /app. The
 # accessibility tests read the CSS they assert about out of the shipped files —
@@ -77,7 +77,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 3 — Runtime
 # ---------------------------------------------------------------------------
-FROM php:8.5-apache AS runtime
+FROM php:8.5-apache@sha256:7cd25eb48f9763dfeabe8fda3939897aca2001802fadeafa1b602f26c735ef96 AS runtime
 
 # gd is required to generate responsive image variants; without it the media
 # library can store an upload but not resize it.
@@ -153,7 +153,8 @@ COPY --from=admin-ui /repo/admin-ui/dist ./public/admin
 
 # content/ and data/ are volume mount points. They are created and owned here so
 # the container still starts when no volume is mounted, and www-data can write
-# to them either way.
+# to them either way. The updater also replaces application directories from
+# the web process, so this image keeps the existing ownership model.
 RUN set -eux; \
     mkdir -p content data; \
     chown -R www-data:www-data /var/www/html; \
@@ -165,6 +166,25 @@ RUN set -eux; \
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD php -r 'exit(@file_get_contents("http://127.0.0.1/health.php") !== false ? 0 : 1);'
+    CMD ["php", "-r", "$body = @file_get_contents('http://127.0.0.1/health.php'); exit($body !== false && isset($http_response_header[0]) && str_contains($http_response_header[0], ' 200 ') ? 0 : 1);"]
 
 CMD ["apache2-foreground"]
+
+# Optional deployment-managed profile: non-root server, immutable application
+# ownership, upgrades supplied by rebuilding the image. Select --target hardened.
+FROM runtime AS hardened
+RUN set -eux; \
+    sed -i 's/Listen 80$/Listen 8080/' /etc/apache2/ports.conf; \
+    sed -i 's/<VirtualHost \*:80>/<VirtualHost *:8080>/' /etc/apache2/sites-available/000-default.conf; \
+    chown -R root:root /var/www/html; \
+    chown -R www-data:www-data /var/www/html/content /var/www/html/data; \
+    mkdir -p /var/run/apache2 /var/lock/apache2; \
+    chown -R www-data:www-data /var/run/apache2 /var/lock/apache2
+ENV CLICK_DEPLOYMENT_MANAGED=1
+USER www-data
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["php", "-r", "$body = @file_get_contents('http://127.0.0.1:8080/health.php'); exit($body !== false && isset($http_response_header[0]) && str_contains($http_response_header[0], ' 200 ') ? 0 : 1);"]
+
+# Preserve the established self-updating profile as the default build output.
+FROM runtime AS default

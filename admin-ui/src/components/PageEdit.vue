@@ -14,13 +14,21 @@
 
     <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
     <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
-    <p
-      v-if="publishError"
-      class="banner"
-      :class="publishErrorEditorial ? 'warning' : 'error'"
-      role="alert"
-    >{{ publishError }}</p>
+<p v-if="conflict" class="banner error" role="alert">
+      This page changed remotely. Your edits are still here. Compare and combine them with the latest saved version, or reload to review it.
+      <button type="button" class="btn-reload-conflict" @click="compareConflict">Compare with saved version</button>
+      <button type="button" class="btn-reload-conflict" @click="reloadConflict">Reload to review</button>
+    </p>
+    <p v-if="mergeError" class="banner error" role="alert">{{ mergeError }}</p>
+    <DraftMerge v-if="conflict && mergeBase && mergeServer" :base="mergeBase" :local="page" :server="mergeServer" :server-revision="mergeRevision" @apply="applyMergedDraft" />
+    <p v-if="publishError" class="banner" :class="publishErrorEditorial ? 'warning' : 'error'" role="alert">{{ publishError }}</p>
     <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
+    <section v-if="recoveryCandidate" class="banner recovery-banner" role="status">
+      <strong>A local recovery copy is available.</strong>
+      <span>It is scoped to your account, this site, this page and {{ languageName(locale) }}.</span>
+      <button type="button" class="btn-secondary" @click="restoreRecovery">Restore copy</button>
+      <button type="button" class="inline-button" @click="discardRecovery">Discard copy</button>
+    </section>
 
     <div v-if="loading" class="banner">Loading…</div>
 
@@ -38,6 +46,8 @@
         @publish="publishPage"
         @unpublish="unpublishPage"
       />
+
+      <PageQualityChecklist :page="page" :locales="siteLocales" :translations="translations" />
 
       <!--
         Only for a page that exists. Scheduling something with no working copy
@@ -62,6 +72,41 @@
         :translations="translations"
         :busy="loading || saving"
         @select="switchLocale"
+      />
+      <div v-if="!isNew && siteLocales.length > 1" class="translation-compare-toggle">
+        <button
+          type="button"
+          class="btn-secondary"
+          :aria-expanded="showTranslationCompare"
+          aria-controls="translation-compare-panel"
+          @click="showTranslationCompare = !showTranslationCompare"
+        >
+          {{ showTranslationCompare ? 'Hide translation comparison' : 'Compare translations' }}
+        </button>
+      </div>
+      <TranslationCompare
+        v-if="showTranslationCompare && !isNew && siteLocales.length > 1"
+        :slug="storedSlug"
+        :locales="siteLocales"
+        :current-locale="locale"
+        :current-revision="revision"
+        :working-copy="page"
+        :translations="translations"
+        :target-dirty="dirty"
+        :can-mark="can('content.edit.any') || can('content.edit.own')"
+        :can-edit-any="can('content.edit.any')"
+        :current-username="currentUsername"
+        @close="showTranslationCompare = false"
+      />
+      <PageReviewWorkflow
+        v-if="!isNew && storedSlug"
+        :slug="storedSlug"
+        :locale="locale"
+        :current-username="currentUsername"
+        :can-request="can('content.edit.any') || can('content.edit.own')"
+        :saved-revision="revision"
+        :dirty="dirty"
+        :refresh-token="revision"
       />
 
       <!--
@@ -102,7 +147,24 @@
         </p>
       </div>
 
-      <SectionEditor v-model="page.sections" :errors="sectionErrors" />
+      <SectionEditor v-model="page.sections" :errors="sectionErrors" :template-scope="templateScope" :can-manage-presets="can('sections.manage')" />
+
+      <div class="editor-tools">
+        <label class="recovery-opt-in">
+          <input v-model="recoveryEnabled" type="checkbox" />
+          Keep a local recovery copy on this device
+        </label>
+        <p class="field-help">Off by default. When enabled, unsaved text is stored in this browser for up to 7 days and removed when you save or discard.</p>
+        <p v-if="recoveryStorageError" class="field-help" role="alert">{{ recoveryStorageError }}</p>
+        <button v-if="dirty && !comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = true">Compare with saved page</button>
+        <button v-else-if="comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = false">Hide comparison</button>
+        <DraftComparison
+          v-if="comparisonOpen && comparisonBase"
+          :before="comparisonBase"
+          :after="page"
+          :heading="conflict && conflictComparison ? 'Latest saved page compared with your edits' : 'Unsaved changes compared with the saved page'"
+        />
+      </div>
 
       <!--
         Page-level SEO. Collapsed by default because most edits are to the body,
@@ -198,6 +260,19 @@
       </div>
 
       <p v-if="previewError" class="banner error" role="alert">{{ previewError }}</p>
+      <div v-if="can('content.preview')" class="live-preview-tools">
+        <button type="button" class="btn-secondary" :disabled="previewBusy" @click="toggleLivePreview">
+          {{ livePreviewOpen ? 'Hide live preview' : 'Live preview' }}
+        </button>
+        <span class="field-help">Unsaved changes render in an isolated frame. Scripts and form submissions are disabled.</span>
+      </div>
+      <ResponsivePreview
+        v-if="livePreviewOpen"
+        :html="previewHtml"
+        :busy="previewBusy"
+        :error="livePreviewError"
+        @refresh="refreshLivePreview"
+      />
 
       <div class="actions">
         <button class="btn-secondary" :disabled="saving" @click="cancel">Cancel</button>
@@ -212,6 +287,9 @@
       <PageVersions
         v-if="!isNew"
         :versions="versions"
+        :slug="storedSlug"
+        :locale="locale"
+        :working-copy="page"
         :loading="versionsLoading"
         :error="versionsError"
         :can-restore="can('content.restore')"
@@ -228,7 +306,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import SectionEditor from './SectionEditor.vue';
 import PresenceBar from './collaboration/PresenceBar.vue';
 import ReviewPanel from './collaboration/ReviewPanel.vue';
@@ -237,10 +315,20 @@ import PagePublication from './PagePublication.vue';
 import PageSchedule from './PageSchedule.vue';
 import PageLanguages from './PageLanguages.vue';
 import PageVersions from './PageVersions.vue';
+import PageQualityChecklist from './PageQualityChecklist.vue';
 import ImageField from './fields/ImageField.vue';
+import DraftComparison from './page-edit/DraftComparison.vue';
+import DraftMerge from './page-edit/DraftMerge.vue';
+import ResponsivePreview from './page-edit/ResponsivePreview.vue';
+import TranslationCompare from './page-edit/TranslationCompare.vue';
+import PageReviewWorkflow from './page-edit/PageReviewWorkflow.vue';
+import { clearDraftRecovery, readDraftRecovery, writeDraftRecovery } from './page-edit/draftRecovery.js';
 
 const props = defineProps({ slug: String, initialLocale: { type: String, default: '' } });
-const emit = defineEmits(['saved', 'cancel']);
+const emit = defineEmits(['saved', 'cancel', 'replace-route']);
+const localDraftStorage = () => {
+  try { return window.localStorage; } catch { return null; }
+};
 
 // The address this page lives at once it exists. Tracked separately from the
 // prop because previewing a new page has to save it first, and every write
@@ -287,11 +375,25 @@ const saving = ref(false);
 const previewing = ref(false);
 const loadError = ref('');
 const saveError = ref('');
+const conflict = ref(false);
+const revision = ref('');
+const mergeBase = ref(null);
+const mergeServer = ref(null);
+const mergeRevision = ref('');
+const mergeError = ref('');
+const mergeAppliedNoticePending = ref(false);
+let conflictCompareSequence = 0;
 const previewError = ref('');
 const publishError = ref('');
 const publishErrorEditorial = ref(false);
 const notice = ref('');
 const previewUrl = ref('');
+const livePreviewOpen = ref(false);
+const previewHtml = ref('');
+const previewBusy = ref(false);
+const livePreviewError = ref('');
+let livePreviewTimer = null;
+let livePreviewSequence = 0;
 const previewExpiry = ref('');
 const copied = ref(false);
 const sectionErrors = ref({});
@@ -320,6 +422,7 @@ const translations = ref({});
 const translationMissing = ref(false);
 const fallbackSource = ref(null);
 const fallbackSourceLocale = ref('');
+const showTranslationCompare = ref(false);
 
 const displayNames = (() => {
   try {
@@ -389,6 +492,49 @@ const pendingCount = computed(() => {
 const savedSnapshot = ref('');
 const snapshot = () => JSON.stringify(page.value);
 const dirty = computed(() => savedSnapshot.value !== '' && savedSnapshot.value !== snapshot());
+const recoveryEnabled = ref(false);
+const recoveryCandidate = ref(null);
+const recoveryStorageError = ref('');
+const comparisonOpen = ref(false);
+const conflictComparison = ref(false);
+const conflictBaseline = ref(null);
+const comparisonBase = computed(() => {
+  if (conflict.value && conflictComparison.value && conflictBaseline.value) return conflictBaseline.value;
+  try { return savedSnapshot.value ? JSON.parse(savedSnapshot.value) : null; } catch { return null; }
+});
+const recoveryScope = computed(() => {
+  if (!currentUsername.value || !locale.value) return null;
+  const siteId = window.location.pathname.match(/\/sites\/([^/]+)/)?.[1] || 'primary';
+  return {
+    account: currentUsername.value,
+    site: `${window.location.origin}/${siteId}`,
+    document: storedSlug.value || '__new_page__',
+    locale: locale.value,
+  };
+});
+const templateScope = computed(() => recoveryScope.value
+  ? { account: recoveryScope.value.account, site: recoveryScope.value.site }
+  : null);
+
+const readRecoveryCandidate = () => {
+  if (!recoveryScope.value) return;
+  recoveryCandidate.value = readDraftRecovery(localDraftStorage(), recoveryScope.value);
+  if (recoveryCandidate.value) recoveryEnabled.value = true;
+};
+
+const restoreRecovery = () => {
+  if (!recoveryCandidate.value) return;
+  page.value = JSON.parse(JSON.stringify(recoveryCandidate.value));
+  recoveryCandidate.value = null;
+  comparisonOpen.value = true;
+  notice.value = 'Recovery copy restored. Review it against the saved page before saving.';
+};
+
+const discardRecovery = () => {
+  if (recoveryScope.value) clearDraftRecovery(localDraftStorage(), recoveryScope.value);
+  recoveryCandidate.value = null;
+  recoveryEnabled.value = false;
+};
 
 /* ------------------------------------------------------------ load -- */
 
@@ -437,6 +583,7 @@ const loadPage = async () => {
     // this is a translation waiting to be written rather than a broken link.
     translationMissing.value = true;
     publication.value = null;
+    revision.value = '';
     page.value = { title: '', slug: storedSlug.value, sections: [], seo: emptySeo() };
     savedSnapshot.value = snapshot();
     return;
@@ -451,6 +598,7 @@ const loadPage = async () => {
   if (body.fallback === true) {
     translationMissing.value = true;
     publication.value = null;
+    revision.value = '';
     fallbackSource.value = {
       title: data.title ?? '',
       sections: Array.isArray(data.sections) ? data.sections : [],
@@ -462,6 +610,7 @@ const loadPage = async () => {
   }
 
   if (body.locale) locale.value = body.locale;
+  revision.value = body.data?.revision ?? '';
   publication.value = body.publication ?? null;
 
   page.value = {
@@ -556,13 +705,21 @@ const reload = async () => {
  */
 const persist = async () => {
   saveError.value = '';
+  conflict.value = false;
   sectionErrors.value = {};
   notice.value = '';
 
   // A page that exists in another language still has to be *created* in this
   // one: translations are separate documents, and PUT to one that does not
   // exist is a 404 by design rather than an upsert.
-  const creating = isNew.value || translationMissing.value;
+  const wasNew = isNew.value;
+  const submittedRecoveryScope = recoveryScope.value;
+  const creating = wasNew || translationMissing.value;
+  if (!creating && !revision.value) {
+    saveError.value = 'This page has no revision token. Reload this page before saving.';
+    return null;
+  }
+  const submittedSnapshot = snapshot();
 
   const res = await fetch(
     creating ? `/api/pages${localeQuery()}` : `/api/pages/${storedSlug.value}${localeQuery()}`,
@@ -577,6 +734,7 @@ const persist = async () => {
         // keys it does not recognise untouched, so `seo` is stored and returned
         // as-is without any new endpoint or validator change.
         seo: page.value.seo,
+        ...(!creating ? { expectedRevision: revision.value } : {}),
       }),
     }
   );
@@ -591,13 +749,27 @@ const persist = async () => {
       || (Object.keys(sectionErrors.value).length
         ? 'Some sections need attention before this page can be saved.'
         : `Could not save (${res.status}).`);
+    conflict.value = res.status === 409;
+    if (conflict.value) {
+      conflictCompareSequence += 1;
+      mergeBase.value = null;
+      mergeServer.value = null;
+      mergeRevision.value = '';
+      mergeError.value = '';
+    }
     return null;
   }
 
   const slug = body.data?.slug ?? storedSlug.value;
+  revision.value = body.data?.revision ?? '';
   storedSlug.value = slug;
   translationMissing.value = false;
-  savedSnapshot.value = snapshot();
+  savedSnapshot.value = submittedSnapshot;
+  if (submittedRecoveryScope) clearDraftRecovery(localDraftStorage(), submittedRecoveryScope);
+  recoveryCandidate.value = null;
+  if (wasNew) {
+    emit('replace-route', `/admin/pages/edit/${encodeURIComponent(slug)}${localeQuery()}`);
+  }
 
   return slug;
 };
@@ -613,7 +785,9 @@ const savePage = async () => {
       // the editor to discover it on the public site.
       await refreshPublication();
       await Promise.all([loadTranslations(), loadVersions(), loadSchedule()]);
-      notice.value = 'Saved. This is not on the public site until you publish.';
+      notice.value = dirty.value
+        ? 'Submitted edits were saved. Newer edits still need saving.'
+        : 'Saved. This is not on the public site until you publish.';
     }
   } catch (e) {
     saveError.value = `Could not save: ${e.message}`;
@@ -774,6 +948,7 @@ const clearSchedule = async () => {
 // Confirmation happens inside PageVersions, in the product's own voice, so
 // there is no second prompt here.
 const restoreVersion = async (version) => {
+  if (dirty.value && !window.confirm('Restore this version and discard your unsaved edits?')) return;
   restoringId.value = version.id;
   versionsError.value = '';
   notice.value = '';
@@ -814,12 +989,94 @@ const switchLocale = async (code) => {
   }
 
   locale.value = code;
+  conflictCompareSequence += 1;
+  conflict.value = false;
+  conflictBaseline.value = null;
+  conflictComparison.value = false;
+  mergeBase.value = null;
+  mergeServer.value = null;
+  mergeRevision.value = '';
+  mergeError.value = '';
   previewUrl.value = '';
   notice.value = '';
   publishError.value = '';
   publishErrorEditorial.value = false;
   saveError.value = '';
   await reload();
+};
+
+const confirmDiscard = (destination) => !dirty.value || window.confirm(
+  `Leave this page for ${destination}? Unsaved changes will be lost.`
+);
+
+const beforeUnload = (event) => {
+  if (!dirty.value) return;
+  event.preventDefault();
+  event.returnValue = '';
+};
+
+const beforeNavigate = (event) => {
+  if (!confirmDiscard('another screen')) event.preventDefault();
+};
+
+const reloadConflict = async () => {
+  if (!window.confirm('Reload the latest page? Your local edits will be discarded.')) return;
+  conflictCompareSequence += 1;
+  conflict.value = false;
+  mergeBase.value = null;
+  mergeServer.value = null;
+  mergeRevision.value = '';
+  await reload();
+};
+
+const compareConflict = async () => {
+  const sequence = ++conflictCompareSequence;
+  const requestedSlug = storedSlug.value;
+  const requestedLocale = locale.value;
+  conflictComparison.value = false;
+  mergeError.value = '';
+  try {
+    const res = await fetch(`/api/pages/${encodeURIComponent(requestedSlug)}?locale=${encodeURIComponent(requestedLocale)}`);
+    const body = await res.json().catch(() => ({}));
+    if (sequence !== conflictCompareSequence || requestedSlug !== storedSlug.value || requestedLocale !== locale.value) return;
+    if (!res.ok || body.fallback === true) throw new Error(body.error || 'Could not read the latest saved version.');
+    const data = body.data?.data ?? body.data ?? {};
+    conflictBaseline.value = {
+      title: data.title ?? '',
+      slug: requestedSlug,
+      sections: Array.isArray(data.sections) ? data.sections : [],
+      seo: seoFrom(data.seo),
+    };
+    if (!savedSnapshot.value) throw new Error('The original saved draft is no longer available. Reload the page to review it.');
+    mergeBase.value = JSON.parse(savedSnapshot.value);
+    mergeServer.value = conflictBaseline.value;
+    mergeRevision.value = body.data?.revision ?? body.revision ?? '';
+    if (!mergeRevision.value) throw new Error('The latest revision token is missing. Reload before merging.');
+    conflictComparison.value = true;
+    comparisonOpen.value = true;
+  } catch (e) {
+    if (sequence === conflictCompareSequence && requestedSlug === storedSlug.value && requestedLocale === locale.value) {
+      mergeError.value = `Could not compare the saved page: ${e.message}`;
+    }
+  }
+};
+
+const applyMergedDraft = ({ page: mergedPage, revision: latestRevision }) => {
+  if (!conflict.value || !mergeServer.value || !latestRevision || latestRevision !== mergeRevision.value) return;
+  page.value = JSON.parse(JSON.stringify(mergedPage));
+  mergeAppliedNoticePending.value = true;
+  revision.value = latestRevision;
+  savedSnapshot.value = JSON.stringify(mergeServer.value);
+  conflict.value = false;
+  conflictComparison.value = false;
+  comparisonOpen.value = false;
+  conflictBaseline.value = null;
+  mergeBase.value = null;
+  mergeServer.value = null;
+  mergeRevision.value = '';
+  mergeError.value = '';
+  saveError.value = '';
+  notice.value = 'Review the merged draft and save when ready. Nothing has been saved or published.';
 };
 
 const copyFallbackSource = () => {
@@ -839,6 +1096,63 @@ const copyFallbackSource = () => {
 const previewAbsoluteUrl = computed(() =>
   previewUrl.value ? new URL(previewUrl.value, window.location.origin).toString() : ''
 );
+
+const livePreviewSlug = () => {
+  if (storedSlug.value) return storedSlug.value;
+  const requested = page.value.slug || page.value.title || 'preview';
+  const slug = requested.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return slug || 'preview';
+};
+
+const refreshLivePreview = async () => {
+  if (!livePreviewOpen.value) return;
+  if (livePreviewTimer) clearTimeout(livePreviewTimer);
+  livePreviewTimer = null;
+  const sequence = ++livePreviewSequence;
+  previewBusy.value = true;
+  livePreviewError.value = '';
+  try {
+    const slug = encodeURIComponent(livePreviewSlug());
+    const res = await fetch(`/api/pages/${slug}/preview/render${localeQuery()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: page.value.title, sections: page.value.sections, seo: page.value.seo }),
+    });
+    const html = await res.text();
+    if (sequence !== livePreviewSequence) return;
+    if (!res.ok) {
+      let message = html;
+      try { message = JSON.parse(html).error || message; } catch { /* raw server error text */ }
+      livePreviewError.value = message || `Could not render this preview (${res.status}).`;
+      return;
+    }
+    previewHtml.value = html;
+  } catch (error) {
+    if (sequence === livePreviewSequence) livePreviewError.value = `Could not render this preview: ${error.message}`;
+  } finally {
+    if (sequence === livePreviewSequence) previewBusy.value = false;
+  }
+};
+
+const scheduleLivePreview = () => {
+  if (!livePreviewOpen.value) return;
+  if (livePreviewTimer) clearTimeout(livePreviewTimer);
+  livePreviewTimer = setTimeout(() => { refreshLivePreview(); }, 350);
+};
+
+const toggleLivePreview = () => {
+  livePreviewOpen.value = !livePreviewOpen.value;
+  if (livePreviewOpen.value) refreshLivePreview();
+  else {
+    livePreviewSequence += 1;
+    previewBusy.value = false;
+    if (livePreviewTimer) clearTimeout(livePreviewTimer);
+    livePreviewTimer = null;
+  }
+};
+
+watch(page, scheduleLivePreview, { deep: true });
 
 const previewPage = async () => {
   saving.value = true;
@@ -881,13 +1195,48 @@ const copyPreviewLink = async () => {
   }
 };
 
-const cancel = () => emit('cancel');
+const cancel = () => {
+  if (confirmDiscard('the page list')) {
+    if (recoveryScope.value) clearDraftRecovery(localDraftStorage(), recoveryScope.value);
+    emit('cancel');
+  }
+};
 
 // Editing clears the "Saved" confirmation, so it can never sit above a screen
 // full of changes that have not been saved at all.
-watch(page, () => { if (dirty.value) notice.value = ''; }, { deep: true });
+watch(page, () => {
+  if (mergeAppliedNoticePending.value) {
+    mergeAppliedNoticePending.value = false;
+    return;
+  }
+  if (dirty.value) notice.value = '';
+}, { deep: true });
+watch(page, () => {
+  const scope = recoveryScope.value;
+  if (!scope) return;
+  try {
+    if (recoveryEnabled.value && dirty.value) {
+      writeDraftRecovery(localDraftStorage(), scope, page.value);
+      recoveryStorageError.value = '';
+    }
+  } catch {
+    recoveryStorageError.value = 'This browser could not store a local recovery copy.';
+  }
+}, { deep: true });
+watch(recoveryEnabled, (enabled) => {
+  if (!enabled && recoveryScope.value) {
+    clearDraftRecovery(localDraftStorage(), recoveryScope.value);
+    recoveryCandidate.value = null;
+  } else if (enabled && dirty.value && recoveryScope.value) {
+    try { writeDraftRecovery(localDraftStorage(), recoveryScope.value, page.value); } catch {
+      recoveryStorageError.value = 'This browser could not store a local recovery copy.';
+    }
+  }
+});
 
 onMounted(async () => {
+  window.addEventListener('beforeunload', beforeUnload);
+  window.addEventListener('click:before-navigate', beforeNavigate);
   loading.value = true;
 
   try {
@@ -895,16 +1244,25 @@ onMounted(async () => {
 
     if (!props.slug) {
       savedSnapshot.value = snapshot();
+      readRecoveryCandidate();
       return;
     }
 
     await loadPage();
+    readRecoveryCandidate();
     await Promise.all([loadTranslations(), loadVersions(), loadSchedule()]);
   } catch (e) {
     loadError.value = `Could not load this page: ${e.message}`;
   } finally {
     loading.value = false;
   }
+});
+
+onUnmounted(() => {
+  if (livePreviewTimer) clearTimeout(livePreviewTimer);
+  livePreviewSequence += 1;
+  window.removeEventListener('beforeunload', beforeUnload);
+  window.removeEventListener('click:before-navigate', beforeNavigate);
 });
 </script>
 
@@ -932,6 +1290,10 @@ onMounted(async () => {
 .field-help { margin: 0.35rem 0 0; font-size: 0.8125rem; color: var(--app-text-muted); }
 .inline-button { background: none; border: none; padding: 0; font: inherit; color: var(--color-primary-600); text-decoration: underline; cursor: pointer; }
 .actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem; }
+.editor-tools { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--app-border); }
+.recovery-opt-in { display: flex; align-items: center; gap: .55rem; font-weight: 500; }
+.recovery-opt-in input { width: auto; }
+.recovery-banner { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
 .preview-link { margin-top: 1.5rem; padding: 1rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface-strong); }
 .preview-link-title { margin: 0 0 0.25rem; font-weight: 600; }
 .preview-link-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: stretch; }

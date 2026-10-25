@@ -117,16 +117,16 @@ final class PublishGate
      *
      * @param array<string, mixed> $user
      */
-    public function announcePublished(ContentKey $key, array $user): void
+    public function announcePublished(ContentKey $key, array $user, ?string $revision = null): void
     {
-        $this->ask(self::PUBLISHED_HOOK, $key, $user);
+        $this->ask(self::PUBLISHED_HOOK, $key, $user, $revision);
     }
 
     /**
      * @param array<string, mixed> $user
      * @return array<string, mixed> One entry per plugin that answered.
      */
-    private function ask(string $hook, ContentKey $key, array $user): array
+    private function ask(string $hook, ContentKey $key, array $user, ?string $revision = null): array
     {
         if ($this->dispatch === null) {
             return [];
@@ -141,6 +141,7 @@ final class PublishGate
                 'slug' => $key->slug,
                 'locale' => $key->locale->code,
                 'user' => $user,
+                ...($revision !== null ? ['revision' => $revision] : []),
             ]);
         } catch (\Throwable $e) {
             // The dispatcher isolates each plugin, so reaching here means the

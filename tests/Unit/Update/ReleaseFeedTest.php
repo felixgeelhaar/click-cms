@@ -308,6 +308,24 @@ final class ReleaseFeedTest extends TestCase
         $this->assertStringContainsString('backwards', (string) $result['error']);
     }
 
+    public function testFeedIsRefusedWhenRollbackStateCannotBePersisted(): void
+    {
+        // A regular file cannot serve as the state directory. Accepting the
+        // feed in this condition would silently turn off replay protection.
+        $stateFile = $this->dir . '/not-a-directory';
+        file_put_contents($stateFile, 'occupied');
+        [$url] = $this->publish((string) json_encode([
+            'sequence' => 5,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [$this->release('2.0.0')],
+        ]));
+
+        $result = (new ReleaseFeed($stateFile))->fetch($url, $this->publicKey);
+
+        $this->assertSame([], $result['releases']);
+        $this->assertStringContainsString('not trusted', (string) $result['error']);
+    }
+
     public function testTheSameSequenceIsStillAcceptedSoARepublishIsNotBroken(): void
     {
         $state = $this->dir . '/state';
@@ -320,6 +338,36 @@ final class ReleaseFeedTest extends TestCase
 
         $this->assertCount(1, (new ReleaseFeed($state))->fetch($url, $this->publicKey)['releases']);
         $this->assertCount(1, (new ReleaseFeed($state))->fetch($url, $this->publicKey)['releases']);
+    }
+
+    /**
+     * A sequence identifies one piece of signed metadata. Accepting a different
+     * payload at the same sequence lets a mirror replay an older, still-valid
+     * signed release list after a publisher has reused that sequence.
+     */
+    public function testASecondDifferentFeedAtTheSameSequenceIsRefused(): void
+    {
+        $state = $this->dir . '/state';
+        $feed = new ReleaseFeed($state);
+        [$first] = $this->publish((string) json_encode([
+            'sequence' => 5,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [$this->release('2.0.0')],
+        ]));
+        $this->assertCount(1, $feed->fetch($first, $this->publicKey)['releases']);
+
+        // Both documents are genuinely signed by the trusted publisher. The
+        // second one nevertheless reuses sequence 5 for older release data.
+        [$second] = $this->publish((string) json_encode([
+            'sequence' => 5,
+            'expires' => gmdate('c', time() + 86400),
+            'releases' => [$this->release('1.0.0')],
+        ]));
+
+        $result = $feed->fetch($second, $this->publicKey);
+
+        $this->assertSame([], $result['releases']);
+        $this->assertStringContainsString('same sequence', (string) $result['error']);
     }
 
     /**
@@ -395,6 +443,11 @@ final class ReleaseFeedTest extends TestCase
 
         $this->assertNull($result['error']);
         $this->assertSame('1.2.0', $result['releases'][0]->version->toString());
+
+        $state = json_decode((string) file_get_contents($state . '/feed-state.json'), true);
+        $this->assertSame(11, $state['highestSequence']);
+        $this->assertSame(hash('sha256', file_get_contents($this->dir . '/releases.json')), $state['highestDigest']);
+        $this->assertSame([$newPublic], $state['announcedKeys']);
     }
 
     /**

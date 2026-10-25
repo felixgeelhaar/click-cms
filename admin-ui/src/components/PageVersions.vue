@@ -56,6 +56,15 @@
           </div>
 
           <button
+            v-if="index !== 0 && comparing !== version.id"
+            type="button"
+            class="btn-sm"
+            :disabled="Boolean(loadingComparison) || !slug || !workingCopy"
+            :aria-label="`Compare the working copy with the version saved ${formatWhen(version.recordedAt)}`"
+            @click="compare(version)"
+          >Compare</button>
+
+          <button
             v-if="canRestore && index !== 0 && confirming !== version.id"
             type="button"
             class="btn-sm"
@@ -97,23 +106,42 @@
               Cancel
             </button>
           </div>
+          <div v-if="comparing === version.id" class="version-diff" role="region" :aria-label="`Changes since ${version.title || 'this version'}`">
+            <div class="diff-head">
+              <strong>Changes from this version to the working copy</strong>
+              <button type="button" class="btn-sm" @click="closeComparison">Close comparison</button>
+            </div>
+            <p v-if="loadingComparison === version.id" class="diff-message">Loading saved version…</p>
+            <p v-else-if="comparisonError" class="versions-error" role="alert">Could not load this version: {{ comparisonError }}. Refresh the history and try again.</p>
+            <p v-else-if="!diffRows.length" class="diff-message">No content differences. The public page and working copy match this version.</p>
+            <ul v-else class="diff-list">
+              <li v-for="row in diffRows" :key="row.path" class="diff-row">
+                <code>{{ row.path }}</code>
+                <div><span class="diff-label">Before</span><pre>{{ row.before }}</pre></div>
+                <div><span class="diff-label">Working copy</span><pre>{{ row.after }}</pre></div>
+              </li>
+            </ul>
+          </div>
         </li>
     </ol>
   </section>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 const confirming = ref('');
 
-defineProps({
+const props = defineProps({
   versions: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' },
   canRestore: { type: Boolean, default: false },
   /** The id currently being restored, or '' . */
   restoring: { type: String, default: '' },
+  slug: { type: String, default: '' },
+  locale: { type: String, default: '' },
+  workingCopy: { type: Object, default: null },
 });
 
 defineEmits(['restore', 'reload']);
@@ -129,6 +157,50 @@ const reasonLabel = (reason) => ({
   publish: 'Published from here',
   delete: 'Before deletion',
 }[reason] || 'Saved');
+
+const comparing = ref('');
+const loadingComparison = ref('');
+const comparisonError = ref('');
+const historicalDocument = ref(null);
+const flatten = (value, prefix = '', out = {}) => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    Object.keys(value).sort().forEach((key) => flatten(value[key], prefix ? `${prefix}.${key}` : key, out));
+  } else {
+    out[prefix || 'value'] = value;
+  }
+  return out;
+};
+const display = (value) => value === undefined ? '(missing)' : value === null ? '(empty)' : typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+const diffRows = computed(() => {
+  if (!historicalDocument.value || !props.workingCopy) return [];
+  const before = flatten(historicalDocument.value);
+  const after = flatten(props.workingCopy);
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])].sort()
+    .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
+    .map((key) => ({ path: key, before: display(before[key]), after: display(after[key]) }));
+});
+const compare = async (version) => {
+  comparing.value = version.id;
+  historicalDocument.value = null;
+  comparisonError.value = '';
+  loadingComparison.value = version.id;
+  const query = props.locale ? `?locale=${encodeURIComponent(props.locale)}` : '';
+  try {
+    const response = await fetch(`/api/pages/${encodeURIComponent(props.slug)}/versions/${encodeURIComponent(version.id)}${query}`);
+    const body = await response.json();
+    if (!response.ok || !body.data?.document) throw new Error(body.error || `Request failed (${response.status})`);
+    historicalDocument.value = body.data.document;
+  } catch (error) {
+    comparisonError.value = error.message;
+  } finally {
+    loadingComparison.value = '';
+  }
+};
+const closeComparison = () => {
+  comparing.value = '';
+  historicalDocument.value = null;
+  comparisonError.value = '';
+};
 </script>
 
 <style scoped>
@@ -148,6 +220,15 @@ const reasonLabel = (reason) => ({
 .version-tag { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.1rem 0.4rem; border-radius: 999px; border: 1px solid var(--app-border); color: var(--app-text-muted); }
 .version-tag.current { border-color: var(--color-primary-600); color: var(--color-primary-600); }
 .version-tag.live { border-color: var(--color-success-500); color: var(--color-success-text, #15803d); }
+.version-diff { flex-basis: 100%; padding: 0.75rem; border-radius: 8px; background: var(--app-surface); }
+.diff-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.diff-message { margin: 0.65rem 0 0; font-size: 0.8125rem; color: var(--app-text-muted); }
+.diff-list { list-style: none; display: grid; gap: 0.65rem; padding: 0; margin: 0.65rem 0 0; }
+.diff-row { display: grid; grid-template-columns: minmax(8rem, 0.5fr) repeat(2, minmax(0, 1fr)); gap: 0.65rem; align-items: start; padding-top: 0.65rem; border-top: 1px solid var(--app-border); }
+.diff-row code { overflow-wrap: anywhere; font-size: 0.75rem; }
+.diff-row pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.2rem 0 0; font: inherit; font-size: 0.8rem; }
+.diff-label { font-size: 0.7rem; color: var(--app-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+@media (max-width: 640px) { .diff-row { grid-template-columns: 1fr; } }
 .confirm { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem; max-width: 24rem; }
 .confirm-text { flex-basis: 100%; margin: 0; font-size: 0.8125rem; line-height: 1.4; color: var(--app-text-muted); text-align: right; }
 .btn-sm.primary { background: var(--color-primary-600); color: white; border-color: var(--color-primary-600); }

@@ -60,7 +60,7 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Multi-architecture: this is software people run on whatever they have,
       # and arm64 covers both Apple silicon and the cheaper cloud instances.

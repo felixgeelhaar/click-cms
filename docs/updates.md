@@ -17,9 +17,25 @@ Configure the channel in `config/core.json`:
   "policy": "security",
   "feedUrl": "https://felixgeelhaar.github.io/click-cms/feed.json",
   "publicKey": "-----BEGIN PUBLIC KEY-----\n…\n-----END PUBLIC KEY-----",
-  "allowPreRelease": false
+  "allowPreRelease": false,
+  "publicRoot": "/srv/www/example/public"
 }
 ```
+
+`publicRoot` is optional. Set it to the absolute path of the existing public
+directory when the application root (containing `src/`, `vendor/` and
+`config/`) is separate from the web server's document root. The updater replaces
+its software entries, keeps its `.htaccess`, and stores/restores its previous contents
+in the ordinary update backup. The configured directory must exist and must not
+itself be a symlink; an invalid setting makes install and restore stop before
+changing files. Leave it unset for the standard `application-root/public`
+layout. The value is installation-wide and must be present for both CLI and
+admin updates.
+
+When converting an already-running split-root installation, install this
+updater version and configure `publicRoot` through a deployment/manual step
+before relying on automatic updates. An older updater cannot understand the
+setting and may continue replacing the wrong `public/` directory.
 
 `feedUrl` and `publicKey` also read from `CLICK_CMS_UPDATE_FEED_URL` and
 `CLICK_CMS_UPDATE_PUBLIC_KEY`, so a key need not sit in a committed file.
@@ -45,11 +61,32 @@ vulnerability, while anything that could change behaviour waits for a human.
 
 ### Running it
 
-Updates install from the command line, via cron:
+Ordinary GET/HEAD requests to Click trigger a due update check, once per day.
+This includes REST requests from a separate SPA. No cron, shell access, PHP
+subprocesses or loopback HTTP are required. `security`, `minor` and `all` install
+only releases their policy permits; `notify` only checks and `manual` does no
+background work. Managed deployments (`CLICK_DEPLOYMENT_MANAGED=1`) disable it.
+POST requests and uploads never trigger a check. A site receiving no requests
+cannot check until its next request; fully cached traffic that never reaches PHP
+also cannot trigger it.
 
-```cron
-17 3 * * *  cd /var/www/html && php bin/click-update.php >> data/updates/cron.log 2>&1
-```
+The front controller takes a shared installation lock before autoloading.
+Downloads and verification happen before exclusive maintenance. The installer
+acquires the exclusive lock only when no other PHP request is using the code;
+if busy, the web scheduler retries in five minutes. During replacement, requests
+receive HTTP 503 with `Retry-After: 5` and `Cache-Control: no-store`. The updating
+process exits without booting the application with its old loaded classes. The
+next request starts with the new release. The due request may take longer while
+checking/downloading; this is an in-process worker, not a detached background job.
+
+PHP needs writable installation and backup directories, OpenSSL/Zip support and
+outbound access to the configured feed and packages. OPcache must validate
+changed files or permit a reset from the web PHP pool. Host execution limits
+still apply: preparation may fail on hosts with very low time/memory limits.
+Failures are shown in update status/history or the PHP error log; they never
+justify weakening signatures, checksum verification or policy.
+
+An optional CLI scheduler remains available on hosts that offer cron:
 
 ```bash
 php bin/click-update.php              # check; install what the policy allows
@@ -57,25 +94,32 @@ php bin/click-update.php --dry-run    # report what would happen, change nothing
 php bin/click-update.php --force      # ignore the once-a-day interval
 ```
 
-The interval is enforced inside the CMS, so a more frequent cron entry is
-harmless. Overlapping runs take an exclusive lock; the second one ends rather
-than installing in parallel.
-
-**There is deliberately no "update during a web request" mode.** Installing
-replaces `src/` underneath the running process, and mid-request that can leave a
-half-served page unable to autoload the class it needs next, with an opcode
-cache holding a mix of two releases. A CLI run has no page in flight.
-
-An administrator can also install an offered update from **Manage → Updates**,
-which does not wait for cron.
+An administrator can also install an offered update from **Manage → Updates**.
+All installers use the same request barrier. CLI runs cannot reset a separate
+web pool's OPcache; those hosts must enable timestamp validation or provide their
+own cache lifecycle.
 
 ### If an update goes wrong
 
-Every install moves the replaced directories aside first. The path is printed,
+Before mutation, the updater writes a durable `data/updates/swap-journal.json`
+and preserves its dependency-free recovery code outside the replaced software.
+If the worker is killed, the next front-controller request restores the previous
+software before Composer loads. An invalid journal or failed recovery keeps the
+site in maintenance and retains the evidence for an operator. The public root
+and front controller remain reachable during replacement. Keep `data/updates`
+private and include it in operational backups. Transaction backups must live in
+`data/updates`; custom external installer backup roots are refused so early
+recovery can validate every recovery path.
+
+
+Every install preserves the previous software in a backup. The path is printed,
 logged to `data/updates/history.json`, and restorable:
 
 ```php
-(new UpdateInstaller('/var/www/html'))->restore('/var/www/html/data/updates/backup-…');
+$root = '/var/www/html';
+$config = CoreConfig::load($root . '/config/core.json');
+(new UpdateInstaller($root, null, $config->updatePublicRoot()))
+    ->restore($root . '/data/updates/backup-…');
 ```
 
 ## The feed format
@@ -366,3 +410,76 @@ Stated plainly, because a half-known threat model is worse than a known one:
   single document from a single origin.
 - **No staged rollout.** Every site on `security` takes a security release as
   soon as it sees it.
+
+## Split-root installations and existing sites
+
+When `public/` is served from a separate directory, set
+`core.updates.publicRoot` to that directory's absolute filesystem path. The
+scheduled CLI updater and the administrator's update action use the same value.
+An SFTP chroot path or URL is not a filesystem path. A missing, relative or unsafe
+configured directory stops installation before code changes. The directory and
+the application must be on a filesystem where the directory moves can succeed;
+a failed move triggers rollback rather than a recursive fallback copy.
+
+```json
+{
+  "core": {
+    "updates": {
+      "policy": "minor",
+      "allowPreRelease": false,
+      "publicRoot": "/absolute/path/to/web/2026/cms2"
+    }
+  }
+}
+```
+
+Merge these settings into the existing configuration; retain the configured
+feed URL and signing key. `minor` opts into unattended stable patch and minor
+updates. It does not authorize majors or prereleases. Ordinary CMS traffic
+provides the scheduler, including API traffic from TurboScience. When a newer
+major or beta is available, the updater still installs the newest stable release
+permitted by the policy instead of letting that newer offer block compatible
+updates.
+
+The external public directory participates in code backup, failed-install
+rollback and explicit restore. Its existing `.htaccess` survives; the release's
+version is retained as `.htaccess.dist` for comparison. Failure to preserve those
+site-owned rules fails the update. Content, configuration and private data are
+not release files and remain outside the replacement set. Software-owned starter
+presets ship inside `src/Resources`, so an existing site receives them without
+any write to its configuration directory.
+
+### First transition from an older updater
+
+An updater already installed on a site runs its old implementation. Adding
+`publicRoot` does not retrofit external-directory support into that old code.
+For a detached public directory, use a verified release's corrected installer
+for a one-time controlled transition, preserving both application and public
+backups. Rehearse it on an isolated copy first. After the corrected updater and
+site-local public-root setting are present, subsequent compatible stable
+releases use the unattended web path, without server cron or shell access.
+
+Do not claim that CLI execution alone drains web traffic. PHP requests and
+opcode caches can still overlap a directory swap. Use the host's maintenance
+window/traffic controls and PHP cache restart procedure when required; the
+installer is a rollback-capable directory replacement, not a zero-downtime
+transaction across running requests. A release requiring data migration or a
+PHP restart needs an explicitly managed transition.
+
+### Isolated TurboScience rehearsal
+
+With PHP/Zip/OpenSSL, Python 3.10+, Node 22.13+ and the admin development
+dependencies installed, run:
+
+```sh
+php scripts/rehearse-turboscience-upgrade.php /path/to/click-cms /path/to/turboscience-website
+```
+
+The harness uses local `v1.4.0` and `v1.8.0` Git tags, the site's checked-in
+configuration and Bludit export, and its migration functions to reconstruct an
+isolated Click fixture. It does not copy credentials or access the live site.
+Local candidate version numbers and an ephemeral RSA signing key are rehearsal
+fixtures, not published releases. Loopback servers exercise the signed feed and
+prefixed API delivery. The SPA probe executes the site's actual page and chrome
+clients with a DOM implementation; it does not replace browser visual testing
+or verification of the production host's Apache, scheduler or opcode cache.

@@ -8,6 +8,8 @@ use Click\Cms\Domain\Backup\ArchivePath;
 use Click\Cms\Domain\Backup\BackupManifest;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Storage\StorageInterface;
+use Click\Cms\Domain\Publishing\PublishingStorage;
+use Click\Cms\Domain\Publishing\Publishable;
 use ZipArchive;
 
 /**
@@ -139,7 +141,7 @@ final class BackupExporter
     {
         $out = [];
 
-        foreach ($this->storage->types() as $type) {
+        foreach (array_unique([...$this->storage->types(), ...Publishable::types()]) as $type) {
             // Every language, not the site's default: a translation left out of
             // the backup is a translation lost, and `findByType()` with no locale
             // is precisely "all of them".
@@ -172,6 +174,30 @@ final class BackupExporter
                     'sha256' => hash('sha256', $bytes),
                     'bytes' => strlen($bytes),
                 ];
+            }
+        }
+
+        if ($this->storage instanceof PublishingStorage) {
+            foreach (array_unique([...$this->storage->types(), ...Publishable::types()]) as $type) {
+                if (!Publishable::includes($type)) {
+                    continue;
+                }
+                foreach ($this->storage->workingCopies($type, null) as $document) {
+                    $entry = $this->entryNameFor($document);
+                    if ($entry === null) {
+                        throw new BackupException('A working copy has an unsafe archive key.');
+                    }
+                    $entry = 'drafts/' . $entry;
+                    $bytes = json_encode($document->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+                    $zip->addFromString($entry, $bytes);
+                    $out[] = [
+                        'entry' => $entry, 'key' => $document->key->toString(),
+                        'type' => $document->type(), 'slug' => $document->slug(),
+                        'locale' => $document->locale()->code,
+                        'sha256' => hash('sha256', $bytes), 'bytes' => strlen($bytes),
+                        'publication' => 'draft',
+                    ];
+                }
             }
         }
 

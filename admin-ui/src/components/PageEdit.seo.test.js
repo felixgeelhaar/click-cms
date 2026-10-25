@@ -32,9 +32,9 @@ const installFetch = ({ seo = undefined, media = [] } = {}) => {
     const pageMatch = path.match(/^\/api\/pages\/([^/]+)$/);
     if (pageMatch) {
       const slug = pageMatch[1];
-      if (method === 'PUT') return ok({ data: { slug } });
+      if (method === 'PUT') return ok({ data: { slug, revision: 'rev-2' } });
       return ok({
-        data: { key: `page:${locale}:${slug}`, slug, locale, data: { title: 'Home', sections: [], seo } },
+        data: { key: `page:${locale}:${slug}`, slug, locale, data: { title: 'Home', sections: [], seo }, revision: 'rev-1' },
         locale,
         publication: { published: true, hasUnpublishedChanges: false, neverPublished: false, publishedAt: null },
       });

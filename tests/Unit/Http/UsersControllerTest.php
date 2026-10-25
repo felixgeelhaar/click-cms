@@ -85,6 +85,43 @@ final class UsersControllerTest extends TestCase
         $this->assertStringNotContainsString('$2y$', json_encode($listed));
     }
 
+    public function testUserResponsesWithholdTwoFactorCredentials(): void
+    {
+        $this->create(['username' => 'ada', 'email' => 'ada@example.com', 'password' => 'a-good-password']);
+        $account = $this->content->user('ada');
+        $account->update(['twoFactor' => ['secret' => 'SYNTHETIC-SECRET', 'recoveryCodeHashes' => ['SYNTHETIC-HASH']]]);
+        $this->content->save($account);
+        foreach ([$this->users->get('ada'), $this->users->list()] as $response) {
+            $this->assertStringNotContainsString('SYNTHETIC-SECRET', json_encode($response));
+            $this->assertStringNotContainsString('SYNTHETIC-HASH', json_encode($response));
+        }
+    }
+
+    public function testUnsafeBcryptInputsAreRejectedWithoutChangingAccounts(): void
+    {
+        $this->create(['username' => 'ada', 'email' => 'ada@example.com', 'password' => 'first-password']);
+        $before = $this->content->user('ada')->data['password'];
+        foreach ([str_repeat('a', 73), str_repeat('é', 37), "valid-pass\0word"] as $password) {
+            $response = $this->create(['username' => 'new-user', 'email' => 'new@example.com', 'password' => $password]);
+            self::assertSame(400, $response['status']);
+            self::assertNull($this->content->user('new-user'));
+            $_POST = ['password' => $password];
+            $response = $this->users->update('ada');
+            self::assertSame(400, $response['status']);
+            self::assertSame($before, $this->content->user('ada')->data['password']);
+        }
+    }
+
+    public function testTheFull72BytePasswordIsAcceptedAndVerified(): void
+    {
+        $password = str_repeat('é', 36);
+        $response = $this->create(['username' => 'boundary', 'email' => 'boundary@example.com', 'password' => $password]);
+        self::assertSame(201, $response['status']);
+        $hash = $this->content->user('boundary')->data['password'];
+        self::assertTrue(password_verify($password, $hash));
+        self::assertFalse(password_verify(str_repeat('é', 35) . 'xx', $hash));
+    }
+
     public function testTheStoredPasswordIsHashedNotPlaintext(): void
     {
         $this->create(['username' => 'ada', 'email' => 'ada@example.com', 'password' => 'a-good-password']);

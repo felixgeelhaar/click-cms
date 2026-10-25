@@ -95,24 +95,15 @@ final class PreviewRouteTest extends TestCase
     /** Put a real session on disk and hand its identifier to the request. */
     private function signIn(string $role, bool $mustChangePassword = false): void
     {
-        $id = bin2hex(random_bytes(32));
-        mkdir($this->base . '/data/sessions', 0o700, true);
-
-        file_put_contents(
-            $this->base . '/data/sessions/' . $id . '.json',
-            json_encode([
-                'username' => 'ann',
-                'expiresAt' => time() + 3600,
-                'lastActivity' => time(),
-                'user' => [
-                    'username' => 'ann',
-                    'role' => $role,
-                    'mustChangePassword' => $mustChangePassword,
-                ],
-            ])
-        );
-
-        $_COOKIE[SessionStore::COOKIE] = $id;
+        $content = (new \ReflectionMethod($this->app, 'getContentService'))->invoke($this->app);
+        $content->save(\Click\Cms\Domain\Content\Content::create($content->userKey('ann'), [
+            'password' => 'test-hash', 'role' => $role, 'status' => 'active',
+        ]));
+        $sessions = (new \ReflectionProperty(Application::class, 'sessions'))->getValue($this->app);
+        $sessions->start([
+            'username' => 'ann', 'expiresAt' => time() + 3600, 'lastActivity' => time(),
+            'user' => ['username' => 'ann', 'role' => $role, 'mustChangePassword' => $mustChangePassword],
+        ]);
     }
 
     /* ------------------------------------------------- the public site -- */

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Domain\Backup;
 
 use InvalidArgumentException;
+use Click\Cms\Domain\ValueObjects\ContentKey;
 
 /**
  * What an archive says it contains — the only thing a restore ever trusts, and
@@ -52,7 +53,7 @@ final class BackupManifest
      * database backend contained no documents at all and restoring one would
      * silently produce an empty site.
      */
-    public const FORMAT_VERSION = 2;
+    public const FORMAT_VERSION = 3;
 
     public const MEDIA_EMBEDDED = 'embedded';
     public const MEDIA_POOLED = 'pool';
@@ -180,7 +181,7 @@ final class BackupManifest
         if (!is_int($version)) {
             throw new InvalidArgumentException('The manifest does not say which format it is in.');
         }
-        if ($version !== self::FORMAT_VERSION) {
+        if (!in_array($version, [2, self::FORMAT_VERSION], true)) {
             throw new InvalidArgumentException(sprintf(
                 'This archive is in backup format %d; this version of the CMS reads format %d.',
                 $version,
@@ -196,6 +197,21 @@ final class BackupManifest
         $documents = [];
         foreach (self::listOf($row, 'documents') as $item) {
             $documents[] = self::readDocument($item);
+        }
+
+        $seen = [];
+        $entries = [];
+        foreach ($documents as $document) {
+            $state = $document['publication'] ?? 'live';
+            if ($version === 2 && $state !== 'live') {
+                throw new InvalidArgumentException('Draft recovery requires backup format 3.');
+            }
+            $identity = $document['key'] . ':' . $state;
+            if (isset($seen[$identity]) || isset($entries[$document['entry']])) {
+                throw new InvalidArgumentException('Duplicate backup document state or archive entry.');
+            }
+            $seen[$identity] = true;
+            $entries[$document['entry']] = true;
         }
 
         $media = [];
@@ -255,7 +271,18 @@ final class BackupManifest
             throw new InvalidArgumentException("The manifest names an unsafe archive entry: \"{$entry}\".");
         }
 
+        $key = ContentKey::fromString(self::requireString($item, 'key', 'document'));
+        if ($key->type !== ($item['type'] ?? null) || $key->slug !== ($item['slug'] ?? null)
+            || $key->locale->code !== ($item['locale'] ?? null)) {
+            throw new InvalidArgumentException('Backup document identity disagrees with its key.');
+        }
+        $publication = $item['publication'] ?? 'live';
+        if (!in_array($publication, ['live', 'draft'], true)) {
+            throw new InvalidArgumentException('Unknown backup document publication state.');
+        }
+
         return [
+            ...(isset($item['publication']) ? ['publication' => $publication] : []),
             'entry' => $entry,
             'key' => self::requireString($item, 'key', 'document'),
             'type' => self::requireString($item, 'type', 'document'),

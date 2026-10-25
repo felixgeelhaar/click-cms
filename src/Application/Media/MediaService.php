@@ -434,19 +434,29 @@ final class MediaService
         }
 
         $id = pathinfo($original, PATHINFO_FILENAME);
-        $cachePath = $this->derivedDir() . '/' . $transform->cacheName($id, $extension);
+        $derivedDir = $this->derivedDir();
+        if (!is_dir($derivedDir) && !@mkdir($derivedDir, 0o775, true) && !is_dir($derivedDir)) {
+            return $original;
+        }
+
+        $resolvedDerivedDir = realpath($derivedDir);
+        if ($resolvedDerivedDir === false || !$this->isWithinMediaDirectory($resolvedDerivedDir)) {
+            return $original;
+        }
+
+        $cachePath = $resolvedDerivedDir . '/' . $transform->cacheName($id, $extension);
 
         // Served straight from cache on every request after the first. A
         // rendition is immutable — its name contains the width, and the stored
         // original never changes under a given name — so a stale hit is not
         // possible without someone deleting the source.
-        if (is_file($cachePath)) {
-            return $cachePath;
+        if (is_file($cachePath) || is_link($cachePath)) {
+            return $this->containedMediaPath($cachePath) ?? $original;
         }
 
         $rendered = $this->processor->renderWidth($original, $cachePath, $transform->width);
 
-        return $rendered === null ? $original : $cachePath;
+        return $rendered === null ? $original : ($this->containedMediaPath($cachePath) ?? $original);
     }
 
     private function derivedDir(): string
@@ -468,7 +478,29 @@ final class MediaService
 
         $path = $this->mediaDir . '/' . $filename;
 
-        return is_file($path) ? $path : null;
+        return is_file($path) ? $this->containedMediaPath($path) : null;
+    }
+
+    /**
+     * Resolve a file only when its canonical target remains beneath media/.
+     * A safe filename alone is not enough: `is_file()` follows symlinks, so a
+     * planted link can otherwise turn a valid media URL into a local-file read.
+     */
+    private function containedMediaPath(string $path): ?string
+    {
+        $resolved = realpath($path);
+
+        return $resolved !== false && $this->isWithinMediaDirectory($resolved) ? $resolved : null;
+    }
+
+    private function isWithinMediaDirectory(string $path): bool
+    {
+        $mediaRoot = realpath($this->mediaDir);
+        if ($mediaRoot === false) {
+            return false;
+        }
+
+        return str_starts_with($path, rtrim($mediaRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR);
     }
 
     private function ensureDir(): void

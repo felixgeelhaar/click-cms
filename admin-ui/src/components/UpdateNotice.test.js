@@ -100,6 +100,30 @@ describe('the update notice', () => {
     expect(wrapper.text()).toContain('Updated to 1.4.5');
   });
 
+  it('reloads the page when the administrator asks to use the installed version', async () => {
+    const originalWindow = window;
+    const reload = vi.fn();
+    global.fetch = vi.fn((url) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(url === '/api/updates' ? available : { data: { installed: true, version: '1.4.5' } }),
+    }));
+
+    const wrapper = mountWith();
+    await flushPromises();
+    await wrapper.find('.btn-primary').trigger('click');
+    await flushPromises();
+    const mockedWindow = Object.create(originalWindow);
+    Object.defineProperty(mockedWindow, 'location', { value: { reload } });
+    vi.stubGlobal('window', mockedWindow);
+    try {
+      await wrapper.find('.notice--done .btn').trigger('click');
+      expect(reload).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('reports a failed install rather than pretending', async () => {
     global.fetch = vi.fn((url) =>
       url === '/api/updates'
@@ -113,6 +137,26 @@ describe('the update notice', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Disk full');
+    expect(wrapper.text()).not.toContain('Updated to');
+  });
+
+  it.each([
+    ['missing confirmation', {}, 'Could not install the update: the server did not confirm installation.'],
+    ['truthy nonboolean confirmation', { installed: 'yes' }, 'Could not install the update: the server did not confirm installation.'],
+    ['negative reply with server detail', { installed: false, error: 'Rollback failed.' }, 'Rollback failed.'],
+  ])('does not report success for %s', async (_scenario, data, expectedError) => {
+    global.fetch = vi.fn((url) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(url === '/api/updates' ? available : { data }),
+    }));
+
+    const wrapper = mountWith();
+    await flushPromises();
+    await wrapper.find('.btn-primary').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[role="alert"]').text()).toBe(expectedError);
     expect(wrapper.text()).not.toContain('Updated to');
   });
 

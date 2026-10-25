@@ -26,8 +26,8 @@ require_once dirname(__DIR__, 3) . '/scripts/generate-ts-client.php';
  * if they *stop* erroring — that is what catches a generator quietly widening
  * everything to `any`, which would compile beautifully and check nothing.
  *
- * TypeScript is a development dependency of the SDK package, not of this PHP
- * project, so the test skips cleanly when it is not installed rather than making
+ * TypeScript can come from the SDK package or the admin UI. This PHP
+ * test skips cleanly when neither is installed rather than making
  * an offline `phpunit` run fail.
  */
 final class GeneratedTypeScriptCompilesTest extends TestCase
@@ -98,6 +98,7 @@ final class GeneratedTypeScriptCompilesTest extends TestCase
         $candidates = [
             escapeshellarg($root . '/sdk/typescript/node_modules/.bin/tsc'),
             escapeshellarg($root . '/node_modules/.bin/tsc'),
+            escapeshellarg($root . '/admin-ui/node_modules/.bin/tsc'),
             'npx --no-install tsc',
         ];
 

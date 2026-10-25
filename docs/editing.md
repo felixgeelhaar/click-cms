@@ -399,6 +399,57 @@ older content while your saved edits wait — that is exactly what the *Edits
 pending* tab lists. Putting them live is one more step, and it has its own page:
 [Publishing your changes](publishing.md).
 
+### Recovering work after a reload
+
+The editor does not keep a browser copy of your writing unless you opt in. Turn
+on **Keep a local recovery copy on this device** to store unsaved work in this
+browser for up to seven days. A copy belongs to your account, site, page and
+language. It is deleted when you sign out of that account. If you return after a reload, the editor offers **Restore copy** or
+**Discard copy**; it never replaces the saved page without asking. Saving,
+discarding the recovery copy, or turning the option off removes it from this
+browser. The copy is local to this browser and is not shared with other editors.
+
+### Compare and preview
+
+For a page with several languages, open **Compare translations** below the
+language status panel. Choose a source and target language to review their title
+and section fields side by side. The target defaults to the language open in the
+editor, including its unsaved changes; the source is read-only. The panel shows
+each language's publication freshness and reports missing or unavailable
+translations. When you change the editor language, that becomes the comparison
+target. The comparison never copies text between languages.
+
+Editors who can edit the target can record **Mark saved target reviewed against
+this source** after checking the saved snapshots. Save unsaved target changes
+first. The marker records the exact source and target revisions, reviewer and
+time. A subsequent change to either saved revision makes the marker stale;
+missing markers are unknown. Publication status is separate. This records a
+human review, not an assessment of translation accuracy. If either snapshot
+changes during review, refresh and review the comparison again. Review markers
+need a full site-data backup; see [Editorial sidecar data](backup.md#editorial-sidecar-data).
+
+While editing, **Compare with saved page** lists fields that differ from the
+last saved version. If another editor saves first, use **Compare with saved
+version** in the conflict message to compare your edits with the latest saved
+page. The merge panel compares the version you originally loaded, your local
+edits and the latest saved version. Non-overlapping object fields combine
+automatically; overlapping changes require **Keep your edit** or **Use latest
+saved**. Arrays without stable unique item IDs, reordered arrays and structural
+changes require a choice for the whole array. Review the values, then choose
+**Apply merged draft to editor**. This updates only your local editor and its
+revision baseline. Save explicitly afterwards; another concurrent change can
+still produce a new conflict. **Reload to review** discards your local changes
+after confirmation.
+
+**Live preview** renders your current unsaved fields in the editor. It refreshes
+after a short pause while you type; choose **Mobile**, **Tablet** or **Desktop**
+to change the preview width, or press **Refresh** to render immediately. The
+isolated preview frame disables scripts and form submissions, so interactive
+site behavior is not available there. Nothing is saved by this action.
+
+**Preview** saves your edits and creates a separate expiring link that can be
+copied and shared with somebody who does not have an account.
+
 If your account is an **author**, that step is not yours to take, and the banner
 says so rather than offering a button. Save, leave a note, and tell whoever
 approves. See [What your account can do](roles.md#author).
@@ -406,7 +457,8 @@ approves. See [What your account can do](roles.md#author).
 ## If it goes wrong
 
 - **You have not saved yet.** Click **Cancel**. The page returns to its last
-  saved state.
+  saved state. If you opted in to recovery, discard the local recovery copy too
+  when the editor offers it.
 - **The save was refused.** Read the message against the red-bordered field. See
   [Required fields](#required-fields-and-the-red-asterisk). Nothing you typed is
   lost.
@@ -416,3 +468,74 @@ approves. See [What your account can do](roles.md#author).
   [Undoing a mistake](publishing.md#undoing-a-mistake-with-version-history).
 - **You cannot tell whether a change is live.** Open the page from the Pages
   list and read the banner at the top. It always says.
+
+
+## When someone else saves first
+
+The page and collection editors send the revision they loaded with each update.
+If the saved draft has changed in the meantime, Click refuses the stale save
+with a conflict instead of replacing the newer draft. Your text stays in the
+editor. In the page editor, **Compare with saved version** opens the explicit
+three-way merge described above. Collection entries keep the comparison/reload
+workflow: copy changes you want to keep before reloading, then apply them to the
+latest version.
+
+Leaving an editor with unsaved changes asks for confirmation. This is a warning,
+not automatic draft recovery: save your work before closing the browser.
+
+### Revision checks for API clients
+
+Authenticated page and collection detail responses and successful write responses
+include an opaque `revision` beside the document fields inside `data`. Send that
+value as `expectedRevision` in the JSON body of an update. A stale revision
+returns HTTP 409 without saving. A malformed revision returns HTTP 400. Obtain
+a fresh revision by reading the draft again, then explicitly review and merge
+your changes; do not automatically retry a rejected update with the new token.
+
+For compatibility, clients that omit `expectedRevision` keep the existing
+unconditional update behavior. They do not receive stale-write protection.
+The revision is response metadata and is not persisted as a content field.
+
+Revision comparison and draft writes are serialized using per-document locks in
+the site's shared version-history filesystem. This applies to the application
+storage stack with JSON, SQLite, MySQL and PostgreSQL content backends, since
+they share that history store. It requires all writers to use that stack and a
+filesystem that provides shared advisory locks. Separate history directories on
+multiple hosts do not provide a distributed concurrency guarantee.
+
+### Publication and review revisions
+
+Page publication promotes only the revision checked by the publication policy.
+The standard storage stack compares and promotes under the same document lock;
+a concurrent save returns a conflict and leaves the newer draft private. Custom
+publishing decorators must forward `ConditionalPublishingStorage`; the page
+service refuses publication when this capability is absent. As with conditional
+saves, the lock assumes all writers share the same version directory and a
+filesystem with working advisory locks. It is not a distributed transaction
+across independent version directories or an atomic multi-page release.
+
+## Shared section presets
+
+The section editor combines built-in starters, your personal browser starters
+and the site's shared library. Administrators can **Create shared preset** from
+the current sections and **Save new version** to update a selected shared preset.
+Other accounts with section-editor access can adopt presets. The server checks
+the site's current section schemas and refuses invalid definitions. An old
+snapshot that no longer matches those schemas cannot be adopted.
+
+Choose a shared preset and version, then explicitly append or replace sections.
+This changes the local editor; save the page when ready. Each page keeps its own
+copy, so updating or deleting a preset never changes existing pages. Version
+checks reject concurrent library updates rather than overwriting them. The
+library retains the latest 50 snapshots per preset. Personal starters still
+remain scoped to your account, site and browser.
+
+### Inbox review decisions
+
+Inbox decisions include the review request revision. A stale inbox cannot
+decide a replacement request; refresh the inbox first. Publication notifications
+close a request only when they identify the same content revision, so a delayed
+notification cannot close a review of a newer draft. These checks retain the
+shared-filesystem locking assumptions described above.
+Legacy API clients that omit `reviewRevision` retain the previous request-selection
+behavior and cannot bind a decision to the inbox snapshot they displayed.

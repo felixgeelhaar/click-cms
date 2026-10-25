@@ -108,6 +108,12 @@ final class ApiGuardTest extends TestCase
         $this->assertFalse($this->guard->isPublic('collections/blog/entries/hello/backreferences', 'GET'));
         // Minting a preview link is a POST and must stay authenticated.
         $this->assertFalse($this->guard->isPublic('collections/blog/entries/hello/preview', 'POST'));
+        $this->assertFalse($this->guard->isPublic('pages/home/preview/render', 'POST'));
+        // Shared section presets contain unpublished page structure and stay
+        // behind the management session even though the editor reads them.
+        $this->assertFalse($this->guard->isPublic('section-presets', 'GET'));
+        $this->assertFalse($this->guard->isPublic('section-presets', 'POST'));
+        $this->assertFalse($this->guard->isPublic('section-presets/abc/versions/1', 'GET'));
     }
 
     /* --------------------------------------------- authentication -- */
@@ -115,6 +121,20 @@ final class ApiGuardTest extends TestCase
     public function testAnAnonymousRequestToAProtectedPathIsRefused(): void
     {
         $this->assertSame(401, $this->guard->enforceAuth('media', 'GET')['status']);
+    }
+
+    public function testSecurityHealthIsPrivateAndAdministratorOnly(): void
+    {
+        $this->assertFalse($this->guard->isPublic('security/health', 'GET'));
+        $this->assertSame(401, $this->guard->enforceAuth('security/health', 'GET')['status']);
+
+        $this->signIn('editor');
+        $this->assertSame(403, $this->guard->enforceAuth('security/health', 'GET')['status']);
+
+        $_COOKIE = [];
+        $this->signIn('admin');
+        $this->guard = new ApiGuard(new SessionStore($this->base . '/sessions', 1800));
+        $this->assertNull($this->guard->enforceAuth('security/health', 'GET'));
     }
 
     public function testAnAnonymousRequestToAPublicPathIsAllowed(): void
@@ -145,6 +165,28 @@ final class ApiGuardTest extends TestCase
         $this->assertSame(403, $this->guard->enforceAuth('users', 'GET')['status']);
     }
 
+    public function testLiveDraftRenderRequiresPreviewCapability(): void
+    {
+        $this->assertSame(401, $this->guard->enforceAuth('pages/home/preview/render', 'POST')['status']);
+        $this->signIn('viewer');
+        $this->assertSame(403, $this->guard->enforceAuth('pages/home/preview/render', 'POST')['status']);
+        $_COOKIE = [];
+        $this->signIn('editor');
+        $this->guard = new ApiGuard(new SessionStore($this->base . '/sessions', 1800));
+        $this->assertNull($this->guard->enforceAuth('pages/home/preview/render', 'POST'));
+    }
+
+    public function testLiveDraftRenderRequiresCsrfToken(): void
+    {
+        $this->signIn('editor');
+        $this->assertSame(403, $this->guard->enforceCsrf('pages/home/preview/render', 'POST', [])['status']);
+        $this->assertNull($this->guard->enforceCsrf(
+            'pages/home/preview/render',
+            'POST',
+            ['HTTP_X_CLICK_CSRF' => 'the-real-token'],
+        ));
+    }
+
     public function testAnAdminCanReachUserManagement(): void
     {
         $this->signIn('admin');
@@ -172,6 +214,19 @@ final class ApiGuardTest extends TestCase
         $this->assertNull(
             $this->guard->enforceCsrf('pages', 'POST', ['HTTP_X_CLICK_CSRF' => 'the-real-token'])
         );
+    }
+
+    public function testPresetWritesRequireTheSessionCsrfToken(): void
+    {
+        $this->signIn('admin');
+        self::assertSame(403, $this->guard->enforceCsrf('section-presets', 'POST', [])['status']);
+        self::assertSame(403, $this->guard->enforceCsrf('section-presets/abc', 'PUT', [])['status']);
+        self::assertSame(403, $this->guard->enforceCsrf('section-presets/abc', 'DELETE', [])['status']);
+        self::assertNull($this->guard->enforceCsrf(
+            'section-presets/abc',
+            'PUT',
+            ['HTTP_X_CLICK_CSRF' => 'the-real-token'],
+        ));
     }
 
     public function testLoginAndGraphqlAreExemptFromCsrf(): void

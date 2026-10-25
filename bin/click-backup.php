@@ -282,7 +282,7 @@ if (!$force && !$scheduler->isDue(time())) {
 
 $service = new BackupService(
     $store,
-    StorageFactory::create($config, $root),
+    \Click\Cms\Application\Backup\BackupSource::create($config, $root, dirname(__DIR__)),
     $root . '/content/media',
     $config->storageBackend(),
     $config->backupIncludeMedia(),

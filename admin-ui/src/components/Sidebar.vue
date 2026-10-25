@@ -46,8 +46,11 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { withBase } from '../lib/base.js';
-const props = defineProps({ activeRoute: String, userRole: String, collapsed: Boolean, showBuilder: Boolean, showWebhooks: Boolean, showReviews: Boolean, showRelease: Boolean });
+const props = defineProps({ activeRoute: String, userRole: String, capabilities: { type: Array, default: () => [] }, collapsed: Boolean, showBuilder: Boolean, showWebhooks: Boolean, showReviews: Boolean, showRelease: Boolean });
 const emit = defineEmits(['navigate']);
+const can = (capability) => props.capabilities.length
+  ? props.capabilities.includes(capability)
+  : capability === 'content.view' || capability === 'media.view' || props.userRole === 'admin';
 
 const iconPaths = {
   dashboard: ['M3 3h8v8H3z', 'M13 3h8v5h-8z', 'M13 10h8v11h-8z', 'M3 13h8v8H3z'],
@@ -73,6 +76,8 @@ const iconPaths = {
   // A download arrow into a tray: new code arriving.
   updates: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3'],
   settings: ['M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'],
+  security: ['M12 3l8 3v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3z', 'M9 12l2 2 4-4'],
+  reviews: ['M8 5h12', 'M8 10h12', 'M8 15h8', 'M4 5h.01', 'M4 10h.01', 'M4 15h.01', 'M4 19h16'],
 };
 
 /**
@@ -88,39 +93,38 @@ const navGroups = computed(() => {
     ] },
   ];
 
-  const content = [
-    { href: '/admin/pages', icon: 'pages', label: 'Pages' },
-  ];
+  const content = [];
+  if (can('content.view')) content.push({ href: '/admin/pages', icon: 'pages', label: 'Pages' });
   // Only when collaboration is installed, like Webhooks under Manage: a menu
   // item whose every request answers 404 is worse than no menu item.
   if (props.showReviews) content.push({ href: '/admin/reviews', icon: 'reviews', label: 'Reviews' });
   if (props.showRelease) content.push({ href: '/admin/release', icon: 'release', label: 'Release' });
   content.push(
     { href: '/admin/collections', icon: 'collections', label: 'Collections' },
-    { href: '/admin/media', icon: 'media', label: 'Media' },
   );
+  if (can('media.view')) content.push({ href: '/admin/media', icon: 'media', label: 'Media' });
   if (props.showBuilder) content.push({ href: '/admin/builder', icon: 'builder', label: 'Builder' });
   content.push({ href: '/admin/submissions', icon: 'submissions', label: 'Submissions' });
-  groups.push({ id: 'content', label: 'Content', collapsible: true, items: content });
+  if (content.length) groups.push({ id: 'content', label: 'Content', collapsible: true, items: content });
 
-  if (props.userRole === 'admin') {
-    const manage = [
-      { href: '/admin/plugins', icon: 'plugins', label: 'Plugins' },
-      { href: '/admin/marketplace', icon: 'marketplace', label: 'Marketplace' },
-      { href: '/admin/users', icon: 'users', label: 'Users' },
+  const manage = [];
+  if (can('plugins.manage')) manage.push({ href: '/admin/plugins', icon: 'plugins', label: 'Plugins' });
+  if (can('plugins.install')) manage.push({ href: '/admin/marketplace', icon: 'marketplace', label: 'Marketplace' });
+  if (can('users.manage')) manage.push({ href: '/admin/users', icon: 'users', label: 'Users' });
+  if (can('settings.manage')) {
+    manage.push(
       { href: '/admin/redirects', icon: 'redirects', label: 'Redirects' },
       { href: '/admin/menus', icon: 'menus', label: 'Menus' },
       { href: '/admin/themes', icon: 'themes', label: 'Themes' },
-    ];
+      { href: '/admin/security', icon: 'security', label: 'Security health' },
+    );
+  }
     // Only when the plugin serving it is installed, like Builder above: a menu
     // item whose every request answers 404 is worse than no menu item.
-    if (props.showWebhooks) manage.push({ href: '/admin/webhooks', icon: 'webhooks', label: 'Webhooks' });
-    manage.push(
-      { href: '/admin/settings', icon: 'settings', label: 'Settings' },
-      { href: '/admin/updates', icon: 'updates', label: 'Updates' },
-    );
-    groups.push({ id: 'manage', label: 'Manage', collapsible: true, items: manage });
-  }
+    if (props.showWebhooks && can('settings.manage')) manage.push({ href: '/admin/webhooks', icon: 'webhooks', label: 'Webhooks' });
+  if (can('settings.manage')) manage.push({ href: '/admin/settings', icon: 'settings', label: 'Settings' });
+  if (can('plugins.install')) manage.push({ href: '/admin/updates', icon: 'updates', label: 'Updates' });
+  if (manage.length) groups.push({ id: 'manage', label: 'Manage', collapsible: true, items: manage });
 
   groups.push({ id: 'account', label: 'Account', collapsible: true, items: [
     { href: '/admin/profile', icon: 'profile', label: 'Profile' },

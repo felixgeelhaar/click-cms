@@ -46,7 +46,74 @@ $root = $configuredRoot !== null && is_dir($configuredRoot)
     ? rtrim($configuredRoot, '/')
     : __DIR__ . '/..';
 
+// Acquire the installation barrier BEFORE Composer or application classes load.
+// A busy updater answers maintenance instead of mixing two software versions.
+$gateDirectory = $root . '/data/updates';
+if (!is_dir($gateDirectory)) {
+    @mkdir($gateDirectory, 0755, true);
+}
+$clickGate = @fopen($gateDirectory . '/requests.lock', 'c');
+if (!is_resource($clickGate)) {
+    $clickGate = @fopen($gateDirectory . '/requests.lock', 'r');
+}
+if (!is_resource($clickGate) || !flock($clickGate, LOCK_SH | LOCK_NB)) {
+    http_response_code(503);
+    header('Retry-After: 5');
+    header('Cache-Control: no-store');
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "Click is updating. Please retry shortly.\n";
+    exit;
+}
+// Recover a killed worker before Composer can load a missing/mixed vendor or
+// src tree. Recovery code is preserved outside the replaceable directories.
+if (file_exists($gateDirectory . '/swap-journal.json') || is_link($gateDirectory . '/swap-journal.json')) {
+    if (!is_resource($clickGate) || !flock($clickGate, LOCK_EX | LOCK_NB)) {
+        http_response_code(503);
+        header('Retry-After: 5');
+        header('Cache-Control: no-store');
+        exit("Click update recovery is pending.\n");
+    }
+    $recoveryFile = $gateDirectory . '/bootstrap-recovery.php';
+    $recovery = ['error' => 'Recovery bootstrap is unavailable.'];
+    if (is_file($recoveryFile) && !is_link($recoveryFile)) {
+        require_once $recoveryFile;
+        $rawConfig = json_decode((string) @file_get_contents($root . '/config/core.json'), true);
+        $expectedPublic = $rawConfig['core']['updates']['publicRoot'] ?? null;
+        if ($expectedPublic === null || (is_string($expectedPublic) && trim($expectedPublic) !== '')) {
+            $recovery = \Click\Cms\Application\Update\UpdateRecovery::recover($root,
+                is_string($expectedPublic) ? trim($expectedPublic) : null);
+        }
+    }
+    if (($recovery['error'] ?? null) !== null) {
+        error_log('Click update recovery failed: ' . $recovery['error']);
+        http_response_code(503);
+        header('Retry-After: 60');
+        header('Cache-Control: no-store');
+        exit("Click update recovery needs administrator attention.\n");
+    }
+    if (function_exists('opcache_reset')) { @opcache_reset(); }
+    http_response_code(503);
+    header('Retry-After: 5');
+    header('Cache-Control: no-store');
+    exit("Click update recovery finished. Please retry shortly.\n");
+}
+
 require_once $root . '/vendor/autoload.php';
+
+if (is_resource($clickGate)) {
+    \Click\Cms\Application\Update\RequestGate::adopt($root, $clickGate);
+    if (\Click\Cms\Application\Update\WebUpdateRunner::run($root)) {
+        // Even rollback can replace files. This worker loaded the old classes
+        // and must never construct Application after an installation attempt.
+        http_response_code(503);
+        header('Retry-After: 5');
+        header('Cache-Control: no-store');
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Click update finished. Please retry shortly.\n";
+        exit;
+    }
+}
+
 
 use Click\Cms\Application\Config\ConfigurationException;
 use Click\Cms\Core\Application;
