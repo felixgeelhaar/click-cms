@@ -129,7 +129,7 @@ jobs:
           # a one-line summary, and not wrapped. Strip the `v1.8.0 — ` prefix and
           # what remains is the summary. The body's first non-blank line stays as
           # a fallback for a release titled with nothing but its tag.
-          jq '[ .[] | select(.draft | not) | {
+          jq '[ .[] | select(.draft | not) | . as $release | {
                 version: (.tag_name | ltrimstr("v")),
                 packageUrl: ("https://github.com/${{ github.repository }}/releases/download/" + .tag_name + "/click-cms-" + (.tag_name | ltrimstr("v")) + ".zip"),
                 security: (.body // "" | test("\\[security\\]"; "i")),
@@ -138,6 +138,7 @@ jobs:
                   | if ($title | length) > 0 then $title
                     else ((.body // "") | split("\n") | map(select(test("\\S"))) | (.[0] // "")) end
                 ),
+                packagePublished: any(.assets[]?; .name == ("click-cms-" + ($release.tag_name | ltrimstr("v")) + ".zip")),
                 requiresPhp: "8.1"
               } ]' releases-api.json > releases-raw.json
 
@@ -152,7 +153,22 @@ jobs:
             $out = [];
             foreach ($rows as $row) {
               $tmp = tempnam(sys_get_temp_dir(), "pkg");
-              if (@copy($row["packageUrl"], $tmp) && filesize($tmp) > 0) {
+              $downloaded = false;
+              for ($attempt = 0; $attempt < 4; $attempt++) {
+                if (@copy($row["packageUrl"], $tmp) && filesize($tmp) > 0) {
+                  $downloaded = true;
+                  break;
+                }
+                if (!$row["packagePublished"]) break;
+                if ($attempt < 3) sleep(5);
+              }
+              if (!$downloaded && $row["packagePublished"]) {
+                fwrite(STDERR, "Published package could not be downloaded: " . $row["version"] . "\n");
+                @unlink($tmp);
+                exit(1);
+              }
+              if ($downloaded) {
+                unset($row["packagePublished"]);
                 $row["sha256"] = hash_file("sha256", $tmp);
                 $out[] = $row;
               }

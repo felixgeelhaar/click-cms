@@ -218,6 +218,7 @@ jobs:
           # The dispatching token, not GITHUB_TOKEN. `gh` reads GH_TOKEN.
           GH_TOKEN: ${{ secrets.PAGES_DISPATCH_TOKEN }}
           REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ needs.package.outputs.version }}
           # The default branch, deliberately, and not GITHUB_REF_NAME — on a
           # release event that is the *tag*. Dispatching on a tag would build
           # the site from whatever that tag points at, so a release cut from an
@@ -270,7 +271,12 @@ jobs:
             exit 1
           }
 
-          echo "Feed published by ${url}"
+          # A successful Pages deployment must actually offer this release.
+          feed="https://${REPO%%/*}.github.io/${REPO#*/}/feed.json"
+          curl -fsS --retry 3 "$feed?release=${RELEASE_VERSION}" -o /tmp/published-feed.json
+          jq -e --arg version "$RELEASE_VERSION" \
+            'any(.releases[]; .version == $version)' /tmp/published-feed.json >/dev/null
+          echo "Feed published by ${url}; release ${RELEASE_VERSION} is offered"
 
   # The old path, kept only for an installation with no dispatching token — a
   # fork, or this repository before the secret is added. It is known not to take

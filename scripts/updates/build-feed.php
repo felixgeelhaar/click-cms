@@ -41,8 +41,35 @@ $releasesPath = $argv[1];
 $keyPath = $argv[2];
 $outDir = rtrim($argv[3], '/');
 
-$options = getopt('', ['sequence::', 'ttl-days::']);
-$ttlDays = isset($options['ttl-days']) ? max(1, (int) $options['ttl-days']) : 30;
+$options = [];
+foreach (array_slice($argv, 4) as $argument) {
+    if (!is_string($argument) || preg_match('/^--(sequence|ttl-days)=(.*)$/D', $argument, $match) !== 1) {
+        fwrite(STDERR, "Invalid option: {$argument}\nUsage: php scripts/updates/build-feed.php <releases.json> <private_key.pem> <out_dir> [--sequence=N] [--ttl-days=N]\n");
+        exit(1);
+    }
+    $name = $match[1];
+    $value = $match[2];
+    if (array_key_exists($name, $options)) {
+        fwrite(STDERR, "Option --{$name} may only be supplied once.\n");
+        exit(1);
+    }
+    if (preg_match('/^[1-9][0-9]*$/D', $value) !== 1) {
+        fwrite(STDERR, "Option --{$name} must be a positive integer.\n");
+        exit(1);
+    }
+    $parsed = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if ($parsed === false) {
+        fwrite(STDERR, "Option --{$name} is outside the supported integer range.\n");
+        exit(1);
+    }
+    if ($name === 'ttl-days' && $parsed > 3650) {
+        fwrite(STDERR, "Option --ttl-days must not exceed 3650.\n");
+        exit(1);
+    }
+    $options[$name] = $parsed;
+}
+
+$ttlDays = $options['ttl-days'] ?? 30;
 
 foreach ([$releasesPath => 'Releases file', $keyPath => 'Private key'] as $path => $what) {
     if (!is_file($path)) {
@@ -68,12 +95,16 @@ if (!is_array($releases)) {
  * number, which is monotonic), otherwise one past whatever the previous feed
  * published, otherwise 1.
  */
-$sequence = isset($options['sequence']) ? (int) $options['sequence'] : null;
+$sequence = $options['sequence'] ?? null;
 if ($sequence === null) {
     $previous = json_decode((string) @file_get_contents("$outDir/feed.json"), true);
     $sequence = is_array($previous) && is_int($previous['sequence'] ?? null)
         ? $previous['sequence'] + 1
         : 1;
+}
+if (!is_int($sequence) || $sequence < 1) {
+    fwrite(STDERR, "The feed sequence must be a positive integer.\n");
+    exit(1);
 }
 
 // Validated here rather than discovered by every site that fetches it: a feed
