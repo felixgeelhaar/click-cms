@@ -284,7 +284,7 @@ jobs:
       # Bump both to `upload-pages-artifact@v5` / `deploy-pages@v5` once #26 is
       # closed, or sooner if Node 20 stops being merely deprecated. Until then
       # the stale pin buys a comparable baseline, which is worth more.
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
 
