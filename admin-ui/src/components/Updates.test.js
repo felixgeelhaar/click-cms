@@ -92,6 +92,29 @@ describe('the updates page', () => {
     expect(wrapper.text()).toContain('1.0.1 installed');
   });
 
+  it.each([
+    ['missing confirmation', {}, 'Could not install the update: the server did not confirm installation.'],
+    ['truthy nonboolean confirmation', { installed: 'yes' }, 'Could not install the update: the server did not confirm installation.'],
+    ['server supplied failure detail', { installed: false, error: 'The backup could not be created.' }, 'The backup could not be created.'],
+  ])('does not claim success for %s', async (_scenario, data, expectedError) => {
+    const wrapper = await mountUpdates({
+      status: {
+        hasUpdate: true,
+        step: 'patch',
+        reason: '',
+        release: { version: '1.0.1', security: false, notes: '' },
+      },
+      apply: OK(data),
+    });
+
+    await wrapper.find('.btn-primary').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[role="alert"]').text()).toBe(expectedError);
+    expect(wrapper.text()).not.toContain('Version  installed');
+    expect(wrapper.text()).not.toContain('Reload to run the new code');
+  });
+
   it('checking again asks the server rather than reusing the first answer', async () => {
     const wrapper = await mountUpdates();
 

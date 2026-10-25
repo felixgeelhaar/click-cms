@@ -1,5 +1,18 @@
 RewriteEngine On
 
+# Apache serves the built admin shell before PHP sees /admin/. Keep that HTML
+# fresh so logout or an account switch cannot leave a shared browser cache with
+# a prior session's UI response. Ordinary JS, CSS, images and public pages keep
+# their existing cache behavior.
+<IfModule mod_setenvif.c>
+    SetEnvIf Request_URI "(^|/)admin(/|$)" CLICK_ADMIN_HTML_REQUEST
+</IfModule>
+<IfModule mod_headers.c>
+    <FilesMatch "^index\.html$">
+        Header always set Cache-Control "no-store, private" env=CLICK_ADMIN_HTML_REQUEST
+    </FilesMatch>
+</IfModule>
+
 # Installed in a subdirectory? Uncomment this and name the URL path the site
 # answers on, with a trailing slash — `RewriteBase /2026/cms/`.
 #

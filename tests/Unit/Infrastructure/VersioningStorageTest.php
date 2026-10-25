@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Click\Cms\Tests\Unit\Infrastructure;
 
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Content\ContentRevision;
 use Click\Cms\Domain\History\RetentionPolicy;
 use Click\Cms\Domain\History\Version;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
+use Click\Cms\Infrastructure\Storage\SqliteStorage;
 use Click\Cms\Infrastructure\Storage\VersioningStorage;
 use PHPUnit\Framework\TestCase;
 
@@ -76,6 +78,82 @@ final class VersioningStorageTest extends TestCase
 
         // Not lost, just not live.
         $this->assertSame('Home', $this->storage->draft(ContentKey::page('home'))?->title());
+    }
+
+    public function testConditionalSaveAcceptsCurrentRevisionAndRejectsStaleRevision(): void
+    {
+        $key = ContentKey::page('conditional');
+        $first = Content::create($key, ['title' => 'First']);
+
+        $this->assertTrue($this->storage->saveIfUnchanged($first, ''));
+        $current = $this->storage->draft($key);
+        $this->assertNotNull($current);
+        $revision = ContentRevision::of($current);
+        $second = Content::create($key, ['title' => 'Second']);
+        $countBeforeConflict = count($this->versions->all($key));
+
+        $this->assertFalse($this->storage->saveIfUnchanged($second, ''));
+        $this->assertSame('First', $this->storage->draft($key)?->title());
+        $this->assertCount($countBeforeConflict, $this->versions->all($key));
+        $this->assertTrue($this->storage->saveIfUnchanged($second, $revision));
+        $this->assertSame('Second', $this->storage->draft($key)?->title());
+    }
+
+    public function testConditionalSaveCanMatchSeededContentAndLocksAreReentrantForRecord(): void
+    {
+        $key = ContentKey::page('seeded');
+        $seed = Content::create($key, ['title' => 'Seed']);
+        (new JsonStorage($this->contentDir))->save($seed);
+
+        $updated = Content::create($key, ['title' => 'Updated']);
+        $this->assertTrue($this->storage->saveIfUnchanged($updated, ContentRevision::of($seed)));
+        $this->assertSame('Updated', $this->storage->draft($key)?->title());
+    }
+
+    public function testConditionalSaveUsesTheSameHistoryLockWithSqliteBackend(): void
+    {
+        $key = ContentKey::page('sqlite-cas');
+        $storage = new VersioningStorage(
+            new SqliteStorage(dirname($this->contentDir) . '/content.sqlite'),
+            $this->versions,
+        );
+        $first = Content::create($key, ['title' => 'First']);
+        $second = Content::create($key, ['title' => 'Second']);
+
+        $this->assertTrue($storage->saveIfUnchanged($first, ''));
+        $current = $storage->draft($key);
+        $this->assertNotNull($current);
+        $this->assertFalse($storage->saveIfUnchanged($second, ''));
+        $this->assertTrue($storage->saveIfUnchanged($second, ContentRevision::of($current)));
+        $this->assertSame('Second', $storage->draft($key)?->title());
+    }
+
+    public function testLockIsReleasedAfterExceptionAndDeleteAndRestoreRemainSerialized(): void
+    {
+        $key = ContentKey::page('lock-release');
+        try {
+            $this->versions->synchronize($key, static function (): void {
+                throw new \RuntimeException('simulated failure');
+            });
+            $this->fail('the operation should throw');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('simulated failure', $exception->getMessage());
+        }
+
+        $this->versions->synchronize($key, fn () => $this->storage->save(
+            Content::create($key, ['title' => 'Before delete'])
+        ));
+        $old = $this->storage->draft($key);
+        $this->assertNotNull($old);
+        $oldRevision = ContentRevision::of($old);
+        $this->assertTrue($this->storage->delete($key));
+        $this->assertFalse($this->storage->saveIfUnchanged(
+            Content::create($key, ['title' => 'Stale']),
+            $oldRevision,
+        ));
+
+        $this->storage->saveWithReason($old, Version::REASON_RESTORE);
+        $this->assertSame('Before delete', $this->storage->draft($key)?->title());
     }
 
     public function testPublishingPromotesTheWorkingCopy(): void

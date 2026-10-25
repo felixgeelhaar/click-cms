@@ -6,8 +6,11 @@ namespace Click\Cms\Tests\Unit\Content;
 
 use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Content\PageService;
+use Click\Cms\Domain\Content\ContentRevision;
+use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
+use Click\Cms\Infrastructure\Storage\VersioningStorage;
 use PHPUnit\Framework\TestCase;
 
 final class PageServiceTest extends TestCase
@@ -21,7 +24,10 @@ final class PageServiceTest extends TestCase
         mkdir($this->dir, 0o775, true);
 
         $this->service = new PageService(
-            new ContentService(new JsonStorage($this->dir)),
+            new ContentService(new VersioningStorage(
+                new JsonStorage($this->dir . '/content'),
+                new JsonVersionStore($this->dir . '/versions'),
+            )),
             new JsonSectionTypeRepository(dirname(__DIR__, 3) . '/config/sections')
         );
     }
@@ -44,6 +50,27 @@ final class PageServiceTest extends TestCase
     private function admin(): array
     {
         return ['username' => 'boss', 'role' => 'admin'];
+    }
+
+    public function testADraftChangedDuringThePublishGateCannotBePromoted(): void
+    {
+        $content = new ContentService(new VersioningStorage(
+            new JsonStorage($this->dir . '/race-content'),
+            new JsonVersionStore($this->dir . '/race-versions'),
+        ));
+        $key = \Click\Cms\Domain\ValueObjects\ContentKey::page('checked');
+        $content->save(\Click\Cms\Domain\Content\Content::create($key, ['title' => 'Reviewed']));
+        $gate = new \Click\Cms\Application\Plugin\PublishGate(function (string $hook) use ($content, $key): array {
+            if ($hook === \Click\Cms\Application\Plugin\PublishGate::HOOK) {
+                $content->save(\Click\Cms\Domain\Content\Content::create($key, ['title' => 'Changed after review']));
+            }
+            return [];
+        });
+        $pages = new PageService($content, new JsonSectionTypeRepository(dirname(__DIR__, 3) . '/config/sections'), publishGate: $gate);
+        $result = $pages->publish('checked', $this->admin());
+        self::assertSame(409, $result['status']);
+        self::assertNull($content->get($key));
+        self::assertSame('Changed after review', $content->draft($key)?->title());
     }
 
     public function testCreatesAPageAndDerivesItsSlug(): void
@@ -151,6 +178,45 @@ final class PageServiceTest extends TestCase
         $this->assertSame('Renamed', $result['page']->title());
         // Untouched fields survive.
         $this->assertSame('Written once', $result['page']->data['summary']);
+    }
+
+    public function testUpdateRejectsAStaleRevisionAndLeavesTheWinningDraftIntact(): void
+    {
+        $this->service->create(
+            ['title' => 'Home', 'slug' => 'home', 'summary' => 'Original'],
+            $this->admin()
+        );
+        $loadedByBothEditors = $this->service->find('home');
+        self::assertNotNull($loadedByBothEditors);
+        $revision = ContentRevision::of($loadedByBothEditors);
+
+        $saved = $this->service->update('home', [
+            'title' => 'Winner',
+            'expectedRevision' => $revision,
+        ], $this->admin());
+        self::assertSame(200, $saved['status']);
+
+        $stale = $this->service->update('home', [
+            'title' => 'Stale overwrite',
+            'expectedRevision' => $revision,
+        ], $this->admin());
+
+        self::assertSame(409, $stale['status']);
+        self::assertSame('Winner', $this->service->find('home')?->title());
+        self::assertArrayNotHasKey('expectedRevision', $this->service->find('home')?->data ?? []);
+    }
+
+    public function testMalformedExpectedRevisionIsRejected(): void
+    {
+        $this->service->create(['title' => 'Home', 'slug' => 'home'], $this->admin());
+
+        $result = $this->service->update('home', [
+            'title' => 'Changed',
+            'expectedRevision' => '',
+        ], $this->admin());
+
+        self::assertSame(400, $result['status']);
+        self::assertSame('Home', $this->service->find('home')?->title());
     }
 
     /**

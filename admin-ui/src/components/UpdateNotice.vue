@@ -29,6 +29,8 @@ const error = ref('');
 const dismissed = ref(false);
 const done = ref(null);
 
+const reload = () => window.location.reload();
+
 const mayInstall = computed(() => props.capabilities.includes('plugins.install'));
 const release = computed(() => state.value?.release ?? null);
 const show = computed(
@@ -55,8 +57,12 @@ const install = async () => {
   try {
     const res = await fetch('/api/updates/apply', { method: 'POST' });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok || !(body.data?.installed ?? false)) {
-      error.value = body.error ?? `The update could not be installed (${res.status}).`;
+    if (!res.ok || body.data?.installed !== true) {
+      error.value = body.error
+        ?? body.data?.error
+        ?? (res.ok
+          ? 'Could not install the update: the server did not confirm installation.'
+          : `The update could not be installed (${res.status}).`);
       return;
     }
     done.value = body.data.version ?? release.value?.version ?? '';
@@ -75,7 +81,7 @@ const install = async () => {
   <div v-if="done !== null" class="notice notice--done" role="status">
     <strong>Updated to {{ done }}.</strong>
     <span>Reload to use the new version.</span>
-    <button class="btn" @click="() => window.location.reload()">Reload</button>
+    <button class="btn" @click="reload">Reload</button>
   </div>
 
   <div v-else-if="show" class="notice" role="status">

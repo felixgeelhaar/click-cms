@@ -22,7 +22,7 @@ services:
       - ./data:/var/www/html/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1/health.php') !== false ? 0 : 1);"]
+      test: ["CMD", "php", "-r", "$$body = @file_get_contents('http://127.0.0.1/health.php'); exit($$body !== false && isset($$http_response_header[0]) && str_contains($$http_response_header[0], ' 200 ') ? 0 : 1);"]
       interval: 30s
       timeout: 5s
       start_period: 10s
@@ -59,7 +59,7 @@ services:
 
   # Development only: `docker compose --profile dev up`
   admin-ui:
-    image: node:22-alpine
+    image: node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
     container_name: click-cms-admin-ui
     working_dir: /app
     volumes:
@@ -73,6 +73,18 @@ services:
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     depends_on:
       - click-cms
+    # npm install can take a while on first boot; readiness means Astro serves.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4321/admin/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 120s
+      retries: 4
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
     profiles:
       - dev
 

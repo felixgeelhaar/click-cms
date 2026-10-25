@@ -88,7 +88,7 @@ final class UpdateService
     /**
      * Install only what the policy allows to happen with nobody watching.
      *
-     * This is what a cron or a request-tail hook calls. When the policy does not
+     * This is what the optional CLI or pre-boot web scheduler calls. When the policy does not
      * permit the offered release it does nothing at all — not even a record,
      * because "we looked and were not allowed" is the normal state of a site on
      * the default policy and would otherwise fill the history with noise.

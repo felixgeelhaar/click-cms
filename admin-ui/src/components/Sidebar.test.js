@@ -53,6 +53,7 @@ describe('Sidebar', () => {
     // The admin-only destinations are absent from the markup entirely.
     expect(author.find('a[href="/admin/users"]').exists()).toBe(false);
     expect(author.find('a[href="/admin/settings"]').exists()).toBe(false);
+    expect(author.find('a[href="/admin/security"]').exists()).toBe(false);
     // A non-admin still gets their own content nav.
     expect(author.find('a[href="/admin/pages"]').exists()).toBe(true);
   });
@@ -61,6 +62,28 @@ describe('Sidebar', () => {
     expect(mountSidebar({ showBuilder: false }).find('a[href="/admin/builder"]').exists()).toBe(false);
     expect(mountSidebar({ showBuilder: true }).find('a[href="/admin/builder"]').exists()).toBe(true);
   });
+
+  it('builds the workspace from capabilities rather than an administrator role label', () => {
+    const editor = mountSidebar({
+      userRole: 'admin',
+      capabilities: ['content.view', 'media.view', 'plugins.manage'],
+    });
+    expect(editor.find('a[href="/admin/pages"]').exists()).toBe(true);
+    expect(editor.find('a[href="/admin/media"]').exists()).toBe(true);
+    expect(editor.find('a[href="/admin/plugins"]').exists()).toBe(true);
+    expect(editor.find('a[href="/admin/users"]').exists()).toBe(false);
+    expect(editor.find('a[href="/admin/settings"]').exists()).toBe(false);
+    expect(editor.find('a[href="/admin/security"]').exists()).toBe(false);
+  });
+
+  it('shows Security health only with the settings management capability', () => {
+    const administrator = mountSidebar({ capabilities: ['settings.manage'] });
+    expect(administrator.find('a[href="/admin/security"]').text()).toContain('Security health');
+
+    const contentEditor = mountSidebar({ capabilities: ['content.view', 'content.edit.own'] });
+    expect(contentEditor.find('a[href="/admin/security"]').exists()).toBe(false);
+  });
+
 
   it('only shows Reviews under Content when collaboration reviews are available', () => {
     expect(mountSidebar({ showReviews: false }).find('a[href="/admin/reviews"]').exists()).toBe(false);
@@ -87,7 +110,6 @@ describe('Sidebar', () => {
     expect(hrefs.indexOf('/admin/reviews')).toBeLessThan(hrefs.indexOf('/admin/release'));
     expect(shown.find('a[href="/admin/users"]').exists()).toBe(false);
   });
-
   it('collapses and expands a group from its header, with aria-expanded tracking it', async () => {
     const wrapper = mountSidebar();
     const header = wrapper.findAll('button.nav-group-header').find((b) => b.text().includes('Content'));

@@ -349,3 +349,36 @@ documents restoring from SQLite onto flat files, on a case-insensitive filesyste
 | `src/Application/Backup/BackupService.php` | Taking a backup, in either shape. |
 | `bin/click-backup.php` | The cron entry point and the restore command. |
 | `plugins/backup/bootstrap.php` | The administrator-only HTTP surface. |
+
+## Publication-safe recovery (format 3)
+
+New backups use format 3. Live content and the latest unpublished working copy
+are separate, checksummed entries. Restoration promotes only the live entry;
+private revisions and never-published pages remain drafts. Archives from format 2
+are still readable, but cannot recover drafts that their exporter omitted.
+Older CMS versions reject format 3 rather than accidentally publishing its drafts.
+Restore into the current application with collection definitions installed first.
+A target without draft support refuses draft-bearing archives before writing.
+Historical version chains, configuration, signing keys, sessions, installed plugin
+code and external services are not reconstructed by this content archive. Keep
+configuration and deployment recovery material separately with restricted access.
+
+Restore into a clean, isolated installation, with the same content schemas and
+compatible CMS version. Verify both the public page and the editor working copy,
+media hashes, translations, account access and any external integrations before
+cutover. Run `php scripts/security/restore-drill.php` to exercise a disposable
+SQLite-to-flat-file recovery with distinct live/private copies, media and locale
+content. It touches only a randomly named temporary directory and removes it on
+completion. This fixture drill does not replace restoring your own off-site copy.
+
+## Editorial sidecar data
+
+The content archive does not include the shared preset library
+(`data/section-presets.json`) or translation review markers
+(`data/translation-reviews/`). Include these in restricted, consistent backups
+of the complete site data directory, alongside the deployment material. Stop
+writes or take a filesystem snapshot before copying. Shared presets can otherwise
+be lost even when their adopted page sections survive in content backups.
+Missing translation markers display unknown; markers whose source or target
+revision does not match restored content display stale. Do not interpret a
+content-only restore as recovery of all editorial workflow metadata.

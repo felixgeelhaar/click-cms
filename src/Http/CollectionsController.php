@@ -11,6 +11,7 @@ use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Application\Preview\PreviewLinks;
 use Click\Cms\Domain\Collection\CollectionType;
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Content\ContentRevision;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\Schema\FieldType;
@@ -159,7 +160,7 @@ final class CollectionsController
             return $this->fault(404, 'Entry not found.');
         }
 
-        $response = ['data' => $this->entryView($collectionType, $entry, true)];
+        $response = ['data' => $this->entryView($collectionType, $entry, true, true)];
 
         // Which other languages this entry exists in, so the editor's language
         // switcher can show what is written and what is still untranslated —
@@ -477,7 +478,7 @@ final class CollectionsController
 
         $collectionType = $this->collections->collectionType($type);
         $view = $collectionType !== null && $result['entry'] !== null
-            ? $this->entryView($collectionType, $result['entry'], true)
+            ? $this->entryView($collectionType, $result['entry'], true, true)
             : null;
 
         return ['status' => $result['status'], 'data' => $view];
@@ -490,7 +491,7 @@ final class CollectionsController
      * is withheld from the public delivery view, which has no business knowing an
      * entry has unpublished changes.
      */
-    private function entryView(CollectionType $type, Content $entry, bool $includePublication): array
+    private function entryView(CollectionType $type, Content $entry, bool $includePublication, bool $includeRevision = false): array
     {
         $view = [
             'slug' => $entry->slug(),
@@ -517,6 +518,10 @@ final class CollectionsController
                 'neverPublished' => $state->neverPublished,
                 'publishedAt' => $state->publishedAt,
             ];
+        }
+
+        if ($includeRevision) {
+            $view['revision'] = ContentRevision::of($entry);
         }
 
         return $view;

@@ -8,6 +8,8 @@ use Click\Cms\Application\Cache\RenderCache;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Publishing\PublicationState;
 use Click\Cms\Domain\Publishing\PublishingStorage;
+use Click\Cms\Domain\Publishing\ConditionalPublishingStorage;
+use Click\Cms\Domain\Storage\ConditionalStorage;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 
@@ -49,7 +51,7 @@ use Click\Cms\Domain\ValueObjects\Locale;
  * and the section type definitions live outside storage and are invalidated by
  * their own handlers.
  */
-final class CacheInvalidatingStorage implements PublishingStorage
+final class CacheInvalidatingStorage implements ConditionalPublishingStorage, ConditionalStorage
 {
     public function __construct(
         private readonly PublishingStorage $inner,
@@ -102,6 +104,20 @@ final class CacheInvalidatingStorage implements PublishingStorage
         $this->cache->flush();
     }
 
+    public function saveIfUnchanged(Content $content, string $expectedRevision): bool
+    {
+        if (!$this->inner instanceof ConditionalStorage) {
+            throw new \RuntimeException('Conditional saves are not supported by the wrapped storage.');
+        }
+
+        $saved = $this->inner->saveIfUnchanged($content, $expectedRevision);
+        if ($saved) {
+            $this->cache->flush();
+        }
+
+        return $saved;
+    }
+
     public function saveWithReason(Content $content, string $reason): void
     {
         $this->inner->saveWithReason($content, $reason);
@@ -118,6 +134,16 @@ final class CacheInvalidatingStorage implements PublishingStorage
         $this->cache->flush();
 
         return $deleted;
+    }
+
+    public function publishIfUnchanged(ContentKey $key, string $expectedRevision): Content|false|null
+    {
+        if (!$this->inner instanceof ConditionalPublishingStorage) {
+            throw new \RuntimeException('Conditional publication is not supported by the wrapped storage.');
+        }
+        $published = $this->inner->publishIfUnchanged($key, $expectedRevision);
+        if ($published instanceof Content) $this->cache->flush();
+        return $published;
     }
 
     public function publish(ContentKey $key): ?Content

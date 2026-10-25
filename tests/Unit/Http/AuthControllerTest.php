@@ -39,7 +39,7 @@ final class AuthControllerTest extends TestCase
 
         $this->content = new ContentService(new JsonStorage($this->base . '/content'));
         $this->auth = new AuthController(
-            new SessionStore($this->base . '/sessions', 1800),
+            new SessionStore($this->base . '/sessions', 1800, fn (string $username): ?array => $this->content->user($username)?->data),
             new LoginThrottle($this->base . '/lockouts.json', 3, 900, 900),
             $this->content,
             CoreConfig::fromArray([]),
@@ -82,6 +82,17 @@ final class AuthControllerTest extends TestCase
     }
 
     /* ----------------------------------------------------- seeding -- */
+
+    public function testUnsafeBcryptPasswordChangesAreRejectedWithoutChangingTheHash(): void
+    {
+        $this->post('login', ['username' => 'admin', 'password' => 'admin']);
+        $before = $this->content->user('admin')->data['password'];
+        foreach ([str_repeat('a', 73), str_repeat('é', 37), "valid-pass\0word"] as $password) {
+            $response = $this->post('password', ['currentPassword' => 'admin', 'newPassword' => $password]);
+            self::assertSame(422, $response['status'] ?? 200);
+            self::assertSame($before, $this->content->user('admin')->data['password']);
+        }
+    }
 
     public function testTheSeededAdminExistsAndMustChangeItsPassword(): void
     {

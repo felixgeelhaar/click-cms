@@ -336,6 +336,76 @@ final class PluginMarketplaceTest extends TestCase
         $this->assertDirectoryDoesNotExist($this->base . '/plugins/sample-plugin');
     }
 
+    public function testRegistryPluginIdCannotEscapeMarketplaceForTemporaryPackageFile(): void
+    {
+        $outsidePath = $this->base . '/plugins/victim-2.1.0.zip';
+        file_put_contents($outsidePath, 'keep me');
+
+        // The ID is signed and selected by the caller, but is still untrusted
+        // path input. The current temp filename embeds it before validation.
+        $reg = $this->publishRegistry('../../plugins/victim', 'Victim');
+
+        $result = $this->marketplace->installFromRegistry(
+            $reg['registryUrl'],
+            $reg['publicKey'],
+            '../../plugins/victim'
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('keep me', file_get_contents($outsidePath), 'A rejected install must not overwrite or delete a file outside the marketplace directory.');
+    }
+
+    public function testSignedManifestVersionCannotEscapeMarketplaceForTemporaryPackageFile(): void
+    {
+        $outsidePath = $this->base . '/plugins/victim.zip';
+        file_put_contents($outsidePath, 'keep me');
+        // The old filename begins with `<id>-` before parsing version path
+        // separators, so this prefix must exist for the traversal to resolve.
+        mkdir($this->base . '/data/marketplace/sample-plugin-..', 0o755, true);
+
+        // The requested plugin id is valid; only the signed version field is
+        // hostile. Neither may be incorporated into a filesystem path.
+        $reg = $this->publishRegistry(
+            'sample-plugin',
+            'Sample Plugin',
+            static function (array $manifest): array {
+                $manifest['version'] = '../../../../plugins/victim';
+                return $manifest;
+            }
+        );
+
+        $result = $this->marketplace->installFromRegistry(
+            $reg['registryUrl'],
+            $reg['publicKey'],
+            'sample-plugin'
+        );
+
+        $this->assertTrue($result['success'], $result['error'] ?? '');
+        $this->assertSame('keep me', file_get_contents($outsidePath), 'A signed version must not overwrite or delete a file outside the marketplace directory.');
+    }
+
+    public function testRejectsASignedManifestWithMalformedChecksumWithoutThrowing(): void
+    {
+        $reg = $this->publishRegistry(
+            'sample-plugin',
+            'Sample Plugin',
+            static function (array $manifest): array {
+                $manifest['sha256'] = ['not-a-hash'];
+                return $manifest;
+            }
+        );
+
+        $result = $this->marketplace->installFromRegistry(
+            $reg['registryUrl'],
+            $reg['publicKey'],
+            'sample-plugin'
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('checksum', strtolower($result['error']));
+        $this->assertDirectoryDoesNotExist($this->base . '/plugins/sample-plugin');
+    }
+
     public function testRejectsAPackageThatInstallsUnderADifferentId(): void
     {
         // The registry vouches for "trusted-plugin" but the package's own

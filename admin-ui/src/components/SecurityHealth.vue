@@ -1,0 +1,93 @@
+<template>
+  <section class="security-health">
+    <header class="page-header">
+      <div>
+        <h1>Security health</h1>
+        <p>Configuration checks with evidence and a next step for each finding.</p>
+      </div>
+    </header>
+
+    <div v-if="error" class="notice error" role="alert">
+      <p>{{ error }}</p>
+      <button class="btn-sm btn-secondary" type="button" :disabled="loading" @click="load">Retry</button>
+    </div>
+    <p v-if="loading" class="loading" role="status">Checking configuration…</p>
+
+    <div v-else-if="checks.length" class="check-list">
+      <article v-for="check in checks" :key="check.id" class="check-card">
+        <div class="check-heading">
+          <h2>{{ check.label }}</h2>
+          <span :class="['status', check.status]">{{ statusLabel(check.status) }}</span>
+        </div>
+        <p class="check-value">{{ check.value }}</p>
+        <p>{{ check.detail }}</p>
+        <p class="next-step">
+          <strong>Next step:</strong>
+          <a v-if="check.href" :href="check.external ? check.href : withBase(check.href)" :target="check.external ? '_blank' : undefined" :rel="check.external ? 'noopener noreferrer' : undefined" @click="check.external ? undefined : navigate($event, check.href)">{{ check.action }}</a>
+          <span v-else>{{ check.action }}</span>
+        </p>
+      </article>
+    </div>
+    <p v-else class="empty-state">No checks were returned.</p>
+  </section>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+import { withBase } from '../lib/base.js';
+
+const emit = defineEmits(['navigate']);
+const checks = ref([]);
+const loading = ref(true);
+const error = ref('');
+
+const statusLabel = (status) => ({ good: 'Configured', review: 'Review', attention: 'Action needed' }[status] || 'Unverified');
+const navigate = (event, href) => {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+  event.preventDefault();
+  emit('navigate', href);
+};
+
+const load = async () => {
+  loading.value = true;
+  error.value = '';
+  try {
+    const res = await fetch('/api/security/health');
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || `Could not load security health (${res.status}).`);
+    checks.value = Array.isArray(body.data?.checks) ? body.data.checks : [];
+  } catch (e) {
+    error.value = e.message || 'Could not load security health.';
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(load);
+</script>
+
+<style scoped>
+.security-health { max-width: 1050px; }
+.page-header { margin-bottom: 1.5rem; }
+h1 { margin: 0 0 0.5rem; color: var(--app-text); font-size: 1.875rem; }
+.page-header p, .check-card > p { color: var(--app-text-muted); }
+.check-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+.check-card { padding: 1.25rem; border: 1px solid var(--card-border); border-radius: var(--card-radius-sm); background: var(--card-bg); color: var(--app-text); }
+.check-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+h2 { margin: 0; font-size: 1.05rem; }
+.status { flex-shrink: 0; border-radius: 999px; padding: 0.25rem 0.65rem; background: var(--app-surface-strong); color: var(--app-text-muted); font-size: 0.75rem; font-weight: 700; }
+.status.good { background: #dcfce7; color: #166534; }
+.status.review { background: #fef3c7; color: #92400e; }
+.status.attention { background: #fee2e2; color: #991b1b; }
+.check-value { margin: 0.75rem 0 0.25rem; color: var(--app-text); font-weight: 600; }
+.next-step { margin-bottom: 0; }
+.next-step a { color: var(--color-primary-700); font-weight: 600; }
+.notice { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.error { color: var(--color-danger-600, #dc2626); }
+.loading, .empty-state { padding: 2rem; text-align: center; color: var(--app-text-muted); }
+button:focus-visible,
+a:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+[data-theme="dark"] .status.good { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+[data-theme="dark"] .status.review { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+[data-theme="dark"] .status.attention { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+</style>

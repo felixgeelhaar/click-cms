@@ -95,8 +95,8 @@ final class UpdateInstallerTest extends TestCase
         mkdir($this->base . '/public', 0o755, true);
         file_put_contents($this->base . '/public/index.php', '<?php // live');
 
-        // A package whose `public` cannot be installed: an unwritable live
-        // directory in its place is enough to make the rename fail.
+        // The public directory remains in place. Simulate a failed atomic
+        // replacement of its index, followed by a failed restore from backup.
         $package = $this->makePackage('update.zip', [
             'click-cms-1.5.0/src/App.php' => '<?php // version 2',
             'click-cms-1.5.0/public/index.php' => '<?php // version 2',
@@ -115,13 +115,17 @@ final class UpdateInstallerTest extends TestCase
 
             protected function move(string $from, string $to): bool
             {
-                return $to === $this->blocked ? false : parent::move($from, $to);
+                if ($to === $this->blocked . '/index.php'
+                    && (str_contains($from, '.update-staging-') || str_contains($from, '/backup-'))) {
+                    return false;
+                }
+                return parent::move($from, $to);
             }
         };
 
         $result = $installer->install($this->releaseFor($package), $package);
 
-        $this->assertFalse($result['success']);
+        $this->assertFalse($result['success'], (string) ($result['error'] ?? ''));
         $this->assertStringContainsString('public', (string) $result['error']);
         // The message must name the backup, because a human has to finish the job.
         $this->assertStringContainsString($this->base . '/data/updates', (string) $result['error']);
@@ -160,6 +164,154 @@ final class UpdateInstallerTest extends TestCase
         $this->assertSame($live, file_get_contents($this->base . '/public/.htaccess'));
         // The rest of public/ still updates.
         $this->assertSame('<?php // version 2', file_get_contents($this->base . '/public/index.php'));
+    }
+
+    public function testSplitPublicRootUpdatesAndRestoresAssetsAndSiteHtaccess(): void
+    {
+        $public = $this->packages . '/detached-public';
+        mkdir($public, 0o755, true);
+        file_put_contents($public . '/index.php', '<?php // old public');
+        $htaccess = "SetEnv CLICK_CMS_ROOT /srv/cms\nRewriteBase /site/\n";
+        file_put_contents($public . '/.htaccess', $htaccess);
+        $package = $this->makePackage('split.zip', [
+            'click-cms-1.5.0/src/App.php' => '<?php // next code',
+            'click-cms-1.5.0/public/index.php' => '<?php // next public',
+            'click-cms-1.5.0/public/.htaccess' => "RewriteEngine On\n",
+        ]);
+        $installer = new UpdateInstaller($this->base, $this->base . '/data/updates', $public);
+
+        $result = $installer->install($this->releaseFor($package), $package);
+        $this->assertTrue($result['success'], (string) ($result['error'] ?? ''));
+        $this->assertSame('<?php // next public', file_get_contents($public . '/index.php'));
+        $this->assertSame($htaccess, file_get_contents($public . '/.htaccess'));
+        $this->assertSame("RewriteEngine On\n", file_get_contents($public . '/.htaccess.dist'));
+        $this->assertSame('<?php // old public', file_get_contents($result['backup'] . '/public/index.php'));
+
+        $restored = $installer->restore((string) $result['backup']);
+        $this->assertTrue($restored['success'], (string) ($restored['error'] ?? ''));
+        $this->assertSame('<?php // old public', file_get_contents($public . '/index.php'));
+        $this->assertSame($htaccess, file_get_contents($public . '/.htaccess'));
+    }
+
+    public function testConfiguredSymlinkPublicRootIsRefusedWithOrWithoutTrailingSlash(): void
+    {
+        $public = $this->packages . '/real-public';
+        $link = $this->packages . '/public-link';
+        mkdir($public, 0o755, true);
+        file_put_contents($public . '/index.php', '<?php // site public');
+        symlink($public, $link);
+        $package = $this->makePackage('symlink-root.zip', ['public/index.php' => '<?php // next public']);
+        try {
+            foreach ([$link, $link . '/'] as $configured) {
+                $installer = new UpdateInstaller($this->base, null, $configured);
+                $result = $installer->install($this->releaseFor($package), $package);
+                $this->assertFalse($result['success'], 'Symlink root must be refused: ' . $configured);
+                $this->assertSame('<?php // site public', file_get_contents($public . '/index.php'));
+            }
+        } finally {
+            unlink($link);
+        }
+    }
+
+    public function testConfiguredMissingSplitPublicRootFailsClosed(): void
+    {
+        $package = $this->makePackage('split.zip', ['public/index.php' => '<?php']);
+        $installer = new UpdateInstaller($this->base, $this->base . '/data/updates', $this->packages . '/missing');
+
+        $result = $installer->install($this->releaseFor($package), $package);
+
+        $this->assertFalse($result['success'], (string) ($result['error'] ?? ''));
+        $this->assertStringContainsString('public root', (string) $result['error']);
+        $this->assertSame('<?php // version 1', file_get_contents($this->base . '/src/App.php'));
+        $this->assertFileDoesNotExist($this->base . '/public/index.php');
+    }
+
+    public function testSplitPublicRootHtaccessPreservationFailureRollsBack(): void
+    {
+        $public = $this->packages . '/detached-public';
+        mkdir($public, 0o755, true);
+        file_put_contents($public . '/index.php', '<?php // old public');
+        file_put_contents($public . '/.htaccess', "RewriteBase /site/\n");
+        $package = $this->makePackage('split-rollback.zip', [
+            'public/index.php' => '<?php // next public',
+            'public/.htaccess' => "RewriteEngine On\n",
+            'public/.htaccess.dist/blocked' => 'cannot copy a file over this directory',
+        ]);
+        $installer = new UpdateInstaller($this->base, $this->base . '/data/updates', $public);
+
+        $result = $installer->install($this->releaseFor($package), $package);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('<?php // old public', file_get_contents($public . '/index.php'));
+        $this->assertSame("RewriteBase /site/\n", file_get_contents($public . '/.htaccess'));
+    }
+
+    public function testSplitPublicRootSwapFailureRollsBackToCapturedExternalPath(): void
+    {
+        $public = $this->packages . '/detached-public';
+        mkdir($public, 0o755, true);
+        file_put_contents($public . '/index.php', '<?php // old public');
+        $package = $this->makePackage('split-failure.zip', ['public/index.php' => '<?php // next public']);
+        $installer = new class ($this->base, $this->base . '/data/updates', $public) extends UpdateInstaller {
+            private bool $failed = false;
+            private string $canonicalPublicRoot;
+
+            public function __construct(string $base, string $backups, private readonly string $publicRoot)
+            {
+                $this->canonicalPublicRoot = (string) realpath($publicRoot);
+                parent::__construct($base, $backups, $publicRoot);
+            }
+
+            protected function move(string $from, string $to): bool
+            {
+                if (!$this->failed && $to === $this->canonicalPublicRoot . '/index.php' && str_contains($from, '.update-staging-')) {
+                    $this->failed = true;
+                    return false;
+                }
+                return parent::move($from, $to);
+            }
+        };
+
+        $result = $installer->install($this->releaseFor($package), $package);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('<?php // old public', file_get_contents($public . '/index.php'));
+        $this->assertFileDoesNotExist($this->base . '/public/index.php');
+    }
+
+    public function testSplitPublicRootRestoreFailureRollsBackToCapturedExternalPath(): void
+    {
+        $public = $this->packages . '/detached-public';
+        mkdir($public, 0o755, true);
+        file_put_contents($public . '/index.php', '<?php // current public');
+        $backup = $this->base . '/data/updates/backup-split-restore';
+        mkdir($backup . '/public', 0o755, true);
+        file_put_contents($backup . '/public/index.php', '<?php // saved public');
+        $installer = new class ($this->base, $this->base . '/data/updates', $public, $backup) extends UpdateInstaller {
+            private bool $failed = false;
+            private string $canonicalPublicRoot;
+
+            public function __construct(string $base, string $backups, private readonly string $publicRoot, private readonly string $backup)
+            {
+                $this->canonicalPublicRoot = (string) realpath($publicRoot);
+                parent::__construct($base, $backups, $publicRoot);
+            }
+
+            protected function move(string $from, string $to): bool
+            {
+                if (!$this->failed && $from === $this->backup . '/public' && $to === $this->canonicalPublicRoot) {
+                    $this->failed = true;
+                    return false;
+                }
+                return parent::move($from, $to);
+            }
+        };
+
+        $result = $installer->restore($backup);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('<?php // current public', file_get_contents($public . '/index.php'));
+        $this->assertSame('<?php // saved public', file_get_contents($backup . '/public/index.php'));
     }
 
     /**
@@ -228,6 +380,132 @@ final class UpdateInstallerTest extends TestCase
         $this->assertSame('<?php // version 1', file_get_contents($this->base . '/src/App.php'));
     }
 
+    public function testRestoreFailureRestoresLiveDirectoriesAndKeepsBackupSource(): void
+    {
+        mkdir($this->base . '/public', 0o755, true);
+        file_put_contents($this->base . '/public/index.php', '<?php // live public');
+        $backup = $this->base . '/data/updates/backup-restore-failure';
+        mkdir($backup . '/src', 0o755, true);
+        mkdir($backup . '/public', 0o755, true);
+        file_put_contents($backup . '/src/App.php', '<?php // saved src');
+        file_put_contents($backup . '/public/index.php', '<?php // saved public');
+
+        $installer = new class ($this->base, $this->base . '/data/updates', $backup . '/public', $this->base . '/public') extends UpdateInstaller {
+            private bool $failed = false;
+
+            public function __construct(string $base, string $backups, private readonly string $blockedFrom, private readonly string $blockedTo)
+            {
+                parent::__construct($base, $backups);
+            }
+
+            protected function move(string $from, string $to): bool
+            {
+                if (!$this->failed && $from === $this->blockedFrom && $to === $this->blockedTo) {
+                    $this->failed = true;
+                    return false;
+                }
+                return parent::move($from, $to);
+            }
+        };
+
+        $result = $installer->restore($backup);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('<?php // version 1', file_get_contents($this->base . '/src/App.php'));
+        $this->assertSame('<?php // live public', file_get_contents($this->base . '/public/index.php'));
+        $this->assertSame('<?php // saved src', file_get_contents($backup . '/src/App.php'));
+        $this->assertSame('<?php // saved public', file_get_contents($backup . '/public/index.php'));
+    }
+
+    public function testRestoreReportsAndRetainsRecoveryFilesWhenRollbackAlsoFails(): void
+    {
+        mkdir($this->base . '/public', 0o755, true);
+        file_put_contents($this->base . '/public/index.php', '<?php // live public');
+        $backup = $this->base . '/data/updates/backup-restore-double-failure';
+        mkdir($backup . '/src', 0o755, true);
+        mkdir($backup . '/public', 0o755, true);
+        file_put_contents($backup . '/src/App.php', '<?php // saved src');
+        file_put_contents($backup . '/public/index.php', '<?php // saved public');
+
+        $installer = new class ($this->base, $this->base . '/data/updates', $backup, $this->base) extends UpdateInstaller {
+            private bool $restoreFailed = false;
+            private bool $rollbackFailed = false;
+
+            public function __construct(string $base, string $backups, private readonly string $backup, private readonly string $basePath)
+            {
+                parent::__construct($base, $backups);
+            }
+
+            protected function move(string $from, string $to): bool
+            {
+                if (!$this->restoreFailed && $from === $this->backup . '/public' && $to === $this->basePath . '/public') {
+                    $this->restoreFailed = true;
+                    return false;
+                }
+                if (!$this->rollbackFailed && str_starts_with($from, $this->basePath . '/.update-restore-')
+                    && str_ends_with($from, '/src') && $to === $this->basePath . '/src') {
+                    $this->rollbackFailed = true;
+                    return false;
+                }
+
+                return parent::move($from, $to);
+            }
+        };
+
+        $result = $installer->restore($backup);
+        $recoveryDirs = glob($this->base . '/.update-restore-*') ?: [];
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('src', (string) $result['error']);
+        $this->assertCount(1, $recoveryDirs);
+        $this->assertStringContainsString($recoveryDirs[0], (string) $result['error']);
+        $this->assertSame('<?php // version 1', file_get_contents($recoveryDirs[0] . '/src/App.php'));
+        $this->assertSame('<?php // saved src', file_get_contents($backup . '/src/App.php'));
+    }
+
+    public function testRestoreRejectsDirectoriesOutsideTheConfiguredBackupRoot(): void
+    {
+        $untrusted = $this->packages . '/backup-outside-root';
+        mkdir($untrusted . '/src', 0o755, true);
+        file_put_contents($untrusted . '/src/App.php', '<?php // attacker controlled');
+
+        $result = $this->installer()->restore($untrusted);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('safe directory', (string) $result['error']);
+        $this->assertSame('<?php // version 1', file_get_contents($this->base . '/src/App.php'));
+    }
+
+    public function testFlatPackageWithOnlyASrcDirectoryCanBeInstalled(): void
+    {
+        $package = $this->makePackage('flat.zip', ['src/App.php' => '<?php // flat version 2']);
+
+        $result = $this->installer()->install($this->releaseFor($package), $package);
+
+        $this->assertTrue($result['success'], (string) ($result['error'] ?? ''));
+        $this->assertSame('<?php // flat version 2', file_get_contents($this->base . '/src/App.php'));
+    }
+
+    public function testRestoreDoesNotFollowALiveDirectorySymlinkOutsideTheInstallation(): void
+    {
+        $outside = $this->packages . '/outside';
+        mkdir($outside, 0o755, true);
+        file_put_contents($outside . '/keep.txt', 'must survive');
+
+        $backup = $this->base . '/data/updates/backup-symlink-test';
+        mkdir($backup . '/src', 0o755, true);
+        file_put_contents($backup . '/src/App.php', '<?php // saved');
+
+        $this->rrmdir($this->base . '/src');
+        symlink($outside, $this->base . '/src');
+
+        $result = $this->installer()->restore($backup);
+
+        $this->assertTrue($result['success'], (string) ($result['error'] ?? ''));
+        $this->assertSame('must survive', file_get_contents($outside . '/keep.txt'));
+        $this->assertSame('<?php // saved', file_get_contents($this->base . '/src/App.php'));
+    }
+
     /* ------------------------------------------------------------- refusals -- */
 
     /** The most important test here: a bad checksum must change nothing at all. */
@@ -283,6 +561,53 @@ final class UpdateInstallerTest extends TestCase
         $this->assertSame('<?php // version 1', file_get_contents($this->base . '/src/App.php'));
     }
 
+    public function testASymlinkEntryInThePackageIsRefused(): void
+    {
+        $package = $this->packages . '/symlink.zip';
+        $zip = new ZipArchive();
+        $zip->open($package, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        $zip->addFromString('click-cms-1.5.0/src/App.php', '<?php // version 2');
+        $zip->addFromString('click-cms-1.5.0/src/escape', '../../outside');
+        $this->assertTrue($zip->setExternalAttributesName(
+            'click-cms-1.5.0/src/escape',
+            ZipArchive::OPSYS_UNIX,
+            0120777 << 16,
+        ));
+        $zip->close();
+
+        $result = $this->installer()->install($this->releaseFor($package), $package);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('symlink', strtolower((string) $result['error']));
+        $this->assertSame('<?php // version 1', file_get_contents($this->base . '/src/App.php'));
+    }
+
+    public function testUpdateAndRestoreRefuseWhenTheSharedInstallerLockIsHeld(): void
+    {
+        $package = $this->makePackage('locked.zip', [
+            'click-cms-1.5.0/src/App.php' => '<?php // version 2',
+        ]);
+        $lockPath = $this->base . '/data/updates/install.lock';
+        mkdir(dirname($lockPath), 0o755, true);
+        $lock = fopen($lockPath, 'c');
+        $this->assertNotFalse($lock);
+        $this->assertTrue(flock($lock, LOCK_EX | LOCK_NB));
+
+        try {
+            $update = $this->installer()->install($this->releaseFor($package), $package);
+            $restore = $this->installer()->restore(dirname($lockPath) . '/backup-existing');
+
+            $this->assertFalse($update['success']);
+            $this->assertFalse($restore['success']);
+            $this->assertStringContainsString('already in progress', (string) $update['error']);
+            $this->assertStringContainsString('already in progress', (string) $restore['error']);
+            $this->assertSame('<?php // version 1', file_get_contents($this->base . '/src/App.php'));
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
     public function testAnAbsolutePathEntryIsRefused(): void
     {
         $pkg = $this->makePackage('abs.zip', [
@@ -302,7 +627,8 @@ final class UpdateInstallerTest extends TestCase
 
         $result = $this->installer()->install($this->releaseFor($pkg), $pkg);
 
-        $this->assertTrue($result['success']);
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('no installable', (string) $result['error']);
         $this->assertSame('<?php // version 1', file_get_contents($this->base . '/src/App.php'));
     }
 

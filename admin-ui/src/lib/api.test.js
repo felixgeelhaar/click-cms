@@ -72,3 +72,28 @@ describe('the installed fetch wrapper', () => {
     expect(new Headers(init.headers).get('X-Click-CSRF')).toBe('tok');
   });
 });
+
+describe('CSRF destination and Request support', () => {
+  let original;
+  beforeEach(() => {
+    window.history.replaceState({}, '', '/admin');
+    window.__clickCsrfInstalled = false;
+    original = vi.fn(async () => new Response('{}'));
+    window.fetch = original;
+    installCsrfFetch();
+    setCsrfToken('private-token');
+  });
+
+  it('does not disclose the token to another origin', async () => {
+    await window.fetch('https://outside.example/upload', { method: 'POST' });
+    expect(new Headers(original.mock.calls[0][1].headers).has('X-Click-CSRF')).toBe(false);
+  });
+
+  it('uses the method and headers of a Request object', async () => {
+    // nox:ignore TAINT-006 -- window.fetch is a vi.fn mock; this same-origin fixture performs no network request.
+    await window.fetch(new Request(window.location.origin + '/api/pages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
+    const [, init] = original.mock.calls[0];
+    expect(new Headers(init.headers).get('X-Click-CSRF')).toBe('private-token');
+    expect(new Headers(init.headers).get('Content-Type')).toBe('application/json');
+  });
+});

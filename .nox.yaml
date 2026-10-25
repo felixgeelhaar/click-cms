@@ -1,0 +1,11 @@
+# Keep all rule families and severities in reports. High/critical findings
+# block the gate; medium/low findings remain visible for review. No baseline.
+policy:
+  fail_on: high
+  warn_on: medium
+plugins:
+  # Built-in analyzers only; scans must not silently install executable plugins.
+  auto_install: false
+scan:
+  exclude:
+    - ".nox/reports/"

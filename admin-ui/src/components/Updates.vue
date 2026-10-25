@@ -169,8 +169,12 @@ const apply = async () => {
       forbidden.value = true;
       return;
     }
-    if (!res.ok) {
-      error.value = body.error ?? `Could not install the update (${res.status}).`;
+    if (!res.ok || body.data?.installed !== true) {
+      error.value = body.error
+        ?? body.data?.error
+        ?? (res.ok
+          ? 'Could not install the update: the server did not confirm installation.'
+          : `Could not install the update (${res.status}).`);
       return;
     }
 

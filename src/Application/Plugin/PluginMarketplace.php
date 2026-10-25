@@ -116,6 +116,13 @@ class PluginMarketplace
      */
     public function installFromZip(string $zipPath, ?string $expectedId = null): array
     {
+        if (\Click\Cms\Application\Config\DeploymentMode::managed()) {
+            return ['success' => false, 'error' => 'Code installation is controlled by the deployment.'];
+        }
+        if ($expectedId !== null && !$this->isPluginIdSafe($expectedId)) {
+            return ['success' => false, 'error' => 'Invalid expected plugin id'];
+        }
+
         if (!file_exists($zipPath)) {
             return ['success' => false, 'error' => 'ZIP file not found'];
         }
@@ -352,6 +359,15 @@ class PluginMarketplace
 
     public function installFromRegistry(string $registryUrl, string $publicKey, string $pluginId, ?string $version = null): array
     {
+        if (\Click\Cms\Application\Config\DeploymentMode::managed()) {
+            return ['success' => false, 'error' => 'Code installation is controlled by the deployment.'];
+        }
+        // The requested id is eventually compared with signed manifest data,
+        // but it must be safe before it is used in any filesystem operation.
+        if (!$this->isPluginIdSafe($pluginId)) {
+            return ['success' => false, 'error' => 'Invalid plugin id'];
+        }
+
         $catalog = $this->getRegistryCatalog($registryUrl, $publicKey);
 
         if (!empty($catalog['errors'])) {
@@ -377,11 +393,16 @@ class PluginMarketplace
         $packageUrl = $plugin['packageUrl'] ?? null;
         $expectedHash = $plugin['sha256'] ?? null;
 
-        if ($packageUrl === null || $expectedHash === null) {
+        if (!is_string($packageUrl) || $packageUrl === '') {
             return ['success' => false, 'error' => 'Manifest missing packageUrl or sha256'];
         }
+        if (!is_string($expectedHash) || preg_match('/^[a-f0-9]{64}$/i', $expectedHash) !== 1) {
+            return ['success' => false, 'error' => 'Manifest has an invalid sha256 checksum'];
+        }
 
-        $tempFile = $this->marketplacePath . '/' . $pluginId . '-' . ($plugin['version'] ?? 'latest') . '.zip';
+        // Neither the caller's id nor signed manifest fields belong in a path.
+        // Even signed metadata is untrusted filesystem input until validated.
+        $tempFile = $this->marketplacePath . '/.package-' . bin2hex(random_bytes(12)) . '.zip';
         $downloaded = $this->fetchToFile($packageUrl, $tempFile);
 
         if (!$downloaded) {
@@ -389,7 +410,7 @@ class PluginMarketplace
         }
 
         $actualHash = hash_file('sha256', $tempFile);
-        if (!hash_equals($expectedHash, $actualHash)) {
+        if (!hash_equals(strtolower($expectedHash), $actualHash)) {
             unlink($tempFile);
             return ['success' => false, 'error' => 'Package checksum mismatch'];
         }

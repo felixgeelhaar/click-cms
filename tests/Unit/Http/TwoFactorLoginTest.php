@@ -108,6 +108,18 @@ final class TwoFactorLoginTest extends TestCase
 
     /* ------------------------------------------------------ enrolment -- */
 
+    public function testSuspensionBetweenLoginStepsPreventsSignIn(): void
+    {
+        $secret = $this->enrolAdmin();
+        $this->post('login', ['username' => 'admin', 'password' => 'admin']);
+        $account = $this->content->user('admin');
+        $account->update(['status' => 'suspended']);
+        $this->content->save($account);
+        $result = $this->post('2fa', ['code' => $this->codeFor($secret)]);
+        $this->assertSame(403, $result['status']);
+        $this->assertNull($this->sessions->user());
+    }
+
     public function testEnrolmentIssuesASecretAUriAndRecoveryCodes(): void
     {
         $enrolment = $this->twoFactor->beginEnrolment('admin');

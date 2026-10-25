@@ -5,6 +5,21 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-10-25
+
+### Shared-hosting updates
+- Discover signed releases during normal CMS requests and install compatible stable versions allowed by the configured policy.
+- Drain active requests before installation, preserve site files and detached public roots, and recover interrupted installs before Composer loads.
+- Existing installations need one bootstrap deployment to enable traffic-triggered updates.
+
+### Editing and administration
+- Add draft recovery and comparison, responsive previews, shared section presets, translation freshness, review tools, and WordPress imports.
+- Retain first-run site seeding, free-form editing policy, typed collection reviews, and visible plugin discovery failures.
+
+### Security and validation
+- Strengthen authentication, authorization, storage and archive boundaries, and expose administrator security health checks.
+- Add Warden and Nox gates and an isolated TurboScience upgrade rehearsal covering signed updates, rollback, recovery and SPA compatibility.
+
 ## [1.8.0] — 2026-07-28
 
 ### A site can have its own `config/core.json`

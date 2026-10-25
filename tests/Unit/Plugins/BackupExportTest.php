@@ -179,7 +179,8 @@ final class BackupExportTest extends TestCase
         // would have made the storage-independence bug visible: an archive of a
         // database-backed site reported files and no documents at all.
         $this->assertGreaterThanOrEqual(1, $manifest['counts']['documents'] ?? 0);
-        $this->assertSame(2, $manifest['formatVersion'] ?? null);
+        $this->assertSame(3, $manifest['formatVersion'] ?? null);
+        $this->assertNotFalse($zip->getFromName('drafts/content/page/en/home.json'));
         $zip->close();
     }
 

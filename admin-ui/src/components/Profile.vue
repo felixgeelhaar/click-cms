@@ -167,6 +167,18 @@ const confirmTwoFactor = async () => {
       return;
     }
 
+    // The confirm endpoint is authoritative: the account is already protected
+    // even if the follow-up status read fails. Keep the visible state truthful
+    // rather than falling back to the stale pre-enrolment `Off` value.
+    if (body.data?.active === true) {
+      twoFactor.value = {
+        ...twoFactor.value,
+        active: true,
+        pending: false,
+        recoveryCodesLeft: enrolment.value?.recoveryCodes?.length ?? twoFactor.value.recoveryCodesLeft,
+      };
+    }
+
     enrolment.value = null;
     confirmCode.value = '';
     await loadTwoFactor();

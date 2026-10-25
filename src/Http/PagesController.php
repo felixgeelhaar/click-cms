@@ -8,12 +8,15 @@ use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Content\PageService;
 use Click\Cms\Application\Editing\FreeformPolicy;
+use Click\Cms\Application\Translation\TranslationFreshnessService;
 use Click\Cms\Application\History\HistoryService;
 use Click\Cms\Application\Media\MediaService;
 use Click\Cms\Domain\History\RetentionPolicy;
 use Click\Cms\Application\Preview\PreviewLinks;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
+use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Content\ContentRevision;
 use Click\Cms\Domain\Schema\SectionValidator;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
@@ -21,6 +24,9 @@ use Click\Cms\Infrastructure\Publishing\FileScheduleStore;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
 use Click\Cms\Infrastructure\Storage\VersioningStorage;
+use Click\Cms\Infrastructure\Translation\JsonTranslationReviewStore;
+use Click\Cms\Infrastructure\Schema\JsonSectionPresetRepository;
+use Closure;
 
 /**
  * Managing pages: CRUD, publication, schedule, versions, and preview links.
@@ -44,6 +50,8 @@ final class PagesController
     private ?JsonVersionStore $versions = null;
     private ?PreviewLinks $previewLinks = null;
     private ?FileScheduleStore $scheduleStore = null;
+    private ?SectionPresetsController $sectionPresetController = null;
+    private ?TranslationFreshnessController $translationFreshnessController = null;
 
     /**
      * The prefix this installation is served under.
@@ -71,7 +79,8 @@ final class PagesController
         private readonly ?CoreConfig $config = null,
         ?BasePath $urlBase = null,
         private readonly ?string $installRoot = null,
-        private readonly ?FreeformPolicy $freeform = null,
+        private readonly ?FreeformPolicy $freeformPolicy = null,
+        private readonly ?Closure $previewRenderer = null,
     ) {
         $this->urlBase = $urlBase ?? BasePath::root();
     }
@@ -149,6 +158,14 @@ final class PagesController
             // is read, and being unsafe means it carries the CSRF token and can
             // never be triggered by another site embedding a URL.
             'POST /api/pages/:slug/preview' => [$this, 'createPreviewLink'],
+            'POST /api/pages/:slug/preview/render' => [$this, 'renderDraftPreview'],
+            'GET /api/translation-freshness' => fn (): array => $this->translationFreshness()->read($_GET, $this->currentUser()),
+            'POST /api/translation-freshness' => fn (): array => $this->translationFreshness()->mark($this->jsonBody(), $this->currentUser()),
+            'GET /api/section-presets' => fn (): array => $this->sectionPresets()->list($this->currentUser()),
+            'GET /api/section-presets/:id/versions/:version' => fn (string $id, string $version): array => $this->sectionPresets()->version($id, (int) $version, $this->currentUser()),
+            'POST /api/section-presets' => fn (): array => $this->sectionPresets()->create($this->currentUser(), $this->jsonBody()),
+            'PUT /api/section-presets/:id' => fn (string $id): array => $this->sectionPresets()->update($id, $this->currentUser(), $this->jsonBody()),
+            'DELETE /api/section-presets/:id' => fn (string $id): array => $this->sectionPresets()->delete($id, $this->currentUser(), $this->jsonBody()['expectedVersion'] ?? null),
         ];
     }
 
@@ -255,6 +272,9 @@ final class PagesController
 
         if ($signedIn) {
             $response['publication'] = $this->publicationOf($page);
+            if ($draft !== null) {
+                $response['data']['revision'] = ContentRevision::of($page);
+            }
         }
 
         // Which other languages this page exists in, so an editor sees at a
@@ -361,6 +381,56 @@ final class PagesController
         return $this->pageResponse(
             $this->pages()->create($this->jsonBody(), $this->currentUser(), $this->localeParam())
         );
+    }
+
+    /** Render submitted editor state without saving it. */
+    public function renderDraftPreview(string $slug, ?array $body = null): array
+    {
+        $user = $this->currentUser();
+        if ($user === []) return ['status' => 401, 'error' => 'Not authenticated'];
+        if (!Role::fromName($user['role'] ?? null)->can(Capability::PreviewContent)) return ['status' => 403, 'error' => 'You do not have permission to preview this page.'];
+        if ($this->previewRenderer === null) return ['status' => 501, 'error' => 'Live preview is not available on this installation.'];
+        $locale = $this->requestedLocale();
+        if ($locale['error'] !== null) return ['status' => 400, 'error' => $locale['error']];
+        $body ??= $this->jsonBody();
+        if (!is_string($body['title'] ?? null) || !is_array($body['sections'] ?? null)) return ['status' => 422, 'error' => 'Preview requires a title and a list of sections.'];
+        $validated = $this->pages()->validateForPreview(['sections' => $body['sections']]);
+        if ($validated['errors'] !== []) return ['status' => 422, 'error' => 'The page sections could not be previewed.', 'errors' => $validated['errors']];
+        if ($slug === '' || str_contains($slug, ':') || str_contains($slug, '/')) return ['status' => 400, 'error' => 'The page address is invalid.'];
+        $page = $this->pages()->find($slug, $locale['locale']);
+        if ($page !== null) {
+            $allowed = $this->pages()->canModify($page->data, $user);
+            if ($allowed !== true) return ['status' => 403, 'error' => $allowed];
+            $page = clone $page;
+            $page->update(['title' => $body['title'], 'sections' => $validated['data']['sections']]);
+            if (is_array($body['seo'] ?? null)) {
+                $seo = $body['seo'];
+                $page->update(['seo' => [
+                    'metaTitle' => is_string($seo['metaTitle'] ?? null) ? $seo['metaTitle'] : '',
+                    'description' => is_string($seo['description'] ?? null) ? $seo['description'] : '',
+                    'ogImage' => is_string($seo['ogImage'] ?? null) ? $seo['ogImage'] : '',
+                    'canonicalUrl' => is_string($seo['canonicalUrl'] ?? null) ? $seo['canonicalUrl'] : '',
+                    'noindex' => ($seo['noindex'] ?? false) === true,
+                ]]);
+            }
+        } else {
+            if (!Role::fromName($user['role'] ?? null)->can(Capability::CreateContent)) return ['status' => 403, 'error' => 'You do not have permission to preview a new page.'];
+            $seo = is_array($body['seo'] ?? null) ? $body['seo'] : [];
+            $page = Content::create(ContentKey::page($slug, $locale['locale']), ['title' => $body['title'], 'sections' => $validated['data']['sections'], 'seo' => [
+                'metaTitle' => is_string($seo['metaTitle'] ?? null) ? $seo['metaTitle'] : '',
+                'description' => is_string($seo['description'] ?? null) ? $seo['description'] : '',
+                'ogImage' => is_string($seo['ogImage'] ?? null) ? $seo['ogImage'] : '',
+                'canonicalUrl' => is_string($seo['canonicalUrl'] ?? null) ? $seo['canonicalUrl'] : '',
+                'noindex' => ($seo['noindex'] ?? false) === true,
+            ], 'owner' => $user['username'] ?? null]);
+        }
+        try { $html = ($this->previewRenderer)($page); } catch (\Throwable $error) { error_log('Draft preview rendering failed: ' . $error->getMessage()); return ['status' => 500, 'error' => 'Could not render the page preview.']; }
+        $policy = "default-src 'none'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'self'";
+        $base = htmlspecialchars($this->urlBase->url('/'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $injected = '<base href="' . $base . '"><meta http-equiv="Content-Security-Policy" content="' . htmlspecialchars($policy, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">';
+        if (preg_match('/<head(?:\\s[^>]*)?>/i', $html, $match, PREG_OFFSET_CAPTURE) === 1) { $offset = $match[0][1] + strlen($match[0][0]); $html = substr($html, 0, $offset) . $injected . substr($html, $offset); }
+        else $html = '<!doctype html><html><head>' . $injected . '</head><body>' . $html . '</body></html>';
+        return ['raw' => true, 'html' => $html, 'headers' => ['Content-Type' => 'text/html; charset=utf-8', 'Cache-Control' => 'no-store, private', 'X-Robots-Tag' => 'noindex, nofollow, noarchive', 'Content-Security-Policy' => $policy . "; form-action 'none'"]];
     }
 
     /**
@@ -629,7 +699,7 @@ final class PagesController
             return $response;
         }
 
-        return ['status' => $result['status'], 'data' => $result['page']->toArray()];
+        return ['status' => $result['status'], 'data' => $result['page']->toArray() + ['revision' => ContentRevision::of($result['page'])]];
     }
 
     /* ----------------------------------------------------------- history -- */
@@ -773,6 +843,19 @@ final class PagesController
         );
     }
 
+    private function sectionPresets(): SectionPresetsController
+    {
+        return $this->sectionPresetController ??= new SectionPresetsController($this->basePath, $this->sectionTypesPath());
+    }
+
+    private function translationFreshness(): TranslationFreshnessController
+    {
+        return $this->translationFreshnessController ??= new TranslationFreshnessController(
+            $this->pages(),
+            new TranslationFreshnessService($this->contentService(), new JsonTranslationReviewStore($this->basePath . '/data/translation-reviews')),
+        );
+    }
+
     private function pages(): PageService
     {
         return $this->pages ??= new PageService(
@@ -782,7 +865,7 @@ final class PagesController
             $this->config?->locales() ?? [],
             null,
             $this->schedules(),
-            $this->freeform,
+            $this->freeformPolicy,
         );
     }
 

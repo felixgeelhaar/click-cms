@@ -9,6 +9,7 @@ use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Content\PageService;
 use Click\Cms\Application\Plugin\PluginManager;
 use Click\Cms\Application\Plugin\PublishGate;
+use Click\Cms\Domain\Content\ContentRevision;
 use Click\Cms\Infrastructure\History\JsonVersionStore;
 use Click\Cms\Infrastructure\Schema\JsonSectionTypeRepository;
 use Click\Cms\Infrastructure\Storage\JsonStorage;
@@ -48,6 +49,8 @@ final class CollaborationReviewTest extends TestCase
             $this->content,
             new JsonSectionTypeRepository(dirname(__DIR__, 3) . '/config/sections')
         );
+        $this->makePage('home');
+        $this->makePage('about');
 
         $manager = new PluginManager($this->base . '/plugins', $this->base . '/data');
         $manager->setContentService($this->content);
@@ -124,11 +127,15 @@ final class CollaborationReviewTest extends TestCase
         $this->assertTrue($response['data']['enabled'] ?? false);
     }
 
-    private function makePage(string $slug, string $owner = 'ada'): void
+    private function makePage(string $slug, string $owner = 'ada', string $locale = 'en'): void
     {
+        if ($this->pages->find($slug, $locale) !== null) {
+            return;
+        }
         $this->pages->create(
             ['title' => ucfirst($slug), 'slug' => $slug],
-            ['username' => $owner, 'role' => 'editor']
+            ['username' => $owner, 'role' => 'editor'],
+            $locale,
         );
     }
 
@@ -177,6 +184,14 @@ final class CollaborationReviewTest extends TestCase
         return (string) $this->plugin->reviewFor($slug, $locale)['state'];
     }
 
+    /** @param array<string, mixed> $change */
+    private function changeDraft(string $slug, array $change): void
+    {
+        $draft = $this->pages->find($slug, 'en');
+        $this->assertNotNull($draft);
+        $this->content->save($draft->update($change));
+    }
+
     /* ---------------------------------------------------------- requesting -- */
 
     public function testRequestingAReviewStoresItAsAnOrdinaryContentDocument(): void
@@ -194,12 +209,98 @@ final class CollaborationReviewTest extends TestCase
         $this->assertSame('in_review', $response['data']['state']);
         $this->assertSame('hanna', $response['data']['reviewer']);
         $this->assertSame('Ada Lovelace', $response['data']['requestedByName']);
+        $this->assertSame(ContentRevision::of($this->pages->find('home', 'en')), $response['data']['revision']);
+        $this->assertFalse($response['data']['stale']);
 
         // Stored the same way presence and comments are, so it inherits storage,
         // backups and the version trail rather than inventing a place to live.
         $documents = $this->content->all('collaboration_review');
         $this->assertCount(1, $documents);
         $this->assertSame('collaboration_review', $documents[0]->type());
+    }
+
+    public function testRequestRejectsAClientRevisionThatNoLongerMatchesTheSavedPage(): void
+    {
+        $this->signIn();
+        $revision = ContentRevision::of($this->pages->find('home', 'en'));
+        $this->changeDraft('home', ['title' => 'Changed after the editor loaded it']);
+
+        $response = $this->post('handleRequestReview', [
+            'page' => 'home', 'locale' => 'en', 'revision' => $revision,
+        ]);
+
+        $this->assertSame(409, $response['status'] ?? 200);
+        $this->assertSame(ContentRevision::of($this->pages->find('home', 'en')), $response['data']['currentRevision'] ?? null);
+        $this->assertSame('', $this->state('home'));
+    }
+
+    public function testRequestRequiresAnExistingPageAndAnAuthorMayRequestTheirOwnPageOnly(): void
+    {
+        $this->signIn();
+        $missing = $this->post('handleRequestReview', ['page' => 'missing', 'locale' => 'en']);
+        $this->assertSame(404, $missing['status'] ?? 200);
+
+        $this->makePage('bob-page', 'bob');
+        $this->signIn(role: 'author', username: 'bob');
+        $owned = $this->post('handleRequestReview', ['page' => 'bob-page', 'locale' => 'en']);
+        $this->assertSame('in_review', $owned['data']['state'] ?? null);
+
+        $other = $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'en']);
+        $this->assertSame(403, $other['status'] ?? 200);
+    }
+
+    public function testAuthorCanReadTheirOwnReviewStatusButNotAnotherAuthors(): void
+    {
+        $this->makePage('bob-page', 'bob');
+        $this->makePage('eve-page', 'eve');
+        $this->signIn(role: 'author', username: 'bob');
+        $this->post('handleRequestReview', ['page' => 'bob-page', 'locale' => 'en']);
+
+        $_GET = ['page' => 'bob-page', 'locale' => 'en'];
+        $own = $this->plugin->handleReadReview();
+        $_GET = ['page' => 'eve-page', 'locale' => 'en'];
+        $other = $this->plugin->handleReadReview();
+        $_GET = [];
+
+        $this->assertSame('in_review', $own['data']['state']);
+        $this->assertFalse($own['data']['stale']);
+        $this->assertSame(403, $other['status'] ?? 200);
+    }
+
+    public function testDecisionToApproveIsRefusedWhenTheSavedDraftChangedAfterRequest(): void
+    {
+        $this->signIn(username: 'ada');
+        $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'en']);
+        $this->changeDraft('home', ['title' => 'Changed while review was open']);
+        $this->signIn(username: 'hanna');
+
+        $response = $this->post('handleReviewDecision', [
+            'page' => 'home', 'locale' => 'en', 'decision' => 'approve',
+        ]);
+
+        $this->assertSame(409, $response['status'] ?? 200);
+        $this->assertSame('in_review', $this->state('home'));
+    }
+
+    public function testDecisionFromAnOldInboxCannotApproveAReplacementRequest(): void
+    {
+        $this->signIn(username: 'ada');
+        $first = $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'en']);
+        $this->changeDraft('home', ['title' => 'Replacement draft']);
+        $second = $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'en']);
+        $this->signIn(username: 'hanna');
+        $response = $this->post('handleReviewDecision', [
+            'page' => 'home', 'locale' => 'en', 'decision' => 'approve',
+            'reviewRevision' => $first['data']['reviewRevision'] ?? 'old-inbox',
+        ]);
+        $this->assertSame(409, $response['status'] ?? 200);
+        $this->assertSame('in_review', $this->state('home'));
+        $this->assertNotEmpty($second['data']['reviewRevision']);
+        $accepted = $this->post('handleReviewDecision', [
+            'page' => 'home', 'locale' => 'en', 'decision' => 'approve',
+            'reviewRevision' => $second['data']['reviewRevision'],
+        ]);
+        $this->assertSame('approved', $accepted['data']['state']);
     }
 
     public function testAskingTwiceDoesNotSilentlyReplaceTheFirstRequest(): void
@@ -213,8 +314,28 @@ final class CollaborationReviewTest extends TestCase
         $this->assertSame('first', $this->plugin->reviewFor('home', 'en')['note']);
     }
 
+    public function testAStaleOpenReviewCanBeResubmittedForTheCurrentDraft(): void
+    {
+        $this->signIn(username: 'ada');
+        $first = $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'en', 'note' => 'first']);
+        $this->changeDraft('home', ['title' => 'Updated while waiting']);
+        $this->assertTrue($this->plugin->reviewFor('home', 'en')['stale']);
+
+        $second = $this->post('handleRequestReview', [
+            'page' => 'home', 'locale' => 'en', 'note' => 'Please review the updated copy',
+            'revision' => ContentRevision::of($this->pages->find('home', 'en')),
+        ]);
+
+        $this->assertSame('in_review', $second['data']['state'] ?? null);
+        $this->assertFalse($second['data']['stale']);
+        $this->assertNotSame($first['data']['revision'], $second['data']['revision']);
+        $this->assertSame('Please review the updated copy', $second['data']['note']);
+        $this->assertCount(2, $second['data']['history']);
+    }
+
     public function testAReviewIsPerPageAndLanguage(): void
     {
+        $this->makePage('home', 'ada', 'de');
         $this->signIn();
         $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'de']);
 
@@ -388,6 +509,7 @@ final class CollaborationReviewTest extends TestCase
 
     public function testTheGateAppliesToCollectionEntriesWithAnOpenReview(): void
     {
+        $this->makeEntry('post', 'hello-world');
         $this->armTheGate();
         $this->signIn(username: 'ada');
         $this->post('handleRequestReview', [
@@ -451,6 +573,22 @@ final class CollaborationReviewTest extends TestCase
 
     /* --------------------------------------------------- clearing on publish -- */
 
+    public function testPublishAnnouncementCannotCloseAReviewOfANewerDraft(): void
+    {
+        $this->armTheGate();
+        $this->signIn(username: 'ada');
+        $oldRevision = ContentRevision::of($this->pages->find('home', 'en'));
+        $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'en']);
+        $this->changeDraft('home', ['title' => 'New request after publication']);
+        $this->post('handleRequestReview', ['page' => 'home', 'locale' => 'en']);
+        $this->plugin->hook_content_published([
+            'type' => 'page', 'slug' => 'home', 'locale' => 'en',
+            'revision' => $oldRevision, 'user' => ['username' => 'hanna', 'role' => 'editor'],
+        ]);
+        $this->assertSame('in_review', $this->state('home'));
+        $this->assertNotNull($this->askTheGate('home'));
+    }
+
     public function testPublishingFinishesTheReview(): void
     {
         $this->armTheGate();
@@ -465,6 +603,7 @@ final class CollaborationReviewTest extends TestCase
             'type' => 'page',
             'slug' => 'home',
             'locale' => 'en',
+            'revision' => ContentRevision::of($this->pages->find('home', 'en')),
             'user' => ['username' => 'hanna', 'role' => 'editor'],
         ]);
 
@@ -537,6 +676,8 @@ final class CollaborationReviewTest extends TestCase
 
         $this->assertCount(1, $open);
         $this->assertSame('home', $open[0]['page']);
+        $this->assertNotSame('', $open[0]['revision']);
+        $this->assertFalse($open[0]['stale']);
     }
 
     public function testANoteIsStoredAsInertDataNotMarkup(): void

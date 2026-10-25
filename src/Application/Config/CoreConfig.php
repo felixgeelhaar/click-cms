@@ -447,9 +447,14 @@ final class CoreConfig
 
     /* -------------------------------------------------------- marketplace -- */
 
+    public function deploymentManaged(): bool
+    {
+        return DeploymentMode::managed();
+    }
+
     public function marketplaceEnabled(): bool
     {
-        return $this->bool('core.marketplace.enabled', true);
+        return !$this->deploymentManaged() && $this->bool('core.marketplace.enabled', true);
     }
 
     public function marketplaceRegistryUrl(): string
@@ -473,7 +478,7 @@ final class CoreConfig
      */
     public function updatePolicy(): UpdatePolicy
     {
-        return UpdatePolicy::fromString($this->string('core.updates.policy', ''));
+        return $this->deploymentManaged() ? UpdatePolicy::Manual : UpdatePolicy::fromString($this->string('core.updates.policy', ''));
     }
 
     /*
@@ -531,6 +536,21 @@ final class CoreConfig
     public function updateAllowPreRelease(): bool
     {
         return $this->bool('core.updates.allowPreRelease', false);
+    }
+
+    /** Absolute detached document root for split-root deployments, if configured. */
+    public function updatePublicRoot(): ?string
+    {
+        $updates = $this->get('core.updates');
+        if (!is_array($updates) || !array_key_exists('publicRoot', $updates)) {
+            return null;
+        }
+        $value = $updates['publicRoot'];
+
+        // Preserve an invalid value as an explicit invalid sentinel. Passing
+        // null here would silently switch a split-root install back to the
+        // in-tree default and make an unattended update target the wrong path.
+        return is_string($value) && trim($value) !== '' ? trim($value) : '';
     }
 
     /* ------------------------------------------------------------- backup -- */

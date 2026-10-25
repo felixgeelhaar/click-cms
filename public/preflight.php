@@ -86,6 +86,19 @@ if (
 $root = click_cms_preflight_value('CLICK_CMS_ROOT');
 $root = $root !== null && is_dir($root) ? rtrim($root, '/') : __DIR__ . '/..';
 
+// Preflight also uses the installation barrier before loading any app classes.
+if (!is_dir($root . '/data/updates')) { @mkdir($root . '/data/updates', 0755, true); }
+$preflightGate = @fopen($root . '/data/updates/requests.lock', 'c');
+if (!is_resource($preflightGate)) { $preflightGate = @fopen($root . '/data/updates/requests.lock', 'r'); }
+if ((!is_resource($preflightGate) || !flock($preflightGate, LOCK_SH | LOCK_NB))
+    || file_exists($root . '/data/updates/swap-journal.json')
+    || is_link($root . '/data/updates/swap-journal.json')) {
+    http_response_code(503);
+    header('Retry-After: 5');
+    header('Cache-Control: no-store');
+    exit("Click update/recovery is in progress.\n");
+}
+
 if (!is_file($root . '/vendor/autoload.php')) {
     // Reported rather than fataled. "I looked here and found nothing" is the
     // most useful sentence this page can print, because a missing autoloader is

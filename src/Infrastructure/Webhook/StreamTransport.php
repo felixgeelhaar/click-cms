@@ -55,7 +55,7 @@ final class StreamTransport implements HttpTransport
         // Suppressed because a failed request raises a warning *and* returns
         // false, and the warning would reach the CLI's output as noise around a
         // failure this reports properly a line later.
-        $response = @file_get_contents($url, false, $context);
+        $response = @file_get_contents($url, false, $context, 0, 65537);
 
         // Set by the wrapper as a side effect, in the local scope, and only when
         // a response actually arrived.
@@ -67,6 +67,10 @@ final class StreamTransport implements HttpTransport
                     ? 'The request did not complete: no response, timeout or connection failure.'
                     : 'The request completed with no status line.'
             );
+        }
+
+        if (is_string($response) && strlen($response) > 65536) {
+            return TransportResult::failed('The webhook response exceeded the 64 KiB limit.');
         }
 
         $status = self::statusFrom($headersReceived[0]);

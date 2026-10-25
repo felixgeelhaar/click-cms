@@ -293,12 +293,16 @@ final class MediaController
         $start = 0;
         $end = $size - 1;
 
-        if (is_string($range) && preg_match('/^bytes=(\d*)-(\d*)$/', $range, $m) === 1 && $size > 0) {
-            if ($m[1] !== '') {
+        if (is_string($range) && preg_match('/^bytes=(\d*)-(\d*)$/', $range, $m) === 1
+            && ($m[1] !== '' || $m[2] !== '') && $size > 0) {
+            if ($m[1] === '') {
+                $suffix = min((int) $m[2], $size);
+                $start = $size - $suffix;
+            } else {
                 $start = (int) $m[1];
-            }
-            if ($m[2] !== '') {
-                $end = (int) $m[2];
+                if ($m[2] !== '') {
+                    $end = (int) $m[2];
+                }
             }
             if ($start > $end || $start >= $size) {
                 http_response_code(416);

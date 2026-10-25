@@ -69,6 +69,8 @@ enum Capability: string
     /* Editing modes — see docs/backlog.md */
     case UseSectionEditor = 'edit.sections';
     case UseFreeFormBuilder = 'edit.freeform';
+    /** Create immutable, site-wide section editor presets. */
+    case ManageSectionPresets = 'sections.manage';
 
     /* Administration */
     case ManageUsers = 'users.manage';
@@ -94,6 +96,7 @@ enum Capability: string
             self::DeleteAnyMedia => 'Delete any media',
             self::UseSectionEditor => 'Use the section editor',
             self::UseFreeFormBuilder => 'Use the free-form builder',
+            self::ManageSectionPresets => 'Manage shared section presets',
             self::ManageUsers => 'Manage users',
             self::ManagePlugins => 'Manage plugins',
             self::InstallPlugins => 'Install plugins',

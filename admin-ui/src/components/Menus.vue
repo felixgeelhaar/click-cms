@@ -44,6 +44,10 @@
 
     <p v-if="loading" class="loading">Loading…</p>
 
+    <div v-else-if="loadFailed" class="banner error" role="alert">
+      <p>{{ error }}</p>
+      <button type="button" class="btn-secondary" @click="loadMenus">Retry</button>
+    </div>
     <form v-else class="editor" @submit.prevent="save">
       <div class="name-row">
         <label class="field-label" for="menu-name">Display name</label>
@@ -160,6 +164,7 @@ const localeQuery = () =>
 const newId = ref('');
 
 const loading = ref(true);
+const loadFailed = ref(false);
 const saving = ref(false);
 const error = ref('');
 const savedNotice = ref('');
@@ -175,10 +180,12 @@ const hydrateItems = (raw) =>
 
 const loadMenus = async () => {
   loading.value = true;
+  loadFailed.value = false;
   error.value = '';
   try {
     const res = await fetch('/api/menus');
     const body = await res.json();
+    if (!res.ok) throw new Error(body.error || `Could not load menus (${res.status}).`);
     menus.value = Array.isArray(body.data) ? body.data : [];
 
     // A site with no menus yet still needs somewhere to start, so offer a
@@ -192,7 +199,10 @@ const loadMenus = async () => {
     // items — the same path a menu switch takes.
     await selectMenu(selectedId.value);
   } catch (e) {
-    error.value = 'Could not load menus.';
+    loadFailed.value = true;
+    error.value = e.message || 'Could not load menus.';
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -202,18 +212,28 @@ const applyMenu = (menu) => {
 };
 
 const selectMenu = async (id) => {
+  loading.value = true;
+  loadFailed.value = false;
   error.value = '';
   savedNotice.value = '';
   try {
     const res = await fetch(`/api/menus/${encodeURIComponent(id)}${localeQuery()}`);
+    const body = await res.json().catch(() => ({}));
     if (res.ok) {
-      applyMenu((await res.json()).data);
+      applyMenu(body.data);
       return;
     }
-    // Not yet saved (an in-editor menu): start it empty rather than erroring.
-    applyMenu(menus.value.find((m) => m.id === id) ?? { id, items: [] });
-  } catch {
-    applyMenu({ id, items: [] });
+    // Only a genuine missing menu can safely start as an empty document.
+    if (res.status === 404) {
+      applyMenu(menus.value.find((m) => m.id === id) ?? { id, items: [] });
+      return;
+    }
+    throw new Error(body.error || `Could not load this menu (${res.status}).`);
+  } catch (e) {
+    loadFailed.value = true;
+    error.value = e.message || 'Could not load this menu.';
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -274,6 +294,7 @@ const serialise = () =>
     });
 
 const save = async () => {
+  if (loading.value || loadFailed.value || saving.value) return;
   saving.value = true;
   error.value = '';
   savedNotice.value = '';

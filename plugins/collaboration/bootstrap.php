@@ -10,6 +10,7 @@ use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Application\Content\PageService;
 use Click\Cms\Application\Plugin\PublishGate;
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Content\ContentRevision;
 use Click\Cms\Domain\Identity\Capability;
 use Click\Cms\Domain\Identity\Role;
 use Click\Cms\Domain\Schema\SectionValidator;
@@ -276,7 +277,8 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             $page,
             $this->safeLocaleRef((string) ($params['locale'] ?? '')),
             is_array($params['user'] ?? null) ? $params['user'] : [],
-            $type
+            $type,
+            is_string($params['revision'] ?? null) ? $params['revision'] : null,
         );
     }
 
@@ -684,10 +686,9 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     public function handleRequestReview(): array
     {
         $user = $this->currentUser();
-        if (!$this->mayCollaborate($user)) {
+        if ($user === null) {
             return $this->forbidden();
         }
-
         $input = $this->readBody();
         $page = $this->safePageRef($this->stringField($input, 'page'));
         $locale = $this->reviewLocale($this->safeLocaleRef($this->stringField($input, 'locale')));
@@ -697,8 +698,19 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             return ['status' => 400, 'error' => 'A page is required to request a review.'];
         }
 
+        $draft = $this->reviewDraft($page, $locale, $type);
+        if ($draft === null) return ['status' => 404, 'error' => 'That page does not exist in this language.'];
+        if (!$this->mayRequestReviewFor($user, $draft)) return $this->forbidden();
+        $revision = ContentRevision::of($draft);
+        if (array_key_exists('revision', $input) && !is_string($input['revision'])) {
+            return ['status' => 400, 'error' => 'The page revision must be a string.'];
+        }
+        if (array_key_exists('revision', $input) && !hash_equals($revision, $input['revision'])) {
+            return ['status' => 409, 'error' => 'The saved page changed before this review could be requested. Reload the page and try again.', 'data' => ['currentRevision' => $revision]];
+        }
+
         $existing = $this->reviewFor($page, $locale, $type);
-        if (($existing['state'] ?? '') === self::STATE_IN_REVIEW) {
+        if (($existing['state'] ?? '') === self::STATE_IN_REVIEW && ($existing['stale'] ?? false) !== true) {
             // Refused rather than quietly overwritten. A second request would
             // replace the first request's note and named reviewer, and the
             // person waiting on it would never learn their request was gone.
@@ -716,6 +728,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             'requestedBy' => $this->identityKey($user),
             'requestedByName' => $this->displayName($user),
             'requestedAt' => $now,
+            'revision' => $revision,
             // Editor-typed text, stored exactly as given. Same rule as a comment
             // body: escaping is the display layer's job.
             'note' => $note,
@@ -769,6 +782,15 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             return ['status' => 409, 'error' => 'This page is not waiting for review.'];
         }
 
+        if (array_key_exists('reviewRevision', $input)) {
+            if (!is_string($input['reviewRevision']) || $input['reviewRevision'] === '') {
+                return ['status' => 400, 'error' => 'A valid review revision is required.'];
+            }
+            if (!hash_equals((string) ($review['reviewRevision'] ?? ''), $input['reviewRevision'])) {
+                return ['status' => 409, 'error' => 'This review request changed. Refresh the inbox and review the current request before deciding.'];
+            }
+        }
+
         // The whole point of the feature. Not overridable by an administrator:
         // an override exists to be used, and once it is used routinely the
         // recorded approvals mean nothing. A site with one person who publishes
@@ -781,6 +803,14 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             return [
                 'status' => 403,
                 'error' => 'You cannot approve your own request for review.',
+            ];
+        }
+
+        if ($decision === 'approve' && $this->reviewIsStale($review)) {
+            return [
+                'status' => 409,
+                'error' => 'The saved page changed after this review was requested. Ask for a new review of the current revision.',
+                'data' => ['currentRevision' => $this->currentPageRevision($page, $locale, $type)],
             ];
         }
 
@@ -801,7 +831,10 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             'note' => $note,
         ]);
 
-        return ['data' => $this->writeReview($page, $locale, $review, $type)];
+        $saved = $this->writeReview($page, $locale, $review, $type, $review['reviewRevision'] ?? '');
+        if ($saved === null) return ['status' => 501, 'error' => 'This storage cannot safely record a revision-checked decision.'];
+        if ($saved === false) return ['status' => 409, 'error' => 'This review changed while the decision was being saved. Refresh the inbox and try again.'];
+        return ['data' => $saved];
     }
 
     /**
@@ -873,21 +906,18 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     public function handleReadReview(): array
     {
         $user = $this->currentUser();
-        if (!$this->mayCollaborate($user)) {
-            return $this->forbidden();
-        }
-
+        if ($user === null) return $this->forbidden();
         $page = $this->safePageRef((string) ($_GET['page'] ?? ''));
-
         if ($page === '') {
+            if (!$this->mayCollaborate($user)) return $this->forbidden();
             return ['data' => ['open' => $this->openReviews()]];
         }
-
-        return ['data' => $this->reviewFor(
-            $page,
-            $this->reviewLocale($this->safeLocaleRef((string) ($_GET['locale'] ?? ''))),
-            $this->reviewType((string) ($_GET['type'] ?? ''))
-        )];
+        $locale = $this->reviewLocale($this->safeLocaleRef((string) ($_GET['locale'] ?? '')));
+        $type = $this->reviewType((string) ($_GET['type'] ?? ''));
+        $draft = $this->reviewDraft($page, $locale, $type);
+        if ($draft === null) return ['status' => 404, 'error' => 'That page does not exist in this language.'];
+        if (!$this->mayRequestReviewFor($user, $draft)) return $this->forbidden();
+        return ['data' => $this->reviewFor($page, $locale, $type)];
     }
 
     /**
@@ -967,7 +997,8 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             return null;
         }
 
-        $state = $this->reviewFor($page, $this->reviewLocale($locale), $type)['state'] ?? '';
+        $review = $this->reviewFor($page, $this->reviewLocale($locale), $type);
+        $state = $review['state'] ?? '';
 
         // The reason names the state, because "not allowed" tells an editor
         // nothing about what to do next and this tells them exactly who they are
@@ -980,6 +1011,10 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
                 => "This {$kind} is waiting for review and has not been approved yet.",
             self::STATE_CHANGES_REQUESTED
                 => "A reviewer asked for changes on this {$kind}. It has to be approved before it can be published.",
+            self::STATE_APPROVED, self::STATE_PUBLISHED
+                => $review['stale']
+                    ? "The saved {$kind} changed since it was approved. Request and complete a new review before publishing."
+                    : null,
             default => null,
         };
     }
@@ -1314,7 +1349,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             return $this->emptyReview($page, $locale, $type);
         }
 
-        return $this->presentReview($document->data, $page, $locale, $type);
+        return $this->presentReview($document->data, $page, $locale, $type, ContentRevision::of($document));
     }
 
     /**
@@ -1344,7 +1379,8 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
                 $data,
                 is_string($data['page'] ?? null) ? $data['page'] : '',
                 is_string($data['locale'] ?? null) ? $data['locale'] : '',
-                $type
+                $type,
+                ContentRevision::of($document),
             );
         }
 
@@ -1363,7 +1399,7 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
      *
      * @param array<string, mixed> $user
      */
-    private function closeReview(string $page, string $locale, array $user, string $type = 'page'): void
+    private function closeReview(string $page, string $locale, array $user, string $type = 'page', ?string $publishedRevision = null): void
     {
         $locale = $this->reviewLocale($locale);
         $type = $this->reviewType($type);
@@ -1371,6 +1407,13 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         $state = $review['state'] ?? '';
 
         if ($state === '' || $state === self::STATE_PUBLISHED) {
+            return;
+        }
+
+        // A delayed notification must not close a new request for a different
+        // draft. Legacy notifications without a revision leave the record open.
+        if ($publishedRevision !== null && (!is_string($review['revision'] ?? null)
+            || !hash_equals($review['revision'], $publishedRevision))) {
             return;
         }
 
@@ -1383,14 +1426,14 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             'note' => '',
         ]);
 
-        $this->writeReview($page, $locale, $review, $type);
+        $this->writeReview($page, $locale, $review, $type, $review['reviewRevision'] ?? '');
     }
 
     /**
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function writeReview(string $page, string $locale, array $data, string $type = 'page'): array
+    private function writeReview(string $page, string $locale, array $data, string $type = 'page', ?string $expectedRevision = null): array|false|null
     {
         $type = $this->reviewType($type);
         $contentService = $this->pluginManager->getContentService();
@@ -1405,13 +1448,16 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         // copy of it on disk would be a second answer able to disagree with the
         // first — the same two-sources-of-truth mistake draft-and-publish
         // removed when it deleted the `status` field.
-        unset($data['open']);
+        unset($data['open'], $data['stale'], $data['reviewRevision']);
 
-        $contentService->save(
-            $existing !== null ? $existing->update($data) : Content::create($key, $data)
-        );
-
-        return $this->presentReview($data, $page, $locale, $type);
+        $document = $existing !== null ? $existing->update($data) : Content::create($key, $data);
+        if ($expectedRevision !== null) {
+            $saved = $contentService->saveIfUnchanged($document, $expectedRevision);
+            if ($saved !== true) return $saved;
+        } else {
+            $contentService->save($document);
+        }
+        return $this->presentReview($data, $page, $locale, $type, ContentRevision::of($document));
     }
 
     /**
@@ -1432,13 +1478,17 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function presentReview(array $data, string $page, string $locale, string $type = 'page'): array
+    private function presentReview(array $data, string $page, string $locale, string $type = 'page', ?string $reviewRevision = null): array
     {
         $string = static fn (string $field): ?string
             => is_string($data[$field] ?? null) ? $data[$field] : null;
 
         $state = $string('state') ?? '';
         $type = $this->reviewType($type !== '' ? $type : ($string('type') ?? 'page'));
+        $revision = $string('revision');
+        $currentRevision = $this->currentPageRevision($page, $locale, $type);
+        $tracked = in_array($state, [self::STATE_IN_REVIEW, self::STATE_CHANGES_REQUESTED, self::STATE_APPROVED, self::STATE_PUBLISHED], true);
+        $stale = $tracked && ($revision === null || $currentRevision === null || !hash_equals($revision, $currentRevision));
 
         return [
             'page' => $page,
@@ -1449,6 +1499,9 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
             // gate a fifth thing to have an opinion about.
             'state' => $state,
             'open' => $this->isOpen($state),
+            'revision' => $revision,
+            'reviewRevision' => $reviewRevision,
+            'stale' => $stale,
             'requestedBy' => $string('requestedBy') ?? '',
             'requestedByName' => $string('requestedByName') ?? '',
             'requestedAt' => $string('requestedAt') ?? '',
@@ -1468,6 +1521,25 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
     private function emptyReview(string $page, string $locale, string $type = 'page'): array
     {
         return $this->presentReview([], $page, $locale, $type);
+    }
+
+    /** @param array<string, mixed> $review */
+    private function reviewIsStale(array $review): bool
+    {
+        return ($review['stale'] ?? true) === true;
+    }
+
+    private function currentPageRevision(string $page, string $locale, string $type = 'page'): ?string
+    {
+        $draft = $this->reviewDraft($page, $locale, $type);
+        return $draft === null ? null : ContentRevision::of($draft);
+    }
+
+    private function reviewDraft(string $page, string $locale, string $type = 'page'): ?Content
+    {
+        if ($page === '') return null;
+        if ($type === 'page') return $this->pageService()?->find($page, $locale);
+        return $this->pluginManager->getContentService()?->draft(ContentKey::for($type, $page, $locale !== '' ? $locale : null));
     }
 
     /** The two states that are waiting on somebody, and therefore block. */
@@ -1657,6 +1729,21 @@ class Plugin_collaboration extends \Click\Cms\Application\Plugin\BasePlugin
         return $user !== null
             && Role::fromName(is_string($user['role'] ?? null) ? $user['role'] : null)
                 ->can(Capability::EditAnyContent);
+    }
+
+    /** A requester may start a review for content they are allowed to edit. */
+    private function mayRequestReviewFor(?array $user, Content $draft): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        $role = Role::fromName(is_string($user['role'] ?? null) ? $user['role'] : null);
+
+        return $role->canEditContentOwnedBy(
+            is_string($draft->data['owner'] ?? null) ? $draft->data['owner'] : null,
+            is_string($user['username'] ?? null) ? $user['username'] : null,
+        );
     }
 
     /**

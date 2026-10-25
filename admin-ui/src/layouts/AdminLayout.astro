@@ -24,6 +24,16 @@ const { title = 'Click CMS Admin' } = Astro.props;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title}</title>
+    <script is:inline>
+        // Nested SPA addresses must resolve the same assets as /admin/.
+        // Derive the mount path at runtime to support subdirectory installs.
+        const mount = window.location.pathname.match(/^(.*?\/admin)(?:\/|$)/);
+        if (mount) {
+            const base = document.createElement('base');
+            base.href = window.location.origin + mount[1] + '/';
+            document.head.appendChild(base);
+        }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">

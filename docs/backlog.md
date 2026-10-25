@@ -1,3 +1,36 @@
+## Improvement sweep — 25 October 2026
+
+The parallel improvement batch adds account/site-scoped opt-in draft recovery,
+field-level comparison, unsaved responsive preview, page discovery and
+capability-aware client navigation, plus read-only source/target translation
+comparison using current editor fields and saved locale snapshots. Editorial review uses the existing
+collaboration plugin; it is not available when that plugin is disabled. Section
+starters copy sections independently: later edits never propagate to other
+pages. A checked-in business starter is shared; personal starters stay in the
+browser. WordPress migration supports a bounded text-first draft import and
+reports unsupported content, attachments and redirect candidates separately.
+
+Security work adds deployment-controlled plugin admission, deployment-managed
+installation controls, an optional non-root read-only container profile,
+administrator-only configuration health checks, draft-preserving backup format
+3 (with format 2 reads), and an isolated restore drill in CI. Admitted PHP
+plugins retain application privileges. Static scanner decisions are recorded in
+`docs/security-triage.json`; they are not suppressions or proof of exploitability.
+
+The follow-up adds explicit three-way conflict merging in the page editor,
+revision-bound translation review markers, and a private versioned shared section
+preset library. Merge conflicts require a choice; applying a merge or preset only
+changes the local editor. Translation review records a human check of saved
+revisions, not translation accuracy. Shared preset updates never propagate to
+pages automatically.
+
+Still requiring separate work: enforceable plugin sandboxing, live linked blocks,
+click-to-field preview, broader migration/media/redirect mapping, independent
+security assessment, and studies with real editors and agencies. Release signing identities, support commitments and production restore
+verification require maintainer/operational decisions. Local checks do not prove
+that hosted CI or a production deployment has passed.
+
+---
 
 ## Editing modes: constrained sections vs free-form building
 
@@ -43,6 +76,12 @@ the kind of stale claim this document exists to avoid. What remains open is
 reusable blocks or templates, and that is a data-model decision before it is a
 feature: whether a page references a saved block or holds a snapshot of it, and
 what happens to every page using one when it changes.
+
+**Page starters — bounded first slice built.** The section editor includes a
+checked-in, read-only business services starter and can save/apply personal
+section snapshots. Personal snapshots live in browser local storage under an
+account-and-site-specific key and are cleared on logout. They are not shared or
+versioned agency presets; those remain open.
 
 ### The risk to resolve first
 
@@ -200,6 +239,16 @@ editor, and the media library.
 
 Known gaps:
 
+- A pre-publish checklist now points to missing title, body, search description,
+  and missing or stale translations. It is advisory; the per-language panel
+  remains the source of publication state, and media quality warnings remain on
+  the media picker.
+- Version history can compare a saved snapshot with the current editor content
+  field by field. This includes unsaved edits in the editor.
+- `Reviews` lists open collaboration reviews and lets an authorised reviewer
+  approve or ask for changes with a note. The route depends on the optional
+  `collaboration` plugin; it does not turn the review gate on automatically.
+
 - ~~Rich text is a plain textarea.~~ Done: `richtext` fields now use a
   dependency-free contenteditable editor (bold, italic, links, lists, H2/H3),
   and the renderer sanitises the stored HTML to a fixed tag/attribute allowlist
@@ -215,6 +264,17 @@ Known gaps:
 - ~~No preview of what a page will look like once rendered.~~ Done: an editor
   previews the working copy, and can mint a signed link that shows it to somebody
   with no account at all — which is what preview is actually for.
+
+---
+
+## Content migration
+
+`bin/click-wordpress-import.php` inspects a WXR export by default, or imports
+supported page/post text as unpublished working copies with `--apply`. This is
+a deliberately bounded text import: it does not download media, create
+redirects, or migrate WordPress-specific taxonomies and metadata. See
+[`wordpress-import.md`](wordpress-import.md) for supported mappings and the
+source-only dry-run limitation.
 
 ---
 
@@ -384,6 +444,5 @@ both are gone. Original findings, for the record:
 
 ### visual-builder (free-form building) — a milestone, not a plugin task
 
-- One bootstrap hook; the server-side node-tree renderer exists. The editor —
-  canvas, selection, drag and drop, breakpoints, undo — does not. `backlog.md`
-  already scopes this as its own milestone. Nothing to review until that is built.
+- One bootstrap hook; the server-side node-tree renderer exists. The editor exists; this older finding predates it. Reusable linked blocks and
+  role-specific editing modes remain design work, as described above.

@@ -9,15 +9,15 @@
       <button type="button" class="btn-primary btn-new" @click="$emit('new')">+ New entry</button>
     </div>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert">{{ error }} <button v-if="loadFailed" type="button" class="btn-retry" @click="loadEntries">Retry</button></p>
 
     <div v-if="loading" class="loading">Loading…</div>
 
-    <div v-else-if="entries.length === 0" class="empty-state">
+    <div v-else-if="!loadFailed && entries.length === 0" class="empty-state">
       No entries yet. Create the first one with “New entry”.
     </div>
 
-    <div v-else class="entry-list">
+    <div v-else-if="!loadFailed" class="entry-list">
       <div v-for="entry in entries" :key="entry.slug" class="entry-row">
         <div class="entry-info">
           <!-- Interpolated, never v-html: an entry title is author-supplied data
@@ -36,9 +36,10 @@
           <button
             type="button"
             class="btn-sm btn-danger btn-delete"
+            :disabled="!!deleting"
             :aria-label="`Delete ${entryTitle(entry)}`"
             @click="deleteEntry(entry)"
-          >Delete</button>
+          >{{ deleting === entry.slug ? 'Deleting…' : 'Delete' }}</button>
         </div>
       </div>
     </div>
@@ -59,6 +60,8 @@ defineEmits(['new', 'edit', 'back']);
 const entries = ref([]);
 const loading = ref(true);
 const error = ref('');
+const loadFailed = ref(false);
+const deleting = ref('');
 
 /**
  * Publication state, the same three facts the page list reports, derived from
@@ -86,6 +89,7 @@ const entryTitle = (entry) =>
 
 const loadEntries = async () => {
   loading.value = true;
+  loadFailed.value = false;
   error.value = '';
   try {
     const res = await fetch(`/api/collections/${encodeURIComponent(props.type.id)}/entries`);
@@ -93,6 +97,7 @@ const loadEntries = async () => {
     const body = await res.json();
     entries.value = Array.isArray(body.data) ? body.data : [];
   } catch (e) {
+    loadFailed.value = true;
     error.value = 'Could not load entries.';
   } finally {
     loading.value = false;
@@ -100,15 +105,24 @@ const loadEntries = async () => {
 };
 
 const deleteEntry = async (entry) => {
+  if (deleting.value) return;
   if (!window.confirm(`Delete “${entryTitle(entry)}”? This cannot be undone.`)) return;
+  deleting.value = entry.slug;
+  error.value = '';
   try {
-    await fetch(
+    const res = await fetch(
       `/api/collections/${encodeURIComponent(props.type.id)}/entries/${encodeURIComponent(entry.slug)}`,
       { method: 'DELETE' }
     );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Could not delete that entry (${res.status}).`);
+    }
     await loadEntries();
   } catch (e) {
-    error.value = 'Could not delete that entry.';
+    error.value = e.message || 'Could not delete that entry.';
+  } finally {
+    deleting.value = '';
   }
 };
 
@@ -153,4 +167,12 @@ onMounted(loadEntries);
 [data-theme="dark"] .status-badge.pending { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
 [data-theme="dark"] .status-badge.draft { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
 [data-theme="dark"] .status-badge.takendown { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+</style>
+
+<style scoped>
+.btn-sm:disabled { opacity: 0.6; cursor: wait; }
+@media (max-width: 600px) {
+  .page-header, .entry-row { flex-direction: column; align-items: stretch; }
+  .entry-actions { justify-content: flex-end; }
+}
 </style>

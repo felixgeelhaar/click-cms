@@ -256,3 +256,18 @@ describe('a rejected target', () => {
     expect(calls.some((c) => c === 'GET /api/menus/main')).toBe(true);
   });
 });
+
+describe('load failure protection', () => {
+  it('blocks saving when an existing menu cannot be loaded', async () => {
+    server();
+    const original = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation(async (url, init) => String(url).match(/\/api\/menus\/[^/]+$/) && !init?.method
+      ? { ok: false, status: 503, json: async () => ({ error: 'Menu service unavailable' }) }
+      : original(url, init));
+    const wrapper = mount(Menus);
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('Menu service unavailable');
+    expect(wrapper.find('form.editor').exists()).toBe(false);
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Retry')).toBe(true);
+  });
+});

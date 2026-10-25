@@ -1,0 +1,432 @@
+{
+  "reviewedAt": "2026-10-25",
+  "reviewBy": "2027-01-23",
+  "scanner": "nox 1.48.1",
+  "scope": "Static review of this report; no suppression, no penetration-test claim. Re-review changed fingerprints, trust boundaries and expired decisions.",
+  "sourceReportGeneratedAt": "2026-10-25T17:14:57Z",
+  "findings": [
+    {
+      "fingerprint": "c8e03787adf458d77852ee4deacf62cc43c3dc2db5339ee2076b96b8d1cb89fa",
+      "rule": "IAC-123",
+      "path": "Dockerfile",
+      "status": "reviewed-context",
+      "evidence": "COPY occurs in build stages or before final recursive www-data ownership. Absence of --chown is not itself a writable-host escape; final ownership intentionally supports self-updates."
+    },
+    {
+      "fingerprint": "ca999676aebab8ea0d9a184e5b5fb23da0b6ef11205db3aa6199f4dd68fa2f6e",
+      "rule": "IAC-123",
+      "path": "Dockerfile",
+      "status": "reviewed-context",
+      "evidence": "COPY occurs in build stages or before final recursive www-data ownership. Absence of --chown is not itself a writable-host escape; final ownership intentionally supports self-updates."
+    },
+    {
+      "fingerprint": "d4b9e887c4a223006714e1cb3637896b252e11e389a38a4351176d9d4f7fd4d7",
+      "rule": "IAC-123",
+      "path": "Dockerfile",
+      "status": "reviewed-context",
+      "evidence": "COPY occurs in build stages or before final recursive www-data ownership. Absence of --chown is not itself a writable-host escape; final ownership intentionally supports self-updates."
+    },
+    {
+      "fingerprint": "026a610145049b1e922528f2d71cfb73713dda111ff9efd62e51cbd3ce25b4e6",
+      "rule": "IAC-123",
+      "path": "Dockerfile",
+      "status": "reviewed-context",
+      "evidence": "COPY occurs in build stages or before final recursive www-data ownership. Absence of --chown is not itself a writable-host escape; final ownership intentionally supports self-updates."
+    },
+    {
+      "fingerprint": "0bee1a8e2f4bdfe83a241a71632cc3e83b03f26045453fec215d8d03c774e493",
+      "rule": "IAC-123",
+      "path": "Dockerfile",
+      "status": "reviewed-context",
+      "evidence": "COPY occurs in build stages or before final recursive www-data ownership. Absence of --chown is not itself a writable-host escape; final ownership intentionally supports self-updates."
+    },
+    {
+      "fingerprint": "8f551774db99732be622e2a3c5e443a2cf64f39a7d958f5f357275108b9e5ba2",
+      "rule": "IAC-123",
+      "path": "Dockerfile",
+      "status": "reviewed-context",
+      "evidence": "COPY occurs in build stages or before final recursive www-data ownership. Absence of --chown is not itself a writable-host escape; final ownership intentionally supports self-updates."
+    },
+    {
+      "fingerprint": "950950a207f915771a84bc9b1baf629aa727cf38b2bfaf0cae2458a059cff5a2",
+      "rule": "IAC-123",
+      "path": "Dockerfile",
+      "status": "reviewed-context",
+      "evidence": "COPY occurs in build stages or before final recursive www-data ownership. Absence of --chown is not itself a writable-host escape; final ownership intentionally supports self-updates."
+    },
+    {
+      "fingerprint": "dca5abfc3fa034966ce6dc271fca3289f7c2ee82b0d9ad2a6edb6d7137fab19d",
+      "rule": "IAC-123",
+      "path": "Dockerfile",
+      "status": "reviewed-context",
+      "evidence": "COPY occurs in build stages or before final recursive www-data ownership. Absence of --chown is not itself a writable-host escape; final ownership intentionally supports self-updates."
+    },
+    {
+      "fingerprint": "a234b069a4d666918f19839ab05495e49ef50e7bf016a7f2f6035b57a3e3f9f0",
+      "rule": "IAC-123",
+      "path": "Dockerfile",
+      "status": "reviewed-context",
+      "evidence": "COPY occurs in build stages or before final recursive www-data ownership. Absence of --chown is not itself a writable-host escape; final ownership intentionally supports self-updates."
+    },
+    {
+      "fingerprint": "3613711a8d76007cc2b140a0d013719354f23457a1554ad6cd468950d727bc93",
+      "rule": "IAC-124",
+      "path": "Dockerfile",
+      "status": "informational",
+      "evidence": "Maintainer LABEL does not establish an execution or secret boundary. OCI repository metadata is separate from vulnerability remediation."
+    },
+    {
+      "fingerprint": "5b0927ef24ec00c24fe9841adf6ae21a807280231934a5387b35af41042d4464",
+      "rule": "IAC-153",
+      "path": ".github/workflows/marketplace-registry.yml",
+      "status": "reviewed-context",
+      "evidence": "Artifacts are CI reports or generated registry data, not executables installed from a report. Actions are SHA-pinned; artifact retention and access are repository-governed. No attestation claim is made."
+    },
+    {
+      "fingerprint": "df5b5f3034c7cbc4e84ede14ce5ac9008f6a8f561582bf1070506ced3428f70a",
+      "rule": "IAC-153",
+      "path": ".github/workflows/security.yml",
+      "status": "reviewed-context",
+      "evidence": "Artifacts are CI reports or generated registry data, not executables installed from a report. Actions are SHA-pinned; artifact retention and access are repository-governed. No attestation claim is made."
+    },
+    {
+      "fingerprint": "687a3bdb18df52f2d574daa81b6f5b6003ff6dcedac4663d22b50c5169d3c3eb",
+      "rule": "IAC-155",
+      "path": ".github/workflows/docker-image.yml",
+      "status": "operational-policy",
+      "evidence": "Manual dispatch requires repository workflow permissions. Publishing environment approval is a maintainer governance choice; no environment reviewer protection has been claimed."
+    },
+    {
+      "fingerprint": "bcdd0567c9f97135c707488fc7505dd7d016d012f18233a308932ee5b90e2958",
+      "rule": "IAC-155",
+      "path": ".github/workflows/marketplace-registry.yml",
+      "status": "operational-policy",
+      "evidence": "Manual dispatch requires repository workflow permissions. Publishing environment approval is a maintainer governance choice; no environment reviewer protection has been claimed."
+    },
+    {
+      "fingerprint": "1bbea23c5f9c02f26c127af0a24ed08a80506dccff1dd54f8ea0caf3c113bd71",
+      "rule": "IAC-155",
+      "path": ".github/workflows/pages.yml",
+      "status": "operational-policy",
+      "evidence": "Manual dispatch requires repository workflow permissions. Publishing environment approval is a maintainer governance choice; no environment reviewer protection has been claimed."
+    },
+    {
+      "fingerprint": "09d79998b5c7424a284b643b53815f6c9ba525b7adfd07bbadfde073aac67c21",
+      "rule": "IAC-155",
+      "path": ".github/workflows/release.yml",
+      "status": "operational-policy",
+      "evidence": "Manual dispatch requires repository workflow permissions. Publishing environment approval is a maintainer governance choice; no environment reviewer protection has been claimed."
+    },
+    {
+      "fingerprint": "e30dd01274149f21319aa44f87e0ef8250ecaafaac2e16bbdc8b7ab7b5fd6b9b",
+      "rule": "IAC-155",
+      "path": ".github/workflows/security.yml",
+      "status": "operational-policy",
+      "evidence": "Manual dispatch requires repository workflow permissions. Publishing environment approval is a maintainer governance choice; no environment reviewer protection has been claimed."
+    },
+    {
+      "fingerprint": "75154021c2e07b0785f23e6341d64105430e759d890c80a136a26064751370dc",
+      "rule": "IAC-180",
+      "path": "docker-compose.yml",
+      "status": "required-state-write",
+      "evidence": "Content/data need runtime writes; the admin source bind is a development profile. Host directory ownership and deployment isolation remain operator controls."
+    },
+    {
+      "fingerprint": "db1dc6a5c19211ad6e24ab6bb286efac816860a6d3d021ec2a91ad8bbc6b7aab",
+      "rule": "IAC-180",
+      "path": "docker-compose.yml",
+      "status": "required-state-write",
+      "evidence": "Content/data need runtime writes; the admin source bind is a development profile. Host directory ownership and deployment isolation remain operator controls."
+    },
+    {
+      "fingerprint": "c899f71dcb227f2f91d4154ed0fa2b56ed068b2b297d3908c08fdca36bed3fb6",
+      "rule": "IAC-180",
+      "path": "docker-compose.yml",
+      "status": "required-state-write",
+      "evidence": "Content/data need runtime writes; the admin source bind is a development profile. Host directory ownership and deployment isolation remain operator controls."
+    },
+    {
+      "fingerprint": "ba6d4862014f6ce0c10df45f4e79d1dc1eeb5f1774879cd7020d19b0577c9061",
+      "rule": "IAC-306",
+      "path": ".github/workflows/pages.yml",
+      "status": "required-publish-permission",
+      "evidence": "Pages deployment obtains an OIDC token for GitHub Pages; reusable release deployment declares that permission. This is not an arbitrary third-party audience token grant."
+    },
+    {
+      "fingerprint": "be245a4499fe01a73e9664baf0ed8c855e243ef4da2b278bd541e113a9dfae2e",
+      "rule": "IAC-306",
+      "path": ".github/workflows/release.yml",
+      "status": "required-publish-permission",
+      "evidence": "Pages deployment obtains an OIDC token for GitHub Pages; reusable release deployment declares that permission. This is not an arbitrary third-party audience token grant."
+    },
+    {
+      "fingerprint": "2fe6ff19f2bcf6bb78909689399d70449b0d7ed5a8a9204568672b0bca45989b",
+      "rule": "IAC-308",
+      "path": ".github/workflows/docker-image.yml",
+      "status": "operational-policy",
+      "evidence": "Intentional workflow_dispatch for operator recovery/release/security scans. Repository access controls govern dispatch; requires ongoing governance review."
+    },
+    {
+      "fingerprint": "80faa8ed98a2175e396093d768285261113a338d973a39ac1f6b30aa30077bbe",
+      "rule": "IAC-308",
+      "path": ".github/workflows/marketplace-registry.yml",
+      "status": "operational-policy",
+      "evidence": "Intentional workflow_dispatch for operator recovery/release/security scans. Repository access controls govern dispatch; requires ongoing governance review."
+    },
+    {
+      "fingerprint": "1bf5ffaf4038a450a301180174f387e03abc28da49ffe4c9f9980cc06e41b413",
+      "rule": "IAC-308",
+      "path": ".github/workflows/pages.yml",
+      "status": "operational-policy",
+      "evidence": "Intentional workflow_dispatch for operator recovery/release/security scans. Repository access controls govern dispatch; requires ongoing governance review."
+    },
+    {
+      "fingerprint": "cc3fd855f1a5badf59b08227135b4d796c3509913767ccdb34f1d3cebf0c8984",
+      "rule": "IAC-308",
+      "path": ".github/workflows/release.yml",
+      "status": "operational-policy",
+      "evidence": "Intentional workflow_dispatch for operator recovery/release/security scans. Repository access controls govern dispatch; requires ongoing governance review."
+    },
+    {
+      "fingerprint": "3dfb3e77a4d2a59d8978bd76dadc132ac0f42afee3b02f5ba5e57ba0e20368ac",
+      "rule": "IAC-308",
+      "path": ".github/workflows/security.yml",
+      "status": "operational-policy",
+      "evidence": "Intentional workflow_dispatch for operator recovery/release/security scans. Repository access controls govern dispatch; requires ongoing governance review."
+    },
+    {
+      "fingerprint": "8c9a05e7d0c8a05b61d4c18aefce8e2dc91a85c3456246a1c92bea30dbb416d8",
+      "rule": "IAC-309",
+      "path": ".github/workflows/ci.yml",
+      "status": "reviewed-context",
+      "evidence": "CI/security cancellation supersedes outdated checks for the same ref. Pages publish is serialized without cancellation. Required checks must apply to current head."
+    },
+    {
+      "fingerprint": "162a095592cae53b8ee25cadb877e2dd26172f5682b66569c434a5afe19aed4b",
+      "rule": "IAC-309",
+      "path": ".github/workflows/security.yml",
+      "status": "reviewed-context",
+      "evidence": "CI/security cancellation supersedes outdated checks for the same ref. Pages publish is serialized without cancellation. Required checks must apply to current head."
+    },
+    {
+      "fingerprint": "e37e2faa5f7d812400d1323a31d22e93b710b881ea06f3b656d724454d47a8f4",
+      "rule": "IAC-314",
+      "path": ".github/workflows/release.yml",
+      "status": "required-publish-permission",
+      "evidence": "Release job needs contents:write to create release assets. Other job tokens use least privileges. Branch/release governance remains repository policy."
+    },
+    {
+      "fingerprint": "66027afa893750f6f13bb52aa101ff6944e20f65b9167b1759182c038be13f09",
+      "rule": "IAC-315",
+      "path": ".github/workflows/docker-image.yml",
+      "status": "required-publish-permission",
+      "evidence": "Container publish job needs packages:write for GHCR, scoped at the job. This is a publishing capability to protect with repository governance."
+    },
+    {
+      "fingerprint": "b287120de332f6d3786865d5bb2d13fb9b38e0f699f91b1cf381e16eabfa9c60",
+      "rule": "SEC-080",
+      "path": "scripts/screenshots/capture.mjs",
+      "status": "fixture",
+      "evidence": "Screenshot runner credentials belong to its documentation demo flow; do not reuse them for production deployments."
+    },
+    {
+      "fingerprint": "e7f2add6ada58eeee193334f4b9d6bf933fca359e2bb788718776f4cdc4e2392",
+      "rule": "SEC-081",
+      "path": "tests/Unit/Identity/TotpTest.php",
+      "status": "fixture",
+      "evidence": "RFC 6238 public TOTP test vector, not an account secret."
+    },
+    {
+      "fingerprint": "11a3810a6371d74e80b5798313ccda09952532a17f244bd60dd3f34c702c44de",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "1fe7fc10faaa36246868ed316d15db94999ea194192c3d439fa34fc219c0c778",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "b4de03f51d37d6d8ebc84b79bebb7061b6527c5e759348b7a905157ac8d7e951",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "c852e7e167d57bedf257797f715f1d77497f0795b22f0259770a52052c09eb61",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "139a08d79878fa1287655c9e244dabf3e423bfd3cfaa21e6c80fe58edf54947e",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "18e54b276133a043fbd569fdc4e7791d980a4f789e7589dd94d9901f67e8f0c7",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "1b1ab28f477177f4413c64548194e53d385fbd24d4726638e0aaaed995684afc",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "9eb3677ece01b2c7a89ff1211fb09dccaba8d837ecad34e346f737078b161305",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "b5f899b41c6aa25c91acbc9b5d230fff3ea296f81b9e696dadfd35bb3038881f",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "d5a8c3532ce559e87b93d1815a21abf06214a61356ee45007de98c0d98e187b9",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "e1986ec12ac72af70bddc86c7beec60302925879097f8da6bfc82a6410761a16",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "e8721ce1ce985cb12f5ab7bbf5ba67b9be61897dd048ae62299cbd1273aa6d73",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "fc73f8770604ac95ea5743b76bf5bd89e300f82f5892c34987d2ee66d3101e31",
+      "rule": "SEC-162",
+      "path": "config/core.json",
+      "status": "public-key",
+      "evidence": "PEM BEGIN PUBLIC KEY verification material in marketplace/update configuration; private signing key is absent. High entropy is expected for a public key."
+    },
+    {
+      "fingerprint": "f369c3424bed01bb20333362c3fb4087dc8bdb0d1e8cb50d8f23c4909a97281a",
+      "rule": "SLOP-001",
+      "path": "scripts/security/test_nox_check.py",
+      "status": "local-module",
+      "evidence": "nox_check imports scripts/security/nox_check.py locally during unittest discovery; no external package installation is needed or authorized."
+    },
+    {
+      "fingerprint": "599a7ebde9c0374496ad846961c4893af1811323c4630f8d5f20c9830e205be7",
+      "rule": "TAINT-003",
+      "path": "bin/click-sites.php",
+      "status": "cli-only",
+      "evidence": "click-sites.php refuses non-CLI SAPI before argument handling. Echo is console output, not an HTTP HTML sink."
+    },
+    {
+      "fingerprint": "0e1f5c28f7939ecdaed9d9827aff12174fb1a791ccb6890e05817c61241ca005",
+      "rule": "TAINT-003",
+      "path": "bin/click-sites.php",
+      "status": "cli-only",
+      "evidence": "click-sites.php refuses non-CLI SAPI before argument handling. Echo is console output, not an HTTP HTML sink."
+    },
+    {
+      "fingerprint": "599a7ebde9c0374496ad846961c4893af1811323c4630f8d5f20c9830e205be7",
+      "rule": "TAINT-003",
+      "path": "bin/click-sites.php",
+      "status": "cli-only",
+      "evidence": "click-sites.php refuses non-CLI SAPI before argument handling. Echo is console output, not an HTTP HTML sink."
+    },
+    {
+      "fingerprint": "95100a14287e292d6e5f9582ffea7812d06db883f29cef09871bb64747f46653",
+      "rule": "TAINT-003",
+      "path": "bin/click-sites.php",
+      "status": "cli-only",
+      "evidence": "click-sites.php refuses non-CLI SAPI before argument handling. Echo is console output, not an HTTP HTML sink."
+    },
+    {
+      "fingerprint": "dc62a984df9313e159802fb129998820469fdf4806c36e4a7400069ca3f13183",
+      "rule": "TAINT-003",
+      "path": "src/Core/Application.php",
+      "status": "reviewed-boundary",
+      "evidence": "Application emits assembled response HTML/JSON. Collection output uses SectionRenderer/PageShell escaping and rich-text sanitizing. Trusted PHP plugin/template HTML remains part of the code execution trust boundary; static review is not dynamic proof."
+    },
+    {
+      "fingerprint": "dc62a984df9313e159802fb129998820469fdf4806c36e4a7400069ca3f13183",
+      "rule": "TAINT-003",
+      "path": "src/Core/Application.php",
+      "status": "reviewed-boundary",
+      "evidence": "Application emits assembled response HTML/JSON. Collection output uses SectionRenderer/PageShell escaping and rich-text sanitizing. Trusted PHP plugin/template HTML remains part of the code execution trust boundary; static review is not dynamic proof."
+    },
+    {
+      "fingerprint": "8e76201475e386418da912ff4f18028c32d834916179b153ea8fb040cb0abf21",
+      "rule": "TAINT-003",
+      "path": "src/Core/Application.php",
+      "status": "reviewed-boundary",
+      "evidence": "Application emits assembled response HTML/JSON. Collection output uses SectionRenderer/PageShell escaping and rich-text sanitizing. Trusted PHP plugin/template HTML remains part of the code execution trust boundary; static review is not dynamic proof."
+    },
+    {
+      "fingerprint": "99898f02be5e1d27f64ea5387d2807a2ae0e8b5db006ac48f8fb54f8b5eaf522",
+      "rule": "TAINT-004",
+      "path": "plugins/backup/bootstrap.php",
+      "status": "reviewed-boundary",
+      "evidence": "Backup download resolves store-issued names, verifies archive, builds a new portable temporary output and streams that output; raw query text is not passed as the readfile path. Admin gate protects download."
+    },
+    {
+      "fingerprint": "168efe1cb91adb11807fcaa05b4007aba8d7e4df34bf2cdb2493261ad758c6c8",
+      "rule": "TAINT-004",
+      "path": "src/Http/CoreApiRoutes.php",
+      "status": "reviewed-boundary",
+      "evidence": "Media path is returned by canonical containment checks in MediaService; original/cache symlink escape regressions cover the boundary before range/file streaming."
+    },
+    {
+      "fingerprint": "7c6e5f375e1fb95685a7633bd7fb856c144779147e66efc5a2e5c8cff1a1bd68",
+      "rule": "TAINT-004",
+      "path": "src/Http/CoreApiRoutes.php",
+      "status": "reviewed-boundary",
+      "evidence": "Media path is returned by canonical containment checks in MediaService; original/cache symlink escape regressions cover the boundary before range/file streaming."
+    },
+    {
+      "fingerprint": "3bce46ec189ef5f480960379f1ade2e39b66d552d89ab4528dab35d761b5e6a2",
+      "rule": "TAINT-006",
+      "path": "admin-ui/src/lib/api.test.js",
+      "status": "existing-narrow-fixture-exception",
+      "evidence": "Browser fetch is vi.fn mocked in the same unit test; no request is issued. Existing inline exception remains scoped to this expression."
+    },
+    {
+      "fingerprint": "f5cf71ea48212dca5d462db9d0165fd868bed46aec4bda6c8b495396cd697ede",
+      "rule": "TAINT-007",
+      "path": "src/Core/Application.php",
+      "status": "reviewed-boundary",
+      "evidence": "Kernel emits handler-supplied redirect response; it does not itself take a raw request URL. Redirect-producing handlers remain part of the route trust boundary and must validate any user-controlled destination."
+    },
+    {
+      "fingerprint": "de04cdfcab1344783c3809a00f030a0e508a9b64c85ad210afc4fdd0a7019234",
+      "rule": "VULN-002",
+      "path": "admin-ui/package-lock.json",
+      "status": "reviewed-dependency-name",
+      "evidence": "h3 is present as a transitive dependency in the locked Astro dependency graph. Similarity to d3 is a name heuristic, not a known advisory. Dependency audit remains required."
+    }
+  ],
+  "deploymentNotes": [
+    "The compatible default Apache profile retains a root master on port 80 and drops workers to www-data. The optional hardened build target runs as www-data on 8080 with deployment-managed code; use its read-only Compose profile after deployment validation. This does not sandbox admitted PHP plugins."
+  ]
+}

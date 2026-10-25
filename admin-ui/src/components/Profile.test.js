@@ -92,4 +92,35 @@ describe('Profile', () => {
     expect(wrapper.text()).toContain('offline');
     expect(wrapper.text()).not.toContain('have been saved');
   });
+
+  it('reports two-step sign-in as on from the confirmation response if status refresh fails', async () => {
+    let statusCalls = 0;
+    global.fetch = vi.fn(async (url) => {
+      if (url === '/api/auth/2fa') {
+        statusCalls += 1;
+        if (statusCalls === 1) {
+          return { ok: true, status: 200, json: async () => ({ data: { available: true, active: false, pending: false, recoveryCodesLeft: 0 } }) };
+        }
+        return { ok: false, status: 503, json: async () => ({ error: 'Temporarily unavailable' }) };
+      }
+      if (url === '/api/auth/2fa/enrol') {
+        return { ok: true, status: 200, json: async () => ({ data: { secret: 'ABC123', recoveryCodes: ['RECOVERY-CODE'] } }) };
+      }
+      if (url === '/api/auth/2fa/confirm') {
+        return { ok: true, status: 200, json: async () => ({ data: { success: true, active: true } }) };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const wrapper = mount(Profile, { props: { user } });
+    await flushPromises();
+    await wrapper.get('.two-factor .btn-primary').trigger('click');
+    await flushPromises();
+    await wrapper.get('#confirm-code').setValue('123456');
+    await wrapper.get('.confirm-row .btn-primary').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('.two-factor .state-line').text()).toContain('On.');
+    expect(wrapper.find('.two-factor .state-line').text()).not.toContain('Off.');
+  });
 });

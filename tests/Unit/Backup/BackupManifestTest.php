@@ -240,4 +240,19 @@ final class BackupManifestTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         BackupManifest::create('now', 'json', 'elsewhere', [], []);
     }
+    public function testDocumentIdentityMustAgreeWithItsKey(): void
+    {
+        $row = $this->validArray();
+        $row['documents'][0]['type'] = 'user';
+        $this->expectException(InvalidArgumentException::class);
+        BackupManifest::fromArray($row);
+    }
+
+    public function testFormatTwoLiveContentArchivesRemainReadable(): void
+    {
+        $row = $this->validArray();
+        $row['formatVersion'] = 2;
+        self::assertSame(2, BackupManifest::fromArray($row)->formatVersion);
+    }
+
 }

@@ -11,6 +11,8 @@ use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\History\Version;
 use Click\Cms\Domain\Publishing\PublicationState;
 use Click\Cms\Domain\Publishing\PublishingStorage;
+use Click\Cms\Domain\Publishing\ConditionalPublishingStorage;
+use Click\Cms\Domain\Storage\ConditionalStorage;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Closure;
@@ -49,7 +51,7 @@ use DateTimeImmutable;
  * entry is stamped with is decided here, in infrastructure, and supplied to the
  * entry. A test can hand in a fixed clock; production takes the default.
  */
-final class AuditingStorage implements PublishingStorage
+final class AuditingStorage implements ConditionalPublishingStorage, ConditionalStorage
 {
     /** @var (Closure(): ?string)|null */
     private readonly ?Closure $author;
@@ -144,6 +146,23 @@ final class AuditingStorage implements PublishingStorage
         $this->record($action, $content->key);
     }
 
+    public function saveIfUnchanged(Content $content, string $expectedRevision): bool
+    {
+        if (!$this->inner instanceof ConditionalStorage) {
+            throw new \RuntimeException('Conditional saves are not supported by the wrapped storage.');
+        }
+
+        $action = $expectedRevision === ''
+            ? AuditAction::Created
+            : AuditAction::Updated;
+        if (!$this->inner->saveIfUnchanged($content, $expectedRevision)) {
+            return false;
+        }
+
+        $this->record($action, $content->key);
+        return true;
+    }
+
     public function delete(ContentKey $key): bool
     {
         $removed = $this->inner->delete($key);
@@ -156,6 +175,16 @@ final class AuditingStorage implements PublishingStorage
         }
 
         return $removed;
+    }
+
+    public function publishIfUnchanged(ContentKey $key, string $expectedRevision): Content|false|null
+    {
+        if (!$this->inner instanceof ConditionalPublishingStorage) {
+            throw new \RuntimeException('Conditional publication is not supported by the wrapped storage.');
+        }
+        $published = $this->inner->publishIfUnchanged($key, $expectedRevision);
+        if ($published instanceof Content) $this->record(AuditAction::Published, $key);
+        return $published;
     }
 
     public function publish(ContentKey $key): ?Content

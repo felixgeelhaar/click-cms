@@ -21,6 +21,16 @@ final class CoreConfigTest extends TestCase
         $this->assertSame(['admin-ui', 'authentication'], $config->excludedPluginIds());
         $this->assertSame('json', $config->storageBackend());
         $this->assertSame('data/content.sqlite', $config->storageSqlitePath());
+        $this->assertNull($config->updatePublicRoot());
+    }
+
+    public function testDetachedPublicRootIsReadFromUpdateConfiguration(): void
+    {
+        $config = CoreConfig::fromArray(['core' => ['updates' => ['publicRoot' => ' /srv/www/public ']]]);
+
+        $this->assertSame('/srv/www/public', $config->updatePublicRoot());
+        $this->assertSame('', CoreConfig::fromArray(['core' => ['updates' => ['publicRoot' => false]]])->updatePublicRoot());
+        $this->assertSame('', CoreConfig::fromArray(['core' => ['updates' => ['publicRoot' => null]]])->updatePublicRoot());
     }
 
     /** Core must never require a database, whatever else the file says. */

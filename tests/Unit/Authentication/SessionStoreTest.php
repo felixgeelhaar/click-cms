@@ -53,6 +53,34 @@ final class SessionStoreTest extends TestCase
         }
     }
 
+    public function testAccountSecurityChangesRevokeTheSession(): void
+    {
+        foreach (['password', 'role', 'status', 'deleted'] as $change) {
+            $account = ['password' => 'hash-one', 'role' => 'admin', 'status' => 'active'];
+            $store = new SessionStore($this->path, 1800, function (string $username) use (&$account): ?array {
+                return $username === 'ann' ? $account : null;
+            });
+            $store->start(['username' => 'ann', 'user' => ['username' => 'ann', 'role' => 'admin']]);
+            $this->assertNotNull($store->user());
+            if ($change === 'deleted') {
+                $account = null;
+            } else {
+                $account[$change] = 'changed';
+            }
+            $this->assertNull($store->user(), $change . ' must revoke the session');
+        }
+    }
+
+    public function testPasswordResetRevokesPendingTwoFactorSessions(): void
+    {
+        $account = ['password' => 'before', 'role' => 'editor'];
+        $store = new SessionStore($this->path, 1800, function () use (&$account): array { return $account; });
+        $store->start(['pendingTwoFactor' => 'ann']);
+        $this->assertSame('ann', $store->read()['pendingTwoFactor']);
+        $account['password'] = 'after';
+        $this->assertSame([], $store->read());
+    }
+
     public function testAnAbsentSessionReadsAsEmpty(): void
     {
         $this->assertSame([], $this->store()->read());

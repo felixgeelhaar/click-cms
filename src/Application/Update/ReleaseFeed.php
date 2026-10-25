@@ -154,6 +154,21 @@ final class ReleaseFeed
             ));
         }
 
+        // A sequence identifies one exact signed metadata document. Reusing a
+        // sequence for changed contents would let a mirror replay the older of
+        // two valid documents at that same sequence. Keep the digest alongside
+        // the high-water mark so equal-sequence retries remain safe only when
+        // the bytes are identical.
+        $feedDigest = hash('sha256', $raw);
+        $highestDigest = $this->highestSequenceDigest();
+        if ($highest !== null && $sequence === $highest && $highestDigest !== null
+            && !hash_equals($highestDigest, $feedDigest)) {
+            return $this->nothing(sprintf(
+                'The update feed changed at the same sequence (%d), so it was not trusted.',
+                $sequence
+            ));
+        }
+
         $entries = $decoded['releases'] ?? null;
         if (!is_array($entries)) {
             return $this->nothing('The update feed lists no releases.');
@@ -161,13 +176,12 @@ final class ReleaseFeed
 
         // Recorded only once the feed is fully believed, so a rejected feed
         // cannot raise the bar and lock out the legitimate one behind it.
-        $this->rememberSequence($sequence);
-
-        // Adopted only now, once signature, freshness and sequence have all
-        // passed: a feed that was refused must never get to change who is
-        // trusted, or a forged one could install its own key.
-        if (isset($decoded['keys']) && is_array($decoded['keys'])) {
-            $this->rememberAnnouncedKeys($decoded['keys'], $configured);
+        $announced = isset($decoded['keys']) && is_array($decoded['keys']) ? $decoded['keys'] : null;
+        if (!$this->rememberSequence($sequence, $feedDigest, $raw, trim($signature), $announced, $configured)) {
+            return $this->nothing(sprintf(
+                'The update feed changed while it was being checked at sequence %d, so it was not trusted.',
+                $sequence
+            ));
         }
 
         $releases = [];
@@ -235,20 +249,45 @@ final class ReleaseFeed
         return is_int($seen) ? $seen : null;
     }
 
-    private function rememberSequence(int $sequence): void
+    /** Digest of the exact signed feed at the remembered sequence, if known. */
+    private function highestSequenceDigest(): ?string
     {
         if ($this->stateDir === null) {
-            return;
+            return null;
         }
-        $highest = $this->highestSequenceSeen();
-        if ($highest !== null && $sequence <= $highest) {
-            return;
+        $decoded = json_decode((string) @file_get_contents($this->stateDir . '/feed-state.json'), true);
+        $digest = is_array($decoded) ? ($decoded['highestDigest'] ?? null) : null;
+
+        return is_string($digest) && preg_match('/^[a-f0-9]{64}$/', $digest) === 1 ? $digest : null;
+    }
+
+    private function rememberSequence(
+        int $sequence,
+        string $digest,
+        string $raw,
+        string $signature,
+        ?array $announced,
+        array $configured,
+    ): bool
+    {
+        if ($this->stateDir === null) {
+            return true;
         }
         if (!is_dir($this->stateDir)) {
             @mkdir($this->stateDir, 0o775, true);
         }
 
         $path = $this->stateDir . '/feed-state.json';
+        $lock = @fopen($path . '.lock', 'c');
+        if ($lock === false || !flock($lock, LOCK_EX)) {
+            if (is_resource($lock)) {
+                fclose($lock);
+            }
+
+            // If persistent rollback state cannot be protected, do not accept
+            // an update that would silently disable replay protection.
+            return false;
+        }
 
         // Merged, not replaced. Writing only the sequence would drop the
         // announced keys on the next ordinary feed, so a site that had just
@@ -256,12 +295,61 @@ final class ReleaseFeed
         // it — the rotation quietly undoing itself one fetch later.
         $state = json_decode((string) @file_get_contents($path), true);
         $state = is_array($state) ? $state : [];
+        // Signature verification happened before this lock to avoid holding it
+        // over network I/O. Recheck against the now-current trust set while
+        // serialized with state changes: an in-flight fetch signed by a key
+        // retired by a newer feed must not commit afterward.
+        $currentlyAnnounced = $state['announcedKeys'] ?? null;
+        $currentKeys = array_merge(
+            $configured,
+            is_array($currentlyAnnounced)
+                ? array_values(array_filter($currentlyAnnounced, static fn ($key): bool => is_string($key) && $key !== ''))
+                : [],
+        );
+        if (!$this->verifiesAgainstAny($raw, $signature, $currentKeys)) {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+
+            return false;
+        }
+        $highest = is_int($state['highestSequence'] ?? null) ? $state['highestSequence'] : null;
+        $knownDigest = is_string($state['highestDigest'] ?? null) ? $state['highestDigest'] : null;
+        if (($highest !== null && $sequence < $highest)
+            || ($highest !== null && $sequence === $highest && $knownDigest !== null
+                && !hash_equals($knownDigest, $digest))) {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+
+            return false;
+        }
+        if ($highest !== null && $sequence === $highest && $knownDigest !== null
+            && hash_equals($knownDigest, $digest)) {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+
+            return true;
+        }
         $state['highestSequence'] = $sequence;
+        $state['highestDigest'] = $digest;
+
+        // Keep sequence/digest and key rotation in one locked state update. If
+        // these were separate writes, an older concurrent fetch could finish
+        // last and reinstate a key retired by the newer feed.
+        if ($announced !== null) {
+            $state['announcedKeys'] = $this->validatedAnnouncedKeys($announced, $configured);
+        }
 
         $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
-        if (@file_put_contents($tmp, json_encode($state, JSON_PRETTY_PRINT), LOCK_EX) !== false) {
-            @rename($tmp, $path);
+        $written = @file_put_contents($tmp, json_encode($state, JSON_PRETTY_PRINT), LOCK_EX) !== false
+            && @rename($tmp, $path);
+        if (!$written) {
+            @unlink($tmp);
         }
+
+        flock($lock, LOCK_UN);
+        fclose($lock);
+
+        return $written;
     }
 
     /* ------------------------------------------------------ key rotation -- */
@@ -298,23 +386,19 @@ final class ReleaseFeed
     }
 
     /**
-     * Replace the announced set with what this feed says.
+     * Validate a signed feed's replacement set of announced keys.
      *
      * Replace rather than merge, so retiring a key is possible at all: a set
      * that only ever grew would mean a compromised online key stayed trusted
-     * forever, which is the failure rotation exists to fix. The configured keys
-     * are excluded from the stored set because they are trusted unconditionally
-     * anyway, and storing them would blur which trust came from the operator.
+     * forever. Configured keys are excluded because they are trusted
+     * unconditionally and should remain visibly operator-controlled.
      *
      * @param array<mixed> $announced
      * @param list<string> $configured
+     * @return list<string>
      */
-    private function rememberAnnouncedKeys(array $announced, array $configured): void
+    private function validatedAnnouncedKeys(array $announced, array $configured): array
     {
-        if ($this->stateDir === null) {
-            return;
-        }
-
         $keys = [];
         foreach ($announced as $key) {
             // Only something OpenSSL will actually accept as a public key; a
@@ -327,17 +411,6 @@ final class ReleaseFeed
             }
         }
 
-        $path = $this->stateDir . '/feed-state.json';
-        $state = json_decode((string) @file_get_contents($path), true);
-        $state = is_array($state) ? $state : [];
-        $state['announcedKeys'] = array_values(array_unique($keys));
-
-        if (!is_dir($this->stateDir)) {
-            @mkdir($this->stateDir, 0o775, true);
-        }
-        $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
-        if (@file_put_contents($tmp, json_encode($state, JSON_PRETTY_PRINT), LOCK_EX) !== false) {
-            @rename($tmp, $path);
-        }
+        return array_values(array_unique($keys));
     }
 }

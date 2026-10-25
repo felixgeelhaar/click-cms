@@ -140,6 +140,9 @@ final class AdminSurfacesSmokeTest extends TestCase
 
     private function signInAsAdmin(): string
     {
+        $content = (new ReflectionMethod($this->app, 'getContentService'))->invoke($this->app);
+        $account = ['password' => 'test-hash', 'role' => 'admin', 'status' => 'active'];
+        $content->save(\Click\Cms\Domain\Content\Content::create($content->userKey('ada'), $account));
         $sessions = (new ReflectionProperty(Application::class, 'sessions'))->getValue($this->app);
         $ref = new ReflectionObject($sessions);
 
@@ -148,6 +151,8 @@ final class AdminSurfacesSmokeTest extends TestCase
         $ref->getProperty('id')->setValue($sessions, $id);
         $ref->getMethod('writeFile')->invoke($sessions, $id, [
             'user' => $this->admin(),
+            'username' => 'ada',
+            'accountFingerprint' => hash('sha256', serialize([$account['password'], $account['role'], $account['status'], null])),
             'csrfToken' => $token,
             'lastActivity' => time(),
             'expiresAt' => time() + 3600,

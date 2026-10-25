@@ -65,7 +65,7 @@ const makeFetch = (opts = {}) => vi.fn(async (url, init = {}) => {
     return jsonRes(201, { data: { slug: 'new-post', data: body.values, publication: NEVER } });
   }
   if (method === 'PUT' && entryMatch) {
-    return jsonRes(200, { data: { slug: entryMatch[1], data: body.values, publication: NEVER } });
+    return jsonRes(200, { data: { slug: entryMatch[1], data: body.values, publication: NEVER, revision: 'rev-2' } });
   }
   if (method === 'POST' && /\/publish$/.test(path)) return jsonRes(200, { data: { publication: LIVE } });
   if (method === 'POST' && /\/unpublish$/.test(path)) return jsonRes(200, { data: { publication: NEVER } });
@@ -239,7 +239,7 @@ describe('entry editor depth — languages and history', () => {
       // the language panel can mark it untranslated.
       if (/locale=de/.test(query)) return jsonRes(404, { error: 'Entry not found.' });
       const entry = ENTRIES.find((e) => e.slug === entryMatch[1]);
-      return jsonRes(200, { data: clone(entry) });
+      return jsonRes(200, { data: { ...clone(entry), revision: 'rev-1' } });
     }
 
     return jsonRes(200, { data: [] });
@@ -324,8 +324,9 @@ describe('entry editor depth — languages and history', () => {
 
     // Restore the older version (index 1): open the in-panel confirmation, then
     // confirm.
-    const restoreButtons = wrapper.findAll('.version .btn-sm');
-    await restoreButtons[0].trigger('click');
+    const restoreButton = wrapper.findAll('.version .btn-sm').find((button) => button.text().trim() === 'Restore');
+    expect(restoreButton).toBeDefined();
+    await restoreButton.trigger('click');
     await flushPromises();
     await wrapper.find('.confirm .btn-sm.primary').trigger('click');
     await flushPromises();

@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace Click\Cms\Infrastructure\Storage;
 
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Domain\Content\ContentRevision;
 use Click\Cms\Domain\History\Version;
 use Click\Cms\Domain\History\VersionStoreInterface;
+use Click\Cms\Domain\History\SynchronizedVersionStoreInterface;
 use Click\Cms\Domain\Publishing\Publishable;
 use Click\Cms\Domain\Publishing\PublicationState;
 use Click\Cms\Domain\Publishing\PublishingStorage;
+use Click\Cms\Domain\Publishing\ConditionalPublishingStorage;
+use Click\Cms\Domain\Storage\ConditionalStorage;
 use Click\Cms\Domain\Storage\StorageInterface;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
@@ -45,7 +49,7 @@ use Closure;
  * honest, rather than attributing the change to whoever happens to be first in
  * the user list.
  */
-final class VersioningStorage implements PublishingStorage
+final class VersioningStorage implements ConditionalPublishingStorage, ConditionalStorage
 {
     /** @var (Closure(): ?string)|null */
     private readonly ?Closure $author;
@@ -82,6 +86,29 @@ final class VersioningStorage implements PublishingStorage
     }
 
     public function saveWithReason(Content $content, string $reason): void
+    {
+        $this->synchronize($content->key, fn () => $this->saveUnlocked($content, $reason));
+    }
+
+    public function saveIfUnchanged(Content $content, string $expectedRevision): bool
+    {
+        if (!$this->versions instanceof SynchronizedVersionStoreInterface) {
+            throw new \RuntimeException('Conditional saves require a synchronized version store.');
+        }
+
+        return $this->versions->synchronize($content->key, function () use ($content, $expectedRevision): bool {
+            $current = $this->draft($content->key);
+            $actualRevision = $current === null ? '' : ContentRevision::of($current);
+            if (!hash_equals($actualRevision, $expectedRevision)) {
+                return false;
+            }
+
+            $this->saveUnlocked($content, Version::REASON_SAVE);
+            return true;
+        });
+    }
+
+    private function saveUnlocked(Content $content, string $reason): void
     {
         // A publishable type does not reach `content/` here at all. Editing a
         // live page used to change the live page in the same breath, which made
@@ -149,7 +176,25 @@ final class VersioningStorage implements PublishingStorage
         return $out;
     }
 
+    public function publishIfUnchanged(ContentKey $key, string $expectedRevision): Content|false|null
+    {
+        if (!$this->versions instanceof SynchronizedVersionStoreInterface) {
+            throw new \RuntimeException('Conditional publication requires a synchronized version store.');
+        }
+        return $this->versions->synchronize($key, function () use ($key, $expectedRevision): Content|false|null {
+            $draft = $this->draft($key);
+            if ($draft === null) return null;
+            if (!hash_equals($expectedRevision, ContentRevision::of($draft))) return false;
+            return $this->publishUnlocked($key);
+        });
+    }
+
     public function publish(ContentKey $key): ?Content
+    {
+        return $this->synchronize($key, fn () => $this->publishUnlocked($key));
+    }
+
+    private function publishUnlocked(ContentKey $key): ?Content
     {
         $draft = $this->draft($key);
 
@@ -169,11 +214,27 @@ final class VersioningStorage implements PublishingStorage
 
     public function unpublish(ContentKey $key): bool
     {
-        // No version is recorded. The newest version is the working copy, so
-        // appending the state being taken down would rewind an editor's
-        // in-progress replacement to the text they were replacing. What was
-        // live is already retained: the publish that put it there recorded it.
-        return $this->inner->delete($key);
+        return $this->synchronize($key, fn () => $this->inner->delete($key));
+    }
+
+    public function delete(ContentKey $key): bool
+    {
+        return $this->synchronize($key, fn () => $this->deleteUnlocked($key));
+    }
+
+    private function deleteUnlocked(ContentKey $key): bool
+    {
+        // Snapshot before removing, so deleting a page is recoverable too.
+        // The working copy may be the only copy of a never-published draft.
+        $existing = $this->draft($key);
+
+        if ($existing !== null) {
+            $this->versions->record($existing, $this->author(), Version::REASON_DELETE);
+        }
+
+        $removed = $this->inner->delete($key);
+
+        return $removed || $existing !== null;
     }
 
     public function publicationOf(ContentKey $key): PublicationState
@@ -185,31 +246,6 @@ final class VersioningStorage implements PublishingStorage
         );
     }
 
-    public function delete(ContentKey $key): bool
-    {
-        // Snapshot before removing, so deleting a page is recoverable too.
-        // Deletion is the one operation the old code offered no way back from
-        // at all, and the version outlives the document precisely so it can be
-        // restored afterwards.
-        //
-        // The working copy rather than the live document: a draft that was
-        // never published is the case where the version chain is the only copy
-        // in existence, and recording the live document would snapshot
-        // something older than what is being thrown away.
-        $existing = $this->draft($key);
-
-        if ($existing !== null) {
-            $this->versions->record($existing, $this->author(), Version::REASON_DELETE);
-        }
-
-        $removed = $this->inner->delete($key);
-
-        // A draft that was never published leaves nothing for the backend to
-        // remove, but something was deleted all the same, and reporting
-        // otherwise would have the caller answer 404 to a request that worked.
-        return $removed || $existing !== null;
-    }
-
     public function exists(ContentKey $key): bool
     {
         return $this->inner->exists($key);
@@ -218,5 +254,12 @@ final class VersioningStorage implements PublishingStorage
     private function author(): ?string
     {
         return $this->author === null ? null : ($this->author)();
+    }
+
+    private function synchronize(ContentKey $key, callable $operation): mixed
+    {
+        return $this->versions instanceof SynchronizedVersionStoreInterface
+            ? $this->versions->synchronize($key, $operation)
+            : $operation();
     }
 }

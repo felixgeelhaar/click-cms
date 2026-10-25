@@ -33,10 +33,10 @@ final class UpdateDecision
     /**
      * Pick the best release the site can actually run and decide how to treat it.
      *
-     * "Best" is the newest that (a) is newer than what is running, (b) runs on
-     * this PHP, and (c) is stable unless pre-releases were asked for. A security
-     * release is preferred over a newer non-security one only insofar as it is
-     * newer — the newest applicable release already includes earlier fixes.
+     * Prefer the newest applicable release permitted by the unattended policy.
+     * When none is permitted, offer the newest applicable release for review.
+     * Applicable releases are newer than the running version, support this PHP,
+     * and are stable unless pre-releases were requested.
      *
      * @param list<Release> $releases
      */
@@ -72,23 +72,28 @@ final class UpdateDecision
         usort($applicable, static fn (Release $a, Release $b): int => $a->version->compare($b->version));
         $best = end($applicable);
 
-        $step = $best->version->stepFrom($current);
-
-        // A security fix anywhere in the skipped range makes this update a
-        // security update: taking the newest release also takes that fix, and an
-        // administrator who set the policy to "security" means to receive it.
+        // Prefer the newest release the policy can actually install. Otherwise
+        // a newer major (or opted-in beta) would indefinitely block a stable
+        // compatible update. Keep the newest offer for notification when no
+        // unattended candidate exists.
         $carriesSecurityFix = false;
+        $automaticCandidate = null;
         foreach ($applicable as $release) {
-            if ($release->security) {
-                $carriesSecurityFix = true;
-                break;
+            $carriesSecurityFix = $carriesSecurityFix || $release->security;
+            if ($policy->allowsAutomatic(
+                $release->version->stepFrom($current),
+                $carriesSecurityFix,
+                $release->version->isPreRelease(),
+            )) {
+                $automaticCandidate = $release;
             }
         }
 
+        $selected = $automaticCandidate ?? $best;
         return new self(
-            release: $best,
-            step: $step,
-            automatic: $policy->allowsAutomatic($step, $carriesSecurityFix, $best->version->isPreRelease()),
+            release: $selected,
+            step: $selected->version->stepFrom($current),
+            automatic: $automaticCandidate !== null,
             reason: '',
         );
     }

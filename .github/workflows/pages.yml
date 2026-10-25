@@ -80,7 +80,7 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
@@ -145,6 +145,8 @@ jobs:
 
       - name: Add each package's checksum
         run: |
+          # PHP variables must remain literal for the PHP interpreter.
+          # shellcheck disable=SC2016
           php -r '
             $rows = json_decode(file_get_contents("releases-raw.json"), true) ?: [];
             $out = [];
@@ -282,11 +284,11 @@ jobs:
       # Bump both to `upload-pages-artifact@v5` / `deploy-pages@v5` once #26 is
       # closed, or sooner if Node 20 stops being merely deprecated. Until then
       # the stale pin buys a comparable baseline, which is worth more.
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: _site
 
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
         id: deployment
 
       # ---------------------------------------------------- verification --

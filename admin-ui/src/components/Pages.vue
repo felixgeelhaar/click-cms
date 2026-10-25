@@ -5,7 +5,7 @@
         <h1 class="page-title">Pages</h1>
         <p class="page-subtitle">Manage your content pages</p>
       </div>
-      <a class="btn-primary" :href="withBase(newPageHref)" @click="go($event, newPageHref)">+ New Page</a>
+      <a v-if="canCreate" class="btn-primary" :href="withBase(newPageHref)" @click="go($event, newPageHref)">+ New Page</a>
     </div>
 
     <div class="toolbar">
@@ -15,6 +15,19 @@
           <option v-for="code in locales" :key="code" :value="code">
             {{ localeName(code) }}
           </option>
+        </select>
+      </div>
+
+      <div class="page-search">
+        <label class="locale-label" for="pages-search">Search pages</label>
+        <input id="pages-search" v-model="search" type="search" placeholder="Title or slug" autocomplete="off">
+      </div>
+      <div class="page-sort">
+        <label class="locale-label" for="pages-sort">Sort by</label>
+        <select id="pages-sort" v-model="sortBy" class="locale-select">
+          <option value="recent">Recently updated</option>
+          <option value="title">Title</option>
+          <option value="slug">Slug</option>
         </select>
       </div>
 
@@ -32,11 +45,14 @@
       </div>
     </div>
 
-    <p v-if="localeError" class="notice" role="status">{{ localeError }}</p>
+    <div v-if="localeError" class="notice" role="alert">
+      <p>{{ localeError }}</p>
+      <button type="button" class="btn-sm btn-secondary" @click="loadPages" :disabled="loading">Retry</button>
+    </div>
 
     <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="filteredPages.length === 0" class="empty-state">{{ emptyMessage }}</div>
-    <div v-else class="page-list">
+    <div v-else-if="!loadFailed && !unavailableLocales.includes(activeLocale) && filteredPages.length === 0" class="empty-state">{{ emptyMessage }}</div>
+    <div v-else-if="!loadFailed" class="page-list">
       <div v-for="page in filteredPages" :key="page.key" class="page-card">
         <div class="page-info">
           <!-- h2, not h3: this screen's only h1 is "Pages", so a card title at
@@ -65,28 +81,30 @@
               </a>
               <span v-else class="lang-chip missing">
                 <span class="lang-code">{{ code }}</span>
-                <span class="lang-state">Not translated</span>
+                <span class="lang-state">{{ unavailableLocales.includes(code) ? 'Status unavailable' : 'Not translated' }}</span>
               </span>
             </li>
           </ul>
         </div>
 
         <div class="page-actions">
-          <a
+          <a v-if="canEditPage(page)"
             class="btn-sm btn-secondary"
             :href="withBase(editHref(slugOf(page), activeLocale))"
             :aria-label="`Edit ${page.data?.title || slugOf(page)}`"
             @click="go($event, editHref(slugOf(page), activeLocale))"
           >Edit</a>
-          <button
+          <button v-if="canDeletePage(page)"
             type="button"
             class="btn-sm btn-danger"
             :aria-label="`Delete ${page.data?.title || slugOf(page)}`"
+            :disabled="deleting !== ''"
             @click="deletePage(slugOf(page))"
-          >Delete</button>
+          >{{ deleting === slugOf(page) ? 'Deleting…' : 'Delete' }}</button>
         </div>
       </div>
     </div>
+    <p v-if="!loading && !loadFailed && !canEditAnything" class="notice" role="status">Read only: you can review pages, but your account cannot edit them.</p>
   </div>
 </template>
 
@@ -95,6 +113,11 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { withBase } from '../lib/base.js';
 
 const emit = defineEmits(['navigate']);
+const props = defineProps({
+  capabilities: { type: Array, default: () => [] },
+  username: { type: String, default: '' },
+  siteId: { type: String, default: '' },
+});
 
 /**
  * Publication is no longer a field on the document — `content/` holds published
@@ -120,11 +143,32 @@ const TABS = [
 
 const byLocale = ref({});
 const locales = ref([]);
-const activeLocale = ref('');
+const legacyFilterKey = 'click-admin-pages-filters';
+const filterStorageKey = `click-admin-pages-filters:${encodeURIComponent(props.siteId || 'default')}`;
+const savedFilters = (() => {
+  try {
+    // Older versions persisted search text globally across accounts and sites.
+    // It can include private page titles, so discard that legacy record.
+    window.localStorage?.removeItem(legacyFilterKey);
+    return JSON.parse(window.localStorage?.getItem(filterStorageKey) || '{}');
+  }
+  catch { return {}; }
+})();
+const activeLocale = ref(typeof savedFilters.locale === 'string' ? savedFilters.locale : '');
 const defaultLocale = ref('');
 const loading = ref(true);
 const localeError = ref('');
-const currentTab = ref('all');
+const loadFailed = ref(false);
+const unavailableLocales = ref([]);
+const deleting = ref('');
+const search = ref('');
+const sortBy = ref(['recent', 'title', 'slug'].includes(savedFilters.sortBy) ? savedFilters.sortBy : 'recent');
+const currentTab = ref(TABS.some(({ value }) => value === savedFilters.currentTab) ? savedFilters.currentTab : 'all');
+const can = (capability) => props.capabilities.includes(capability);
+const canCreate = computed(() => can('content.create'));
+const canEditAnything = computed(() => can('content.edit.any') || can('content.edit.own'));
+const canEditPage = (page) => can('content.edit.any') || (can('content.edit.own') && !!props.username && page.data?.owner === props.username);
+const canDeletePage = (page) => can('content.delete.any') || (can('content.delete.own') && !!props.username && page.data?.owner === props.username);
 
 const rows = computed(() => byLocale.value[activeLocale.value] ?? []);
 
@@ -155,19 +199,41 @@ const publishedAt = (page) => {
 // rather than tabs that would all read zero.
 const hasPublicationData = computed(() => rows.value.some((p) => stateOf(p) !== 'unknown'));
 const visibleTabs = computed(() => (hasPublicationData.value ? TABS : TABS.slice(0, 1)));
+watch(visibleTabs, (tabs) => {
+  if (!tabs.some(({ value }) => value === currentTab.value)) currentTab.value = 'all';
+});
 
-const filteredPages = computed(() =>
-  currentTab.value === 'all' ? rows.value : rows.value.filter((p) => stateOf(p) === currentTab.value)
-);
+const filteredPages = computed(() => {
+  const query = search.value.trim().toLocaleLowerCase();
+  const matches = rows.value.filter((page) => {
+    const matchesState = currentTab.value === 'all' || stateOf(page) === currentTab.value;
+    const searchable = `${page.data?.title ?? ''} ${slugOf(page)}`.toLocaleLowerCase();
+    return matchesState && (!query || searchable.includes(query));
+  });
+  const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+  return matches.sort((a, b) => {
+    if (sortBy.value === 'title') return collator.compare(a.data?.title || slugOf(a), b.data?.title || slugOf(b));
+    if (sortBy.value === 'slug') return collator.compare(slugOf(a), slugOf(b));
+    const updated = (p) => Date.parse(p.data?.updatedAt || p.data?.updated_at || p.data?.createdAt || '') || 0;
+    return updated(b) - updated(a);
+  });
+});
 
 const tabCount = (tab) =>
   tab === 'all' ? rows.value.length : rows.value.filter((p) => stateOf(p) === tab).length;
 
 const emptyMessage = computed(() =>
-  currentTab.value === 'all'
-    ? 'No pages in this language yet.'
-    : `No pages are ${stateLabel(currentTab.value).toLowerCase()} in this language.`
+  search.value.trim()
+    ? 'No pages match your search and filters.'
+    : currentTab.value === 'all'
+      ? 'No pages in this language yet.'
+      : `No pages are ${stateLabel(currentTab.value).toLowerCase()} in this language.`
 );
+
+watch([search, sortBy, currentTab, activeLocale], () => {
+  try { window.localStorage?.setItem(filterStorageKey, JSON.stringify({ sortBy: sortBy.value, currentTab: currentTab.value, locale: activeLocale.value })); }
+  catch { /* Preferences are a convenience; private browsing may deny storage. */ }
+});
 
 /** The same slug in another language, if it exists there. */
 const pageIn = (code, slug) => (byLocale.value[code] ?? []).find((p) => slugOf(p) === slug);
@@ -199,12 +265,16 @@ const go = (event, href) => {
 
 const fetchLocale = async (code) => {
   const res = await fetch(code ? `/api/pages?locale=${encodeURIComponent(code)}` : '/api/pages');
-  return res.json();
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `Could not load pages (${res.status}).`);
+  return body;
 };
 
 const loadPages = async () => {
   loading.value = true;
   localeError.value = '';
+  loadFailed.value = false;
+  unavailableLocales.value = [];
   try {
     const first = await fetchLocale(null);
     defaultLocale.value = first.locale ?? '';
@@ -219,27 +289,42 @@ const loadPages = async () => {
     const loaded = { [defaultLocale.value]: first.data ?? [] };
     const others = locales.value.filter((c) => c !== defaultLocale.value);
     const results = await Promise.all(others.map((c) => fetchLocale(c).catch(() => null)));
-    others.forEach((c, i) => { loaded[c] = results[i]?.data ?? []; });
+    others.forEach((c, i) => {
+      if (results[i] === null) unavailableLocales.value.push(c);
+      loaded[c] = results[i]?.data ?? [];
+    });
+    if (unavailableLocales.value.length) {
+      localeError.value = `Could not load pages in ${unavailableLocales.value.map(localeName).join(', ')}. Retry to check their translation status.`;
+    }
 
     byLocale.value = loaded;
   } catch (e) {
     console.error(e);
-    localeError.value = 'Could not load pages.';
+    loadFailed.value = true;
+    localeError.value = e.message || 'Could not load pages.';
   }
   loading.value = false;
 };
 
 const deletePage = async (slug) => {
   if (!confirm(`Delete "${slug}" in ${localeName(activeLocale.value)}? Other languages are not affected.`)) return;
-  // Locale-scoped: page:de:home and page:en:home are separate documents, and
-  // deleting one must not take the other down.
-  await fetch(`/api/pages/${encodeURIComponent(slug)}?locale=${encodeURIComponent(activeLocale.value)}`, {
-    method: 'DELETE',
-  });
-  await loadPages();
+  deleting.value = slug;
+  localeError.value = '';
+  try {
+    const res = await fetch(`/api/pages/${encodeURIComponent(slug)}?locale=${encodeURIComponent(activeLocale.value)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Could not delete this page (${res.status}).`);
+    }
+    await loadPages();
+  } catch (e) {
+    localeError.value = e.message || 'Could not delete this page. Try again.';
+  } finally {
+    deleting.value = '';
+  }
 };
-
-watch(activeLocale, () => { currentTab.value = 'all'; });
 
 onMounted(loadPages);
 </script>
@@ -255,6 +340,9 @@ onMounted(loadPages);
 .locale-picker { display: flex; align-items: center; gap: 0.5rem; }
 .locale-label { color: var(--app-text-muted); font-size: 0.875rem; font-weight: 500; }
 .locale-select { padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--control-border); background: var(--app-surface); color: var(--app-text); font-size: 0.875rem; font-weight: 500; }
+.page-search, .page-sort { display: flex; align-items: center; gap: 0.5rem; }
+.page-search input { min-width: 14rem; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--control-border); background: var(--app-surface); color: var(--app-text); font: inherit; }
+.page-search input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--focus-ring); }
 .locale-select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--focus-ring); }
 
 .filter-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
@@ -309,4 +397,13 @@ a.lang-chip:hover, a.lang-chip:focus-visible { background: var(--sidebar-hover);
 [data-theme="dark"] .lang-chip.live .lang-state { color: #86efac; }
 [data-theme="dark"] .lang-chip.pending .lang-state { color: #fcd34d; }
 [data-theme="dark"] .lang-chip.takendown .lang-state { color: #fca5a5; }
+</style>
+
+<style scoped>
+button:disabled { opacity: 0.65; cursor: wait; }
+@media (max-width: 600px) {
+  .page-header, .page-card { align-items: flex-start; flex-direction: column; }
+  .filter-tabs { flex-wrap: wrap; }
+  .page-actions { width: 100%; }
+}
 </style>

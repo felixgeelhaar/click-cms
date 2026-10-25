@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Click\Cms\Http;
 
+use Click\Cms\Application\Authentication\PasswordInput;
 use Click\Cms\Application\Config\CoreConfig;
 use Click\Cms\Application\Content\ContentService;
 use Click\Cms\Domain\Content\Content;
@@ -187,13 +188,18 @@ final class UsersController
     {
         // Removed, not nulled: a `"password": null` in a response reads like an
         // account without one, which is alarming and untrue.
-        unset($user['data']['password'], $user['password']);
+        unset($user['data']['password'], $user['password'], $user['data']['twoFactor'], $user['twoFactor']);
 
         return $user;
     }
 
     private function rejectWeakPassword(string $password): ?string
     {
+        $hashingError = PasswordInput::hashingError($password);
+        if ($hashingError !== null) {
+            return $hashingError;
+        }
+
         $minimum = $this->config->passwordMinLength();
         if (mb_strlen($password) < $minimum) {
             return "Password must be at least {$minimum} characters.";

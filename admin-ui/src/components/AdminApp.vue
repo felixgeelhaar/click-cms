@@ -65,14 +65,14 @@
              sets. It is only in the tree while open. -->
         <div v-if="mobileNavOpen" class="sidebar-backdrop" aria-hidden="true" @click="mobileNavOpen = false"></div>
         <aside id="admin-sidebar" class="sidebar-shell" :class="{ collapsed: isCollapsed, 'is-open': mobileNavOpen }">
-          <Sidebar :active-route="currentRoute" :user-role="currentUser?.role" :collapsed="isCollapsed" :show-builder="hasBuilder" :show-webhooks="hasWebhooks" :show-reviews="hasReviews" :show-release="hasRelease" @navigate="handleNavigate" />
+          <Sidebar :active-route="currentRoute" :user-role="currentUser?.role" :capabilities="currentUser?.capabilities ?? []" :collapsed="isCollapsed" :show-builder="hasBuilder" :show-webhooks="hasWebhooks" :show-reviews="hasReviews" :show-release="hasRelease" @navigate="handleNavigate" />
         </aside>
         <main id="admin-main" ref="mainEl" tabindex="-1" class="main-content" :class="{ collapsed: isCollapsed }">
           <!-- Above the page rather than inside it, so it is seen once on
                arrival wherever the reader lands, and never competes with the
                screen they came for. -->
           <UpdateNotice :capabilities="currentUser?.capabilities ?? []" />
-          <component :is="currentComponent" v-bind="currentProps" @navigate="handleNavigate" @saved="handleNavigate('/admin/pages')" @cancel="handleNavigate('/admin/pages')" @back="handleNavigate('/admin/plugins')" @branding-updated="handleBrandingUpdate" @settings-updated="handleSettingsUpdated" />
+          <component :is="currentComponent" v-bind="currentProps" @navigate="handleNavigate" @replace-route="handleReplaceRoute" @saved="handleNavigate('/admin/pages')" @cancel="handleCancel" @back="handleNavigate('/admin/plugins')" @branding-updated="handleBrandingUpdate" @settings-updated="handleSettingsUpdated" />
         </main>
       </div>
     </div>
@@ -80,7 +80,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue';
 import Sidebar from './Sidebar.vue';
 import UpdateNotice from './UpdateNotice.vue';
 import Login from './Login.vue';
@@ -105,10 +105,16 @@ import Builder from './Builder.vue';
 import ReviewsInbox from './collaboration/ReviewsInbox.vue';
 import Release from './collaboration/Release.vue';
 import ChangePassword from './ChangePassword.vue';
+import SecurityHealth from './SecurityHealth.vue';
+import ReviewInbox from './ReviewInbox.vue';
 import { installCsrfFetch, setCsrfToken } from '../lib/api.js';
 import { currentRoute as routeFromLocation, withBase } from '../lib/base.js';
+import { clearAccountDraftRecovery } from './page-edit/draftRecovery.js';
+import { clearSectionTemplates } from '../lib/sectionTemplates.js';
 
 const currentRoute = ref('/admin');
+const historyIndex = ref(0);
+let restoringPopState = false;
 const isLoggedIn = ref(false);
 const currentUser = ref(null);
 const installedPluginIds = ref([]);
@@ -235,7 +241,19 @@ const handlePasswordChanged = async () => {
   await checkAuth();
 };
 
-const handleLogout = async () => { await fetch('/api/auth/logout', { method: 'POST' }); currentUser.value = null; isLoggedIn.value = false; };
+const handleLogout = async () => {
+  if (!approveNavigation()) return;
+  const response = await fetch('/api/auth/logout', { method: 'POST' });
+  if (response.ok) {
+    clearAccountDraftRecovery(window.localStorage, currentUser.value?.username);
+    if (site.value.id) clearSectionTemplates({
+      account: currentUser.value?.username ?? '',
+      site: `${window.location.origin}/${site.value.id}`,
+    });
+  }
+  currentUser.value = null;
+  isLoggedIn.value = false;
+};
 const toggleSidebar = () => {
   if (isMobileViewport()) { mobileNavOpen.value = !mobileNavOpen.value; }
   else { isCollapsed.value = !isCollapsed.value; }
@@ -268,15 +286,17 @@ const handleBrandingUpdate = (nextBranding) => { branding.value = nextBranding; 
 const getRouteComponent = () => {
   const path = currentRoute.value.split('?')[0];
   if (path === '/admin' || path === '/admin/') return Dashboard;
-  if (path === '/admin/pages') return Pages;
-  if (path === '/admin/collections' || path.startsWith('/admin/collections/')) return Collections;
-  if (path === '/admin/media') return Media;
+  if (path === '/admin/pages') return can('content.view') ? Pages : Dashboard;
+  if (path === '/admin/collections' || path.startsWith('/admin/collections/')) return can('content.view') ? Collections : Dashboard;
+  if (path === '/admin/media') return can('media.view') ? Media : Dashboard;
   if (path === '/admin/users') return can('users.manage') ? Users : Dashboard;
   if (path === '/admin/profile') return Profile;
   if (path === '/admin/password') return ChangePassword;
   if (path === '/admin/plugins') return can('plugins.manage') ? Plugins : Dashboard;
   if (path === '/admin/marketplace') return can('plugins.install') ? Marketplace : Dashboard;
   if (path === '/admin/settings') return can('settings.manage') ? Settings : Dashboard;
+  if (path === '/admin/security') return can('settings.manage') ? SecurityHealth : Dashboard;
+  if (path === '/admin/reviews') return can('content.edit.any') ? (hasReviews.value ? ReviewsInbox : ReviewInbox) : Dashboard;
   if (path === '/admin/themes') return can('settings.manage') ? Themes : Dashboard;
   if (path === '/admin/updates') return can('plugins.install') ? Updates : Dashboard;
   // Menus and redirects were the two routes with no check at all, so an account
@@ -295,10 +315,9 @@ const getRouteComponent = () => {
   if (path === '/admin/submissions') return FormSubmissions;
   if (path === '/admin/builder') return hasBuilder.value ? Builder : Dashboard;
   if (path === '/admin/webhooks') return hasWebhooks.value ? Webhooks : Dashboard;
-  if (path === '/admin/reviews') return hasReviews.value ? ReviewsInbox : Dashboard;
   if (path === '/admin/release') return hasRelease.value ? Release : Dashboard;
-  if (path.startsWith('/admin/pages/edit/')) return PageEdit;
-  if (path === '/admin/pages/new') return PageEdit;
+  if (path.startsWith('/admin/pages/edit/')) return can('content.edit.any') || can('content.edit.own') ? PageEdit : Dashboard;
+  if (path === '/admin/pages/new') return can('content.create') ? PageEdit : Dashboard;
   if (path.startsWith('/admin/plugins/')) return PluginDetail;
   return Dashboard;
 };
@@ -310,11 +329,11 @@ const getRouteProps = () => {
     // page list's language chips, or a bookmark — opens that translation rather
     // than always the default one.
     const locale = new URLSearchParams(query || '').get('locale') || '';
-    return { slug: path.replace('/admin/pages/edit/', ''), initialLocale: locale };
+    return { slug: path.replace('/admin/pages/edit/', ''), initialLocale: locale, capabilities: currentUser.value?.capabilities ?? [], username: currentUser.value?.username ?? '' };
   }
   if (path === '/admin/pages/new') {
     const locale = new URLSearchParams((currentRoute.value.split('?')[1]) || '').get('locale') || '';
-    return { initialLocale: locale };
+    return { initialLocale: locale, capabilities: currentUser.value?.capabilities ?? [], username: currentUser.value?.username ?? '' };
   }
   if (path === '/admin/collections' || path.startsWith('/admin/collections/')) {
     // /admin/collections
@@ -340,38 +359,122 @@ const getRouteProps = () => {
   }
   if (path.startsWith('/admin/plugins/') && path !== '/admin/plugins') return { id: path.replace('/admin/plugins/', '') };
   if (path === '/admin/users') return { userRole: currentUser.value?.role, currentUsername: currentUser.value?.username };
-  if (path === '/admin/reviews') return { currentUsername: currentUser.value?.username };
+  if (path === '/admin/reviews') return { currentUsername: currentUser.value?.username ?? '', canReview: can('content.publish') };
   if (path === '/admin/plugins') return { userRole: currentUser.value?.role };
   if (path === '/admin/profile' && currentUser.value) return { user: currentUser.value };
-  if (path === '/admin' || path === '/admin/') {
-    return { capabilities: currentUser.value?.capabilities ?? [] };
-  }
+  if (path === '/admin/pages') return {
+    capabilities: currentUser.value?.capabilities ?? [],
+    username: currentUser.value?.username ?? '',
+    siteId: site.value.id,
+  };
+  if (path === '/admin' || path === '/admin/') return { capabilities: currentUser.value?.capabilities ?? [] };
   return {};
 };
 
 const currentComponent = computed(() => getRouteComponent());
 const currentProps = computed(() => getRouteProps());
 
-const handleNavigate = (path) => {
+const screenTitles = new Map([
+  [Dashboard, 'Dashboard'], [Pages, 'Pages'], [Collections, 'Collections'],
+  [Media, 'Media'], [Users, 'Users'], [Profile, 'Profile'],
+  [Settings, 'Settings'], [Redirects, 'Redirects'], [Menus, 'Menus'],
+  [SecurityHealth, 'Security health'],
+  [ReviewInbox, 'Reviews'],
+  [FormSubmissions, 'Form submissions'], [Webhooks, 'Webhooks'],
+  [Plugins, 'Plugins'], [PluginDetail, 'Plugin details'],
+  [Marketplace, 'Marketplace'], [Themes, 'Themes'], [Updates, 'Updates'],
+  [Builder, 'Visual Builder'], [ChangePassword, 'Change password'],
+]);
+
+watchEffect(() => {
+  let title;
+  if (!isLoggedIn.value) title = 'Sign in';
+  else if (mustChangePassword.value) title = 'Choose a password';
+  else if (currentComponent.value === PageEdit) {
+    title = currentProps.value.slug ? 'Edit Page' : 'New Page';
+  } else title = screenTitles.get(currentComponent.value) || 'Dashboard';
+  document.title = `${title} - Click CMS Admin`;
+});
+
+// A newly saved page becomes bookmarkable without adding a stale creation
+// screen to Back history or remounting the editor and losing its state.
+const handleReplaceRoute = (path) => {
+  const url = withBase(path);
+  currentRoute.value = path;
+  window.history.replaceState({ ...(window.history.state || {}), __clickAdminIndex: historyIndex.value }, '', url);
+};
+const onPopState = () => {
+  const targetIndex = Number(window.history.state?.__clickAdminIndex);
+  if (restoringPopState) {
+    restoringPopState = false;
+    currentRoute.value = routeFromLocation();
+    if (Number.isFinite(targetIndex)) historyIndex.value = targetIndex;
+    return;
+  }
+  if (!approveNavigation()) {
+    // popstate cannot be cancelled. Return to the app's prior history entry;
+    // the one-shot flag lets this restoration pass without a second prompt.
+    if (Number.isFinite(targetIndex) && targetIndex !== historyIndex.value) {
+      restoringPopState = true;
+      window.history.go(historyIndex.value - targetIndex);
+    } else {
+      // An older entry may have no app index. Keep the URL aligned with the
+      // editor rather than accepting a route change whose component stayed put.
+      window.history.replaceState(
+        { ...(window.history.state || {}), __clickAdminIndex: historyIndex.value },
+        '',
+        withBase(currentRoute.value)
+      );
+    }
+    return;
+  }
+  currentRoute.value = routeFromLocation();
+  if (Number.isFinite(targetIndex)) historyIndex.value = targetIndex;
+};
+
+const approveNavigation = () => {
+  const event = new Event('click:before-navigate', { cancelable: true });
+  window.dispatchEvent(event);
+  return !event.defaultPrevented;
+};
+
+const commitNavigate = (path) => {
   // The route stays as the app spells it — `/admin/pages` — and only the address
   // bar gets the installation's prefix. That is what keeps every route
   // comparison below free of the question of where the CMS is installed.
   currentRoute.value = path;
-  window.history.pushState({}, '', withBase(path));
+  historyIndex.value += 1;
+  window.history.pushState({ __clickAdminIndex: historyIndex.value }, '', withBase(path));
   // Following a link closes the mobile drawer, so the destination is not left
   // hidden behind the menu the reader just used.
   mobileNavOpen.value = false;
 };
 
+const handleNavigate = (path) => {
+  if (approveNavigation()) commitNavigate(path);
+};
+
+// Editors already confirm their explicit Cancel action. This path avoids
+// asking twice after the editor has approved that discard.
+const handleCancel = () => commitNavigate('/admin/pages');
+
 onMounted(async () => {
   installCsrfFetch();
   currentRoute.value = routeFromLocation();
+  if (Number.isFinite(window.history.state?.__clickAdminIndex)) {
+    historyIndex.value = window.history.state.__clickAdminIndex;
+  } else {
+    history.replaceState({ ...(window.history.state || {}), __clickAdminIndex: 0 }, '', window.location.href);
+  }
   await checkAuth();
-  window.addEventListener('popstate', () => { currentRoute.value = routeFromLocation(); });
+  window.addEventListener('popstate', onPopState);
   window.addEventListener('keydown', onKeydown);
 });
 
-onUnmounted(() => { window.removeEventListener('keydown', onKeydown); });
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown);
+  window.removeEventListener('popstate', onPopState);
+});
 </script>
 
 <style scoped>

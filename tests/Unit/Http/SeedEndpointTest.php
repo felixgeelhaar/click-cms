@@ -62,14 +62,20 @@ final class SeedEndpointTest extends TestCase
 
     private function signInAs(string $role): string
     {
+        $content = (new ReflectionMethod($this->app, 'getContentService'))->invoke($this->app);
+        $account = ['password' => 'test-hash', 'role' => $role, 'status' => 'active'];
+        $content->save(\Click\Cms\Domain\Content\Content::create($content->userKey('u'), $account));
         $sessions = (new \ReflectionProperty(Application::class, 'sessions'))->getValue($this->app);
         $ref = new ReflectionObject($sessions);
 
         $id = str_repeat('c', 64);
         $token = str_repeat('d', 64);
         $ref->getProperty('id')->setValue($sessions, $id);
+        $_COOKIE[\Click\Cms\Application\Authentication\SessionStore::COOKIE] = $id;
         $ref->getMethod('writeFile')->invoke($sessions, $id, [
+            'username' => 'u',
             'user' => ['username' => 'u', 'role' => $role],
+            'accountFingerprint' => hash('sha256', serialize([$account['password'], $account['role'], $account['status'], null])),
             'csrfToken' => $token,
             'lastActivity' => time(),
             'expiresAt' => time() + 3600,

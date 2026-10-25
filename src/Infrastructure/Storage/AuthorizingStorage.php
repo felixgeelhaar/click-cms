@@ -8,6 +8,8 @@ use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\History\Version;
 use Click\Cms\Domain\Publishing\PublicationState;
 use Click\Cms\Domain\Publishing\PublishingStorage;
+use Click\Cms\Domain\Publishing\ConditionalPublishingStorage;
+use Click\Cms\Domain\Storage\ConditionalStorage;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
 use Closure;
@@ -45,7 +47,7 @@ use Closure;
  * path by the caller that has the request context; gating it here would turn
  * every public page view into a policy call and every miss into a 500.
  */
-final class AuthorizingStorage implements PublishingStorage
+final class AuthorizingStorage implements ConditionalPublishingStorage, ConditionalStorage
 {
     /** The operation names handed to the authorizer. */
     public const OP_WRITE = 'write';
@@ -112,6 +114,16 @@ final class AuthorizingStorage implements PublishingStorage
         $this->saveWithReason($content, Version::REASON_SAVE);
     }
 
+    public function saveIfUnchanged(Content $content, string $expectedRevision): bool
+    {
+        $this->guard(self::OP_WRITE, $content->key);
+        if (!$this->inner instanceof ConditionalStorage) {
+            throw new \RuntimeException('Conditional saves are not supported by the wrapped storage.');
+        }
+
+        return $this->inner->saveIfUnchanged($content, $expectedRevision);
+    }
+
     public function saveWithReason(Content $content, string $reason): void
     {
         // A save and a restore are both 'write': the capability being checked is
@@ -128,6 +140,16 @@ final class AuthorizingStorage implements PublishingStorage
         $this->guard(self::OP_DELETE, $key);
 
         return $this->inner->delete($key);
+    }
+
+    public function publishIfUnchanged(ContentKey $key, string $expectedRevision): Content|false|null
+    {
+        $this->guard(self::OP_PUBLISH, $key);
+        if (!$this->inner instanceof ConditionalPublishingStorage) {
+            throw new \RuntimeException('Conditional publication is not supported by the wrapped storage.');
+        }
+        $published = $this->inner->publishIfUnchanged($key, $expectedRevision);
+        return $published;
     }
 
     public function publish(ContentKey $key): ?Content

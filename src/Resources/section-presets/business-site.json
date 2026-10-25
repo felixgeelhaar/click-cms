@@ -1,0 +1,72 @@
+{
+  "id": "starter-business-site",
+  "name": "Business services site",
+  "version": 1,
+  "sections": [
+    {
+      "type": "section-heading",
+      "values": {
+        "heading": "Good work, done with care",
+        "intro": "A clear introduction to what your business does and who you help. Replace this text with your own voice."
+      }
+    },
+    {
+      "type": "card-grid",
+      "values": {
+        "heading": "How we can help",
+        "intro": "Describe the services customers come to you for.",
+        "columns": "3",
+        "cards": [
+          {
+            "title": "Plan",
+            "body": "A focused first step, shaped around your needs.",
+            "image": "",
+            "link": ""
+          },
+          {
+            "title": "Build",
+            "body": "Thoughtful work delivered with clear communication.",
+            "image": "",
+            "link": ""
+          },
+          {
+            "title": "Support",
+            "body": "Practical help to keep things working well.",
+            "image": "",
+            "link": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "rich-text",
+      "values": {
+        "heading": "A little about us",
+        "body": "<p>Introduce your team, your experience, and what customers can expect when they work with you.</p>",
+        "width": "narrow"
+      }
+    },
+    {
+      "type": "faq",
+      "values": {
+        "heading": "Questions, answered",
+        "intro": "Cover the details customers usually ask about before they get in touch.",
+        "items": [
+          {
+            "title": "How do we get started?",
+            "answer": "<p>Tell visitors how to arrange an introductory conversation or request a quote.</p>"
+          }
+        ]
+      }
+    },
+    {
+      "type": "call-to-action",
+      "values": {
+        "heading": "Ready to talk?",
+        "body": "Tell us what you are looking for and we will take it from there.",
+        "buttonLabel": "Contact us",
+        "buttonUrl": "/contact"
+      }
+    }
+  ]
+}

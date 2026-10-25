@@ -56,12 +56,104 @@ include a machine `code` (for example `forbidden`); clients that only read
 ## Layout
 
 ```
-admin-ui/
-├── src/
-│   ├── components/   # Vue screens and shared pieces
-│   ├── layouts/      # AdminLayout.astro
-│   └── pages/        # Astro entry (index.astro)
-├── package.json
-├── astro.config.mjs
-└── dist/             # build output
-```
+
+
+### Typography
+
+- **Font**: Inter (Google Fonts)
+- **Base Size**: 14px
+- **Headings**: 1.875rem - 1.125rem
+- **Line Height**: 1.5
+
+### Spacing
+
+- **Cards**: 1.5rem padding
+- **Grid Gap**: 1.5rem
+- **Border Radius**: 12px (cards), 8px (buttons)
+
+## API Integration
+
+The admin UI connects to the Click CMS backend via:
+
+- `GET /api/info` - System info and plugin list
+- `GET /api/pages` - List all pages
+- `POST /api/graphql` - GraphQL queries
+
+## Browser Support
+
+- Chrome/Edge (latest)
+- Firefox (latest)
+- Safari (latest)
+- Mobile browsers
+
+## Performance
+
+- Static HTML generation via Astro
+- Vue components hydrate on client
+- D3 charts use SVG for crisp rendering
+- Minimal JavaScript bundle size
+
+## Future Enhancements
+
+- [ ] Dark mode toggle
+- [ ] Real-time WebSocket updates
+- [ ] More D3 visualizations (line charts, area charts)
+- [ ] Drag-and-drop page ordering
+- [ ] Media library with image previews
+- [ ] Plugin configuration UI
+- [ ] User management interface
+
+The build also stages these files in `public/admin/`, where the PHP server serves them at `/admin/`. Rebuild after changing the admin UI.
+||||||| dd55734
+
+### Typography
+
+- **Font**: Inter (Google Fonts)
+- **Base Size**: 14px
+- **Headings**: 1.875rem - 1.125rem
+- **Line Height**: 1.5
+
+### Spacing
+
+- **Cards**: 1.5rem padding
+- **Grid Gap**: 1.5rem
+- **Border Radius**: 12px (cards), 8px (buttons)
+
+## API Integration
+
+The admin UI connects to the Click CMS backend via:
+
+- `GET /api/info` - System info and plugin list
+- `GET /api/pages` - List all pages
+- `POST /api/graphql` - GraphQL queries
+
+## Browser Support
+
+- Chrome/Edge (latest)
+- Firefox (latest)
+- Safari (latest)
+- Mobile browsers
+
+## Performance
+
+- Static HTML generation via Astro
+- Vue components hydrate on client
+- D3 charts use SVG for crisp rendering
+- Minimal JavaScript bundle size
+
+## Future Enhancements
+
+- [ ] Dark mode toggle
+- [ ] Real-time WebSocket updates
+- [ ] More D3 visualizations (line charts, area charts)
+- [ ] Drag-and-drop page ordering
+- [ ] Media library with image previews
+- [ ] Plugin configuration UI
+- [ ] User management interface
+## Browser support
+
+The interface targets current Chrome, Edge, Firefox, Safari, and mobile browsers.
+
+## Build output
+
+The build also stages these files in `public/admin/`, where the PHP server serves them at `/admin/`. Rebuild after changing the admin UI.

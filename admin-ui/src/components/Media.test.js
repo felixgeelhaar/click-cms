@@ -120,6 +120,78 @@ describe('focal point', () => {
   });
 });
 
+describe('media description persistence', () => {
+  const serveOneItem = (save) => {
+    global.fetch = vi.fn(async (url, options) => {
+      if (String(url).includes('/api/media/capabilities')) {
+        return { ok: true, status: 200, json: async () => ({ data: { acceptedMimeTypes: [], maxBytes: 0, resizingAvailable: true, variants: [] } }) };
+      }
+      if (options?.method === 'PUT') return save(options);
+      return { ok: true, status: 200, json: async () => ({ data: [item({ alt: 'Original description' })], folders: [] }) };
+    });
+  };
+
+  it('keeps the saved description when the server refuses an edit', async () => {
+    serveOneItem(async () => ({ ok: false, status: 500, json: async () => ({ error: 'Storage is unavailable' }) }));
+    const wrapper = mount(Media);
+    await flushPromises();
+
+    const description = wrapper.get('.alt-input');
+    await description.setValue('Changed description');
+    await flushPromises();
+
+    expect(wrapper.get('.alt-input').element.value).toBe('Original description');
+    expect(wrapper.get('[role="alert"]').text()).toContain('Storage is unavailable');
+  });
+
+  it('keeps the saved description and reports a network failure', async () => {
+    serveOneItem(async () => { throw new Error('offline'); });
+    const wrapper = mount(Media);
+    await flushPromises();
+
+    await wrapper.get('.alt-input').setValue('Changed description');
+    await flushPromises();
+
+    expect(wrapper.get('.alt-input').element.value).toBe('Original description');
+    expect(wrapper.get('[role="alert"]').text()).toContain('offline');
+  });
+
+  it('shows the new description only after the server accepts it', async () => {
+    serveOneItem(async () => ({ ok: true, status: 200, json: async () => ({}) }));
+    const wrapper = mount(Media);
+    await flushPromises();
+
+    await wrapper.get('.alt-input').setValue('Changed description');
+    await flushPromises();
+
+    expect(wrapper.get('.alt-input').element.value).toBe('Changed description');
+    const write = global.fetch.mock.calls.find(([, options]) => options?.method === 'PUT');
+    expect(JSON.parse(write[1].body)).toEqual({ alt: 'Changed description' });
+  });
+});
+
+describe('single media deletion', () => {
+  it('keeps the item and reports when the server refuses deletion', async () => {
+    global.fetch = vi.fn(async (url, options) => {
+      if (String(url).includes('/api/media/capabilities')) {
+        return { ok: true, status: 200, json: async () => ({ data: { acceptedMimeTypes: [], maxBytes: 0, resizingAvailable: true, variants: [] } }) };
+      }
+      if (options?.method === 'DELETE') {
+        return { ok: false, status: 403, json: async () => ({ error: 'You do not have permission to delete media.' }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ data: [item()], folders: [] }) };
+    });
+    const wrapper = mount(Media);
+    await flushPromises();
+
+    await wrapper.get('.card-actions .danger').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.findAll('.card')).toHaveLength(1);
+    expect(wrapper.get('[role="alert"]').text()).toContain('You do not have permission');
+  });
+});
+
 /**
  * Search, folder grouping and bulk delete.
  *

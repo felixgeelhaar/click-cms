@@ -75,6 +75,12 @@ final class BackupRestorer
     public function restore(string $archivePath, bool $overwrite = false): RestoreReport
     {
         $manifest = $this->verifier->verify($archivePath);
+        foreach ($manifest->documents as $entry) {
+            if (($entry['publication'] ?? 'live') === 'draft'
+                && (!$this->content->supportsDrafts() || !Publishable::includes($entry['type']))) {
+                throw new BackupException('This target cannot safely restore unpublished working copies.');
+            }
+        }
 
         $zip = new ZipArchive();
         if ($zip->open($archivePath) !== true) {
@@ -109,7 +115,18 @@ final class BackupRestorer
         bool $overwrite,
         RestoreReport $report,
     ): void {
+        $initiallyPresent = [];
+        $liveKeys = [];
         foreach ($manifest->documents as $entry) {
+            if (($entry['publication'] ?? 'live') === 'live') {
+                $liveKeys[$entry['key']] = true;
+            }
+        }
+        // Restore live copies first, irrespective of manifest ordering.
+        $documents = $manifest->documents;
+        usort($documents, static fn (array $a, array $b): int =>
+            (($a['publication'] ?? 'live') === 'draft') <=> (($b['publication'] ?? 'live') === 'draft'));
+        foreach ($documents as $entry) {
             $label = $entry['type'] . '/' . $entry['locale'] . '/' . $entry['slug'];
 
             $raw = $zip->getFromName($entry['entry']);
@@ -146,7 +163,8 @@ final class BackupRestorer
             // The working copy as well as the live document: an unpublished draft
             // occupies the address just as firmly, and overwriting one would
             // destroy work that was never backed up in the first place.
-            $present = $this->content->exists($key) || $this->content->draft($key) !== null;
+            $identity = $key->toString();
+            $present = $initiallyPresent[$identity] ??= ($this->content->exists($key) || $this->content->draft($key) !== null);
 
             if ($present && !$overwrite) {
                 $report->skipped($label);
@@ -154,12 +172,16 @@ final class BackupRestorer
             }
 
             try {
+                $isDraft = ($entry['publication'] ?? 'live') === 'draft';
+                if ($isDraft && !isset($liveKeys[$entry['key']]) && $overwrite) {
+                    $this->content->unpublish($key);
+                }
                 $this->content->save($document);
 
                 // A publishable type is saved as a working copy and nothing more,
                 // so without this the restored site would be a set of drafts and
                 // a 404 for every address.
-                if (Publishable::includes($document->type())) {
+                if (!$isDraft && Publishable::includes($document->type())) {
                     $this->content->publish($key);
                 }
             } catch (\Throwable $e) {

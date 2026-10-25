@@ -8,6 +8,8 @@ use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Content\ResolvedContent;
 use Click\Cms\Domain\Publishing\PublicationState;
 use Click\Cms\Domain\Publishing\PublishingStorage;
+use Click\Cms\Domain\Publishing\ConditionalPublishingStorage;
+use Click\Cms\Domain\Storage\ConditionalStorage;
 use Click\Cms\Domain\Storage\StorageInterface;
 use Click\Cms\Domain\ValueObjects\ContentKey;
 use Click\Cms\Domain\ValueObjects\Locale;
@@ -256,6 +258,24 @@ final class ContentService
      *
      * @return ?Content What went live, or null when there was nothing to promote.
      */
+    public function supportsDrafts(): bool
+    {
+        return $this->storage instanceof PublishingStorage;
+    }
+
+    public function supportsConditionalPublication(): bool
+    {
+        return $this->storage instanceof ConditionalPublishingStorage;
+    }
+
+    public function publishIfUnchanged(ContentKey $key, string $expectedRevision): Content|false|null
+    {
+        if (!$this->storage instanceof ConditionalPublishingStorage) {
+            throw new \RuntimeException('Conditional publication is not supported.');
+        }
+        return $this->storage->publishIfUnchanged($key, $expectedRevision);
+    }
+
     public function publish(ContentKey $key): ?Content
     {
         if ($this->storage instanceof PublishingStorage) {
@@ -284,6 +304,21 @@ final class ContentService
     public function save(Content $content): void
     {
         $this->storage->save($content);
+    }
+
+    /**
+     * Save only when the stored working copy still matches the supplied revision.
+     *
+     * Null means this backend has no atomic conditional-write capability; false
+     * means it supports the operation but the revision did not match.
+     */
+    public function saveIfUnchanged(Content $content, string $expectedRevision): ?bool
+    {
+        if (!$this->storage instanceof ConditionalStorage) {
+            return null;
+        }
+
+        return $this->storage->saveIfUnchanged($content, $expectedRevision);
     }
 
     public function delete(ContentKey $key): bool

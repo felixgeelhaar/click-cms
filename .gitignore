@@ -8,6 +8,7 @@ vendor/
 
 # Build outputs
 admin-ui/dist/
+/public/admin/
 admin-ui/.astro/
 
 # Environment
@@ -49,6 +50,10 @@ logs/
 
 # Test coverage
 coverage/
+
+# Local security reports and Python gate bytecode.
+/.nox/reports/
+scripts/security/__pycache__/
 
 # OS
 .DS_Store

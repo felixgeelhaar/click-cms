@@ -117,20 +117,17 @@ final class SubdirectoryInstallationTest extends TestCase
     }
 
     /** The media library is management, so it needs a session. */
-    private function signInAsAdmin(): void
+    private function signInAsAdmin(Application $app): void
     {
-        $id = bin2hex(random_bytes(32));
-        @mkdir($this->base . '/data/sessions', 0o700, true);
-        file_put_contents(
-            $this->base . '/data/sessions/' . $id . '.json',
-            json_encode([
-                'username' => 'admin',
-                'expiresAt' => time() + 3600,
-                'lastActivity' => time(),
-                'user' => ['username' => 'admin', 'role' => 'admin'],
-            ])
-        );
-        $_COOKIE[\Click\Cms\Application\Authentication\SessionStore::COOKIE] = $id;
+        $content = (new \ReflectionMethod($app, 'getContentService'))->invoke($app);
+        $content->save(\Click\Cms\Domain\Content\Content::create($content->userKey('admin'), [
+            'password' => 'test-hash', 'role' => 'admin', 'status' => 'active',
+        ]));
+        $sessions = (new \ReflectionProperty(Application::class, 'sessions'))->getValue($app);
+        $sessions->start([
+            'username' => 'admin', 'expiresAt' => time() + 3600, 'lastActivity' => time(),
+            'user' => ['username' => 'admin', 'role' => 'admin'],
+        ]);
     }
 
     /** @return array{body: string, status: int} */
@@ -274,7 +271,7 @@ final class SubdirectoryInstallationTest extends TestCase
     {
         $app = $this->installedAt('/2026/cms/index.php');
         $id = $this->storeImage($app);
-        $this->signInAsAdmin();
+        $this->signInAsAdmin($app);
 
         $body = json_decode($this->get($app, '/2026/cms/api/media')['body'], true);
         $item = ($body['data'] ?? [])[0] ?? null;

@@ -148,6 +148,45 @@ final class UpdateDecisionTest extends TestCase
         $this->assertTrue($d->automatic);
     }
 
+    public function testNewMajorDoesNotBlockCompatibleUnattendedUpdates(): void
+    {
+        $d = $this->decide('1.4.0', [
+            $this->release('1.5.0'), $this->release('2.0.0'),
+        ], UpdatePolicy::Minor);
+
+        $this->assertSame('1.5.0', $d->release->version->toString());
+        $this->assertTrue($d->automatic);
+    }
+
+    public function testMajorSecurityFixDoesNotAuthorizeOrdinaryMinor(): void
+    {
+        $d = $this->decide('1.4.0', [
+            $this->release('1.5.0'), $this->release('2.0.0', security: true),
+        ], UpdatePolicy::Security);
+
+        $this->assertFalse($d->automatic);
+    }
+
+    public function testNewMajorDoesNotBlockCompatibleSecurityFix(): void
+    {
+        $d = $this->decide('1.4.0', [
+            $this->release('1.4.1', security: true), $this->release('1.5.0'), $this->release('2.0.0'),
+        ], UpdatePolicy::Security);
+
+        $this->assertSame('1.5.0', $d->release->version->toString());
+        $this->assertTrue($d->automatic);
+    }
+
+    public function testOptedInPrereleaseDoesNotBlockStableAutomaticUpdate(): void
+    {
+        $d = $this->decide('1.4.0', [
+            $this->release('1.5.0'), $this->release('1.6.0-beta.1'),
+        ], UpdatePolicy::Minor, pre: true);
+
+        $this->assertSame('1.5.0', $d->release->version->toString());
+        $this->assertTrue($d->automatic);
+    }
+
     /* ------------------------------------------------------------- feed hygiene -- */
 
     public function testAMalformedReleaseIsIgnoredRatherThanOffered(): void

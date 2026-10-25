@@ -1,0 +1,32 @@
+# Standalone deployment-managed profile. Do not combine with development binds.
+services:
+  click-cms:
+    build:
+      context: .
+      target: hardened
+    ports:
+      - "8080:8080"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+      - /var/run/apache2:rw,noexec,nosuid,size=1m,uid=33,gid=33
+      - /var/lock/apache2:rw,noexec,nosuid,size=1m,uid=33,gid=33
+    volumes:
+      - content:/var/www/html/content
+      - data:/var/www/html/data
+    healthcheck:
+      test: ["CMD", "php", "-r", "$$h=get_headers('http://127.0.0.1:8080/health.php'); exit(is_array($$h) && str_contains($$h[0], '200') ? 0 : 1);"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1
+volumes:
+  content:
+  data:
