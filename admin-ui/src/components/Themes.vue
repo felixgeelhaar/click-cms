@@ -148,8 +148,8 @@ onMounted(load);
 .upload-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .upload-hint { margin: 0 0 1.5rem; font-size: 0.875rem; line-height: 1.45; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 1rem; }
-.banner.error { color: var(--color-danger-600, #dc2626); background: var(--app-surface-strong); }
-.banner.success { color: var(--color-success-text, #15803d); background: var(--app-surface-strong); }
+.banner.error { color: var(--color-danger-600); background: var(--app-surface-strong); }
+.banner.success { color: var(--color-success-text); background: var(--app-surface-strong); }
 .muted { color: var(--app-text-muted); }
 .loading { text-align: center; padding: 3rem; color: var(--app-text-muted); }
 .empty { color: var(--app-text-muted); font-size: 0.875rem; }
@@ -162,7 +162,7 @@ onMounted(load);
 .theme-source { color: var(--app-text-muted); }
 .theme-actions { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
 .status { font-size: 0.75rem; text-transform: uppercase; font-weight: 500; }
-.status.active { color: var(--color-success-text, #15803d); }
+.status.active { color: var(--color-success-text); }
 .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem; border-radius: 6px; cursor: pointer; }
 .btn-primary { padding: 0.625rem 1.25rem; background: var(--color-primary-600); color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; }
 .btn-sm.btn-primary { padding: 0.5rem 1rem; border-radius: 6px; }
@@ -181,7 +181,7 @@ select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible,
 .upload-button:focus-within {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

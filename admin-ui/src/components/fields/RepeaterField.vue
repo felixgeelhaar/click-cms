@@ -162,9 +162,9 @@ const {
 <style scoped>
 .repeater { border: 1px solid var(--control-border); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem; }
 .repeater-legend { font-weight: 600; font-size: 0.875rem; padding: 0 0.4rem; }
-.required { color: var(--color-danger-600, #dc2626); }
+.required { color: var(--color-danger-600); }
 .repeater-help { margin: 0 0 0.75rem; font-size: 0.8125rem; color: var(--app-text-muted); }
-.repeater-error { margin: 0 0 0.75rem; font-size: 0.8125rem; color: var(--color-danger-600, #dc2626); }
+.repeater-error { margin: 0 0 0.75rem; font-size: 0.8125rem; color: var(--color-danger-600); }
 .repeater-empty { margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--app-text-muted); }
 .repeater-rows { list-style: none; margin: 0 0 0.75rem; padding: 0; display: grid; gap: 0.75rem; }
 .repeater-row { border: 1px solid var(--app-border); border-radius: 8px; padding: 0.875rem; background: var(--app-surface-strong); }
@@ -177,7 +177,7 @@ const {
 .row-controls { display: flex; gap: 0.25rem; }
 .icon-btn { width: 28px; height: 28px; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); line-height: 1; }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.icon-btn.danger { color: var(--color-danger-600, #dc2626); }
+.icon-btn.danger { color: var(--color-danger-600); }
 .btn-add { padding: 0.5rem 0.9rem; border: 1px dashed var(--control-border); background: none; border-radius: 8px; cursor: pointer; color: var(--app-text); font: inherit; }
 .btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
 .icon-btn:focus-visible,

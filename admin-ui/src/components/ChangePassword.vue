@@ -94,12 +94,12 @@ const submit = async () => {
 .title { font-size: 1.5rem; font-weight: 700; margin: 0 0 0.75rem; }
 .intro { margin: 0 0 1.25rem; font-size: 0.9375rem; color: var(--app-text-muted); }
 .message { padding: 0.7rem 0.9rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 1rem; }
-.error { color: var(--color-danger-600, #dc2626); background: var(--app-surface-strong); }
+.error { color: var(--color-danger-600); background: var(--app-surface-strong); }
 .success { color: var(--color-primary-600); background: var(--app-surface-strong); }
 label { display: block; margin: 0 0 0.35rem; font-size: 0.875rem; font-weight: 500; }
 input { width: 100%; padding: 0.65rem 0.75rem; margin-bottom: 0.35rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .hint { margin: 0 0 1rem; font-size: 0.8125rem; color: var(--app-text-muted); }
-.mismatch { color: var(--color-danger-600, #dc2626); }
+.mismatch { color: var(--color-danger-600); }
 .btn-primary { width: 100%; padding: 0.7rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -115,7 +115,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

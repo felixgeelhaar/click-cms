@@ -55,9 +55,9 @@ const issues = computed(() => {
 .quality-checklist h2 { margin: 0; font-size: 0.95rem; }
 .quality-checklist ul { list-style: none; display: grid; gap: 0.45rem; margin: 0.65rem 0 0; padding: 0; }
 .quality-checklist li { display: grid; grid-template-columns: 1rem minmax(0, 1fr) auto; align-items: baseline; gap: 0.55rem; font-size: 0.84rem; }
-.issue-dot { color: var(--color-warning-text, #b45309); font-weight: 700; }
+.issue-dot { color: var(--color-warning-text); font-weight: 700; }
 .quality-checklist a { white-space: nowrap; font-weight: 600; }
-.quality-checklist a:focus-visible { outline: 3px solid var(--color-primary-600, #2563eb); outline-offset: 3px; border-radius: 2px; }
+.quality-checklist a:focus-visible { outline: 3px solid var(--color-primary-600); outline-offset: 3px; border-radius: 2px; }
 .quality-ready, .quality-note { margin: 0.55rem 0 0; font-size: 0.82rem; color: var(--app-text-muted); }
 .quality-note { font-size: 0.75rem; }
 @media (max-width: 640px) { .quality-checklist li { grid-template-columns: 1rem minmax(0, 1fr); } .quality-checklist li a { grid-column: 2; } }

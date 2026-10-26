@@ -1272,7 +1272,7 @@ onUnmounted(() => {
 .edit-heading .page-title { margin-bottom: 0; }
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin-bottom: 2rem; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
-.banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.error { color: var(--color-danger-600); }
 .banner.warning { color: var(--app-text); border: 1px solid var(--app-border); }
 .banner.notice { border: 1px solid var(--app-border); line-height: 1.5; }
 .edit-form { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); padding: 2rem; }
@@ -1317,7 +1317,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

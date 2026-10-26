@@ -133,17 +133,17 @@ onMounted(async () => {
 <style scoped>
 .field { margin-bottom: 1.25rem; }
 .field-label { display: block; margin-bottom: 0.4rem; font-weight: 500; font-size: 0.875rem; color: var(--app-text); }
-.required { color: var(--color-danger-600, #dc2626); margin-left: 0.15rem; }
+.required { color: var(--color-danger-600); margin-left: 0.15rem; }
 .selected { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.6rem; border: 1px solid var(--app-border); border-radius: 8px; background: var(--app-surface-strong); }
 .badge { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; background: var(--app-surface); color: var(--app-text-muted); font-size: 0.9rem; }
 .selected-meta { flex: 1; min-width: 0; }
 .selected-name { margin: 0; font-size: 0.875rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .selected-detail { margin: 0.15rem 0 0; font-size: 0.75rem; color: var(--app-text-muted); }
-.selected-warning { margin: 0.3rem 0 0; font-size: 0.75rem; color: var(--color-warning-700, #b45309); }
+.selected-warning { margin: 0.3rem 0 0; font-size: 0.75rem; color: var(--color-warning-700); }
 .unknown { margin: 0; padding: 0.6rem; border: 1px dashed var(--app-border); border-radius: 8px; font-size: 0.8125rem; color: var(--app-text-muted); }
 .picker { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; }
 .hint { font-size: 0.75rem; color: var(--app-text-muted); }
-.hint-error { color: var(--color-danger-600, #dc2626); }
+.hint-error { color: var(--color-danger-600); }
 .chooser { list-style: none; margin: 0.75rem 0 0; padding: 0.6rem; display: grid; gap: 0.4rem; border: 1px solid var(--control-border); border-radius: 8px; max-height: 280px; overflow-y: auto; }
 .chooser-item { width: 100%; padding: 0.45rem 0.5rem; border: 1px solid transparent; border-radius: 6px; background: none; cursor: pointer; text-align: left; display: grid; gap: 0.1rem; }
 .chooser-item.current { border-color: var(--color-primary-600); }
@@ -152,6 +152,6 @@ onMounted(async () => {
 .chooser-meta { font-size: 0.6875rem; color: var(--app-text-muted); }
 .link-btn { background: none; border: 0; padding: 0; color: var(--color-primary-600); cursor: pointer; text-decoration: underline; font: inherit; }
 .field-message { margin: 0.35rem 0 0; font-size: 0.75rem; }
-.error-message { color: var(--color-danger-600, #dc2626); }
+.error-message { color: var(--color-danger-600); }
 .help-message { color: var(--app-text-muted); }
 </style>

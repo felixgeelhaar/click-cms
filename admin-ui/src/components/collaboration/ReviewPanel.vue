@@ -356,14 +356,14 @@ onMounted(load);
 .review-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .review-title { margin: 0; font-size: 1.125rem; font-weight: 600; color: var(--app-text); }
 .review-note { margin: 0.75rem 0 0; padding: 0.6rem 0.85rem; font-size: 0.875rem; line-height: 1.45; border-radius: 8px; color: var(--app-text-muted); border: 1px solid var(--app-border); background: var(--app-surface-strong); }
-.review-error { margin: 0.75rem 0 0; padding: 0.6rem 0.85rem; font-size: 0.875rem; border-radius: 8px; color: var(--color-danger-600, #dc2626); border: 1px solid var(--color-danger-600, #dc2626); background: color-mix(in srgb, var(--color-danger-600, #dc2626) 8%, transparent); }
+.review-error { margin: 0.75rem 0 0; padding: 0.6rem 0.85rem; font-size: 0.875rem; border-radius: 8px; color: var(--color-danger-600); border: 1px solid var(--color-danger-600); background: color-mix(in srgb, var(--color-danger-600) 8%, transparent); }
 .review-empty { margin: 1rem 0 0; font-size: 0.9375rem; color: var(--app-text-muted); }
 .review-state { margin: 1rem 0 0; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .review-state-label { font-size: 0.8125rem; font-weight: 600; color: var(--app-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .review-badge { display: inline-block; padding: 0.2rem 0.55rem; font-size: 0.8125rem; font-weight: 600; border-radius: 999px; border: 1px solid var(--app-border); background: var(--app-surface-strong); color: var(--app-text); }
-.review-badge.is-in_review { color: var(--color-warning-800, #92400e); border-color: var(--color-warning-600, #d97706); background: color-mix(in srgb, var(--color-warning-600, #d97706) 10%, transparent); }
-.review-badge.is-approved { color: var(--color-success-700, #15803d); border-color: var(--color-success-600, #16a34a); background: color-mix(in srgb, var(--color-success-600, #16a34a) 10%, transparent); }
-.review-badge.is-changes_requested { color: var(--color-danger-700, #b91c1c); border-color: var(--color-danger-600, #dc2626); background: color-mix(in srgb, var(--color-danger-600, #dc2626) 8%, transparent); }
+.review-badge.is-in_review { color: var(--color-warning-800); border-color: var(--color-warning-600); background: color-mix(in srgb, var(--color-warning-600) 10%, transparent); }
+.review-badge.is-approved { color: var(--color-success-700); border-color: var(--color-success-600); background: color-mix(in srgb, var(--color-success-600) 10%, transparent); }
+.review-badge.is-changes_requested { color: var(--color-danger-700); border-color: var(--color-danger-600); background: color-mix(in srgb, var(--color-danger-600) 8%, transparent); }
 .review-details { margin: 0.85rem 0 0; display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; font-size: 0.875rem; }
 .review-details dt { margin: 0; font-weight: 600; color: var(--app-text-muted); }
 .review-details dd { margin: 0; color: var(--app-text); }
@@ -378,7 +378,7 @@ onMounted(load);
 .review-cancel { padding-top: 1rem; border-top: 1px solid var(--app-border); }
 .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); font: inherit; white-space: nowrap; }
 .btn-sm:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-primary { padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; color: #fff; background: var(--color-primary-600, #4f46e5); font: inherit; }
+.btn-primary { padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; color: #fff; background: var(--color-primary-600); font: inherit; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-secondary { padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500; border: 1px solid var(--control-border); border-radius: 8px; cursor: pointer; color: var(--app-text); background: var(--app-surface-strong); font: inherit; }
 .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -389,7 +389,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

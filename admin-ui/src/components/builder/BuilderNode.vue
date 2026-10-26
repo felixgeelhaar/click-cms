@@ -218,7 +218,7 @@ function onDrop() {
 .bnode-tag { position: absolute; top: -0.1rem; left: 0.35rem; display: none; align-items: center; gap: 0.35rem; font-size: 0.7rem; }
 .bnode:hover > .bnode-tag, .bnode.selected > .bnode-tag { display: flex; }
 .bnode-name { background: var(--app-surface-strong); color: var(--app-text-muted); padding: 0 0.35rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
-.bnode-remove { border: none; background: var(--color-danger-600, #dc2626); color: white; width: 1.1rem; height: 1.1rem; line-height: 1; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+.bnode-remove { border: none; background: var(--color-danger-600); color: white; width: 1.1rem; height: 1.1rem; line-height: 1; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
 .bnode-children { display: flex; flex-direction: column; gap: 0.5rem; min-height: 1.5rem; }
 .bnode-empty { margin: 0; padding: 0.75rem; text-align: center; color: var(--app-text-muted); font-size: 0.8125rem; background: var(--app-surface-strong); border-radius: 6px; }
 .bnode.drop-before { box-shadow: 0 -3px 0 var(--color-primary-600); }

@@ -78,7 +78,7 @@ const canSaveSelection = computed(() => {
 .panel-title { font-size: 0.9rem; font-weight: 700; margin: 0 0 0.5rem; color: var(--app-text); }
 .blocks-title { margin-top: 1.25rem; }
 .palette-hint { margin: 0 0 0.75rem; font-size: 0.75rem; color: var(--app-text-muted); line-height: 1.4; }
-.palette-error { color: var(--color-danger-600, #dc2626); }
+.palette-error { color: var(--color-danger-600); }
 .palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 .palette-button { padding: 0.5rem; border: 1px solid var(--app-border); background: var(--app-surface-strong); color: var(--app-text); border-radius: 6px; cursor: pointer; text-transform: capitalize; font: inherit; font-size: 0.8125rem; }
 .palette-button:hover { border-color: var(--color-primary-600); }

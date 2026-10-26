@@ -160,7 +160,7 @@ onMounted(load);
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin: 0 0 0.35rem; }
 .page-subtitle { color: var(--app-text-muted); margin: 0 0 1.25rem; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
-.banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.error { color: var(--color-danger-600); }
 .banner.success { color: var(--color-primary-600); }
 .trust { border: 1px solid var(--app-border); border-radius: 10px; padding: 0.9rem 1.1rem; margin-bottom: 1.5rem; }
 .trust p { margin: 0 0 0.4rem; font-size: 0.875rem; color: var(--app-text-muted); }
@@ -191,7 +191,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

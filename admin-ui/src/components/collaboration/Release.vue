@@ -441,7 +441,7 @@ onMounted(load);
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin: 0 0 0.5rem; }
 .page-subtitle { color: var(--app-text-muted); margin: 0 0 1rem; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 1rem; }
-.banner.error { color: var(--color-danger-600, #dc2626); background: var(--app-surface-strong); border: 1px solid var(--color-danger-600, #dc2626); }
+.banner.error { color: var(--color-danger-600); background: var(--app-surface-strong); border: 1px solid var(--color-danger-600); }
 .banner.notice { color: var(--app-text); background: var(--app-surface-strong); border: 1px solid var(--app-border); }
 .loading { text-align: center; padding: 3rem; color: var(--app-text-muted); }
 .empty { color: var(--app-text-muted); font-size: 0.875rem; }
@@ -457,21 +457,21 @@ onMounted(load);
 .release-table td { padding: 0.75rem; border-bottom: 1px solid var(--app-border); color: var(--app-text); vertical-align: middle; }
 .col-check { width: 2.5rem; }
 .page-slug { font-weight: 600; cursor: pointer; }
-.page-link { color: var(--color-primary-700, var(--color-primary-600, #4338ca)); text-decoration: none; }
+.page-link { color: var(--color-primary-700, var(--color-primary-600)); text-decoration: none; }
 .page-link:hover { text-decoration: underline; }
 .readiness-note { margin: 0.75rem 0 0; font-size: 0.8125rem; color: var(--app-text-muted); }
 .review-badge { display: inline-block; padding: 0.2rem 0.55rem; font-size: 0.8125rem; font-weight: 600; border-radius: 999px; border: 1px solid var(--app-border); background: var(--app-surface-strong); color: var(--app-text); white-space: nowrap; }
-.review-badge.is-ready { color: var(--color-success-800, #166534); border-color: var(--color-success-600, #16a34a); background: color-mix(in srgb, var(--color-success-600, #16a34a) 10%, transparent); }
-.review-badge.is-in_review { color: var(--color-warning-800, #92400e); border-color: var(--color-warning-600, #d97706); background: color-mix(in srgb, var(--color-warning-600, #d97706) 10%, transparent); }
-.review-badge.is-changes_requested { color: var(--color-danger-700, #b91c1c); border-color: var(--color-danger-600, #dc2626); background: color-mix(in srgb, var(--color-danger-600, #dc2626) 8%, transparent); }
+.review-badge.is-ready { color: var(--color-success-800); border-color: var(--color-success-600); background: color-mix(in srgb, var(--color-success-600) 10%, transparent); }
+.review-badge.is-in_review { color: var(--color-warning-800); border-color: var(--color-warning-600); background: color-mix(in srgb, var(--color-warning-600) 10%, transparent); }
+.review-badge.is-changes_requested { color: var(--color-danger-700); border-color: var(--color-danger-600); background: color-mix(in srgb, var(--color-danger-600) 8%, transparent); }
 .actions { margin: 1rem 0 1.5rem; }
 .btn-primary { padding: 0.625rem 1.25rem; background: var(--color-primary-600); color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; font: inherit; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); font: inherit; white-space: nowrap; }
 .btn-sm:disabled { opacity: 0.6; cursor: not-allowed; }
 .result { padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid var(--app-border); background: var(--app-surface-strong); }
-.result.blockers { border-color: var(--color-danger-600, #dc2626); }
-.result.success { border-color: var(--color-success-600, #16a34a); }
+.result.blockers { border-color: var(--color-danger-600); }
+.result.success { border-color: var(--color-success-600); }
 .result-title { margin: 0 0 0.35rem; font-size: 1rem; color: var(--app-text); }
 .result-detail { margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--app-text-muted); }
 .result-list { margin: 0; padding-left: 1.25rem; font-size: 0.875rem; color: var(--app-text); }
@@ -480,7 +480,7 @@ onMounted(load);
 button:focus-visible,
 input:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

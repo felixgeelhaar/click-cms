@@ -33,9 +33,13 @@ import { read, tokensIn, ruleFor, declaration, resolve$, contrast, over, rgb, bo
 const BODY = 4.5;
 const UI = 3;
 
-const adminCss = read('admin-ui/src/layouts/AdminLayout.astro');
+const adminCss = read('admin-ui/src/styles/editorial.css');
 const light = tokensIn(adminCss, ':root');
 const dark = { ...light, ...tokensIn(adminCss, '[data-theme="dark"]') };
+
+for (const tokens of [light, dark]) {
+  for (const key of Object.keys(tokens)) tokens[key] = resolve$(tokens[key], tokens);
+}
 
 const MODES = [['light', light], ['dark', dark]];
 
@@ -67,7 +71,7 @@ describe('admin palette', () => {
       });
 
       it('the primary button carries its own label', () => {
-        expect(contrast('#ffffff', tokens['--color-primary-600'])).toBeGreaterThanOrEqual(BODY);
+        expect(contrast('#ffffff', tokens['--action-fill'])).toBeGreaterThanOrEqual(BODY);
       });
 
       it('the destructive button carries its own label', () => {

@@ -363,7 +363,7 @@ onMounted(async () => {
 .item-controls { display: flex; gap: 0.25rem; margin-top: 1.75rem; flex-shrink: 0; }
 .icon-btn { width: 28px; height: 28px; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; line-height: 1; color: var(--app-text); }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.icon-btn.danger { color: var(--color-danger-600, #dc2626); }
+.icon-btn.danger { color: var(--color-danger-600); }
 
 .child-list { margin: 1rem 0 0 2rem; gap: 0.75rem; }
 .child { display: flex; align-items: flex-start; gap: 0.75rem; border-left: 2px solid var(--app-border); padding-left: 0.75rem; }
@@ -377,15 +377,15 @@ onMounted(async () => {
 .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .banner { margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; }
-.banner.error { background: rgba(239, 68, 68, 0.12); color: var(--color-danger-600, #dc2626); }
-.banner.ok { background: rgba(34, 197, 94, 0.12); color: #166534; }
+.banner.error { background: rgba(239, 68, 68, 0.12); color: var(--color-danger-600); }
+.banner.ok { background: rgba(34, 197, 94, 0.12); color: var(--color-success-text); }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 @media (max-width: 640px) {
   .item-fields { grid-template-columns: 1fr; }
 }
-[data-theme="dark"] .banner.ok { color: #86efac; }
+[data-theme="dark"] .banner.ok { color: var(--color-success-text); }
 
 /*
  * Focus. Every control here is reachable by keyboard and, until this rule, none
@@ -399,7 +399,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

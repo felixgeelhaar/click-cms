@@ -279,7 +279,7 @@ jobs:
 
       - name: Start PHP built-in server
         run: |
-          php -S 127.0.0.1:8080 -t public > /tmp/click-e2e-php.log 2>&1 &
+          php -S 127.0.0.1:8080 -t public e2e/router.php > /tmp/click-e2e-php.log 2>&1 &
           echo $! > /tmp/click-e2e-php.pid
           for _ in $(seq 1 30); do
             code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/ || true)"

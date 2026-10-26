@@ -348,7 +348,7 @@ defineExpose({ builder, selectedId, ctx, loadPage, save });
 .page-subtitle { color: var(--app-text-muted); }
 .builder-actions { display: flex; gap: 0.75rem; flex-shrink: 0; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
-.banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.error { color: var(--color-danger-600); }
 .banner.notice { border: 1px solid var(--app-border); }
 .page-picker { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
 .page-picker label { font-weight: 500; }

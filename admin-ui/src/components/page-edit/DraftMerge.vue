@@ -88,7 +88,7 @@ h2 { margin: 0; font-size: 1rem; }
 .merge-preview { margin: .8rem 0; }
 .merge-preview summary { cursor: pointer; font-weight: 600; }
 .merge-preview pre { max-height: 20rem; overflow: auto; padding: .7rem; border-radius: 6px; background: var(--app-surface); white-space: pre-wrap; overflow-wrap: anywhere; }
-button { border: 0; border-radius: 7px; padding: .55rem .85rem; background: var(--color-primary-700, #1d4ed8); color: white; font: inherit; font-weight: 600; cursor: pointer; }
+button { border: 0; border-radius: 7px; padding: .55rem .85rem; background: var(--color-primary-700); color: white; font: inherit; font-weight: 600; cursor: pointer; }
 button:disabled { opacity: .55; cursor: not-allowed; }
-button:focus-visible, input:focus-visible { outline: 3px solid var(--focus-ring, #0f766e); outline-offset: 3px; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 </style>

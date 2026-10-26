@@ -138,7 +138,7 @@ onMounted(loadEntries);
 .page-subtitle { color: var(--app-text-muted); }
 
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
-.banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.error { color: var(--color-danger-600); }
 .loading, .empty-state { text-align: center; padding: 3rem; color: var(--app-text-muted); }
 
 .entry-list { display: flex; flex-direction: column; gap: 1rem; }
@@ -148,25 +148,25 @@ onMounted(loadEntries);
 .entry-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
 
 .status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.02em; }
-.status-badge.live { background: #dcfce7; color: #166534; }
-.status-badge.pending { background: #fef3c7; color: #92400e; }
-.status-badge.draft { background: #e5e9ef; color: #3f4754; }
-.status-badge.takendown { background: #fee2e2; color: #991b1b; }
+.status-badge.live { background: var(--color-success-bg); color: var(--color-success-text); }
+.status-badge.pending { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.status-badge.draft { background: var(--app-border); color: #3f4754; }
+.status-badge.takendown { background: var(--color-danger-bg); color: var(--color-danger-600); }
 
 .btn-primary { padding: 0.625rem 1rem; background: var(--color-primary-600); color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; }
 .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem; border-radius: 6px; cursor: pointer; }
 .btn-secondary { background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--control-border); }
 /* White on --color-danger-500 is 3.8:1. --color-danger-fill is the same red
    taken just far enough for its own lettering to clear 4.5:1. */
-.btn-danger { background: var(--color-danger-fill, #dc2626); color: white; border: none; }
+.btn-danger { background: var(--color-danger-fill); color: white; border: none; }
 .btn-back:focus-visible,
 .btn-primary:focus-visible,
 .btn-sm:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 6px; }
 
-[data-theme="dark"] .status-badge.live { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+[data-theme="dark"] .status-badge.live { background: rgba(34, 197, 94, 0.18); color: var(--color-success-text); }
 [data-theme="dark"] .status-badge.pending { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
 [data-theme="dark"] .status-badge.draft { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
-[data-theme="dark"] .status-badge.takendown { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+[data-theme="dark"] .status-badge.takendown { background: rgba(239, 68, 68, 0.18); color: var(--color-danger-600); }
 </style>
 
 <style scoped>

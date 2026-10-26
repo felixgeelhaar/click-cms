@@ -567,7 +567,7 @@ onMounted(load);
 .upload-button { position: relative; overflow: hidden; display: inline-flex; align-items: center; }
 .upload-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
-.banner.error { color: var(--color-danger-600, #dc2626); list-style: none; }
+.banner.error { color: var(--color-danger-600); list-style: none; }
 .banner.warning { border: 1px solid var(--app-border); }
 .toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .search-input { flex: 1 1 240px; min-width: 200px; padding: 0.5rem 0.75rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; font-size: 0.875rem; }
@@ -615,7 +615,7 @@ onMounted(load);
 .card-name { margin: 0; font-size: 0.875rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-meta, .card-variants { margin: 0.2rem 0 0; font-size: 0.75rem; color: var(--app-text-muted); }
 .card-quality { margin: 0.35rem 0 0; font-size: 0.75rem; line-height: 1.35; }
-.card-quality.low { color: var(--color-danger-600, #dc2626); }
+.card-quality.low { color: var(--color-danger-600); }
 .card-quality.adequate { color: var(--app-text-muted); }
 .crop-previews {
   list-style: none;
@@ -649,6 +649,6 @@ onMounted(load);
 .alt-input { width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--control-border); border-radius: 6px; background: var(--app-surface); color: var(--app-text); font: inherit; font-size: 0.8125rem; }
 .card-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
 .btn-sm { flex: 1; padding: 0.35rem 0.5rem; font-size: 0.75rem; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); }
-.btn-sm.danger { color: var(--color-danger-600, #dc2626); }
+.btn-sm.danger { color: var(--color-danger-600); }
 .btn-primary { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
 </style>

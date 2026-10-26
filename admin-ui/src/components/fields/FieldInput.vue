@@ -164,7 +164,7 @@ const emitValue = (raw) => {
 <style scoped>
 .field { margin-bottom: 1.25rem; }
 .field-label { display: block; margin-bottom: 0.4rem; font-weight: 500; font-size: 0.875rem; color: var(--app-text); }
-.required { color: var(--color-danger-600, #dc2626); margin-left: 0.15rem; }
+.required { color: var(--color-danger-600); margin-left: 0.15rem; }
 input[type="text"], input[type="number"], input[type="url"], input[type="email"], input[type="date"], textarea, select {
   width: 100%; padding: 0.625rem 0.75rem; border: 1px solid var(--control-border);
   border-radius: 8px; background: var(--app-surface); color: var(--app-text);
@@ -174,10 +174,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 2px solid var(--focus-ring); outline-offset: 1px; border-color: var(--focus-ring);
 }
 textarea { resize: vertical; }
-.field-error input, .field-error textarea, .field-error select { border-color: var(--color-danger-600, #dc2626); }
+.field-error input, .field-error textarea, .field-error select { border-color: var(--color-danger-600); }
 .switch { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
 .switch input { width: auto; }
 .field-message { margin: 0.35rem 0 0; font-size: 0.8125rem; }
 .help-message { color: var(--app-text-muted); }
-.error-message { color: var(--color-danger-600, #dc2626); }
+.error-message { color: var(--color-danger-600); }
 </style>

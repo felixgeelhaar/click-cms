@@ -5,6 +5,7 @@
         <h1 class="page-title">Dashboard</h1>
         <p class="page-subtitle">{{ subtitle }}</p>
       </div>
+      <a v-if="canCreate && !isEmpty" class="btn-primary" :href="withBase('/admin/pages/new')" @click="go($event, '/admin/pages/new')">New page</a>
     </div>
 
     <p v-if="error" class="banner error" role="alert">
@@ -20,6 +21,14 @@
       <div class="stats-grid">
         <StatCard v-for="stat in stats" :key="stat.label" v-bind="stat" />
       </div>
+
+      <section v-if="!isEmpty" class="recent-pages" aria-labelledby="recent-pages-title">
+        <div class="section-heading"><h2 id="recent-pages-title">Your pages</h2><a :href="withBase('/admin/pages')" @click="go($event, '/admin/pages')">View all pages →</a></div>
+        <div v-for="page in recentPages" :key="page.key || page.slug" class="recent-row">
+          <span>{{ page.data?.title || page.slug || page.key }}</span>
+          <span class="page-state">{{ page.publication?.hasUnpublishedChanges ? 'Edits pending' : page.publication?.published ? 'Live' : 'Draft' }}</span>
+        </div>
+      </section>
 
       <!-- A fresh install has an admin account and nothing else. The counts
            above all read zero, which used to look identical to a failed fetch
@@ -78,6 +87,8 @@ const emptyStats = () => [
 ];
 
 const stats = ref(emptyStats());
+const recentPages = ref([]);
+const canCreate = computed(() => props.capabilities.includes('content.create'));
 const loading = ref(true);
 const error = ref('');
 const notice = ref('');
@@ -124,6 +135,7 @@ const load = async () => {
     const pending = pages.filter((p) => p.publication?.hasUnpublishedChanges).length;
     const activePlugins = plugins.filter((p) => p.state === 'activated').length;
 
+    recentPages.value = pages.slice(0, 5);
     pageCount.value = pages.length;
     stats.value = [
       { icon: ICON.pages, label: 'Total Pages', value: pages.length, color: 'blue' },
@@ -179,10 +191,17 @@ onMounted(load);
 
 <style scoped>
 .dashboard { max-width: 1400px; }
-.page-header { margin-bottom: 2rem; }
+.page-header { margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin-bottom: 0.5rem; }
 .page-subtitle { color: var(--app-text-muted); margin: 0; }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-block: 1px solid var(--app-border); margin-bottom: 3rem; }
+.recent-pages { max-width: 70rem; }
+.section-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+.section-heading h2 { font-size: 1.1rem; }
+.section-heading a { color: var(--color-primary-600); font-size: .8125rem; text-decoration: none; }
+.recent-row { display: flex; justify-content: space-between; gap: 1rem; padding: 1.1rem 0; border-bottom: 1px solid var(--app-border); }
+.page-state { color: var(--app-text-muted); font-size: .8125rem; flex-shrink: 0; }
+@media(max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .muted { color: var(--app-text-muted); font-size: 0.875rem; }
 .banner {
   padding: 0.75rem 1rem;
@@ -195,7 +214,7 @@ onMounted(load);
   gap: 0.75rem;
   align-items: center;
 }
-.banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.error { color: var(--color-danger-600); }
 .banner.success { color: var(--color-primary-600); }
 .linkish {
   background: none;
@@ -210,7 +229,7 @@ onMounted(load);
   margin-top: 2rem;
   padding: 1.5rem 1.75rem;
   border: 1px solid var(--app-border);
-  border-radius: 12px;
+  border-radius: var(--card-radius);
   background: var(--card-bg, var(--app-surface));
   max-width: 40rem;
 }
@@ -237,7 +256,7 @@ onMounted(load);
 
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

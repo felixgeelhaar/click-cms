@@ -208,8 +208,8 @@ const closeComparison = () => {
 .versions-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .versions-heading { margin: 0; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--app-text-muted); }
 .versions-note { margin: 0.75rem 0 0; font-size: 0.8125rem; line-height: 1.45; color: var(--app-text-muted); }
-.versions-note.warn { color: var(--color-warning-text, #b45309); }
-.versions-error { margin: 0.75rem 0 0; font-size: 0.8125rem; color: var(--color-danger-600, #dc2626); }
+.versions-note.warn { color: var(--color-warning-text); }
+.versions-error { margin: 0.75rem 0 0; font-size: 0.8125rem; color: var(--color-danger-600); }
 .versions-empty { margin: 0.75rem 0 0; font-size: 0.875rem; color: var(--app-text-muted); }
 .versions-list { list-style: none; margin: 0.75rem 0 0; padding: 0; }
 .version { display: flex; align-items: center; gap: 1rem; padding: 0.6rem 0; border-top: 1px solid var(--app-border); }
@@ -219,7 +219,7 @@ const closeComparison = () => {
 .version-meta { margin: 0.15rem 0 0; font-size: 0.75rem; color: var(--app-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .version-tag { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.1rem 0.4rem; border-radius: 999px; border: 1px solid var(--app-border); color: var(--app-text-muted); }
 .version-tag.current { border-color: var(--color-primary-600); color: var(--color-primary-600); }
-.version-tag.live { border-color: var(--color-success-500); color: var(--color-success-text, #15803d); }
+.version-tag.live { border-color: var(--color-success-500); color: var(--color-success-text); }
 .version-diff { flex-basis: 100%; padding: 0.75rem; border-radius: 8px; background: var(--app-surface); }
 .diff-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 .diff-message { margin: 0.65rem 0 0; font-size: 0.8125rem; color: var(--app-text-muted); }
@@ -247,7 +247,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

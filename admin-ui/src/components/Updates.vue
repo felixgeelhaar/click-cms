@@ -198,7 +198,7 @@ onMounted(async () => {
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin: 0 0 0.35rem; }
 .page-subtitle { color: var(--app-text-muted); margin: 0 0 1.25rem; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
-.banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.error { color: var(--color-danger-600); }
 .banner.success { color: var(--color-primary-600); }
 .panel { border: 1px solid var(--app-border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem; background: var(--card-bg); }
 .panel-title { margin: 0 0 0.75rem; font-size: 1.125rem; }
@@ -212,13 +212,13 @@ onMounted(async () => {
 .offer-version { font-size: 1.25rem; font-weight: 600; }
 .step { font-size: 0.75rem; text-transform: uppercase; color: var(--app-text-muted); }
 .badge { font-size: 0.7rem; text-transform: uppercase; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 999px; }
-.badge.security { background: var(--color-danger-600, #dc2626); color: white; }
+.badge.security { background: var(--color-danger-600); color: white; }
 .notes { margin: 0 0 0.9rem; font-size: 0.875rem; color: var(--app-text-muted); white-space: pre-line; }
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .entry { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; font-size: 0.875rem; padding: 0.6rem 0.75rem; border: 1px solid var(--app-border); border-radius: 8px; }
 .result { font-size: 0.75rem; text-transform: uppercase; font-weight: 600; }
-.result.ok { color: var(--color-success-text, #15803d); }
-.result.failed { color: var(--color-danger-600, #dc2626); }
+.result.ok { color: var(--color-success-text); }
+.result.failed { color: var(--color-danger-600); }
 .entry-version { font-weight: 500; }
 .entry-at, .entry-error { color: var(--app-text-muted); font-size: 0.8125rem; }
 .btn-primary { padding: 0.55rem 1.1rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
@@ -238,7 +238,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }
