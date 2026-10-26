@@ -100,7 +100,7 @@ class Application
      * signed feed offers, so it is the single answer to "what is running here?"
      * — bumping it is part of cutting a release, not an afterthought.
      */
-    public const VERSION = '1.10.0';
+    public const VERSION = '1.11.0';
 
     /**
      * The password the installer seeds. Published in the documentation and
