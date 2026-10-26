@@ -47,6 +47,10 @@ final class Navigation
     private const GROUPS = [
         'Start here' => [
             'README.md',
+            'docs/handbook-en.md',
+            'docs/handbook-de.md',
+            'docs/demos-en.md',
+            'docs/demos-de.md',
         ],
         // Written for whoever maintains the content, in the admin panel, with no
         // interest in how any of it works. In the order someone new to the panel

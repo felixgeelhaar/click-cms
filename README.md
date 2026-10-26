@@ -1,5 +1,8 @@
 # Click CMS
 
+**Documentation:** [English handbook](docs/handbook-en.md) · [Deutsches Handbuch](docs/handbook-de.md) · [English demos](docs/demos-en.md) · [Deutsche Demos](docs/demos-de.md)
+
+
 A modern PHP CMS with plugin architecture, Vue admin UI, Visual Builder, and marketplace.
 
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?style=flat&logo=php)
