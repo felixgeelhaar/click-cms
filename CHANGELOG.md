@@ -5,6 +5,21 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-10-26
+
+### A clearer page editor
+- Open page editing with title and content, with separate Page settings and Activity views that preserve unsaved work when switching.
+- Keep publishing status and review together, and disclose scheduling, publishing checks and starter templates until needed. Active schedules and required approvals remain visible.
+- Start existing pages with the first section open and the remaining sections as an outline. Confirm section removal before changing the draft.
+- Consolidate review requests, reviewer assignment, decisions and history into one panel, with saved-revision requests and stale-review warnings.
+- Require an explicit save before publishing local edits. Saving remains separate from publishing.
+- Open the relevant view and move keyboard focus when following publishing checks; open Activity for recovery and conflict comparisons.
+
+### Validation
+- Pass 706 admin unit and accessibility tests, PHP compatibility and container checks, browser tests, Nox and dependency audits.
+- Verify editing, save/reload and sandboxed preview on an isolated example site, plus all editor views and expanded controls down to 320px.
+- This is a regular compatible stable release. Existing installations receive it according to their configured update policy.
+
 ## [1.10.0] — 2026-10-26
 
 ### Editorial administration
