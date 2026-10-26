@@ -184,3 +184,30 @@ describe('approving a review', () => {
     expect(wrapper.get('.review-error').text()).toContain('You cannot approve your own request for review.');
   });
 });
+
+
+describe('consolidated page review', () => {
+  it('blocks unsaved requests and sends the saved revision with the reviewer', async () => {
+    const { posts } = server();
+    const wrapper = mount(ReviewPanel, { props: { page: 'home', locale: 'en', savedRevision: 'saved-123', dirty: true, compact: true } });
+    await flushPromises();
+    expect(wrapper.get('.review-form .btn-primary').attributes('disabled')).toBeDefined();
+    await wrapper.get('.review-form').trigger('submit');
+    expect(posts).toHaveLength(0);
+    await wrapper.setProps({ dirty: false });
+    await wrapper.get('#collaboration-reviewer').setValue('ada');
+    await wrapper.get('.review-form').trigger('submit');
+    await flushPromises();
+    expect(posts[0].body).toMatchObject({ revision: 'saved-123', reviewer: 'ada', page: 'home' });
+  });
+
+  it('keeps stale approval visible and permits a new request without offering approval', async () => {
+    server({ review: inReview({ stale: true }), gateEnabled: true });
+    const wrapper = mount(ReviewPanel, { props: { page: 'home', savedRevision: 'new-revision', compact: true } });
+    await flushPromises();
+    expect(wrapper.get('.review-error').text()).toContain('page changed');
+    expect(wrapper.find('.review-decision').exists()).toBe(false);
+    expect(wrapper.find('.review-form .btn-primary').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Approval is required');
+  });
+});

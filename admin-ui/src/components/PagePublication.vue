@@ -14,6 +14,7 @@
         <span class="pub-dot" aria-hidden="true"></span>{{ headline }}
       </p>
       <p class="pub-detail">{{ detail }}</p>
+      <p v-if="dirty" class="pub-detail">Save your changes before publishing. Saving does not change the live page.</p>
 
       <p v-if="livePath" class="pub-live">
         <a :href="livePath" target="_blank" rel="noopener">
@@ -37,7 +38,7 @@
         v-if="canPublish && !upToDate"
         type="button"
         class="btn-publish"
-        :disabled="Boolean(busy) || isNew"
+        :disabled="Boolean(busy) || isNew || dirty"
         @click="$emit('publish')"
       >
         {{ busy === 'publish' ? 'Publishing…' : publishLabel }}
@@ -68,6 +69,7 @@ const props = defineProps({
   /** '' | 'publish' | 'unpublish' */
   busy: { type: String, default: '' },
   isNew: { type: Boolean, default: false },
+  dirty: { type: Boolean, default: false },
   slug: { type: String, default: '' },
   locale: { type: String, default: '' },
   defaultLocale: { type: String, default: '' },

@@ -584,6 +584,53 @@ describe('publish conflict as editorial state', () => {
     expect(banner.exists()).toBe(true);
     expect(banner.classes()).not.toContain('error');
     expect(banner.text()).toContain('open review');
-    expect(banner.text()).toContain('Open the review panel below');
+    expect(banner.text()).toContain('Open the review panel beside the content');
   });
+});
+
+
+describe('content first navigation', () => {
+  it('keeps unsaved fields mounted across views and keeps publishing visible', async () => {
+    installFetch({ capabilities: ['content.publish'], pages: { en: { title: 'Home', slug: 'home', sections: [], publication: PENDING } } });
+    const wrapper = mount(PageEdit, { props: { slug: 'home' } });
+    await flushPromises();
+    await wrapper.get('#page-title').setValue('Still editing');
+    const settings = wrapper.findAll('.editor-views button').find(button => button.text() === 'Page settings');
+    await settings.trigger('click');
+    expect(wrapper.get('#page-title').element.value).toBe('Still editing');
+    expect(wrapper.get('.save-state').text()).toBe('Unsaved changes');
+    expect(wrapper.get('.editor-sidebar').isVisible()).toBe(true);
+    expect(wrapper.findAll('.review')).toHaveLength(1);
+    expect(wrapper.find('.page-review').exists()).toBe(false);
+    await wrapper.findAll('.editor-views button')[0].trigger('click');
+    expect(wrapper.get('#page-title').isVisible()).toBe(true);
+    expect(wrapper.get('#page-title').element.value).toBe('Still editing');
+    wrapper.unmount();
+  });
+});
+
+
+it('opens the settings view and SEO disclosure from a publishing check', async () => {
+  installFetch({ pages: { en: { title: 'Home', slug: 'home', sections: [] } } });
+  const wrapper = mount(PageEdit, { props: { slug: 'home' }, attachTo: document.body });
+  await flushPromises();
+  await wrapper.get('a[href="#seo-description"]').trigger('click');
+  await flushPromises();
+  expect(wrapper.get('#seo-description').isVisible()).toBe(true);
+  expect(wrapper.get('.seo-group').element.open).toBe(true);
+  expect(document.activeElement.id).toBe('seo-description');
+  wrapper.unmount();
+});
+
+
+it('moves keyboard focus to Languages from a translation check', async () => {
+  installFetch({ locales: ['en', 'de'], pages: { en: { title: 'Home', slug: 'home', sections: [] } } });
+  const wrapper = mount(PageEdit, { props: { slug: 'home' }, attachTo: document.body });
+  await flushPromises();
+  await wrapper.findAll('.editor-views button')[1].trigger('click');
+  await wrapper.get('a[href="#page-languages-heading"]').trigger('click');
+  await flushPromises();
+  expect(wrapper.get('#page-languages-heading').isVisible()).toBe(true);
+  expect(document.activeElement.id).toBe('page-languages-heading');
+  wrapper.unmount();
 });

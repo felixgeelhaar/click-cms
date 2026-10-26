@@ -13,11 +13,6 @@
       </button>
     </div>
 
-    <p v-if="!gateEnabled" class="review-note" role="status">
-      Review gating is off — publishing does not require approval. You can still
-      request a review to coordinate with your team.
-    </p>
-
     <p v-if="error" class="review-error" role="alert">{{ error }}</p>
 
     <p v-if="loading && !loaded" class="review-empty">Loading…</p>
@@ -27,6 +22,16 @@
         <span class="review-state-label">Status</span>
         <span class="review-badge" :class="`is-${stateKey}`">{{ stateLabel }}</span>
       </p>
+
+      <p v-if="review.stale" class="review-error" role="status">The page changed after this review. Request review again for the current saved version.</p>
+      <p v-if="gateEnabled" class="review-note">Approval is required before publishing.</p>
+      <details class="review-options" :open="!compact">
+      <summary>Review options</summary>
+    <p v-if="!gateEnabled" class="review-note" role="status">
+      Review gating is off — publishing does not require approval. You can still
+      request a review to coordinate with your team.
+    </p>
+
 
       <dl v-if="hasDetails" class="review-details">
         <template v-if="review.requestedByName || review.requestedBy">
@@ -75,13 +80,19 @@
           placeholder="What should the reviewer focus on?"
           :disabled="Boolean(busy)"
         ></textarea>
+        <label class="review-form-label" for="collaboration-reviewer">Reviewer username (optional)</label>
+        <input id="collaboration-reviewer" v-model="reviewer" class="review-input" maxlength="120" autocomplete="off" />
+        <p v-if="dirty || savedRevision === ''" class="review-note">Save the page before requesting a review.</p>
         <div class="review-form-actions">
-          <button type="submit" class="btn-primary" :disabled="Boolean(busy)">
+          <button type="submit" class="btn-primary" :disabled="Boolean(busy) || dirty || savedRevision === ''">
             {{ busy === 'request' ? 'Requesting…' : 'Request review' }}
           </button>
         </div>
       </form>
 
+      <details v-if="review.history?.length"><summary>Review history</summary>
+        <ol><li v-for="(event, index) in review.history" :key="index">{{ STATE_LABELS[event.state] || event.state }} · {{ event.byName || event.by }} · {{ formatWhen(event.at) }}<p v-if="event.note">{{ event.note }}</p></li></ol>
+      </details>
       <!-- Decide an open review. -->
       <div v-if="canDecide" class="review-decision">
         <p class="review-form-intro">This page is waiting for a decision.</p>
@@ -135,6 +146,7 @@
           </button>
         </div>
       </form>
+      </details>
     </template>
   </section>
 </template>
@@ -147,6 +159,10 @@ const props = defineProps({
   locale: { type: String, default: '' },
   /** Content type under review. Defaults to page so existing mounts stay valid. */
   type: { type: String, default: 'page' },
+  savedRevision: { type: String, default: null },
+  dirty: { type: Boolean, default: false },
+  canRequestReview: { type: Boolean, default: true },
+  compact: { type: Boolean, default: false },
 });
 
 const emptyReview = () => ({
@@ -171,6 +187,7 @@ const busy = ref('');
 const error = ref('');
 
 const requestNote = ref('');
+const reviewer = ref('');
 const decisionNote = ref('');
 const cancelNote = ref('');
 
@@ -212,8 +229,8 @@ const hasDetails = computed(() => {
   );
 });
 
-const canRequest = computed(() => !review.value.open && !busy.value);
-const canDecide = computed(() => review.value.state === 'in_review' && !busy.value);
+const canRequest = computed(() => props.canRequestReview && (!review.value.open || review.value.stale) && !busy.value);
+const canDecide = computed(() => review.value.state === 'in_review' && !review.value.stale && !busy.value);
 const canCancel = computed(() => review.value.open && !busy.value);
 
 const loadSettings = async () => {
@@ -227,13 +244,17 @@ const loadSettings = async () => {
   }
 };
 
+let loadSequence = 0;
 const load = async () => {
+  const sequence = ++loadSequence;
   if (!props.page) return;
+  const reviewQuery = query();
   loading.value = true;
   error.value = '';
   try {
     await loadSettings();
-    const res = await fetch(`/api/collaboration/review?${query()}`);
+    const res = await fetch(`/api/collaboration/review?${reviewQuery}`);
+    if (sequence !== loadSequence) return;
     if (!res.ok) {
       error.value = res.status === 403
         ? 'You do not have permission to view review state on this page.'
@@ -242,13 +263,17 @@ const load = async () => {
       return;
     }
     const body = await res.json();
+    if (sequence !== loadSequence) return;
     review.value = { ...emptyReview(), ...(body.data ?? {}) };
   } catch {
+    if (sequence !== loadSequence) return;
     error.value = 'Could not load review state. Please try again.';
     review.value = emptyReview();
   } finally {
-    loading.value = false;
-    loaded.value = true;
+    if (sequence === loadSequence) {
+      loading.value = false;
+      loaded.value = true;
+    }
   }
 };
 
@@ -263,7 +288,7 @@ const readError = async (res) => {
 };
 
 const requestReview = async () => {
-  if (busy.value) return;
+  if (busy.value || !canRequest.value || props.dirty || props.savedRevision === '') return;
   busy.value = 'request';
   error.value = '';
   try {
@@ -272,6 +297,8 @@ const requestReview = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(reviewBody({
         note: requestNote.value.trim(),
+        reviewer: reviewer.value.trim(),
+        ...(props.savedRevision !== null ? { revision: props.savedRevision } : {}),
       })),
     });
     if (!res.ok) {
@@ -343,7 +370,7 @@ const formatWhen = (value) => {
   return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString();
 };
 
-watch(() => [props.page, props.locale, props.type], () => {
+watch(() => [props.page, props.locale, props.type, props.savedRevision], () => {
   loaded.value = false;
   load();
 });

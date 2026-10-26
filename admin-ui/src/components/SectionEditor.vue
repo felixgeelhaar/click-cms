@@ -1,5 +1,5 @@
 <template>
-  <div class="section-editor">
+  <div class="section-editor" :class="{ 'content-first': contentFirst }">
     <div class="editor-head">
       <h2 class="editor-title">Sections</h2>
       <p class="editor-subtitle">
@@ -7,6 +7,116 @@
       </p>
     </div>
 
+
+
+    <p v-if="typesError" class="banner error" role="alert">{{ typesError }}</p>
+
+    <p v-else-if="loadingTypes" class="banner">Loading section types…</p>
+
+    <p v-else-if="types.length === 0" class="banner">
+      This site has not declared any section types yet, so there is nothing to add.
+    </p>
+
+    <!-- Warnings surface malformed definitions instead of hiding them, so an
+         author notices a typo rather than wondering where a type went. -->
+    <div v-if="Object.keys(typeWarnings).length" class="banner warning">
+      <strong>Some section types could not be loaded:</strong>
+      <ul>
+        <li v-for="(message, file) in typeWarnings" :key="file">{{ file }} — {{ message }}</li>
+      </ul>
+    </div>
+
+    <ol v-if="sections.length" class="section-list">
+      <li
+        v-for="(section, index) in sections"
+        :key="section._uid"
+        class="section-item"
+        :class="{ dragging: dragIndex === index, 'drag-over': overIndex === index }"
+        :aria-grabbed="dragIndex === index ? 'true' : 'false'"
+        @dragover="onDragOver(index, $event)"
+        @drop="onDrop(index)"
+      >
+        <header class="section-head">
+          <div class="section-identity">
+            <!-- Pointer-only, and hidden on purpose: a role-less <span> may not
+                 carry aria-label, and this handle takes no focus. The labelled
+                 arrow buttons opposite are the keyboard path. -->
+            <span
+              class="drag-handle"
+              draggable="true"
+              aria-hidden="true"
+              @dragstart="onDragStart(index)"
+              @dragend="onDragEnd"
+            >⠿</span>
+            <span class="section-index">{{ index + 1 }}</span>
+            <div>
+              <button v-if="contentFirst" type="button" class="section-title-button" :aria-expanded="!section._collapsed" @click="toggle(index)">{{ labelFor(section.type) }}</button>
+              <p v-else class="section-type">{{ labelFor(section.type) }}</p>
+              <!--
+                Only claim a design is gone when we actually know the catalogue.
+                `typeFor()` is null both for a type that was removed and for one
+                we simply failed to fetch, and reporting the second as the first
+                told an editor their page's design "is no longer declared" when
+                nothing was wrong with it but a request.
+              -->
+              <p v-if="!typeFor(section.type) && catalogueKnown" class="section-missing">
+                Unknown section type “{{ section.type }}” — its design is no longer declared.
+              </p>
+              <p v-else-if="!typeFor(section.type)" class="section-unavailable">
+                The fields for this section cannot be shown until the section
+                designs load. Your content is safe — reload the page to try again.
+              </p>
+            </div>
+          </div>
+
+          <div class="section-controls">
+            <button
+              type="button" class="icon-btn" :disabled="index === 0"
+              :aria-label="`Move section ${index + 1} up`" @click="move(index, -1)"
+            >↑</button>
+            <button
+              type="button" class="icon-btn" :disabled="index === sections.length - 1"
+              :aria-label="`Move section ${index + 1} down`" @click="move(index, 1)"
+            >↓</button>
+            <button
+              type="button" class="icon-btn"
+              :aria-label="`${section._collapsed ? 'Expand' : 'Collapse'} section ${index + 1}`"
+              @click="toggle(index)"
+            >{{ section._collapsed ? '▸' : '▾' }}</button>
+            <details v-if="contentFirst" class="section-options">
+              <summary :aria-label="`Options for section ${index + 1}`">Options</summary>
+              <button type="button" class="icon-btn danger" :aria-label="`Remove section ${index + 1}`" @click="remove(index)">Remove section</button>
+            </details>
+            <button v-else
+              type="button" class="icon-btn danger"
+              :aria-label="`Remove section ${index + 1}`" @click="remove(index)"
+            >✕</button>
+          </div>
+        </header>
+
+        <div v-if="!section._collapsed" class="section-body">
+          <template v-if="typeFor(section.type)">
+            <component
+              :is="fieldComponent(field)"
+              v-for="field in typeFor(section.type).fields"
+              :key="field.name"
+              :field="field"
+              :model-value="section.values[field.name]"
+              :error="errorFor(index, field.name)"
+              @update:model-value="setValue(index, field.name, $event)"
+            />
+          </template>
+
+          <!-- A section whose type has been removed keeps its stored values so
+               deleting a definition cannot silently destroy content. Shown only
+               once we know the type is genuinely gone: dumping JSON at an editor
+               because a request failed reads as "your page is broken". -->
+          <pre v-else-if="catalogueKnown" class="orphan-values">{{ JSON.stringify(section.values, null, 2) }}</pre>
+        </div>
+      </li>
+    </ol>
+
+    <details class="starter-disclosure" :open="sections.length === 0"><summary>Starter templates and shared presets</summary>
     <section class="template-tools" aria-label="Starter templates">
       <label for="section-template-picker">Starter template</label>
       <div class="template-row">
@@ -65,109 +175,7 @@
       <p class="template-help">Personal starters stay in this browser and are scoped to your account and site. Shared presets are versioned for this site.</p>
       <p v-if="templateNotice" class="template-notice" role="status">{{ templateNotice }}</p>
     </section>
-
-    <p v-if="typesError" class="banner error" role="alert">{{ typesError }}</p>
-
-    <p v-else-if="loadingTypes" class="banner">Loading section types…</p>
-
-    <p v-else-if="types.length === 0" class="banner">
-      This site has not declared any section types yet, so there is nothing to add.
-    </p>
-
-    <!-- Warnings surface malformed definitions instead of hiding them, so an
-         author notices a typo rather than wondering where a type went. -->
-    <div v-if="Object.keys(typeWarnings).length" class="banner warning">
-      <strong>Some section types could not be loaded:</strong>
-      <ul>
-        <li v-for="(message, file) in typeWarnings" :key="file">{{ file }} — {{ message }}</li>
-      </ul>
-    </div>
-
-    <ol v-if="sections.length" class="section-list">
-      <li
-        v-for="(section, index) in sections"
-        :key="section._uid"
-        class="section-item"
-        :class="{ dragging: dragIndex === index, 'drag-over': overIndex === index }"
-        :aria-grabbed="dragIndex === index ? 'true' : 'false'"
-        @dragover="onDragOver(index, $event)"
-        @drop="onDrop(index)"
-      >
-        <header class="section-head">
-          <div class="section-identity">
-            <!-- Pointer-only, and hidden on purpose: a role-less <span> may not
-                 carry aria-label, and this handle takes no focus. The labelled
-                 arrow buttons opposite are the keyboard path. -->
-            <span
-              class="drag-handle"
-              draggable="true"
-              aria-hidden="true"
-              @dragstart="onDragStart(index)"
-              @dragend="onDragEnd"
-            >⠿</span>
-            <span class="section-index">{{ index + 1 }}</span>
-            <div>
-              <p class="section-type">{{ labelFor(section.type) }}</p>
-              <!--
-                Only claim a design is gone when we actually know the catalogue.
-                `typeFor()` is null both for a type that was removed and for one
-                we simply failed to fetch, and reporting the second as the first
-                told an editor their page's design "is no longer declared" when
-                nothing was wrong with it but a request.
-              -->
-              <p v-if="!typeFor(section.type) && catalogueKnown" class="section-missing">
-                Unknown section type “{{ section.type }}” — its design is no longer declared.
-              </p>
-              <p v-else-if="!typeFor(section.type)" class="section-unavailable">
-                The fields for this section cannot be shown until the section
-                designs load. Your content is safe — reload the page to try again.
-              </p>
-            </div>
-          </div>
-
-          <div class="section-controls">
-            <button
-              type="button" class="icon-btn" :disabled="index === 0"
-              :aria-label="`Move section ${index + 1} up`" @click="move(index, -1)"
-            >↑</button>
-            <button
-              type="button" class="icon-btn" :disabled="index === sections.length - 1"
-              :aria-label="`Move section ${index + 1} down`" @click="move(index, 1)"
-            >↓</button>
-            <button
-              type="button" class="icon-btn"
-              :aria-label="`${section._collapsed ? 'Expand' : 'Collapse'} section ${index + 1}`"
-              @click="toggle(index)"
-            >{{ section._collapsed ? '▸' : '▾' }}</button>
-            <button
-              type="button" class="icon-btn danger"
-              :aria-label="`Remove section ${index + 1}`" @click="remove(index)"
-            >✕</button>
-          </div>
-        </header>
-
-        <div v-if="!section._collapsed" class="section-body">
-          <template v-if="typeFor(section.type)">
-            <component
-              :is="fieldComponent(field)"
-              v-for="field in typeFor(section.type).fields"
-              :key="field.name"
-              :field="field"
-              :model-value="section.values[field.name]"
-              :error="errorFor(index, field.name)"
-              @update:model-value="setValue(index, field.name, $event)"
-            />
-          </template>
-
-          <!-- A section whose type has been removed keeps its stored values so
-               deleting a definition cannot silently destroy content. Shown only
-               once we know the type is genuinely gone: dumping JSON at an editor
-               because a request failed reads as "your page is broken". -->
-          <pre v-else-if="catalogueKnown" class="orphan-values">{{ JSON.stringify(section.values, null, 2) }}</pre>
-        </div>
-      </li>
-    </ol>
-
+    </details>
     <div class="add-row">
       <label class="add-label" for="section-type-picker">Add a section</label>
       <div class="add-controls">
@@ -197,6 +205,7 @@ const props = defineProps({
   errors: { type: Object, default: () => ({}) },
   templateScope: { type: Object, default: null },
   canManagePresets: { type: Boolean, default: false },
+  contentFirst: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -262,15 +271,21 @@ const sections = ref([]);
 let uid = 0;
 
 const hydrate = (value) => {
-  sections.value = (value ?? []).map((section) => ({
+  sections.value = (value ?? []).map((section, index) => ({
     _uid: ++uid,
-    _collapsed: false,
+    _collapsed: props.contentFirst && index > 0,
     type: section.type,
     values: { ...(section.values ?? {}) },
   }));
 };
 
 hydrate(props.modelValue);
+watch(() => props.errors, (errors) => {
+  for (const key of Object.keys(errors ?? {})) {
+    const index = Number(key.split('.')[0]);
+    if (sections.value[index]) sections.value[index]._collapsed = false;
+  }
+}, { deep: true });
 
 // Re-hydrate only when the parent supplies a genuinely different set, so typing
 // does not reset the editor on every keystroke.
@@ -328,6 +343,7 @@ const add = () => {
 };
 
 const remove = (index) => {
+  if (props.contentFirst && !window.confirm(`Remove section ${index + 1}? You can cancel the page edit to discard this change before saving.`)) return;
   sections.value.splice(index, 1);
   commit();
 };
@@ -506,6 +522,14 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.content-first .section-controls .icon-btn { min-width: 44px; min-height: 44px; }
+.section-options { position: relative; }
+.section-options summary { cursor: pointer; padding: .65rem; }
+.section-options .icon-btn { min-width: 9rem; }
+.section-title-button { font: inherit; font-weight: 600; text-align: left; background: transparent; color: var(--app-text); border: 0; cursor: pointer; padding: .5rem; }
+.starter-disclosure { margin: 1.25rem 0; }
+.starter-disclosure > summary { cursor: pointer; font-weight: 600; padding: .75rem 0; }
+
 .section-editor { margin-top: 2rem; }
 .template-tools { display: grid; gap: 0.5rem; padding: 0.9rem; border: 1px solid var(--app-border); border-radius: 10px; }
 .template-tools > label { font-weight: 600; }
@@ -552,4 +576,8 @@ onMounted(async () => {
 .btn-primary { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+@media (max-width: 480px) {
+  .content-first .add-controls { flex-wrap: wrap; }
+  .content-first .add-controls select { min-width: 0; flex-basis: 100%; }
+}
 </style>

@@ -346,3 +346,19 @@ describe('SectionEditor starter templates', () => {
     expect(wrapper.text()).toContain('Deleted “Agency hero”.');
   });
 });
+
+
+it('starts content first with a short outline and reveals sections with errors', async () => {
+  global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ data: [] }) }));
+  const wrapper = mount(SectionEditor, { props: { contentFirst: true, modelValue: [
+    { type: 'hero', values: { heading: 'One' } }, { type: 'quote', values: { text: 'Two' } },
+  ] } });
+  await flushPromises();
+  expect(wrapper.findAll('.section-body')).toHaveLength(1);
+  await wrapper.setProps({ errors: { '1.text': 'Required' } });
+  expect(wrapper.findAll('.section-body')).toHaveLength(2);
+  vi.spyOn(window, 'confirm').mockReturnValue(false);
+  await wrapper.get('[aria-label="Remove section 1"]').trigger('click');
+  expect(wrapper.findAll('.section-item')).toHaveLength(2);
+  expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+});

@@ -33,38 +33,44 @@
     <div v-if="loading" class="banner">Loading…</div>
 
     <div v-else class="edit-form">
-      <PagePublication
-        :publication="publication"
-        :pending-count="pendingCount"
-        :can-publish="can('content.publish')"
-        :can-unpublish="can('content.unpublish')"
-        :busy="publishBusy"
-        :is-new="isNew || translationMissing"
-        :slug="storedSlug"
-        :locale="locale"
-        :default-locale="defaultLocale"
-        @publish="publishPage"
-        @unpublish="unpublishPage"
-      />
+      <div class="editor-toolbar">
+        <nav class="editor-views" aria-label="Page editor views">
+          <button v-for="view in editorViews" :key="view.id" type="button" :aria-pressed="editorView === view.id" @click="editorView = view.id">{{ view.label }}</button>
+        </nav>
+        <span class="save-state" role="status">{{ dirty ? 'Unsaved changes' : 'No unsaved changes' }}</span>
+      <div class="actions">
+        <button class="btn-secondary" :disabled="saving" @click="cancel">Cancel</button>
+        <button class="btn-secondary" :disabled="saving" @click="previewPage">
+          {{ previewing ? 'Preparing…' : 'Preview' }}
+        </button>
+        <button class="btn-primary" :disabled="saving" @click="savePage">
+          {{ saving ? 'Saving…' : 'Save' }}
+        </button>
+      </div>
 
-      <PageQualityChecklist :page="page" :locales="siteLocales" :translations="translations" />
-
+      </div>
       <!--
-        Only for a page that exists. Scheduling something with no working copy
-        to promote would produce a schedule the sweeper drops as soon as it
-        fires, which is a worse way to learn "save it first" than not offering
-        the control.
+        A language with no working copy of its own is not an empty page: it is a
+        page that does not exist in that language yet, and saying so is what
+        stops an editor believing their German text disappeared.
       -->
-      <PageSchedule
-        v-if="!isNew && !translationMissing"
-        :schedule="schedule"
-        :can-schedule="can('content.publish')"
-        :busy="scheduleBusy"
-        @save="saveSchedule"
-        @clear="clearSchedule"
-      />
-      <p v-if="scheduleError" class="banner error" role="alert">{{ scheduleError }}</p>
+      <p v-if="translationMissing" class="banner notice">
+        There is no {{ languageName(locale) }} version of this page yet. Fill this
+        in and save to create one — it is a separate document from
+        {{ languageName(defaultLocale) }} and is published on its own.
+        <button
+          v-if="fallbackSource"
+          type="button"
+          class="inline-button"
+          @click="copyFallbackSource"
+        >
+          Start from the {{ languageName(fallbackSourceLocale) }} text
+        </button>
+      </p>
 
+      <div class="editor-layout">
+      <section class="editor-content" aria-label="Page editing">
+      <div v-show="editorView === 'content'">
       <PageLanguages
         v-if="!isNew && siteLocales.length > 1"
         :locales="siteLocales"
@@ -98,42 +104,23 @@
         :current-username="currentUsername"
         @close="showTranslationCompare = false"
       />
-      <PageReviewWorkflow
-        v-if="!isNew && storedSlug"
-        :slug="storedSlug"
-        :locale="locale"
-        :current-username="currentUsername"
-        :can-request="can('content.edit.any') || can('content.edit.own')"
-        :saved-revision="revision"
-        :dirty="dirty"
-        :refresh-token="revision"
-      />
-
-      <!--
-        A language with no working copy of its own is not an empty page: it is a
-        page that does not exist in that language yet, and saying so is what
-        stops an editor believing their German text disappeared.
-      -->
-      <p v-if="translationMissing" class="banner notice">
-        There is no {{ languageName(locale) }} version of this page yet. Fill this
-        in and save to create one — it is a separate document from
-        {{ languageName(defaultLocale) }} and is published on its own.
-        <button
-          v-if="fallbackSource"
-          type="button"
-          class="inline-button"
-          @click="copyFallbackSource"
-        >
-          Start from the {{ languageName(fallbackSourceLocale) }} text
-        </button>
-      </p>
 
       <div class="form-group">
         <label for="page-title">Title</label>
         <input id="page-title" v-model="page.title" type="text" placeholder="Page title" />
       </div>
 
-      <div class="form-group">
+      <div v-if="isNew" class="form-group">
+        <label for="page-slug">Slug</label>
+        <input id="page-slug" v-model="page.slug" type="text" placeholder="page-slug" />
+        <p class="field-help">The page address. Choose it before the first save.</p>
+      </div>
+      <SectionEditor content-first v-model="page.sections" :errors="sectionErrors" :template-scope="templateScope" :can-manage-presets="can('sections.manage')" />
+
+      </div>
+      <div v-show="editorView === 'settings'" class="settings-view">
+        <h2>Page settings</h2>
+      <div v-if="!isNew" class="form-group">
         <label for="page-slug">Slug</label>
         <input
           id="page-slug"
@@ -145,25 +132,6 @@
         <p v-if="!isNew" class="field-help">
           The slug is part of the page's address and cannot be changed here.
         </p>
-      </div>
-
-      <SectionEditor v-model="page.sections" :errors="sectionErrors" :template-scope="templateScope" :can-manage-presets="can('sections.manage')" />
-
-      <div class="editor-tools">
-        <label class="recovery-opt-in">
-          <input v-model="recoveryEnabled" type="checkbox" />
-          Keep a local recovery copy on this device
-        </label>
-        <p class="field-help">Off by default. When enabled, unsaved text is stored in this browser for up to 7 days and removed when you save or discard.</p>
-        <p v-if="recoveryStorageError" class="field-help" role="alert">{{ recoveryStorageError }}</p>
-        <button v-if="dirty && !comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = true">Compare with saved page</button>
-        <button v-else-if="comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = false">Hide comparison</button>
-        <DraftComparison
-          v-if="comparisonOpen && comparisonBase"
-          :before="comparisonBase"
-          :after="page"
-          :heading="conflict && conflictComparison ? 'Latest saved page compared with your edits' : 'Unsaved changes compared with the saved page'"
-        />
       </div>
 
       <!--
@@ -234,6 +202,44 @@
         </div>
       </details>
 
+      </div>
+      <div v-show="editorView === 'activity'">
+        <h2>Activity</h2>
+      <PageVersions
+        v-if="!isNew"
+        :versions="versions"
+        :slug="storedSlug"
+        :locale="locale"
+        :working-copy="page"
+        :loading="versionsLoading"
+        :error="versionsError"
+        :can-restore="can('content.restore')"
+        :restoring="restoringId"
+        @restore="restoreVersion"
+        @reload="loadVersions"
+      />
+
+      <CommentsPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" />
+      <details class="editor-disclosure" :open="comparisonOpen"><summary>Recovery and comparison</summary>
+      <div class="editor-tools">
+        <label class="recovery-opt-in">
+          <input v-model="recoveryEnabled" type="checkbox" />
+          Keep a local recovery copy on this device
+        </label>
+        <p class="field-help">Off by default. When enabled, unsaved text is stored in this browser for up to 7 days and removed when you save or discard.</p>
+        <p v-if="recoveryStorageError" class="field-help" role="alert">{{ recoveryStorageError }}</p>
+        <button v-if="dirty && !comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = true">Compare with saved page</button>
+        <button v-else-if="comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = false">Hide comparison</button>
+        <DraftComparison
+          v-if="comparisonOpen && comparisonBase"
+          :before="comparisonBase"
+          :after="page"
+          :heading="conflict && conflictComparison ? 'Latest saved page compared with your edits' : 'Unsaved changes compared with the saved page'"
+        />
+      </div>
+
+      </details>
+      </div>
       <!--
         The link is shown rather than opened for the editor automatically. It is
         meant to be sent to somebody — a client, a proofreader — who has no
@@ -273,40 +279,48 @@
         :error="livePreviewError"
         @refresh="refreshLivePreview"
       />
-
-      <div class="actions">
-        <button class="btn-secondary" :disabled="saving" @click="cancel">Cancel</button>
-        <button class="btn-secondary" :disabled="saving" @click="previewPage">
-          {{ previewing ? 'Preparing…' : 'Preview' }}
-        </button>
-        <button class="btn-primary" :disabled="saving" @click="savePage">
-          {{ saving ? 'Saving…' : 'Save' }}
-        </button>
-      </div>
-
-      <PageVersions
-        v-if="!isNew"
-        :versions="versions"
+      </section>
+      <aside class="editor-sidebar" aria-label="Publishing and review">
+      <PagePublication
+        :publication="publication"
+        :pending-count="pendingCount"
+        :can-publish="can('content.publish')"
+        :can-unpublish="can('content.unpublish')"
+        :busy="publishBusy"
+        :dirty="dirty"
+        :is-new="isNew || translationMissing"
         :slug="storedSlug"
         :locale="locale"
-        :working-copy="page"
-        :loading="versionsLoading"
-        :error="versionsError"
-        :can-restore="can('content.restore')"
-        :restoring="restoringId"
-        @restore="restoreVersion"
-        @reload="loadVersions"
+        :default-locale="defaultLocale"
+        @publish="publishPage"
+        @unpublish="unpublishPage"
       />
 
-      <!-- Collaboration: review workflow and notes. Shown once the page exists. -->
-      <ReviewPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" />
-      <CommentsPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" />
+      <details v-if="!isNew && !translationMissing" class="editor-disclosure" :open="Boolean(schedule?.publishAt || schedule?.unpublishAt)">
+        <summary>{{ schedule?.publishAt || schedule?.unpublishAt ? 'Active publishing schedule' : 'Publishing schedule' }}</summary>
+      <PageSchedule
+        v-if="!isNew && !translationMissing"
+        :schedule="schedule"
+        :can-schedule="can('content.publish')"
+        :busy="scheduleBusy"
+        @save="saveSchedule"
+        @clear="clearSchedule"
+      />
+      </details>
+      <p v-if="scheduleError" class="banner error" role="alert">{{ scheduleError }}</p>
+      <details class="editor-disclosure" @click="navigateCheck">
+        <summary>Page checks</summary>
+        <PageQualityChecklist :page="page" :locales="siteLocales" :translations="translations" />
+      </details>
+      <ReviewPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" :saved-revision="revision" :dirty="dirty" compact :can-request-review="can('content.edit.any') || can('content.edit.own')" />
+      </aside>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { nextTick, computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import SectionEditor from './SectionEditor.vue';
 import PresenceBar from './collaboration/PresenceBar.vue';
 import ReviewPanel from './collaboration/ReviewPanel.vue';
@@ -321,10 +335,26 @@ import DraftComparison from './page-edit/DraftComparison.vue';
 import DraftMerge from './page-edit/DraftMerge.vue';
 import ResponsivePreview from './page-edit/ResponsivePreview.vue';
 import TranslationCompare from './page-edit/TranslationCompare.vue';
-import PageReviewWorkflow from './page-edit/PageReviewWorkflow.vue';
 import { clearDraftRecovery, readDraftRecovery, writeDraftRecovery } from './page-edit/draftRecovery.js';
 
 const props = defineProps({ slug: String, initialLocale: { type: String, default: '' } });
+const editorView = ref('content');
+const editorViews = [{ id: 'content', label: 'Content' }, { id: 'settings', label: 'Page settings' }, { id: 'activity', label: 'Activity' }];
+const navigateCheck = async (event) => {
+  const link = event.target.closest('a[href^="#"]');
+  if (!link) return;
+  event.preventDefault();
+  const id = link.getAttribute('href').slice(1);
+  editorView.value = id.startsWith('seo-') ? 'settings' : 'content';
+  await nextTick();
+  const target = document.getElementById(id);
+  const disclosure = target?.closest('details');
+  if (disclosure) disclosure.open = true;
+  target?.scrollIntoView?.({ block: 'center' });
+  // Headings (such as Languages) need a programmatic focus target too.
+  if (target && !target.matches('input, select, textarea, button, a[href], [tabindex]')) target.setAttribute('tabindex', '-1');
+  target?.focus();
+};
 const emit = defineEmits(['saved', 'cancel', 'replace-route']);
 const localDraftStorage = () => {
   try { return window.localStorage; } catch { return null; }
@@ -527,6 +557,7 @@ const restoreRecovery = () => {
   page.value = JSON.parse(JSON.stringify(recoveryCandidate.value));
   recoveryCandidate.value = null;
   comparisonOpen.value = true;
+  editorView.value = 'activity';
   notice.value = 'Recovery copy restored. Review it against the saved page before saving.';
 };
 
@@ -745,6 +776,7 @@ const persist = async () => {
     // Field-level errors come back keyed "<sectionIndex>.<fieldName>" so the
     // editor can put each message against the input that caused it.
     sectionErrors.value = body.errors ?? {};
+    editorView.value = 'content';
     saveError.value = body.error
       || (Object.keys(sectionErrors.value).length
         ? 'Some sections need attention before this page can be saved.'
@@ -835,7 +867,7 @@ const publicationAction = async (action) => {
         /review/i.test(message) &&
         !/review panel/i.test(message)
       ) {
-        message = `${message} Open the review panel below.`;
+        message = `${message} Open the review panel beside the content.`;
       }
       publishError.value = message;
       publishErrorEditorial.value = res.status === 409;
@@ -1054,6 +1086,7 @@ const compareConflict = async () => {
     if (!mergeRevision.value) throw new Error('The latest revision token is missing. Reload before merging.');
     conflictComparison.value = true;
     comparisonOpen.value = true;
+    editorView.value = 'activity';
   } catch (e) {
     if (sequence === conflictCompareSequence && requestedSlug === storedSlug.value && requestedLocale === locale.value) {
       mergeError.value = `Could not compare the saved page: ${e.message}`;
@@ -1267,7 +1300,28 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.page-edit { max-width: 860px; }
+.page-edit { max-width: 1440px; }
+.editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; padding-bottom: 1.25rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--app-border); }
+.editor-views { display: flex; flex-wrap: wrap; gap: .25rem; }
+.editor-views button { padding: .65rem .85rem; border: 1px solid transparent; border-radius: .5rem; background: transparent; color: var(--app-text-muted); cursor: pointer; font: inherit; }
+.editor-views button[aria-pressed="true"] { background: var(--app-surface-strong); border-color: var(--app-border); color: var(--app-text); font-weight: 600; }
+.save-state { font-size: .85rem; color: var(--app-text-muted); }
+.editor-toolbar .actions { margin: 0 0 0 auto; flex-wrap: wrap; }
+.editor-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(270px, 330px); gap: 2rem; align-items: start; }
+.editor-content, .editor-sidebar { min-width: 0; }
+.editor-sidebar { border-left: 1px solid var(--app-border); padding-left: 1.5rem; }
+.editor-sidebar :deep(.pub) { display: block; margin: 0; }
+.editor-sidebar :deep(.pub-body) { min-width: 0; }
+.editor-sidebar :deep(.quality-checklist li) { grid-template-columns: 1rem minmax(0, 1fr); }
+.editor-sidebar :deep(.quality-checklist li a) { grid-column: 2; white-space: normal; }
+.editor-sidebar :deep(.pub-actions) { margin-top: 1rem; flex-wrap: wrap; }
+.editor-sidebar :deep(.review) { margin-top: 1.5rem; }
+.editor-sidebar :deep(.review-details) { grid-template-columns: 1fr; }
+.editor-disclosure { margin-top: 1.25rem; border-top: 1px solid var(--app-border); padding-top: 1rem; }
+.editor-disclosure > summary { cursor: pointer; font-weight: 600; padding: .5rem 0; }
+@media (max-width: 1050px) { .editor-layout { grid-template-columns: minmax(0, 1fr); } .editor-sidebar { border-left: 0; border-top: 1px solid var(--app-border); padding: 1.5rem 0 0; } }
+@media (max-width: 600px) { .editor-toolbar .actions { margin-left: 0; } .edit-form { padding: 1rem; } }
+
 .edit-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
 .edit-heading .page-title { margin-bottom: 0; }
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin-bottom: 2rem; }
@@ -1320,5 +1374,9 @@ summary:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
+}
+@media (max-width: 600px) {
+  .edit-form { padding: 1rem; }
+  .editor-toolbar .actions { width: 100%; min-width: 0; max-width: 100%; justify-content: flex-start; gap: .5rem; }
 }
 </style>

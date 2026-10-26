@@ -105,3 +105,12 @@ describe('PagePublication', () => {
     expect(wrapper.text()).toContain('cannot publish');
   });
 });
+
+
+it('requires a save before publishing local edits', async () => {
+  const wrapper = mount(PagePublication, { props: { publication: { published: false, neverPublished: true }, canPublish: true, dirty: true } });
+  expect(wrapper.get('.btn-publish').attributes('disabled')).toBeDefined();
+  expect(wrapper.text()).toContain('Save your changes before publishing');
+  await wrapper.get('.btn-publish').trigger('click');
+  expect(wrapper.emitted('publish')).toBeUndefined();
+});
