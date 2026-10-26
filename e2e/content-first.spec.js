@@ -47,6 +47,9 @@ test('content first editor keeps edits across views, saves, previews and fits mo
       await views.getByRole('button', { name: view, exact: true }).click();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${view} at ${width}px`).toBe(true);
     }
+    await page.locator('.editor-sidebar details, .starter-disclosure').evaluateAll(panels => panels.forEach(panel => { panel.open = true; }));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `Expanded controls at ${width}px`).toBe(true);
+    await page.locator('.editor-sidebar details, .starter-disclosure').evaluateAll(panels => panels.forEach(panel => { panel.open = false; }));
     await page.evaluate(() => window.scrollTo(0, 0));
     if (out && width === 390) await page.screenshot({ path: `${out}/click-editor-content-mobile.png`, fullPage: true });
   }

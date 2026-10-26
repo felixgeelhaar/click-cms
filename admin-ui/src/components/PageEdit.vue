@@ -351,6 +351,8 @@ const navigateCheck = async (event) => {
   const disclosure = target?.closest('details');
   if (disclosure) disclosure.open = true;
   target?.scrollIntoView?.({ block: 'center' });
+  // Headings (such as Languages) need a programmatic focus target too.
+  if (target && !target.matches('input, select, textarea, button, a[href], [tabindex]')) target.setAttribute('tabindex', '-1');
   target?.focus();
 };
 const emit = defineEmits(['saved', 'cancel', 'replace-route']);

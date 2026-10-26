@@ -621,3 +621,16 @@ it('opens the settings view and SEO disclosure from a publishing check', async (
   expect(document.activeElement.id).toBe('seo-description');
   wrapper.unmount();
 });
+
+
+it('moves keyboard focus to Languages from a translation check', async () => {
+  installFetch({ locales: ['en', 'de'], pages: { en: { title: 'Home', slug: 'home', sections: [] } } });
+  const wrapper = mount(PageEdit, { props: { slug: 'home' }, attachTo: document.body });
+  await flushPromises();
+  await wrapper.findAll('.editor-views button')[1].trigger('click');
+  await wrapper.get('a[href="#page-languages-heading"]').trigger('click');
+  await flushPromises();
+  expect(wrapper.get('#page-languages-heading').isVisible()).toBe(true);
+  expect(document.activeElement.id).toBe('page-languages-heading');
+  wrapper.unmount();
+});
