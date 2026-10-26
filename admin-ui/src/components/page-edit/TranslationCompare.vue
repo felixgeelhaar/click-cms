@@ -330,7 +330,7 @@ h2 { margin: 0; font-size: 1rem; }
 .language-controls { display: flex; flex-wrap: wrap; gap: 1rem; margin: .75rem 0; }
 .language-controls label { display: grid; gap: .35rem; min-width: 12rem; font-size: .85rem; font-weight: 600; }
 .language-controls select { padding: .5rem; border: 1px solid var(--control-border); border-radius: 6px; background: var(--app-surface); color: var(--app-text); font: inherit; }
-.language-controls select:focus-visible, .compare-heading button:focus-visible { outline: 2px solid var(--focus-ring, #0f766e); outline-offset: 2px; }
+.language-controls select:focus-visible, .compare-heading button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .compare-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
 .compare-side { min-width: 0; padding: .75rem; border: 1px solid var(--app-border); border-radius: 6px; background: var(--app-surface); }
 .compare-side h3 { margin: 0; font-size: .9rem; }
@@ -338,12 +338,12 @@ h2 { margin: 0; font-size: 1rem; }
 .field-values { display: grid; grid-template-columns: minmax(5rem, auto) minmax(0, 1fr); gap: .35rem .65rem; margin: .75rem 0 0; font-size: .82rem; }
 .field-values dt { color: var(--app-text-muted); font-weight: 600; }
 .field-values dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.compare-message.error { color: var(--color-danger-600, #dc2626); }
+.compare-message.error { color: var(--color-danger-600); }
 .freshness-panel { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; margin-top: .8rem; padding: .7rem .8rem; border: 1px solid var(--app-border); border-radius: 6px; background: var(--app-surface); }
 .freshness-panel p { margin: 0; font-size: .84rem; }
 .freshness-panel button { border: 1px solid var(--control-border); border-radius: 6px; padding: .4rem .65rem; background: var(--app-surface-strong); color: var(--app-text); font: inherit; font-size: .82rem; cursor: pointer; }
 .freshness-panel button:disabled { opacity: .55; cursor: not-allowed; }
-.freshness-panel button:focus-visible { outline: 3px solid var(--color-primary-600, #2563eb); outline-offset: 2px; }
+.freshness-panel button:focus-visible { outline: 3px solid var(--color-primary-600); outline-offset: 2px; }
 .diff-table-wrap { max-width: 100%; margin-top: .75rem; overflow: auto; }
 table { width: 100%; border-collapse: collapse; background: var(--app-surface); font-size: .85rem; }
 th, td { padding: .55rem; border: 1px solid var(--app-border); text-align: left; vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; }

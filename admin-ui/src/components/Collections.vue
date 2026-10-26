@@ -212,7 +212,7 @@ onMounted(loadTypes);
 .page-subtitle { color: var(--app-text-muted); }
 
 .banner { padding: 0.75rem 1rem; border-radius: 8px; background: var(--app-surface-strong); font-size: 0.875rem; margin-bottom: 1rem; }
-.banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.error { color: var(--color-danger-600); }
 .loading, .empty-state { text-align: center; padding: 3rem; color: var(--app-text-muted); }
 
 .type-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }

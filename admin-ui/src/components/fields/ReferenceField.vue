@@ -147,7 +147,7 @@ onMounted(load);
 .ref-chip-move:disabled { opacity: 0.35; cursor: not-allowed; }
 .ref-chip-move:not(:disabled):hover { color: var(--color-primary-600); }
 .ref-chip-remove { border: 0; background: none; cursor: pointer; color: var(--app-text-muted); font-size: 1rem; line-height: 1; padding: 0 0.2rem; }
-.ref-chip-remove:hover { color: var(--color-danger-600, #dc2626); }
+.ref-chip-remove:hover { color: var(--color-danger-600); }
 /* The chip controls are 12px glyphs with no border of their own; without a ring
    there is nothing on screen to say which one the keyboard is on. */
 .ref-chip-move:focus-visible,

@@ -98,6 +98,6 @@ onBeforeUnmount(stop);
 .presence-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--app-text-muted); }
 .presence-list { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .presence-editor { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0.55rem 0.15rem 0.15rem; border: 1px solid var(--app-border); border-radius: 999px; background: var(--app-surface-strong); }
-.presence-avatar { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; font-size: 0.75rem; font-weight: 600; color: #fff; background: var(--color-primary-600, #4f46e5); }
+.presence-avatar { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; font-size: 0.75rem; font-weight: 600; color: #fff; background: var(--color-primary-600); }
 .presence-name { font-size: 0.8125rem; color: var(--app-text); }
 </style>

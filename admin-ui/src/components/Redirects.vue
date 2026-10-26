@@ -120,7 +120,7 @@ onMounted(load);
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin: 0 0 0.35rem; }
 .page-subtitle { color: var(--app-text-muted); margin: 0; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 1rem; background: var(--app-surface-strong); }
-.banner.error { color: var(--color-danger-600, #dc2626); }
+.banner.error { color: var(--color-danger-600); }
 .banner.success { color: var(--color-primary-600); }
 .empty { color: var(--app-text-muted); padding: 1.5rem 0; }
 .rule-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
@@ -134,7 +134,7 @@ onMounted(load);
 .btn-primary { padding: 0.625rem 1.25rem; border-radius: 8px; font-weight: 500; cursor: pointer; background: var(--color-primary-600); color: white; border: none; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-sm { padding: 0.5rem 0.75rem; font-size: 0.8125rem; border: 1px solid var(--control-border); background: var(--app-surface); border-radius: 6px; cursor: pointer; color: var(--app-text); }
-.btn-sm.danger { color: var(--color-danger-600, #dc2626); }
+.btn-sm.danger { color: var(--color-danger-600); }
 
 /*
  * Focus. Every control here is reachable by keyboard and, until this rule, none
@@ -148,7 +148,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

@@ -228,7 +228,7 @@ const save = () => {
 
 button:focus-visible,
 input:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

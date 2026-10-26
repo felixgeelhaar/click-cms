@@ -240,7 +240,7 @@ onMounted(load);
 .page-title { font-size: 1.875rem; font-weight: 700; color: var(--app-text); margin: 0 0 0.35rem; }
 .page-subtitle { color: var(--app-text-muted); margin: 0 0 1.5rem; }
 .banner { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 1rem; }
-.banner.error { color: var(--color-danger-600, #dc2626); background: var(--app-surface-strong); }
+.banner.error { color: var(--color-danger-600); background: var(--app-surface-strong); }
 .banner.success { color: var(--color-primary-600); background: var(--app-surface-strong); }
 .panel { border: 1px solid var(--app-border); border-radius: 10px; padding: 1.25rem 1.5rem; background: var(--card-bg); }
 .setting { display: flex; align-items: flex-start; justify-content: space-between; gap: 2rem; }
@@ -248,7 +248,7 @@ onMounted(load);
 .setting-title { margin: 0 0 0.4rem; font-size: 1.0625rem; }
 .setting-desc { margin: 0 0 0.6rem; font-size: 0.875rem; line-height: 1.5; color: var(--app-text-muted); }
 .setting-state { margin: 0; font-size: 0.8125rem; color: var(--app-text-muted); }
-.setting-state.warn { color: var(--color-warning-text, #b45309); }
+.setting-state.warn { color: var(--color-warning-text); }
 .inline-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; max-width: 26rem; }
 .text-input { flex: 1; min-width: 0; padding: 0.55rem 0.7rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .text-input:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; border-color: var(--color-primary-600); }

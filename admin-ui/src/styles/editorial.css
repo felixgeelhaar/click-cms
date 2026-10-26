@@ -1,0 +1,203 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { min-height: 100vh; }
+/* Click Editorial: shared foundations for every admin screen and plugin view.
+ * Keep public themes independent: this stylesheet is imported by AdminLayout.
+ */
+:root {
+  color-scheme: light;
+  --font-body: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: var(--font-body);
+  --color-primary-50: #f0effb;
+  --color-primary-100: #e7e5f6;
+  --color-primary-500: #6260d2;
+  --color-primary-600: #5351bd;
+  --color-primary-700: #43419f;
+  --action-fill: #5351bd;
+  --color-gray-50: #faf9f6;
+  --color-gray-100: #f2f1ed;
+  --color-gray-200: #e3e1da;
+  --color-gray-300: #c8c6bd;
+  --color-gray-400: #94938a;
+  --color-gray-500: #727168;
+  --color-gray-600: #66655d;
+  --color-gray-700: #494840;
+  --color-gray-800: #34332d;
+  --color-gray-900: #252520;
+  --app-bg: #faf9f6;
+  --app-surface: #ffffff;
+  --app-surface-strong: #f3f2ee;
+  --app-text: #252520;
+  --app-text-muted: #68675f;
+  --app-border: #e3e1da;
+  --app-elevation: 0 8px 24px rgb(37 37 32 / 8%);
+  --sidebar-bg: #f3f2ee;
+  --sidebar-border: var(--app-border);
+  --sidebar-glow: none;
+  --sidebar-active: #e8e6f6;
+  --sidebar-active-text: #4845a6;
+  --sidebar-hover: #eae9e3;
+  --sidebar-icon-bg: var(--sidebar-active);
+  --card-bg: var(--app-surface);
+  --card-border: var(--app-border);
+  --card-radius: 8px;
+  --card-radius-sm: 6px;
+  --card-shadow: none;
+  --card-shadow-soft: none;
+  --control-radius: 5px;
+  --control-border: #8d8b80;
+  --focus-ring: #5351bd;
+  --color-success-500: #4c7659;
+  --color-success-text: #356345;
+  --color-success-bg: #edf3ee;
+  --color-warning-500: #ac7926;
+  --color-warning-text: #815510;
+  --color-warning-bg: #faf3e5;
+  --color-danger-500: #bd4545;
+  --color-danger-600: #a22e36;
+  --color-danger-fill: #aa3540;
+  --color-danger-bg: #faedef;
+  --preview-stage-bg: #e9e7e0;
+  --overlay-bg: rgb(25 25 22 / 44%);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-primary-50: #29263e;
+  --color-primary-100: #35304f;
+  --color-primary-500: #aaa6ff;
+  /* Components use 600 for both text and filled actions; actions get a separate
+     fill below so text remains readable without white-on-pastel buttons. */
+  --color-primary-600: #b5b1ff;
+  --color-primary-700: #c9c5ff;
+  --color-gray-50: #191917;
+  --color-gray-100: #24241f;
+  --color-gray-200: #35352f;
+  --color-gray-300: #4c4b43;
+  --color-gray-400: #838176;
+  --color-gray-500: #aaa89c;
+  --color-gray-600: #b5b3a8;
+  --color-gray-700: #d1cfc5;
+  --color-gray-800: #e4e2d9;
+  --color-gray-900: #f3f1e9;
+  --app-bg: #191917;
+  --app-surface: #22221e;
+  --app-surface-strong: #292923;
+  --app-text: #f0eee6;
+  --app-text-muted: #b3b0a4;
+  --app-border: #3c3b33;
+  --app-elevation: 0 8px 24px rgb(0 0 0 / 24%);
+  --sidebar-bg: #161613;
+  --sidebar-active: #302c47;
+  --sidebar-active-text: #c8c3ff;
+  --sidebar-hover: #272620;
+  --control-border: #827e70;
+  --focus-ring: #b5b1ff;
+  --color-success-500: #97bb9e;
+  --color-success-text: #a8cbb0;
+  --color-success-bg: #233328;
+  --color-warning-500: #d4ad66;
+  --color-warning-text: #e3c17f;
+  --color-warning-bg: #3a301e;
+  --color-danger-500: #df9399;
+  --color-danger-600: #f0a1aa;
+  --color-danger-fill: #aa3540;
+  --color-danger-bg: #3c262b;
+  --preview-stage-bg: #151512;
+  --overlay-bg: rgb(0 0 0 / 62%);
+}
+html, body { background: var(--app-bg); }
+body { font-family: var(--font-body); font-size: 14px; line-height: 1.6; color: var(--app-text); }
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 550; letter-spacing: -.025em; }
+button, input, textarea, select { font-family: inherit; }
+/* Specificity intentionally exceeds local component styles: the shared system
+   owns visual primitives, while components keep layout and behavior. */
+:root:root .admin-app button { font-family: var(--font-body); }
+:root:root .admin-app :is(.btn-primary, .btn-secondary, .btn-danger, .btn-sm, .btn, .chip-button, .icon-button, .tab, .text-input, .locale-select) { border-radius: var(--control-radius); box-shadow: none; font-weight: 500; }
+:root:root .admin-app :is(.btn-primary, .submit-button, .btn-save) { background: var(--action-fill); color: #fff; border-color: var(--action-fill); }
+:root:root .admin-app :is(.btn-primary, .submit-button, .btn-save):hover:not(:disabled) { background: #43419f; border-color: #43419f; }
+:root:root .admin-app :is(.btn-secondary, .chip-button, .icon-button) { background: var(--app-surface); color: var(--app-text); border-color: var(--control-border); }
+:root:root .admin-app :is(.btn-secondary, .chip-button, .icon-button):hover:not(:disabled) { background: var(--app-surface-strong); }
+:root:root .admin-app .btn-danger { background: transparent; color: var(--color-danger-600); border: 1px solid var(--control-border); }
+:root:root .admin-app .btn-danger:hover:not(:disabled) { background: var(--color-danger-bg); border-color: var(--color-danger-600); }
+:root:root .admin-app :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']), textarea, select) { border-radius: var(--control-radius); color: var(--app-text); background-color: var(--app-surface); border-color: var(--control-border); }
+:root:root .admin-app :is(input, select, textarea) { accent-color: #5351bd; }
+:root:root .admin-app :is(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+:root:root .admin-app :is(h1, .page-title) { font-size: clamp(1.5rem, 2.5vw, 1.9rem); font-weight: 550; letter-spacing: -.04em; line-height: 1.25; }
+:root:root .admin-app :is(.page-subtitle, .subtitle) { color: var(--app-text-muted); font-size: .875rem; }
+:root:root .admin-app .page-header { margin-bottom: 2rem; gap: 1rem; }
+:root:root .admin-app .topbar { min-height: 64px; padding: .8rem 1.5rem; background: var(--app-bg); }
+:root:root .admin-app .brand { gap: .75rem; font-weight: 500; }
+:root:root .admin-app .brand-mark { width: auto; height: auto; border-radius: 0; background: transparent; color: var(--app-text); font-size: 1.8rem; letter-spacing: -.08em; font-weight: 650; }
+:root:root .admin-app .brand-name { color: var(--app-text-muted); font-size: .75rem; }
+:root:root .admin-app .profile-button { background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--app-border); border-radius: 50%; font-size: .75rem; }
+:root:root .admin-app .sidebar-shell { width: 216px; background: var(--sidebar-bg); top: 64px; height: calc(100vh - 64px); }
+:root:root .admin-app .sidebar-shell.collapsed { width: 64px; }
+:root:root .admin-app .sidebar { padding: 1.25rem .75rem; }
+:root:root .admin-app .nav-group { margin-bottom: 1.25rem; }
+:root:root .admin-app .nav-group-header { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: .75rem; margin-bottom: .4rem; }
+:root:root .admin-app .nav-item { border-radius: 5px; padding: .5rem .75rem; gap: .65rem; font-size: .8125rem; }
+:root:root .admin-app .nav-item .icon { width: 17px; height: 17px; stroke-width: 1.6; }
+:root:root .admin-app .nav-item.active { font-weight: 550; }
+:root:root .admin-app .nav-item.active::before { display: none; }
+:root:root .admin-app .main-content { min-width: 0; padding: 2.75rem clamp(1.25rem, 4vw, 4rem); }
+:root:root .admin-app :is(.card, .panel, .page-card, .plugin-card, .collection-card, .check-card, .section-card, .login-card, .modal, .dialog) { box-shadow: none; border-color: var(--app-border); }
+:root:root .admin-app :is(.status-badge, .badge, .status) { text-transform: none; letter-spacing: 0; font-weight: 500; border-radius: 4px; }
+:root:root .admin-app :is(.status-badge.live, .status.good, .badge.success) { background: var(--color-success-bg); color: var(--color-success-text); }
+:root:root .admin-app :is(.status-badge.pending, .status.review, .badge.warning) { background: var(--color-warning-bg); color: var(--color-warning-text); }
+:root:root .admin-app :is(.status-badge.takendown, .status.attention, .badge.danger) { background: var(--color-danger-bg); color: var(--color-danger-600); }
+:root:root .admin-app .page-list { gap: 0; border-top: 1px solid var(--app-border); }
+:root:root .admin-app .page-card { background: transparent; border: 0; border-bottom: 1px solid var(--app-border); border-radius: 0; padding: 1.25rem .25rem; }
+:root:root .admin-app .page-info h2 { font-weight: 500; font-size: 1rem; }
+:root:root .admin-app .filter-tabs .tab { font-size: .8125rem; }
+:root:root .admin-app :is(th, .table-header) { background: var(--app-surface-strong); font-weight: 500; text-transform: none; letter-spacing: 0; }
+:root:root .admin-app :is(td, th) { border-color: var(--app-border); }
+:root:root .admin-app .check-list { display: flex; flex-direction: column; gap: 0; }
+:root:root .admin-app .check-card { background: transparent; border: 0; border-top: 1px solid var(--app-border); border-radius: 0; padding: 1.5rem 0; }
+:root:root .admin-app .check-card h2 { font-weight: 550; font-size: 1rem; }
+:root:root .admin-app .check-card p { font-size: .875rem; max-width: 70ch; }
+:root:root .admin-app .check-card .status { background: transparent; padding: .25rem 0 .25rem .75rem; }
+:root:root .admin-app .next-step { margin-top: .65rem; }
+:root:root .admin-app .next-step strong { margin-right: .3em; font-weight: 500; }
+:root:root .admin-app .login-screen, :root:root .admin-app .login { background: var(--app-bg); width: 100%; padding: 1rem; }
+:root:root .admin-app .login-card { border-radius: 8px; padding: 2.5rem; }
+:root:root .admin-app .login .logo { background: transparent; color: var(--app-text); border-radius: 0; font-size: 2rem; letter-spacing: -.08em; }
+:root:root .admin-app .sidebar-backdrop { background: var(--overlay-bg); }
+:root:root .admin-app .preview-stage { background: var(--preview-stage-bg); }
+@media (max-width: 860px) {
+  :root:root .admin-app .sidebar-shell { top: 0; height: 100%; }
+  :root:root .admin-app .main-content { padding: 1.75rem 1.25rem; }
+  :root:root .admin-app .topbar { padding: .75rem 1rem; gap: .65rem; }
+}
+@media (max-width: 480px) {
+  :root:root .admin-app .brand-name { display: none; }
+  :root:root .admin-app .topbar-right { gap: .5rem; }
+  :root:root .admin-app .page-header { align-items: flex-start; flex-wrap: wrap; }
+  :root:root .admin-app :is(input, select, textarea) { font-size: 16px; }
+  :root:root .admin-app :is(.btn-primary, .btn-secondary, .btn-danger, .btn-sm, .tab, .nav-item, .icon-button, .chip-button, .text-button, .profile-button) { min-height: 44px; }
+  :root:root .admin-app .login-card { padding: 1.75rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:root .admin-app *, body { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+:root:root .admin-app :is(.btn-publish, .btn-sm.primary, .approve, .role--admin, .presence-avatar, .skip-link) { background: var(--action-fill); color: #fff; }
+:root:root .admin-app .avatar { background: var(--app-surface-strong); color: var(--app-text); }
+:root:root .admin-app .login .logo { width: auto; }
+@media (max-width: 600px) {
+  :root:root .admin-app :is(.template-tools, .template-history, .section-item, .section-body, .field) { min-width: 0; }
+  :root:root .admin-app :is(.template-row, .section-head, .preview-link-row) { flex-wrap: wrap; gap: .5rem; }
+  :root:root .admin-app .template-row :is(input, select) { flex-basis: 100%; width: 100%; }
+  :root:root .admin-app .section-head { padding: .75rem; }
+  :root:root .admin-app .section-head > * { min-width: 0; }
+  :root:root .admin-app :is(.template-help, .section-head) { overflow-wrap: anywhere; }
+}
+@media (max-width: 600px) {
+  :root:root .admin-app fieldset { min-inline-size: 0; max-width: 100%; }
+  :root:root .admin-app :is(.row-head, .selected) { flex-wrap: wrap; }
+  :root:root .admin-app :is(.repeater-row, .link-field, .picker) { min-width: 0; }
+}
+@media (max-width: 600px) {
+  :root:root .admin-app .users .row { flex-wrap: wrap; }
+  :root:root .admin-app .users .identity { flex-basis: 100%; }
+  :root:root .admin-app .users .identity > div { min-width: 0; overflow-wrap: anywhere; }
+  :root:root .admin-app .users .avatar { flex-shrink: 0; }
+}

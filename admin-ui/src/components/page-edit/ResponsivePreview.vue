@@ -35,8 +35,8 @@ h2 { margin: 0; font-size: 1rem; }
 p { margin: .2rem 0 0; color: var(--app-text-muted); font-size: .8rem; }
 .device-controls { display: flex; flex-wrap: wrap; gap: .4rem; }
 .device-controls button { border: 1px solid var(--control-border); border-radius: 6px; padding: .4rem .6rem; background: var(--app-surface); color: var(--app-text); cursor: pointer; }
-.device-controls button[aria-pressed="true"] { border-color: var(--focus-ring, #0f766e); box-shadow: inset 0 0 0 1px var(--focus-ring, #0f766e); }
-.device-controls button:focus-visible { outline: 2px solid var(--focus-ring, #0f766e); outline-offset: 2px; }
+.device-controls button[aria-pressed="true"] { border-color: var(--focus-ring); box-shadow: inset 0 0 0 1px var(--focus-ring); }
+.device-controls button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .preview-stage { display: flex; justify-content: center; min-height: 520px; padding: 1rem; overflow: auto; background: #e5e7eb; }
 iframe { min-height: 520px; flex: 0 0 auto; border: 1px solid #9ca3af; background: white; transition: width .15s ease; }
 .preview-error, .preview-empty { margin: auto; color: var(--app-text-muted); }

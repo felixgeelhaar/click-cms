@@ -114,7 +114,7 @@ onMounted(load);
 .submissions-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .submissions-title { margin: 0; font-size: 1.5rem; font-weight: 600; color: var(--app-text); }
 .submissions-subtitle { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--app-text-muted); }
-.submissions-error { margin: 1rem 0 0; padding: 0.6rem 0.85rem; font-size: 0.875rem; border-radius: 8px; color: var(--color-danger-600, #dc2626); border: 1px solid var(--color-danger-600, #dc2626); background: color-mix(in srgb, var(--color-danger-600, #dc2626) 8%, transparent); }
+.submissions-error { margin: 1rem 0 0; padding: 0.6rem 0.85rem; font-size: 0.875rem; border-radius: 8px; color: var(--color-danger-600); border: 1px solid var(--color-danger-600); background: color-mix(in srgb, var(--color-danger-600) 8%, transparent); }
 .submissions-empty { margin: 1.5rem 0 0; font-size: 0.9375rem; color: var(--app-text-muted); }
 .submissions-list { list-style: none; margin: 1.25rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.85rem; }
 .submission { padding: 1rem 1.25rem; border: 1px solid var(--app-border); border-radius: 10px; background: var(--app-surface-strong); }
@@ -142,7 +142,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--focus-ring, #0f766e);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }

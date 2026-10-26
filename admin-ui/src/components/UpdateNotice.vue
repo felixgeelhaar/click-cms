@@ -110,13 +110,13 @@ const install = async () => {
   gap: 0.75rem 1rem;
   padding: 0.85rem 1rem;
   margin-bottom: 1.25rem;
-  border: 1px solid var(--color-border, #d6d9de);
-  border-left: 3px solid var(--color-accent, #3b6ef5);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
   border-radius: 6px;
-  background: var(--color-surface-raised, #f7f8fa);
+  background: var(--color-surface-raised);
 }
 .notice--done {
-  border-left-color: var(--color-success, #2e7d4f);
+  border-left-color: var(--color-success);
 }
 .notice__text {
   display: flex;
@@ -127,12 +127,12 @@ const install = async () => {
 }
 .notice__security {
   font-weight: 600;
-  color: var(--color-danger, #b3261e);
+  color: var(--color-danger);
 }
 .notice__error {
   flex: 1 1 100%;
   margin: 0;
-  color: var(--color-danger, #b3261e);
+  color: var(--color-danger);
 }
 .notice__actions {
   display: flex;

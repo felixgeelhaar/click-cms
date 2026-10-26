@@ -144,11 +144,11 @@ watch(() => [props.slug, props.locale, props.savedRevision, props.refreshToken],
 .review-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .review-heading h2 { margin: 0; font-size: .96rem; }
 .review-state { margin: .2rem 0 0; color: var(--app-text-muted); font-size: .82rem; font-weight: 600; }
-.state-approved { color: var(--color-success-700, #15803d); }
-.state-changes_requested { color: var(--color-warning-text, #b45309); }
-.history-toggle { border: 0; padding: .3rem; background: none; color: var(--color-primary-700, #1d4ed8); text-decoration: underline; cursor: pointer; font: inherit; font-size: .82rem; }
+.state-approved { color: var(--color-success-700); }
+.state-changes_requested { color: var(--color-warning-text); }
+.history-toggle { border: 0; padding: .3rem; background: none; color: var(--color-primary-700); text-decoration: underline; cursor: pointer; font: inherit; font-size: .82rem; }
 .review-message { margin: .7rem 0 0; font-size: .84rem; }
-.review-message.error { color: var(--color-danger-600, #b91c1c); }
+.review-message.error { color: var(--color-danger-600); }
 .save-first { margin: .2rem 0 0; color: var(--app-text-muted); font-size: .78rem; }
 .request-note { margin: .5rem 0 0; white-space: pre-wrap; font-size: .84rem; }
 .request-form { display: grid; gap: .45rem; margin-top: .8rem; }
@@ -156,9 +156,9 @@ watch(() => [props.slug, props.locale, props.savedRevision, props.refreshToken],
 .request-form label span { color: var(--app-text-muted); font-weight: 400; }
 .request-form textarea, .request-form input { width: 100%; box-sizing: border-box; padding: .55rem .65rem; border: 1px solid var(--control-border); border-radius: 7px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .request-form textarea { resize: vertical; }
-.request-button { justify-self: start; border: 0; border-radius: 7px; padding: .55rem .85rem; background: var(--color-primary-700, #1d4ed8); color: white; font: inherit; font-weight: 600; cursor: pointer; }
+.request-button { justify-self: start; border: 0; border-radius: 7px; padding: .55rem .85rem; background: var(--color-primary-700); color: white; font: inherit; font-weight: 600; cursor: pointer; }
 .request-button:disabled { opacity: .6; cursor: wait; }
 .review-history { display: grid; gap: .45rem; margin: .8rem 0 0; padding-left: 1.25rem; font-size: .82rem; }
 .review-history p { margin: .2rem 0; white-space: pre-wrap; }
-.history-toggle:focus-visible, .request-button:focus-visible { outline: 3px solid var(--color-primary-600, #2563eb); outline-offset: 3px; }
+.history-toggle:focus-visible, .request-button:focus-visible { outline: 3px solid var(--color-primary-600); outline-offset: 3px; }
 </style>

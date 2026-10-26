@@ -286,11 +286,11 @@ onMounted(async () => {
   width: 100%; padding: 0.5rem 0.65rem; border: 1px solid var(--control-border);
   border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit;
 }
-.link-select[aria-invalid="true"] { border-color: var(--color-danger-600, #dc2626); }
+.link-select[aria-invalid="true"] { border-color: var(--color-danger-600); }
 .link-external { margin-top: 0.5rem; }
 .link-sub-label { display: block; margin-bottom: 0.25rem; font-size: 0.75rem; font-weight: 500; color: var(--app-text-muted); }
 .link-hint { margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--app-text-muted); }
-.link-warning { margin: 0.35rem 0 0; font-size: 0.75rem; color: var(--color-danger-600, #dc2626); }
+.link-warning { margin: 0.35rem 0 0; font-size: 0.75rem; color: var(--color-danger-600); }
 .link-caution { margin: 0.35rem 0 0; font-size: 0.75rem; color: var(--app-text-muted); }
 .link-warning code { font-size: 0.75rem; }
 

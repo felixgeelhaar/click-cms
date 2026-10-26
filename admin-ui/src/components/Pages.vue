@@ -353,7 +353,7 @@ onMounted(loadPages);
 .btn-sm:focus-visible,
 .lang-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
-.notice { margin-bottom: 1rem; color: var(--color-danger-600, #dc2626); font-size: 0.875rem; }
+.notice { margin-bottom: 1rem; color: var(--color-danger-600); font-size: 0.875rem; }
 .loading, .empty-state { text-align: center; padding: 3rem; color: var(--app-text-muted); }
 .page-list { display: flex; flex-direction: column; gap: 1rem; }
 .page-card { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.5rem; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius-sm); }
@@ -364,20 +364,20 @@ onMounted(loadPages);
 .state-meta { color: var(--app-text-muted); font-size: 0.75rem; }
 
 .status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.02em; }
-.status-badge.live { background: #dcfce7; color: #166534; }
-.status-badge.pending { background: #fef3c7; color: #92400e; }
-.status-badge.never { background: #e5e9ef; color: #3f4754; }
-.status-badge.takendown { background: #fee2e2; color: #991b1b; }
-.status-badge.unknown { background: #e5e9ef; color: #3f4754; }
+.status-badge.live { background: var(--color-success-bg); color: var(--color-success-text); }
+.status-badge.pending { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.status-badge.never { background: var(--app-border); color: #3f4754; }
+.status-badge.takendown { background: var(--color-danger-bg); color: var(--color-danger-600); }
+.status-badge.unknown { background: var(--app-border); color: #3f4754; }
 
 .translations { list-style: none; display: flex; flex-wrap: wrap; gap: 0.375rem; margin: 0.625rem 0 0; padding: 0; }
 .lang-chip { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.1875rem 0.5rem; border-radius: 6px; border: 1px solid var(--app-border); font-size: 0.6875rem; text-decoration: none; color: var(--app-text-muted); }
 .lang-chip.current { border-color: var(--color-primary-600); }
 .lang-code { text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em; color: var(--app-text); }
 .lang-state { color: var(--app-text-muted); }
-.lang-chip.live .lang-state { color: #166534; }
-.lang-chip.pending .lang-state { color: #92400e; }
-.lang-chip.takendown .lang-state { color: #991b1b; }
+.lang-chip.live .lang-state { color: var(--color-success-text); }
+.lang-chip.pending .lang-state { color: var(--color-warning-text); }
+.lang-chip.takendown .lang-state { color: var(--color-danger-600); }
 .lang-chip.missing { border-style: dashed; }
 a.lang-chip:hover, a.lang-chip:focus-visible { background: var(--sidebar-hover); }
 
@@ -385,18 +385,18 @@ a.lang-chip:hover, a.lang-chip:focus-visible { background: var(--sidebar-hover);
 .btn-sm { display: inline-block; padding: 0.5rem 1rem; font-size: 0.875rem; border-radius: 6px; cursor: pointer; text-decoration: none; }
 .btn-secondary { background: var(--app-surface-strong); color: var(--app-text); border: 1px solid var(--control-border); }
 /* White on --color-danger-500 is 3.8:1 — under the 4.5:1 its own label needs. */
-.btn-danger { background: var(--color-danger-fill, #dc2626); color: white; border: none; }
+.btn-danger { background: var(--color-danger-fill); color: white; border: none; }
 
 /* The badge palette above is tuned for light surfaces; on dark ones the same
    tints go muddy, so they are restated rather than left to wash out. */
-[data-theme="dark"] .status-badge.live { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+[data-theme="dark"] .status-badge.live { background: rgba(34, 197, 94, 0.18); color: var(--color-success-text); }
 [data-theme="dark"] .status-badge.pending { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
 [data-theme="dark"] .status-badge.never,
 [data-theme="dark"] .status-badge.unknown { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
-[data-theme="dark"] .status-badge.takendown { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
-[data-theme="dark"] .lang-chip.live .lang-state { color: #86efac; }
+[data-theme="dark"] .status-badge.takendown { background: rgba(239, 68, 68, 0.18); color: var(--color-danger-600); }
+[data-theme="dark"] .lang-chip.live .lang-state { color: var(--color-success-text); }
 [data-theme="dark"] .lang-chip.pending .lang-state { color: #fcd34d; }
-[data-theme="dark"] .lang-chip.takendown .lang-state { color: #fca5a5; }
+[data-theme="dark"] .lang-chip.takendown .lang-state { color: var(--color-danger-600); }
 </style>
 
 <style scoped>

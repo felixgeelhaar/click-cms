@@ -23,7 +23,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
         <button class="brand" @click="handleNavigate('/admin')">
-          <span class="brand-mark">C</span>
+          <span class="brand-mark">click</span>
           <span class="brand-name">{{ brandLabel }}</span>
         </button>
         <!--

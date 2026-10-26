@@ -92,8 +92,8 @@ onMounted(loadPlugins);
   font-size: 0.875rem;
   margin: 0 0 1.25rem;
 }
-.banner.error { color: var(--color-danger-600, #dc2626); }
-.banner.warn { color: var(--color-warning-text, #a16207); border: 1px solid var(--app-border); }
+.banner.error { color: var(--color-danger-600); }
+.banner.warn { color: var(--color-warning-text); border: 1px solid var(--app-border); }
 .banner-title { margin: 0 0 0.5rem; font-weight: 600; }
 .issue-list { margin: 0; padding-left: 1.25rem; }
 .issue-list li { margin: 0.25rem 0; }
@@ -107,7 +107,7 @@ onMounted(loadPlugins);
 /* --color-success-500 is a fill: as 12px lettering on a white card it measures
    2.3:1. --color-success-text is the same green at a legible weight, and is
    restated for dark mode where a dark green would fail the other way. */
-.status.activated { color: var(--color-success-text, #15803d); }
+.status.activated { color: var(--color-success-text); }
 .status.deactivated { color: var(--app-text-muted); }
 .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem; border-radius: 6px; cursor: pointer; }
 .btn-primary { background: var(--color-primary-600); color: white; border: none; }
