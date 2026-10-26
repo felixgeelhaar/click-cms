@@ -5,6 +5,18 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [1.10.0] — 2026-10-26
+
+### Editorial administration
+- Apply a shared warm-neutral and indigo design throughout the CMS admin, including authentication, editing, collections, media, plugins, reviews, builder, settings, updates and security health.
+- Add a quieter navigation rail, flat page rows, consistent form controls and status styling, and readable light and dark palettes without third-party font requests.
+- Show real page titles and publication states on the dashboard alongside counts and a permission-aware New page action.
+- Improve mobile touch targets and fix overflow in template controls, nested section fields and user actions.
+
+### Validation
+- Add an opt-in browser sweep of available admin routes in both themes and on mobile, plus draft persistence, rendered preview and public-theme checks.
+- Preserve public theme styling, site content and the existing update policy; the release is a regular compatible stable update, not a security release.
+
 ## [1.9.0] — 2026-10-25
 
 ### Shared-hosting updates
