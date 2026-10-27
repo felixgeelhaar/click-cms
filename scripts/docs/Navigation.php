@@ -47,6 +47,8 @@ final class Navigation
     private const GROUPS = [
         'Start here' => [
             'README.md',
+            'docs/editor-en.md',
+            'docs/editor-de.md',
             'docs/handbook-en.md',
             'docs/handbook-de.md',
             'docs/demos-en.md',

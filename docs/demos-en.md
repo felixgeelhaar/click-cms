@@ -2,6 +2,8 @@
 
 [Deutsch](demos-de.md) · [English handbook](handbook-en.md)
 
+**For editors:** ask your website manager for a practice site, then go straight to [demo 1](#demo-1-edit-a-page-and-preview-it). You do not need to run the setup commands. For a shorter introduction, use the [editor guide](editor-en.md).
+
 These are hands-on walkthroughs, not a hosted public sandbox. Use a disposable local instance or an isolated staging copy. Never seed or practice recovery on a production site. Allow about 30 minutes for the four demos after installation.
 
 ## Prepare a local instance

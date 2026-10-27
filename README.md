@@ -1,5 +1,7 @@
 # Click CMS
 
+**For editors:** [Simple English guide](docs/editor-en.md) · [Einfache Anleitung auf Deutsch](docs/editor-de.md)
+
 **Documentation:** [English handbook](docs/handbook-en.md) · [Deutsches Handbuch](docs/handbook-de.md) · [English demos](docs/demos-en.md) · [Deutsche Demos](docs/demos-de.md)
 
 

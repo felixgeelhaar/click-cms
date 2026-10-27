@@ -2,6 +2,8 @@
 
 [Deutsch](handbook-de.md) · [Hands-on demos](demos-en.md)
 
+**Here to edit your website?** Start with the [simple editor guide](editor-en.md). It takes you through one task at a time. The technical sections below are for the person who runs or builds your site.
+
 For editors, site owners and developers. These instructions describe Click 1.11. Features depend on your role, installed plugins and the site's section and collection definitions. English interface labels are included so you can find controls even when reading the German guide.
 
 ## Choose your starting point

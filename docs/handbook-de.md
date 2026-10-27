@@ -2,6 +2,8 @@
 
 [English](handbook-en.md) · [Praktische Demos](demos-de.md)
 
+**Sie möchten Ihre Website bearbeiten?** Beginnen Sie mit der [einfachen Redaktionsanleitung](editor-de.md). Sie erklärt jede Aufgabe Schritt für Schritt. Die technischen Kapitel unten richten sich an die Personen, die Ihre Website betreiben oder entwickeln.
+
 Für Redakteure, Website-Verantwortliche und Entwickler. Dieses Handbuch beschreibt Click 1.11. Verfügbare Funktionen hängen von Rolle, Plugins und den Abschnitts- und Sammlungsdefinitionen der Website ab. Englische Bezeichnungen entsprechen den Bedienelementen der Oberfläche.
 
 ## Den passenden Einstieg wählen

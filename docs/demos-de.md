@@ -2,6 +2,8 @@
 
 [English](demos-en.md) · [Deutsches Handbuch](handbook-de.md)
 
+**Für die Redaktion:** Bitten Sie Ihre Website-Betreuung um eine Übungswebsite und starten Sie direkt mit [Demo 1](#demo-1-seite-bearbeiten-und-prüfen). Sie müssen die Einrichtungsbefehle nicht ausführen. Den kurzen Einstieg finden Sie in der [Redaktionsanleitung](editor-de.md).
+
 Dies sind praktische Anleitungen, kein öffentlich gehosteter Testzugang. Verwenden Sie eine lokale Testinstallation oder eine isolierte Staging-Kopie. Beispieldaten und Wiederherstellungsübungen gehören nicht auf die Produktionswebsite. Planen Sie nach der Installation etwa 30 Minuten ein.
 
 ## Lokale Installation vorbereiten
