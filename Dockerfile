@@ -49,7 +49,7 @@ RUN composer install \
 # whatever the CPU. If this stage ever produces a native binary, this line has
 # to go.
 # ---------------------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS admin-ui
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS admin-ui
 
 # The repository layout is mirrored rather than flattened into /app. The
 # accessibility tests read the CSS they assert about out of the shipped files —
