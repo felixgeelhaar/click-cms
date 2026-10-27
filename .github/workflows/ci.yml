@@ -159,6 +159,9 @@ jobs:
       # Then prove the built image actually serves. The health endpoint boots
       # nothing but confirms PHP runs and the writable paths exist — the failure
       # that matters in a container.
+      - name: Verify Apache admin routes at root and nested prefixes
+        run: python3 scripts/test-admin-apache-routing.py --image click-cms:ci
+
       - name: Run container
         run: docker run -d --name click-cms-ci -p 8080:80 click-cms:ci
 
