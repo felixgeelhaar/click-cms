@@ -354,6 +354,23 @@ final class SiteBuilderTest extends TestCase
         $this->assertStringContainsString('overflow-x: auto', $css);
     }
 
+    public function testThePublicSiteSharesTheAdminDesignFoundations(): void
+    {
+        $this->fixture();
+        $this->build();
+        $css = $this->read('style.css');
+        $admin = file_get_contents(dirname(__DIR__, 3) . '/admin-ui/src/styles/editorial.css');
+
+        // Changing a foundation in the admin must also change the public site.
+        preg_match_all('/^  (--(?:app-bg|app-text|font-body|focus-ring):[^;]+;)/m', $admin, $tokens);
+        $this->assertGreaterThanOrEqual(7, count($tokens[1]));
+        foreach ($tokens[1] as $token) {
+            $this->assertStringContainsString($token, $css);
+        }
+        $this->assertStringContainsString('--font-prose: var(--font-body)', $css);
+        $this->assertStringNotContainsString('.admin-app', $css);
+    }
+
     // ------------------------------------------------------------------
     // Screenshots
     // ------------------------------------------------------------------
