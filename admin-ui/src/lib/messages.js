@@ -114,6 +114,8 @@ export function message(text, parameters) {
 }
 
 const patterns = [
+  [/^Missing dependencies: (.+)$/, names => `Erforderliche Plugins fehlen: ${names}`],
+  [/^Cannot deactivate - other plugins depend on it: (.+)$/, names => `Dieses Plugin wird noch von anderen Plugins benötigt: ${names}`],
   [/^(.+) is required\.$/, label => `Bitte „${label}“ ausfüllen.`],
   [/^(.+) must be at least (\d+) characters\.$/, (label, n) => `„${label}“ muss mindestens ${n} Zeichen enthalten.`],
   [/^(.+) must be at most (\d+) characters\.$/, (label, n) => `„${label}“ darf höchstens ${n} Zeichen enthalten.`],
@@ -142,7 +144,8 @@ const patterns = [
 export function errorTranslation(value) {
   const text = String(value ?? '');
   if (!text || messageLanguage.value === 'en') return { text, technical: '' };
-  if (german[text]) return { text: german[text], technical: '' };
+  const known = german[text] ?? interfaceGerman[text];
+  if (known) return { text: known, technical: '' };
   for (const [pattern, translate] of patterns) {
     const match = text.match(pattern);
     if (match) return { text: translate(...match.slice(1)), technical: '' };

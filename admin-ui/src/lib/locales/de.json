@@ -985,5 +985,11 @@
   "“{0}” is not published, so anyone following this link gets a “page not found”.": "„{0}“ ist nicht veröffentlicht. Besucher dieses Links sehen „Seite nicht gefunden“.",
   "” — its design is no longer declared.": "“ – die Gestaltung ist nicht mehr definiert.",
   "← Back": "← Zurück",
-  "← Collections": "← Sammlungen"
+  "← Collections": "← Sammlungen",
+  "Could not activate plugin.": "Das Plugin konnte nicht aktiviert werden.",
+  "Could not deactivate plugin.": "Das Plugin konnte nicht deaktiviert werden.",
+  "Plugin blocked by deployment policy": "Die Bereitstellungsrichtlinie erlaubt dieses Plugin nicht.",
+  "Activation failed": "Die Aktivierung ist fehlgeschlagen.",
+  "Plugin not activated": "Das Plugin ist nicht aktiviert.",
+  "Plugin already activated": "Das Plugin ist bereits aktiviert."
 }

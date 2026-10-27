@@ -49,3 +49,10 @@ it('interpolates UI parameters without translating or interpreting authored valu
   expect(message('Saved “My English title”.')).toBe('„My English title“ gespeichert.');
   expect(message('unknown plugin label')).toBe('unknown plugin label');
 });
+
+it('translates plugin refusals while preserving dependency names', () => {
+  messageLanguage.value = 'de';
+  expect(errorTranslation('Plugin blocked by deployment policy').text).toContain('Bereitstellungsrichtlinie');
+  expect(errorTranslation('Missing dependencies: Search API').text).toBe('Erforderliche Plugins fehlen: Search API');
+  expect(errorTranslation('Cannot deactivate - other plugins depend on it: Forms').text).toContain('benötigt: Forms');
+});
