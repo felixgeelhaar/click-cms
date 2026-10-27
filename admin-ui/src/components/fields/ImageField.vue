@@ -20,47 +20,46 @@
         <!-- An SVG scales to any size and has no raster dimensions, so it reads
              as a vector rather than as an empty "×". -->
         <p class="selected-detail">
-          <span v-if="isVector(selected)">Scalable vector (SVG)</span>
+          <span v-if="isVector(selected)">{{ message('Scalable vector (SVG)') }}</span>
           <template v-else>
             {{ selected.width }}×{{ selected.height }}
             <span v-if="selected.variants?.length"> · {{ selected.variants.join(', ') }}</span>
           </template>
         </p>
         <p v-if="!selected.alt" class="selected-warning">
-          No description set — add one in the Media library so screen readers can
-          describe it.
+          {{ message('No description set — add one in the Media library so screen readers can describe it.') }}
         </p>
         <!-- When the field declares displayWidth the library is fetched judged
              against that slot, so this is the server's verdict for this field
              specifically: the same file can be fine in a card and wrong in a
              header, and the wording says which. -->
         <p v-if="selected.quality?.warning" class="selected-warning">
-          {{ selected.quality.message }}
+          {{ imageQualityMessage(selected.quality) }}
         </p>
       </div>
-      <button type="button" class="btn-sm" @click="clear">Remove</button>
+      <button type="button" class="btn-sm" @click="clear">{{ message('Remove') }}</button>
     </div>
 
     <!-- A reference that is not in the library still shows, so content authored
          before the library existed keeps working and can be recognised. -->
     <p v-else-if="modelValue" class="unknown">
-      Using <code>{{ modelValue }}</code>, which is not in the media library.
-      <button type="button" class="link-btn" @click="clear">Clear</button>
+      {{ message('This reference is not in the media library. Choose a file from the library to replace it.') }} <code>{{ modelValue }}</code>
+      <button type="button" class="link-btn" @click="clear">{{ message('Clear') }}</button>
     </p>
 
     <div class="picker">
       <button type="button" class="btn-sm" :disabled="loading" @click="open = !open">
-        {{ open ? 'Close library' : (selected ? 'Change image' : 'Choose image') }}
+        {{ open ? message('Close library') : (selected ? message('Change image') : message('Choose image')) }}
       </button>
-      <span v-if="loading" class="hint">Loading library…</span>
+      <span v-if="loading" class="hint">{{ message('Loading library…') }}</span>
       <!-- A request that failed is not an empty library. Saying "upload images
            first" to somebody whose library is full sends them to do work they
            have already done, and hides the fact that something is wrong. -->
       <span v-else-if="failed" class="hint hint-error" data-test="library-failed">
-        The library could not be loaded. Reload the page to try again.
+        {{ message('The library could not be loaded. Reload the page to try again.') }}
       </span>
       <span v-else-if="!items.length" class="hint">
-        The library is empty — upload images on the Media page first.
+        {{ message('The library is empty — upload images on the Media page first.') }}
       </span>
     </div>
 
@@ -86,12 +85,14 @@
       </li>
     </ul>
 
-    <p v-if="error" class="field-message error-message">{{ error }}</p>
+    <p v-if="error" class="field-message error-message"><LocalizedError :message="error" /></p>
     <p v-else-if="field.help" class="field-message help-message">{{ field.help }}</p>
   </div>
 </template>
 
 <script setup>
+import { message, imageQualityMessage } from '../../lib/messages.js';
+import LocalizedError from '../LocalizedError.vue';
 import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps({

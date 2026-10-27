@@ -7,12 +7,13 @@
     </div>
     <div class="stat-content">
       <div class="stat-value">{{ value }}</div>
-      <div class="stat-label">{{ label }}</div>
+      <div class="stat-label">{{ message(label) }}</div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import { computed } from 'vue';
 const props = defineProps({ icon: String, label: String, value: Number, color: String });
 const iconPaths = computed(() => {

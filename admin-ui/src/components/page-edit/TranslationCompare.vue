@@ -2,46 +2,42 @@
   <section id="translation-compare-panel" class="translation-compare" aria-labelledby="translation-compare-title">
     <div class="compare-heading">
       <div>
-        <h2 id="translation-compare-title">Compare translations</h2>
-        <p>Compare saved source and target snapshots. Freshness is unknown until someone records a review.</p>
+        <h2 id="translation-compare-title">{{ message('Compare translations') }}</h2>
+        <p>{{ message('Compare saved source and target snapshots. Freshness is unknown until someone records a review.') }}</p>
       </div>
-      <button type="button" class="inline-button" @click="$emit('close')">Close comparison</button>
+      <button type="button" class="inline-button" @click="$emit('close')">{{ message('Close comparison') }}</button>
     </div>
 
     <div class="language-controls">
-      <label>
-        Source language
-        <select v-model="sourceLocale" aria-label="Source language">
+      <label> {{ message('Source language') }} <select v-model="sourceLocale" :aria-label="message(&quot;Source language&quot;)">
           <option v-for="code in locales" :key="`source-${code}`" :value="code">{{ nameOf(code) }} ({{ code }})</option>
         </select>
       </label>
-      <label>
-        Target language
-        <select v-model="targetLocale" aria-label="Target language">
+      <label> {{ message('Target language') }} <select v-model="targetLocale" :aria-label="message(&quot;Target language&quot;)">
           <option v-for="code in locales" :key="`target-${code}`" :value="code">{{ nameOf(code) }} ({{ code }})</option>
         </select>
       </label>
     </div>
 
-    <p v-if="sameLanguage" class="compare-message" role="status">Choose two different languages.</p>
+    <p v-if="sameLanguage" class="compare-message" role="status">{{ message('Choose two different languages.') }}</p>
     <div v-else class="compare-columns" aria-live="polite" :aria-busy="busy">
-      <section class="compare-side" :aria-label="`Source: ${nameOf(sourceLocale)}`">
-        <h3>{{ nameOf(sourceLocale) }} <span>{{ sourcePublication }}</span></h3>
-        <p v-if="sourceBusy" class="compare-message" role="status">Loading source translation…</p>
-        <p v-else-if="sourceError" class="compare-message error" role="alert">{{ sourceError }}</p>
-        <p v-else-if="sourceMissing" class="compare-message" role="status">No saved translation exists in {{ nameOf(sourceLocale) }}.</p>
+      <section class="compare-side" :aria-label="message('Source: {0}', [nameOf(sourceLocale)])">
+        <h3>{{ nameOf(sourceLocale) }} <span>{{ message(sourcePublication) }}</span></h3>
+        <p v-if="sourceBusy" class="compare-message" role="status">{{ message('Loading source translation…') }}</p>
+        <p v-else-if="sourceError" class="compare-message error" role="alert"><LocalizedError :message="sourceError" /></p>
+        <p v-else-if="sourceMissing" class="compare-message" role="status">{{ message('No saved translation exists in') }} {{ nameOf(sourceLocale) }}.</p>
         <dl v-if="sourcePage" class="field-values">
           <template v-for="field in fieldsFor(sourcePage)" :key="`source-${field.path}`">
             <dt>{{ field.path }}</dt><dd>{{ field.value }}</dd>
           </template>
         </dl>
       </section>
-      <section class="compare-side" :aria-label="`Target: ${nameOf(targetLocale)}`">
-        <h3>{{ nameOf(targetLocale) }} <span>{{ targetPublication }}</span></h3>
-        <p v-if="targetBusy" class="compare-message" role="status">Loading target translation…</p>
-        <p v-else-if="targetError" class="compare-message error" role="alert">{{ targetError }}</p>
-        <p v-else-if="targetMissing" class="compare-message" role="status">No saved translation exists in {{ nameOf(targetLocale) }}.</p>
-        <p v-else-if="targetLocale === currentLocale" class="compare-message">Showing your current editor fields, including unsaved changes.</p>
+      <section class="compare-side" :aria-label="message('Target: {0}', [nameOf(targetLocale)])">
+        <h3>{{ nameOf(targetLocale) }} <span>{{ message(targetPublication) }}</span></h3>
+        <p v-if="targetBusy" class="compare-message" role="status">{{ message('Loading target translation…') }}</p>
+        <p v-else-if="targetError" class="compare-message error" role="alert"><LocalizedError :message="targetError" /></p>
+        <p v-else-if="targetMissing" class="compare-message" role="status">{{ message('No saved translation exists in') }} {{ nameOf(targetLocale) }}.</p>
+        <p v-else-if="targetLocale === currentLocale" class="compare-message">{{ message('Showing your current editor fields, including unsaved changes.') }}</p>
         <dl v-if="targetPage" class="field-values">
           <template v-for="field in fieldsFor(targetPage)" :key="`target-${field.path}`">
             <dt>{{ field.path }}</dt><dd>{{ field.value }}</dd>
@@ -51,9 +47,9 @@
     </div>
 
     <div v-if="!sameLanguage && !busy && !sourceError && !targetError && !sourceMissing && !targetMissing" class="diff-table-wrap">
-      <table aria-label="Translation field comparison">
+      <table :aria-label="message(&quot;Translation field comparison&quot;)">
         <thead>
-          <tr><th scope="col">Field</th><th scope="col">{{ nameOf(sourceLocale) }}</th><th scope="col">{{ nameOf(targetLocale) }}</th></tr>
+          <tr><th scope="col">{{ message('Field') }}</th><th scope="col">{{ nameOf(sourceLocale) }}</th><th scope="col">{{ nameOf(targetLocale) }}</th></tr>
         </thead>
         <tbody>
           <tr v-for="field in differences" :key="field.path">
@@ -61,20 +57,20 @@
             <td>{{ field.before }}</td>
             <td>{{ field.after }}</td>
           </tr>
-          <tr v-if="differences.length === 0"><td colspan="3">No title or section field differences.</td></tr>
+          <tr v-if="differences.length === 0"><td colspan="3">{{ message('No title or section field differences.') }}</td></tr>
         </tbody>
       </table>
     </div>
 
     <div v-if="!sameLanguage && !busy && sourcePage && targetPage" class="freshness-panel" aria-live="polite">
-      <p v-if="freshnessBusy" role="status">Checking saved translation review…</p>
-      <p v-else-if="freshnessError" class="compare-message error" role="alert">{{ freshnessError }}</p>
-      <p v-else-if="snapshotMismatch" class="compare-message error" role="status">Saved translations changed while the comparison loaded. Reload to compare the current saved versions.</p>
+      <p v-if="freshnessBusy" role="status">{{ message('Checking saved translation review…') }}</p>
+      <p v-else-if="freshnessError" class="compare-message error" role="alert"><LocalizedError :message="freshnessError" /></p>
+      <p v-else-if="snapshotMismatch" class="compare-message error" role="status">{{ message('Saved translations changed while the comparison loaded. Reload to compare the current saved versions.') }}</p>
       <template v-else-if="freshness">
-        <p v-if="freshness.freshness === 'unknown'" role="status">Not yet reviewed against this source.</p>
-        <p v-else-if="freshness.freshness === 'reviewed'" role="status">Reviewed against current source by {{ freshness.reviewedBy }} on {{ formatDate(freshness.reviewedAt) }}.</p>
-        <p v-else-if="freshness.staleReasons?.includes('source_changed')" class="compare-message error" role="status">Source changed since this review. Review the saved comparison again.</p>
-        <p v-else class="compare-message error" role="status">Target changed since this review. Review the saved comparison again.</p>
+        <p v-if="freshness.freshness === 'unknown'" role="status">{{ message('Not yet reviewed against this source.') }}</p>
+        <p v-else-if="freshness.freshness === 'reviewed'" role="status">{{ message('Reviewed against current source by') }} {{ freshness.reviewedBy }} {{ message('on') }} {{ formatDate(freshness.reviewedAt) }}.</p>
+        <p v-else-if="freshness.staleReasons?.includes('source_changed')" class="compare-message error" role="status">{{ message('Source changed since this review. Review the saved comparison again.') }}</p>
+        <p v-else class="compare-message error" role="status">{{ message('Target changed since this review. Review the saved comparison again.') }}</p>
       </template>
       <button
         v-if="mayMarkTarget"
@@ -83,13 +79,15 @@
         class="inline-button"
         :disabled="freshnessBusy || markBusy || snapshotMismatch || !displayedSourceRevision || !displayedTargetRevision || (targetLocale === currentLocale && targetDirty)"
         @click="markReviewed"
-      >{{ markBusy ? 'Saving review…' : freshness?.freshness === 'reviewed' ? 'Confirm review of current saved versions' : 'Mark saved target reviewed against this source' }}</button>
-      <p v-if="targetLocale === currentLocale && targetDirty" class="compare-message">Save the target translation before recording its review.</p>
+      >{{ markBusy ? message('Saving review…') : freshness?.freshness === 'reviewed' ? message('Confirm review of current saved versions') : message('Mark saved target reviewed against this source') }}</button>
+      <p v-if="targetLocale === currentLocale && targetDirty" class="compare-message">{{ message('Save the target translation before recording its review.') }}</p>
     </div>
   </section>
 </template>
 
 <script setup>
+import { message, messageLanguage } from '../../lib/messages.js';
+import LocalizedError from '../LocalizedError.vue';
 import { computed, ref, watch } from 'vue';
 import { comparePageDrafts } from './pageComparison.js';
 
@@ -129,11 +127,11 @@ let requestSequence = 0;
 
 const sameLanguage = computed(() => !!sourceLocale.value && sourceLocale.value === targetLocale.value);
 const busy = computed(() => sourceBusy.value || targetBusy.value);
-const displayNames = (() => {
-  try { return new Intl.DisplayNames(undefined, { type: 'language' }); } catch { return null; }
-})();
+const displayNames = computed(() => {
+  try { return new Intl.DisplayNames(messageLanguage.value, { type: 'language' }); } catch { return null; }
+});
 const nameOf = (code) => {
-  try { return displayNames?.of(code) || code; } catch { return code; }
+  try { return displayNames.value?.of(code) || code; } catch { return code; }
 };
 const freshnessOf = (code) => {
   const translation = props.translations[code];
@@ -149,7 +147,7 @@ const targetPublication = computed(() => `Publication: ${freshnessOf(targetLocal
 const mayMarkTarget = computed(() => props.canMark && (props.canEditAny || (savedTargetOwner.value !== '' && savedTargetOwner.value === props.currentUsername)));
 const formatDate = (value) => {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(messageLanguage.value);
 };
 const normalize = (data) => ({
   title: typeof data?.title === 'string' ? data.title : '',

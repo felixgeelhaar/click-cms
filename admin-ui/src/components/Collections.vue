@@ -31,19 +31,16 @@
     <template v-else>
       <div class="page-header">
         <div>
-          <h1 class="page-title">Collections</h1>
-          <p class="page-subtitle">Repeatable content types</p>
+          <h1 class="page-title">{{ message('Collections') }}</h1>
+          <p class="page-subtitle">{{ message('Repeatable content types') }}</p>
         </div>
       </div>
 
-      <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+      <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
 
-      <div v-if="loading" class="loading">Loading…</div>
+      <div v-if="loading" class="loading">{{ message('Loading…') }}</div>
 
-      <div v-else-if="types.length === 0" class="empty-state">
-        No collection types have been declared yet. A developer defines these
-        server-side; once one exists it appears here.
-      </div>
+      <div v-else-if="types.length === 0" class="empty-state"> {{ message('No collection types have been declared yet. A developer defines these server-side; once one exists it appears here.') }} </div>
 
       <div v-else class="type-list">
         <button
@@ -55,7 +52,7 @@
         >
           <span class="type-label">{{ type.label }}</span>
           <span v-if="type.description" class="type-description">{{ type.description }}</span>
-          <span class="type-count">{{ entryCountLabel(type) }}</span>
+          <span class="type-count">{{ message(entryCountLabel(type)) }}</span>
         </button>
       </div>
     </template>
@@ -63,6 +60,8 @@
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
+import LocalizedError from './LocalizedError.vue';
 import { ref, watch, onMounted } from 'vue';
 import CollectionEntries from './collections/CollectionEntries.vue';
 import CollectionEntryEdit from './collections/CollectionEntryEdit.vue';

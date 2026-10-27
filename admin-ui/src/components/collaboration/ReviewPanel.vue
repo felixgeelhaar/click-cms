@@ -1,65 +1,62 @@
 <template>
   <section class="review" aria-labelledby="collaboration-review-heading">
     <div class="review-head">
-      <h2 id="collaboration-review-heading" class="review-title">Review</h2>
+      <h2 id="collaboration-review-heading" class="review-title">{{ message('Review') }}</h2>
       <button
         type="button"
         class="btn-sm"
         :disabled="loading || Boolean(busy)"
-        aria-label="Reload review state for this page"
+        :aria-label="message(&quot;Reload review state for this page&quot;)"
         @click="load"
       >
-        {{ loading ? 'Loading…' : 'Refresh' }}
+        {{ loading ? message('Loading…') : message('Refresh') }}
       </button>
     </div>
 
-    <p v-if="error" class="review-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="review-error" role="alert"><LocalizedError :message="error" /></p>
 
-    <p v-if="loading && !loaded" class="review-empty">Loading…</p>
+    <p v-if="loading && !loaded" class="review-empty">{{ message('Loading…') }}</p>
 
     <template v-else>
       <p class="review-state" role="status">
         <span class="review-state-label">Status</span>
-        <span class="review-badge" :class="`is-${stateKey}`">{{ stateLabel }}</span>
+        <span class="review-badge" :class="`is-${stateKey}`">{{ message(stateLabel) }}</span>
       </p>
 
-      <p v-if="review.stale" class="review-error" role="status">The page changed after this review. Request review again for the current saved version.</p>
-      <p v-if="gateEnabled" class="review-note">Approval is required before publishing.</p>
+      <p v-if="review.stale" class="review-error" role="status">{{ message('The page changed after this review. Request review again for the current saved version.') }}</p>
+      <p v-if="gateEnabled" class="review-note">{{ message('Approval is required before publishing.') }}</p>
       <details class="review-options" :open="!compact">
-      <summary>Review options</summary>
-    <p v-if="!gateEnabled" class="review-note" role="status">
-      Review gating is off — publishing does not require approval. You can still
-      request a review to coordinate with your team.
-    </p>
+      <summary>{{ message('Review options') }}</summary>
+    <p v-if="!gateEnabled" class="review-note" role="status"> {{ message('Review gating is off — publishing does not require approval. You can still request a review to coordinate with your team.') }} </p>
 
 
       <dl v-if="hasDetails" class="review-details">
         <template v-if="review.requestedByName || review.requestedBy">
-          <dt>Requested by</dt>
+          <dt>{{ message('Requested by') }}</dt>
           <dd>{{ review.requestedByName || review.requestedBy }}</dd>
         </template>
         <template v-if="review.requestedAt">
-          <dt>Requested</dt>
+          <dt>{{ message('Requested') }}</dt>
           <dd>{{ formatWhen(review.requestedAt) }}</dd>
         </template>
         <template v-if="review.note">
-          <dt>Request note</dt>
+          <dt>{{ message('Request note') }}</dt>
           <dd class="review-detail-note">{{ review.note }}</dd>
         </template>
         <template v-if="review.reviewer">
-          <dt>Suggested reviewer</dt>
+          <dt>{{ message('Suggested reviewer') }}</dt>
           <dd>{{ review.reviewer }}</dd>
         </template>
         <template v-if="review.decidedByName || review.decidedBy">
-          <dt>Decided by</dt>
+          <dt>{{ message('Decided by') }}</dt>
           <dd>{{ review.decidedByName || review.decidedBy }}</dd>
         </template>
         <template v-if="review.decidedAt">
-          <dt>Decided</dt>
+          <dt>{{ message('Decided') }}</dt>
           <dd>{{ formatWhen(review.decidedAt) }}</dd>
         </template>
         <template v-if="review.decisionNote">
-          <dt>Decision note</dt>
+          <dt>{{ message('Decision note') }}</dt>
           <dd class="review-detail-note">{{ review.decisionNote }}</dd>
         </template>
       </dl>
@@ -70,39 +67,39 @@
         class="review-form"
         @submit.prevent="requestReview"
       >
-        <p class="review-form-intro">Ask someone to look over this page before it goes live.</p>
-        <label class="review-form-label" for="collaboration-review-request-note">Note (optional)</label>
+        <p class="review-form-intro">{{ message('Ask someone to look over this page before it goes live.') }}</p>
+        <label class="review-form-label" for="collaboration-review-request-note">{{ message('Note (optional)') }}</label>
         <textarea
           id="collaboration-review-request-note"
           v-model="requestNote"
           class="review-input"
           rows="2"
-          placeholder="What should the reviewer focus on?"
+          :placeholder="message(&quot;What should the reviewer focus on?&quot;)"
           :disabled="Boolean(busy)"
         ></textarea>
-        <label class="review-form-label" for="collaboration-reviewer">Reviewer username (optional)</label>
+        <label class="review-form-label" for="collaboration-reviewer">{{ message('Reviewer username (optional)') }}</label>
         <input id="collaboration-reviewer" v-model="reviewer" class="review-input" maxlength="120" autocomplete="off" />
-        <p v-if="dirty || savedRevision === ''" class="review-note">Save the page before requesting a review.</p>
+        <p v-if="dirty || savedRevision === ''" class="review-note">{{ message('Save the page before requesting a review.') }}</p>
         <div class="review-form-actions">
           <button type="submit" class="btn-primary" :disabled="Boolean(busy) || dirty || savedRevision === ''">
-            {{ busy === 'request' ? 'Requesting…' : 'Request review' }}
+            {{ busy === 'request' ? message('Requesting…') : message('Request review') }}
           </button>
         </div>
       </form>
 
-      <details v-if="review.history?.length"><summary>Review history</summary>
-        <ol><li v-for="(event, index) in review.history" :key="index">{{ STATE_LABELS[event.state] || event.state }} · {{ event.byName || event.by }} · {{ formatWhen(event.at) }}<p v-if="event.note">{{ event.note }}</p></li></ol>
+      <details v-if="review.history?.length"><summary>{{ message('Review history') }}</summary>
+        <ol><li v-for="(event, index) in review.history" :key="index">{{ message(STATE_LABELS[event.state] || event.state) }} · {{ event.byName || event.by }} · {{ formatWhen(event.at) }}<p v-if="event.note">{{ event.note }}</p></li></ol>
       </details>
       <!-- Decide an open review. -->
       <div v-if="canDecide" class="review-decision">
-        <p class="review-form-intro">This page is waiting for a decision.</p>
-        <label class="review-form-label" for="collaboration-review-decision-note">Note (optional)</label>
+        <p class="review-form-intro">{{ message('This page is waiting for a decision.') }}</p>
+        <label class="review-form-label" for="collaboration-review-decision-note">{{ message('Note (optional)') }}</label>
         <textarea
           id="collaboration-review-decision-note"
           v-model="decisionNote"
           class="review-input"
           rows="2"
-          placeholder="Explain your decision…"
+          :placeholder="message(&quot;Explain your decision…&quot;)"
           :disabled="Boolean(busy)"
         ></textarea>
         <div class="review-form-actions review-form-actions-split">
@@ -112,7 +109,7 @@
             :disabled="Boolean(busy)"
             @click="submitDecision('changes')"
           >
-            {{ busy === 'changes' ? 'Saving…' : 'Request changes' }}
+            {{ busy === 'changes' ? message('Saving…') : message('Request changes') }}
           </button>
           <button
             type="button"
@@ -120,7 +117,7 @@
             :disabled="Boolean(busy)"
             @click="submitDecision('approve')"
           >
-            {{ busy === 'approve' ? 'Approving…' : 'Approve' }}
+            {{ busy === 'approve' ? message('Approving…') : message('Approve') }}
           </button>
         </div>
       </div>
@@ -131,18 +128,18 @@
         class="review-form review-cancel"
         @submit.prevent="cancelReview"
       >
-        <label class="review-form-label" for="collaboration-review-cancel-note">Cancel review</label>
+        <label class="review-form-label" for="collaboration-review-cancel-note">{{ message('Cancel review') }}</label>
         <textarea
           id="collaboration-review-cancel-note"
           v-model="cancelNote"
           class="review-input"
           rows="2"
-          placeholder="Why is this review being withdrawn? (optional)"
+          :placeholder="message(&quot;Why is this review being withdrawn? (optional)&quot;)"
           :disabled="Boolean(busy)"
         ></textarea>
         <div class="review-form-actions">
           <button type="submit" class="btn-secondary" :disabled="Boolean(busy)">
-            {{ busy === 'cancel' ? 'Cancelling…' : 'Cancel review' }}
+            {{ busy === 'cancel' ? message('Cancelling…') : message('Cancel review') }}
           </button>
         </div>
       </form>
@@ -152,6 +149,8 @@
 </template>
 
 <script setup>
+import { message, messageLanguage } from '../../lib/messages.js';
+import LocalizedError from '../LocalizedError.vue';
 import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps({
@@ -367,7 +366,7 @@ const cancelReview = async () => {
 
 const formatWhen = (value) => {
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString(messageLanguage.value);
 };
 
 watch(() => [props.page, props.locale, props.type, props.savedRevision], () => {

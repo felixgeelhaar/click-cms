@@ -2,20 +2,18 @@
   <div class="collection-entries">
     <div class="page-header">
       <div>
-        <button type="button" class="btn-back" @click="$emit('back')">← Collections</button>
+        <button type="button" class="btn-back" @click="$emit('back')">{{ message('← Collections') }}</button>
         <h1 class="page-title">{{ type.label }}</h1>
         <p v-if="type.description" class="page-subtitle">{{ type.description }}</p>
       </div>
-      <button type="button" class="btn-primary btn-new" @click="$emit('new')">+ New entry</button>
+      <button type="button" class="btn-primary btn-new" @click="$emit('new')">{{ message('+ New entry') }}</button>
     </div>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }} <button v-if="loadFailed" type="button" class="btn-retry" @click="loadEntries">Retry</button></p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /> <button v-if="loadFailed" type="button" class="btn-retry" @click="loadEntries">{{ message('Retry') }}</button></p>
 
-    <div v-if="loading" class="loading">Loading…</div>
+    <div v-if="loading" class="loading">{{ message('Loading…') }}</div>
 
-    <div v-else-if="!loadFailed && entries.length === 0" class="empty-state">
-      No entries yet. Create the first one with “New entry”.
-    </div>
+    <div v-else-if="!loadFailed && entries.length === 0" class="empty-state"> {{ message('No entries yet. Create the first one with “New entry”.') }} </div>
 
     <div v-else-if="!loadFailed" class="entry-list">
       <div v-for="entry in entries" :key="entry.slug" class="entry-row">
@@ -24,22 +22,22 @@
                and is escaped like every other value on this screen. -->
           <h2 class="entry-title">{{ entryTitle(entry) }}</h2>
           <p class="entry-slug">{{ entry.slug }}</p>
-          <span :class="['status-badge', stateOf(entry)]">{{ stateLabel(stateOf(entry)) }}</span>
+          <span :class="['status-badge', stateOf(entry)]">{{ message(stateLabel(stateOf(entry))) }}</span>
         </div>
         <div class="entry-actions">
           <button
             type="button"
             class="btn-sm btn-secondary btn-edit"
-            :aria-label="`Edit ${entryTitle(entry)}`"
+            :aria-label="message('Edit {0}', [entryTitle(entry)])"
             @click="$emit('edit', entry.slug)"
-          >Edit</button>
+          >{{ message('Edit') }}</button>
           <button
             type="button"
             class="btn-sm btn-danger btn-delete"
             :disabled="!!deleting"
-            :aria-label="`Delete ${entryTitle(entry)}`"
+            :aria-label="message('Delete {0}', [entryTitle(entry)])"
             @click="deleteEntry(entry)"
-          >{{ deleting === entry.slug ? 'Deleting…' : 'Delete' }}</button>
+          >{{ deleting === entry.slug ? message('Deleting…') : message('Delete') }}</button>
         </div>
       </div>
     </div>
@@ -47,6 +45,8 @@
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
+import LocalizedError from '../LocalizedError.vue';
 import { ref, onMounted, watch } from 'vue';
 
 const props = defineProps({
@@ -106,7 +106,7 @@ const loadEntries = async () => {
 
 const deleteEntry = async (entry) => {
   if (deleting.value) return;
-  if (!window.confirm(`Delete “${entryTitle(entry)}”? This cannot be undone.`)) return;
+  if (!window.confirm(message(`Delete “${entryTitle(entry)}”? This cannot be undone.`))) return;
   deleting.value = entry.slug;
   error.value = '';
   try {

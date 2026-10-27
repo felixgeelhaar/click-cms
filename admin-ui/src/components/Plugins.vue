@@ -1,35 +1,35 @@
 <template>
   <div class="plugins">
     <h1 class="page-title">Plugins</h1>
-    <p class="page-subtitle">Extend your CMS functionality</p>
+    <p class="page-subtitle">{{ message('Extend your CMS functionality') }}</p>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
 
     <!-- Discovery problems used to be silent skips. An invalid plugin.json or a
          bootstrap without a manifest left the list looking healthy while the
          folder did nothing — surface them here instead. -->
     <div v-if="issues.length" class="banner warn" role="status">
-      <p class="banner-title">{{ issues.length === 1 ? 'One plugin folder was skipped' : `${issues.length} plugin folders were skipped` }}</p>
+      <p class="banner-title">{{ issues.length === 1 ? message('One plugin folder was skipped') : message('{0} plugin folders were skipped', [issues.length]) }}</p>
       <ul class="issue-list">
         <li v-for="issue in issues" :key="issue.directory">
-          <code>{{ issue.directory }}</code> — {{ issue.reason }}
+          <code>{{ issue.directory }}</code> — <LocalizedError :message="issue.reason" />
         </li>
       </ul>
     </div>
 
-    <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="!plugins.length && !issues.length" class="empty">No plugins are installed.</div>
+    <div v-if="loading" class="loading">{{ message('Loading...') }}</div>
+    <div v-else-if="!plugins.length && !issues.length" class="empty">{{ message('No plugins are installed.') }}</div>
     <div v-else class="plugin-grid">
       <div v-for="plugin in plugins" :key="plugin.id" class="plugin-card">
         <div class="plugin-info">
           <!-- h2: "Plugins" is the h1, so a card heading at level 3 skips one. -->
           <h2>{{ plugin.name }}</h2>
-          <p>{{ plugin.description || 'No description' }}</p>
+          <p>{{ plugin.description || message('No description') }}</p>
         </div>
         <div class="plugin-actions">
-          <span :class="['status', plugin.state]">{{ plugin.state }}</span>
-          <button v-if="plugin.state === 'activated'" class="btn-sm btn-secondary" @click="deactivatePlugin(plugin.id)">Deactivate</button>
-          <button v-else class="btn-sm btn-primary" @click="activatePlugin(plugin.id)">Activate</button>
+          <span :class="['status', plugin.state]">{{ message(plugin.state) }}</span>
+          <button v-if="plugin.state === 'activated'" class="btn-sm btn-secondary" @click="deactivatePlugin(plugin.id)">{{ message('Deactivate') }}</button>
+          <button v-else class="btn-sm btn-primary" @click="activatePlugin(plugin.id)">{{ message('Activate') }}</button>
         </div>
       </div>
     </div>
@@ -37,6 +37,8 @@
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
+import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 
 const plugins = ref([]);

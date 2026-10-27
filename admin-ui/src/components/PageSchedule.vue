@@ -15,9 +15,9 @@
       which makes the panel unreachable as a landmark for anyone navigating by
       heading.
     -->
-    <h2 id="page-schedule-heading" class="sch-title">Scheduled publishing</h2>
+    <h2 id="page-schedule-heading" class="sch-title">{{ message('Scheduled publishing') }}</h2>
 
-    <p class="sch-summary" role="status" aria-live="polite">{{ summary }}</p>
+    <p class="sch-summary" role="status" aria-live="polite">{{ message(summary) }}</p>
 
     <!--
       A time in the past with the schedule still standing means nothing swept
@@ -25,34 +25,28 @@
       permanent state, and without this line the editor simply waits for a
       publication no process is going to perform.
     -->
-    <p v-if="overdue" class="sch-overdue-note">
-      This should have happened already. Scheduled publishing needs
-      <code>bin/click-schedule.php</code> to run from cron — ask whoever looks
-      after this site whether it does.
-    </p>
+    <p v-if="overdue" class="sch-overdue-note"> {{ message('This should have happened already. Scheduled publishing needs') }} <code>bin/click-schedule.php</code> {{ message('to run from cron — ask whoever looks after this site whether it does.') }} </p>
 
     <template v-if="canSchedule">
       <div class="sch-fields">
         <label class="sch-field">
-          <span>Publish at</span>
+          <span>{{ message('Publish at') }}</span>
           <input v-model="publishLocal" type="datetime-local" />
         </label>
 
         <label class="sch-field">
-          <span>Take down at</span>
+          <span>{{ message('Take down at') }}</span>
           <input v-model="unpublishLocal" type="datetime-local" />
         </label>
       </div>
 
-      <p class="sch-zone">
-        Times are in {{ zoneName }} — the same clock you are reading now.
-      </p>
+      <p class="sch-zone"> {{ message('Times are in') }} {{ zoneName }} {{ message('— the same clock you are reading now.') }} </p>
 
-      <p v-if="error" class="sch-error" role="alert">{{ error }}</p>
+      <p v-if="error" class="sch-error" role="alert"><LocalizedError :message="error" /></p>
 
       <div class="sch-actions">
         <button type="button" class="btn-schedule" :disabled="busy" @click="save">
-          {{ busy ? 'Saving…' : 'Save schedule' }}
+          {{ busy ? message('Saving…') : message('Save schedule') }}
         </button>
         <button
           v-if="hasSchedule"
@@ -60,19 +54,17 @@
           class="btn-clear"
           :disabled="busy"
           @click="$emit('clear')"
-        >
-          Cancel schedule
-        </button>
+        > {{ message('Cancel schedule') }} </button>
       </div>
     </template>
 
-    <p v-else class="sch-no-permission">
-      Your account cannot schedule this page. Ask an editor.
-    </p>
+    <p v-else class="sch-no-permission"> {{ message('Your account cannot schedule this page. Ask an editor.') }} </p>
   </section>
 </template>
 
 <script setup>
+import { message, messageLanguage } from "../lib/messages.js";
+import LocalizedError from './LocalizedError.vue';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -139,7 +131,7 @@ const zoneName = computed(() => {
 
 const when = (iso) => {
   const at = new Date(iso);
-  return Number.isNaN(at.getTime()) ? '' : at.toLocaleString();
+  return Number.isNaN(at.getTime()) ? '' : at.toLocaleString(messageLanguage.value);
 };
 
 /**
@@ -163,7 +155,7 @@ const summary = computed(() => {
 
   const up = props.schedule.publishAt ? when(props.schedule.publishAt) : '';
   const down = props.schedule.unpublishAt ? when(props.schedule.unpublishAt) : '';
-  const by = props.schedule.scheduledBy ? ` Set by ${props.schedule.scheduledBy}.` : '';
+  const by = props.schedule.scheduledBy ? message(' Set by {0}.', [props.schedule.scheduledBy]) : '';
 
   if (!up && !down) return 'Nothing is scheduled. This page changes only when somebody publishes it.';
   if (up && down) return `Set to go live ${up} and come down ${down}.${by}`;

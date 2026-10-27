@@ -21,12 +21,12 @@
     @drop.prevent.stop="onDrop"
   >
     <div class="bnode-tag">
-      <span class="bnode-name">{{ node.type }}</span>
+      <span class="bnode-name">{{ message(node.type) }}</span>
       <button
         v-if="node.id !== rootId"
         type="button"
         class="bnode-remove"
-        :aria-label="`Remove ${node.type}`"
+        :aria-label="message('Remove {0}', [node.type])"
         @click.stop="ctx.removeNode(node.id)"
       >×</button>
     </div>
@@ -42,7 +42,7 @@
           :node="ctx.nodes.value[childId]"
           :root-id="rootId"
         />
-        <p v-if="node.children.length === 0" class="bnode-empty">Empty {{ node.type }} — select it and add a node, or drop one here</p>
+        <p v-if="node.children.length === 0" class="bnode-empty">{{ message('Empty') }} {{ message(node.type) }} {{ message('— select it and add a node, or drop one here') }}</p>
       </div>
     </template>
 
@@ -51,16 +51,16 @@
 
     <template v-else-if="node.type === 'image'">
       <img v-if="node.props.src" :src="node.props.src" :alt="node.props.alt" class="leaf-image" :style="node.styles" />
-      <div v-else class="leaf-placeholder" :style="node.styles">Image — set a source in the inspector</div>
+      <div v-else class="leaf-placeholder" :style="node.styles">{{ message('Image — set a source in the inspector') }}</div>
     </template>
 
-    <span v-else-if="node.type === 'button'" class="leaf-button" :style="node.styles">{{ node.props.label || 'Button' }}</span>
+    <span v-else-if="node.type === 'button'" class="leaf-button" :style="node.styles">{{ node.props.label || message('Button') }}</span>
 
-    <div v-else-if="node.type === 'spacer'" class="leaf-spacer" :style="{ height: node.styles.height || '32px' }">spacer</div>
+    <div v-else-if="node.type === 'spacer'" class="leaf-spacer" :style="{ height: node.styles.height || '32px' }">{{ message('spacer') }}</div>
 
     <div v-else-if="node.type === 'chart'" class="leaf-chart" :style="node.styles">
-      <strong>{{ node.props.title || 'Chart' }}</strong>
-      <span class="leaf-chart-meta">{{ node.props.chartType || 'bar' }} · {{ (node.props.data || []).length }} points</span>
+      <strong>{{ node.props.title || message('Chart') }}</strong>
+      <span class="leaf-chart-meta">{{ node.props.chartType || message('bar') }} · {{ (node.props.data || []).length }} {{ message('points') }}</span>
     </div>
 
     <!-- preload="none" so a canvas full of clips costs nothing to open. -->
@@ -76,7 +76,7 @@
         muted
         playsinline
       ></video>
-      <div v-else class="leaf-placeholder" :style="node.styles">Video — set a source in the inspector</div>
+      <div v-else class="leaf-placeholder" :style="node.styles">{{ message('Video — set a source in the inspector') }}</div>
     </template>
 
     <!--
@@ -85,8 +85,8 @@
       authenticated session for no editorial benefit.
     -->
     <div v-else-if="node.type === 'embed'" class="leaf-placeholder" :style="node.styles">
-      <template v-if="node.props.url">Embed — {{ embedProvider }}</template>
-      <template v-else>Embed — paste a YouTube, Vimeo or map link</template>
+      <template v-if="node.props.url">{{ message('Embed —') }} {{ embedProvider }}</template>
+      <template v-else>{{ message('Embed — paste a YouTube, Vimeo or map link') }}</template>
     </div>
 
     <component
@@ -108,11 +108,12 @@
 
     <hr v-else-if="node.type === 'divider'" class="leaf-divider" :style="dividerStyle" />
 
-    <div v-else class="leaf-placeholder">{{ node.type }}</div>
+    <div v-else class="leaf-placeholder">{{ message(node.type) }}</div>
   </div>
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
 import { computed, inject, ref } from 'vue';
 import { isContainer as isContainerType } from './model.js';
 

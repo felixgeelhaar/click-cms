@@ -1,11 +1,12 @@
 <template>
   <div class="plugin-detail">
-    <button class="back-btn" @click="emit('back')">← Back</button>
+    <button class="back-btn" @click="emit('back')">{{ message('← Back') }}</button>
     <h1>{{ id }}</h1>
   </div>
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 defineProps({ id: String });
 const emit = defineEmits(['back']);
 </script>

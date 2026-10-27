@@ -1,15 +1,15 @@
 <template>
   <section class="versions" aria-labelledby="page-versions-heading">
     <div class="versions-head">
-      <h2 id="page-versions-heading" class="versions-heading">Version history</h2>
+      <h2 id="page-versions-heading" class="versions-heading">{{ message('Version history') }}</h2>
       <button
         type="button"
         class="btn-sm"
         :disabled="loading"
-        aria-label="Reload the version history for this page"
+        :aria-label="message(&quot;Reload the version history for this page&quot;)"
         @click="$emit('reload')"
       >
-        {{ loading ? 'Loading…' : 'Refresh' }}
+        {{ loading ? message('Loading…') : message('Refresh') }}
       </button>
     </div>
 
@@ -18,11 +18,7 @@
       believes restore rewinds the public site is wrong in a way that costs
       either an unnoticed regression or an unnecessary panic.
     -->
-    <p class="versions-note">
-      Restoring changes the working copy, not the live page. The public site keeps
-      showing whatever is published until you publish again — and the restore
-      itself is recorded as a new version, so it can be undone the same way.
-    </p>
+    <p class="versions-note"> {{ message('Restoring changes the working copy, not the live page. The public site keeps showing whatever is published until you publish again — and the restore itself is recorded as a new version, so it can be undone the same way.') }} </p>
 
     <!--
       History is per translation: the endpoints take the same ?locale= the rest
@@ -31,27 +27,23 @@
       to show anything else rather than offer to restore German text from an
       English version. That constraint is gone.
     -->
-    <p v-if="error" class="versions-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="versions-error" role="alert"><LocalizedError :message="error" /></p>
 
-    <p v-if="loading && !versions.length" class="versions-empty">Loading…</p>
+    <p v-if="loading && !versions.length" class="versions-empty">{{ message('Loading…') }}</p>
 
-    <p v-else-if="!versions.length" class="versions-empty">
-      No versions recorded yet. Every save from here on leaves one behind.
-    </p>
+    <p v-else-if="!versions.length" class="versions-empty"> {{ message('No versions recorded yet. Every save from here on leaves one behind.') }} </p>
 
     <ol v-else class="versions-list">
         <li v-for="(version, index) in versions" :key="version.id" class="version">
           <div class="version-body">
             <p class="version-when">
               {{ formatWhen(version.recordedAt) }}
-              <span v-if="index === 0" class="version-tag current">Working copy</span>
-              <span v-else-if="version.reason === 'publish'" class="version-tag live">
-                Published from here
-              </span>
-              <span v-else class="version-tag">{{ reasonLabel(version.reason) }}</span>
+              <span v-if="index === 0" class="version-tag current">{{ message('Working copy') }}</span>
+              <span v-else-if="version.reason === 'publish'" class="version-tag live"> {{ message('Published from here') }} </span>
+              <span v-else class="version-tag">{{ message(reasonLabel(version.reason)) }}</span>
             </p>
             <p class="version-meta">
-              {{ version.title || 'Untitled' }} · {{ version.author || 'unknown author' }}
+              {{ version.title || message('Untitled') }} · {{ version.author || message('unknown author') }}
             </p>
           </div>
 
@@ -60,19 +52,19 @@
             type="button"
             class="btn-sm"
             :disabled="Boolean(loadingComparison) || !slug || !workingCopy"
-            :aria-label="`Compare the working copy with the version saved ${formatWhen(version.recordedAt)}`"
+            :aria-label="message('Compare the working copy with the version saved {0}', [formatWhen(version.recordedAt)])"
             @click="compare(version)"
-          >Compare</button>
+          >{{ message('Compare') }}</button>
 
           <button
             v-if="canRestore && index !== 0 && confirming !== version.id"
             type="button"
             class="btn-sm"
             :disabled="Boolean(restoring)"
-            :aria-label="`Restore the working copy to the version saved ${formatWhen(version.recordedAt)}`"
+            :aria-label="message('Restore the working copy to the version saved {0}', [formatWhen(version.recordedAt)])"
             @click="confirming = version.id"
           >
-            {{ restoring === version.id ? 'Restoring…' : 'Restore' }}
+            {{ restoring === version.id ? message('Restoring…') : message('Restore') }}
           </button>
 
           <!--
@@ -82,43 +74,38 @@
             to ask twice.
           -->
           <div v-else-if="confirming === version.id" class="confirm" role="group"
-               :aria-label="`Confirm restoring the version saved ${formatWhen(version.recordedAt)}`">
-            <p class="confirm-text">
-              Replace the working copy with this version? The live page does not
-              change until you publish.
-            </p>
+               :aria-label="message('Confirm restoring the version saved {0}', [formatWhen(version.recordedAt)])">
+            <p class="confirm-text"> {{ message('Replace the working copy with this version? The live page does not change until you publish.') }} </p>
             <button
               type="button"
               class="btn-sm primary"
               :disabled="Boolean(restoring)"
-              :aria-label="`Confirm restore of the version saved ${formatWhen(version.recordedAt)}`"
+              :aria-label="message('Confirm restore of the version saved {0}', [formatWhen(version.recordedAt)])"
               @click="$emit('restore', version)"
             >
-              {{ restoring === version.id ? 'Restoring…' : 'Yes, restore' }}
+              {{ restoring === version.id ? message('Restoring…') : message('Yes, restore') }}
             </button>
             <button
               type="button"
               class="btn-sm"
               :disabled="Boolean(restoring)"
-              aria-label="Cancel this restore"
+              :aria-label="message(&quot;Cancel this restore&quot;)"
               @click="confirming = ''"
-            >
-              Cancel
-            </button>
+            > {{ message('Cancel') }} </button>
           </div>
-          <div v-if="comparing === version.id" class="version-diff" role="region" :aria-label="`Changes since ${version.title || 'this version'}`">
+          <div v-if="comparing === version.id" class="version-diff" role="region" :aria-label="message('Changes since {0}', [version.title || message('this version')])">
             <div class="diff-head">
-              <strong>Changes from this version to the working copy</strong>
-              <button type="button" class="btn-sm" @click="closeComparison">Close comparison</button>
+              <strong>{{ message('Changes from this version to the working copy') }}</strong>
+              <button type="button" class="btn-sm" @click="closeComparison">{{ message('Close comparison') }}</button>
             </div>
-            <p v-if="loadingComparison === version.id" class="diff-message">Loading saved version…</p>
-            <p v-else-if="comparisonError" class="versions-error" role="alert">Could not load this version: {{ comparisonError }}. Refresh the history and try again.</p>
-            <p v-else-if="!diffRows.length" class="diff-message">No content differences. The public page and working copy match this version.</p>
+            <p v-if="loadingComparison === version.id" class="diff-message">{{ message('Loading saved version…') }}</p>
+            <p v-else-if="comparisonError" class="versions-error" role="alert">{{ message('Could not load this version:') }} <LocalizedError :message="comparisonError" /> {{ message('Refresh the history and try again.') }}</p>
+            <p v-else-if="!diffRows.length" class="diff-message">{{ message('No content differences. The public page and working copy match this version.') }}</p>
             <ul v-else class="diff-list">
               <li v-for="row in diffRows" :key="row.path" class="diff-row">
                 <code>{{ row.path }}</code>
-                <div><span class="diff-label">Before</span><pre>{{ row.before }}</pre></div>
-                <div><span class="diff-label">Working copy</span><pre>{{ row.after }}</pre></div>
+                <div><span class="diff-label">{{ message('Before') }}</span><pre>{{ row.before }}</pre></div>
+                <div><span class="diff-label">{{ message('Working copy') }}</span><pre>{{ row.after }}</pre></div>
               </li>
             </ul>
           </div>
@@ -128,6 +115,8 @@
 </template>
 
 <script setup>
+import { message, messageLanguage } from '../lib/messages.js';
+import LocalizedError from './LocalizedError.vue';
 import { computed, ref } from 'vue';
 
 const confirming = ref('');
@@ -148,7 +137,7 @@ defineEmits(['restore', 'reload']);
 
 const formatWhen = (value) => {
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString(messageLanguage.value);
 };
 
 const reasonLabel = (reason) => ({

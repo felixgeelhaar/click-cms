@@ -2,56 +2,58 @@
   <section class="review-inbox" aria-labelledby="reviews-title">
     <header class="inbox-heading">
       <div>
-        <p class="eyebrow">Editorial workflow</p>
-        <h1 id="reviews-title">Reviews</h1>
-        <p class="intro">Pages waiting for a colleague's review before publication.</p>
+        <p class="eyebrow">{{ message('Editorial workflow') }}</p>
+        <h1 id="reviews-title">{{ message('Reviews') }}</h1>
+        <p class="intro">{{ message('Pages waiting for a colleague\'s review before publication.') }}</p>
       </div>
-      <button type="button" class="btn-secondary" :disabled="loading" @click="load">Refresh</button>
+      <button type="button" class="btn-secondary" :disabled="loading" @click="load">{{ message('Refresh') }}</button>
     </header>
 
-    <p v-if="error" class="notice error" role="alert">{{ error }}</p>
-    <p v-if="notice" class="notice" role="status">{{ notice }}</p>
-    <p v-if="loading && !reviews.length" class="empty">Loading reviews…</p>
-    <p v-else-if="!reviews.length" class="empty">No reviews are waiting.</p>
+    <p v-if="error" class="notice error" role="alert"><LocalizedError :message="error" /></p>
+    <p v-if="notice" class="notice" role="status">{{ message(notice) }}</p>
+    <p v-if="loading && !reviews.length" class="empty">{{ message('Loading reviews…') }}</p>
+    <p v-else-if="!reviews.length" class="empty">{{ message('No reviews are waiting.') }}</p>
 
     <ol v-else class="review-list">
       <li v-for="review in reviews" :key="`${review.page}:${review.locale}`" class="review-card">
         <div class="review-topline">
           <div>
             <h2><button type="button" class="page-link" :data-testid="`open-${review.page}`" @click="openPage(review)">{{ review.page }}</button></h2>
-            <p class="review-meta">{{ languageName(review.locale) }} · Requested by {{ review.requestedByName || review.requestedBy || 'unknown' }} · {{ formatWhen(review.requestedAt) }}</p>
+            <p class="review-meta">{{ message(languageName(review.locale)) }} {{ message('· Requested by') }} {{ review.requestedByName || review.requestedBy || message('unknown') }} · {{ formatWhen(review.requestedAt) }}</p>
           </div>
-          <span class="review-state">{{ review.state === 'changes_requested' ? 'Changes requested' : 'In review' }}</span>
+          <span class="review-state">{{ review.state === 'changes_requested' ? message('Changes requested') : message('In review') }}</span>
         </div>
-        <p v-if="review.reviewer" class="assigned">For {{ review.reviewer }}</p>
+        <p v-if="review.reviewer" class="assigned">{{ message('For') }} {{ review.reviewer }}</p>
         <p v-if="review.note" class="request-note">{{ review.note }}</p>
         <details v-if="review.history?.length" class="review-history">
-          <summary>Review history ({{ review.history.length }})</summary>
+          <summary>{{ message('Review history (') }}{{ review.history.length }})</summary>
           <ol>
             <li v-for="(event, index) in review.history" :key="`${event.at}-${index}`">
-              <strong>{{ event.state }}</strong> by {{ event.byName || event.by }} · {{ formatWhen(event.at) }}
+              <strong>{{ event.state }}</strong> {{ message('by') }} {{ event.byName || event.by }} · {{ formatWhen(event.at) }}
               <p v-if="event.note">{{ event.note }}</p>
             </li>
           </ol>
         </details>
-        <p v-if="review.stale" class="review-help" role="status">The draft changed after this review was requested. Ask the author to refresh the request before approval.</p>
-        <p v-if="review.state === 'changes_requested'" class="review-help">Waiting for the author to update the page and request another review.</p>
+        <p v-if="review.stale" class="review-help" role="status">{{ message('The draft changed after this review was requested. Ask the author to refresh the request before approval.') }}</p>
+        <p v-if="review.state === 'changes_requested'" class="review-help">{{ message('Waiting for the author to update the page and request another review.') }}</p>
         <div v-else-if="canReview" class="review-actions">
-          <label :for="`decision-note-${review.page}-${review.locale}`">Decision note <span>(optional)</span></label>
-          <textarea :id="`decision-note-${review.page}-${review.locale}`" v-model="notes[keyOf(review)]" rows="2" maxlength="2000" placeholder="Leave a note for the author"></textarea>
+          <label :for="`decision-note-${review.page}-${review.locale}`">{{ message('Decision note') }} <span>(optional)</span></label>
+          <textarea :id="`decision-note-${review.page}-${review.locale}`" v-model="notes[keyOf(review)]" rows="2" maxlength="2000" :placeholder="message(&quot;Leave a note for the author&quot;)"></textarea>
           <div class="action-buttons">
-            <button v-if="review.requestedBy !== currentUsername" type="button" class="approve" :data-testid="`approve-${review.page}`" :disabled="Boolean(busy) || review.stale || !review.reviewRevision" @click="decide(review, 'approve')">{{ busy === keyOf(review) ? 'Saving…' : 'Approve' }}</button>
-            <button type="button" class="changes" :data-testid="`changes-${review.page}`" :disabled="Boolean(busy) || !review.reviewRevision" @click="decide(review, 'changes')">Ask for changes</button>
-            <button type="button" class="page-secondary" :data-testid="`open-link-${review.page}`" @click="openPage(review)">Open page</button>
+            <button v-if="review.requestedBy !== currentUsername" type="button" class="approve" :data-testid="`approve-${review.page}`" :disabled="Boolean(busy) || review.stale || !review.reviewRevision" @click="decide(review, 'approve')">{{ busy === keyOf(review) ? message('Saving…') : message('Approve') }}</button>
+            <button type="button" class="changes" :data-testid="`changes-${review.page}`" :disabled="Boolean(busy) || !review.reviewRevision" @click="decide(review, 'changes')">{{ message('Ask for changes') }}</button>
+            <button type="button" class="page-secondary" :data-testid="`open-link-${review.page}`" @click="openPage(review)">{{ message('Open page') }}</button>
           </div>
         </div>
-        <p v-else class="review-help">You can read this review, but your account cannot approve it.</p>
+        <p v-else class="review-help">{{ message('You can read this review, but your account cannot approve it.') }}</p>
       </li>
     </ol>
   </section>
 </template>
 
 <script setup>
+import { message, messageLanguage } from "../lib/messages.js";
+import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 
 const props = defineProps({
@@ -68,12 +70,12 @@ const notes = ref({});
 
 const keyOf = (review) => `${review.page}:${review.locale}`;
 const languageName = (code) => {
-  try { return new Intl.DisplayNames(undefined, { type: 'language' }).of(code) || code; }
+  try { return new Intl.DisplayNames(messageLanguage.value, { type: 'language' }).of(code) || code; }
   catch { return code; }
 };
 const formatWhen = (value) => {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(messageLanguage.value);
 };
 const openPage = (review) => emit('navigate', `/admin/pages/edit/${encodeURIComponent(review.page)}?locale=${encodeURIComponent(review.locale)}`);
 

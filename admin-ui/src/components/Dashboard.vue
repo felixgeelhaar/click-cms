@@ -2,20 +2,20 @@
   <div class="dashboard">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Dashboard</h1>
-        <p class="page-subtitle">{{ subtitle }}</p>
+        <h1 class="page-title">{{ message('Dashboard') }}</h1>
+        <p class="page-subtitle">{{ message(subtitle) }}</p>
       </div>
-      <a v-if="canCreate && !isEmpty" class="btn-primary" :href="withBase('/admin/pages/new')" @click="go($event, '/admin/pages/new')">New page</a>
+      <a v-if="canCreate && !isEmpty" class="btn-primary" :href="withBase('/admin/pages/new')" @click="go($event, '/admin/pages/new')">{{ message('New page') }}</a>
     </div>
 
     <p v-if="error" class="banner error" role="alert">
-      {{ error }}
-      <button type="button" class="linkish" @click="load">Try again</button>
+      <LocalizedError :message="error" />
+      <button type="button" class="linkish" @click="load">{{ message('Try again') }}</button>
     </p>
 
-    <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
+    <p v-if="notice" class="banner success" role="status">{{ message(notice) }}</p>
 
-    <div v-if="loading" class="muted" aria-live="polite">Loading…</div>
+    <div v-if="loading" class="muted" aria-live="polite">{{ message('Loading…') }}</div>
 
     <template v-else-if="!error">
       <div class="stats-grid">
@@ -23,10 +23,10 @@
       </div>
 
       <section v-if="!isEmpty" class="recent-pages" aria-labelledby="recent-pages-title">
-        <div class="section-heading"><h2 id="recent-pages-title">Your pages</h2><a :href="withBase('/admin/pages')" @click="go($event, '/admin/pages')">View all pages →</a></div>
+        <div class="section-heading"><h2 id="recent-pages-title">{{ message('Your pages') }}</h2><a :href="withBase('/admin/pages')" @click="go($event, '/admin/pages')">{{ message('View all pages →') }}</a></div>
         <div v-for="page in recentPages" :key="page.key || page.slug" class="recent-row">
           <span>{{ page.data?.title || page.slug || page.key }}</span>
-          <span class="page-state">{{ page.publication?.hasUnpublishedChanges ? 'Edits pending' : page.publication?.published ? 'Live' : 'Draft' }}</span>
+          <span class="page-state">{{ page.publication?.hasUnpublishedChanges ? message('Edits pending') : page.publication?.published ? message('Live') : message('Draft') }}</span>
         </div>
       </section>
 
@@ -34,18 +34,14 @@
            above all read zero, which used to look identical to a failed fetch
            that never reported itself. Offer a clear next step instead. -->
       <section v-if="isEmpty" class="first-run" aria-labelledby="first-run-title">
-        <h2 id="first-run-title" class="first-run-title">Your site is empty</h2>
-        <p class="first-run-copy">
-          Start with a blank page, or load a small example site so you can see
-          how pages, collections and media fit together. The example never
-          overwrites anything you already have.
-        </p>
+        <h2 id="first-run-title" class="first-run-title">{{ message('Your site is empty') }}</h2>
+        <p class="first-run-copy"> {{ message('Start with a blank page, or load a small example site so you can see how pages, collections and media fit together. The example never overwrites anything you already have.') }} </p>
         <div class="first-run-actions">
           <a
             class="btn-primary"
             :href="withBase('/admin/pages/new')"
             @click="go($event, '/admin/pages/new')"
-          >Create a page</a>
+          >{{ message('Create a page') }}</a>
           <button
             v-if="canSeed"
             type="button"
@@ -53,7 +49,7 @@
             :disabled="seeding"
             @click="seed"
           >
-            {{ seeding ? 'Loading example…' : 'Load example site' }}
+            {{ seeding ? message('Loading example…') : message('Load example site') }}
           </button>
         </div>
       </section>
@@ -62,6 +58,8 @@
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
+import LocalizedError from './LocalizedError.vue';
 import { computed, ref, onMounted } from 'vue';
 import StatCard from './StatCard.vue';
 import { withBase } from '../lib/base.js';

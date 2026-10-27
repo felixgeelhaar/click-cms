@@ -42,7 +42,7 @@
       :aria-invalid="error ? 'true' : undefined"
       @change="emitValue($event.target.value)"
     >
-      <option value="">— none —</option>
+      <option value="">{{ message('— none —') }}</option>
       <option v-for="option in field.options || []" :key="option" :value="option">{{ option }}</option>
     </select>
 
@@ -77,7 +77,7 @@
         :aria-describedby="describedBy"
         @change="emitValue($event.target.checked)"
       />
-      <span>{{ modelValue ? 'Yes' : 'No' }}</span>
+      <span>{{ modelValue ? message('Yes') : message('No') }}</span>
     </label>
 
     <!-- Images and files carry a reference the site resolves, so this is a text
@@ -105,12 +105,14 @@
       @input="emitValue($event.target.value)"
     />
 
-    <p v-if="error" :id="`${inputId}-error`" class="field-message error-message">{{ error }}</p>
+    <p v-if="error" :id="`${inputId}-error`" class="field-message error-message"><LocalizedError :message="error" /></p>
     <p v-else-if="field.help" :id="`${inputId}-help`" class="field-message help-message">{{ field.help }}</p>
   </div>
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
+import LocalizedError from '../LocalizedError.vue';
 import { computed, useId } from 'vue';
 import RichTextField from './RichTextField.vue';
 import LinesField from './LinesField.vue';

@@ -1,64 +1,52 @@
 <template>
   <div class="profile">
-    <h1 class="page-title">Profile</h1>
-    <p class="page-subtitle">Manage your account settings</p>
+    <h1 class="page-title">{{ message('Profile') }}</h1>
+    <p class="page-subtitle">{{ message('Manage your account settings') }}</p>
     <div class="profile-card">
       <!-- Both fields had a visible caption and no `for`, so neither input had
            an accessible name at all: a screen reader announced two anonymous
            text boxes. -->
       <div class="form-group">
-        <label for="profile-display-name">Display Name</label>
+        <label for="profile-display-name">{{ message('Display Name') }}</label>
         <input id="profile-display-name" v-model="profile.displayName" type="text" autocomplete="name" />
       </div>
       <div class="form-group">
-        <label for="profile-email">Email</label>
+        <label for="profile-email">{{ message('Email') }}</label>
         <input id="profile-email" v-model="profile.email" type="email" autocomplete="email" />
       </div>
       <button class="btn-primary" :disabled="saving" @click="saveProfile">
-        {{ saving ? 'Saving…' : 'Save Changes' }}
+        {{ saving ? message('Saving…') : message('Save Changes') }}
       </button>
 
-      <p v-if="error" class="banner error" role="alert">{{ error }}</p>
-      <p v-else-if="saved" class="banner ok" role="status">Your details have been saved.</p>
+      <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
+      <p v-else-if="saved" class="banner ok" role="status">{{ message('Your details have been saved.') }}</p>
     </div>
 
     <div v-if="twoFactor.available" class="profile-card two-factor">
-      <h2>Two-step sign-in</h2>
+      <h2>{{ message('Two-step sign-in') }}</h2>
 
       <p v-if="twoFactor.active" class="state-line" role="status">
-        <strong>On.</strong> Signing in asks for a code from your authenticator
-        app as well as your password.
-      </p>
+        <strong>{{ message('On.') }}</strong> {{ message('Signing in asks for a code from your authenticator app as well as your password.') }} </p>
       <p v-else class="state-line" role="status">
-        <strong>Off.</strong> Your password is the only thing protecting this
-        account.
-      </p>
+        <strong>{{ message('Off.') }}</strong> {{ message('Your password is the only thing protecting this account.') }} </p>
 
-      <p v-if="twoFactorError" class="banner error" role="alert">{{ twoFactorError }}</p>
+      <p v-if="twoFactorError" class="banner error" role="alert"><LocalizedError :message="twoFactorError" /></p>
 
       <!-- Setting up: the secret, then proof that it was scanned. -->
       <div v-if="enrolment" class="enrolment">
         <ol class="steps">
-          <li>
-            Add this to your authenticator app. Most will scan a QR code; if
-            yours asks you to type a key, this is it:
-            <code class="secret">{{ enrolment.secret }}</code>
+          <li> {{ message('Add this to your authenticator app. Most will scan a QR code; if yours asks you to type a key, this is it:') }} <code class="secret">{{ enrolment.secret }}</code>
           </li>
           <li>
-            <strong>Save these recovery codes somewhere safe.</strong> Each works
-            once, and they are the only way back in if you lose your phone. They
-            are not shown again.
-            <ul class="codes">
+            <strong>{{ message('Save these recovery codes somewhere safe.') }}</strong> {{ message('Each works once, and they are the only way back in if you lose your phone. They are not shown again.') }} <ul class="codes">
               <li v-for="recoveryCode in enrolment.recoveryCodes" :key="recoveryCode">{{ recoveryCode }}</li>
             </ul>
           </li>
-          <li>
-            Type the six-digit code your app is showing now, to prove it worked.
-            <div class="confirm-row">
-              <label class="visually-hidden" for="confirm-code">Six-digit code</label>
+          <li> {{ message('Type the six-digit code your app is showing now, to prove it worked.') }} <div class="confirm-row">
+              <label class="visually-hidden" for="confirm-code">{{ message('Six-digit code') }}</label>
               <input id="confirm-code" v-model="confirmCode" type="text" inputmode="numeric" placeholder="000000" />
               <button class="btn-primary" :disabled="busy" @click="confirmTwoFactor">
-                {{ busy ? 'Checking…' : 'Turn it on' }}
+                {{ busy ? message('Checking…') : message('Turn it on') }}
               </button>
             </div>
           </li>
@@ -67,20 +55,18 @@
 
       <template v-else>
         <p v-if="twoFactor.active" class="hint">
-          {{ twoFactor.recoveryCodesLeft }} recovery
-          {{ twoFactor.recoveryCodesLeft === 1 ? 'code' : 'codes' }} left.
-        </p>
+          {{ twoFactor.recoveryCodesLeft }} {{ message('recovery') }} {{ twoFactor.recoveryCodesLeft === 1 ? message('code') : message('codes') }} {{ message('left.') }} </p>
 
         <div v-if="twoFactor.active" class="disable-row">
-          <label class="visually-hidden" for="disable-password">Your password</label>
-          <input id="disable-password" v-model="disablePassword" type="password" autocomplete="current-password" placeholder="Your password" />
+          <label class="visually-hidden" for="disable-password">{{ message('Your password') }}</label>
+          <input id="disable-password" v-model="disablePassword" type="password" autocomplete="current-password" :placeholder="message(&quot;Your password&quot;)" />
           <button class="btn-secondary" :disabled="busy" @click="disableTwoFactor">
-            {{ busy ? 'Turning off…' : 'Turn off' }}
+            {{ busy ? message('Turning off…') : message('Turn off') }}
           </button>
         </div>
 
         <button v-else class="btn-primary" :disabled="busy" @click="startTwoFactor">
-          {{ busy ? 'Setting up…' : 'Set up two-step sign-in' }}
+          {{ busy ? message('Setting up…') : message('Set up two-step sign-in') }}
         </button>
       </template>
     </div>
@@ -88,6 +74,8 @@
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
+import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 
 const props = defineProps({ user: Object });

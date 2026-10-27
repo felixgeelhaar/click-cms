@@ -1,7 +1,7 @@
 <template>
   <div class="page-edit">
     <div class="edit-heading">
-      <h1 class="page-title">{{ isNew ? 'New Page' : 'Edit Page' }}</h1>
+      <h1 class="page-title">{{ isNew ? message('New Page') : message('Edit Page') }}</h1>
       <!-- Who else is on this page right now. Only meaningful once the page
            exists (a new, unsaved page has no address to share). -->
       <PresenceBar
@@ -12,39 +12,39 @@
       />
     </div>
 
-    <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
-    <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
+    <p v-if="loadError" class="banner error" role="alert"><LocalizedError :message="loadError" /></p>
+    <p v-if="saveError" class="banner error" role="alert"><LocalizedError :message="saveError" /></p>
 <p v-if="conflict" class="banner error" role="alert">
-      This page changed remotely. Your edits are still here. Compare and combine them with the latest saved version, or reload to review it.
-      <button type="button" class="btn-reload-conflict" @click="compareConflict">Compare with saved version</button>
-      <button type="button" class="btn-reload-conflict" @click="reloadConflict">Reload to review</button>
+      {{ message('This page changed remotely. Your edits are still here. Compare and combine them with the latest saved version, or reload to review it.') }}
+      <button type="button" class="btn-reload-conflict" @click="compareConflict">{{ message('Compare with saved version') }}</button>
+      <button type="button" class="btn-reload-conflict" @click="reloadConflict">{{ message('Reload to review') }}</button>
     </p>
-    <p v-if="mergeError" class="banner error" role="alert">{{ mergeError }}</p>
+    <p v-if="mergeError" class="banner error" role="alert"><LocalizedError :message="mergeError" /></p>
     <DraftMerge v-if="conflict && mergeBase && mergeServer" :base="mergeBase" :local="page" :server="mergeServer" :server-revision="mergeRevision" @apply="applyMergedDraft" />
-    <p v-if="publishError" class="banner" :class="publishErrorEditorial ? 'warning' : 'error'" role="alert">{{ publishError }}</p>
-    <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
+    <p v-if="publishError" class="banner" :class="publishErrorEditorial ? 'warning' : 'error'" role="alert"><LocalizedError :message="publishError" /></p>
+    <p v-if="notice" class="banner notice" role="status">{{ message(notice) }}</p>
     <section v-if="recoveryCandidate" class="banner recovery-banner" role="status">
-      <strong>A local recovery copy is available.</strong>
-      <span>It is scoped to your account, this site, this page and {{ languageName(locale) }}.</span>
-      <button type="button" class="btn-secondary" @click="restoreRecovery">Restore copy</button>
-      <button type="button" class="inline-button" @click="discardRecovery">Discard copy</button>
+      <strong>{{ message('A local recovery copy is available.') }}</strong>
+      <span>{{ message('It is scoped to your account, this site, this page and') }} {{ message(languageName(locale)) }}.</span>
+      <button type="button" class="btn-secondary" @click="restoreRecovery">{{ message('Restore copy') }}</button>
+      <button type="button" class="inline-button" @click="discardRecovery">{{ message('Discard copy') }}</button>
     </section>
 
-    <div v-if="loading" class="banner">Loading…</div>
+    <div v-if="loading" class="banner">{{ message('Loading…') }}</div>
 
     <div v-else class="edit-form">
       <div class="editor-toolbar">
-        <nav class="editor-views" aria-label="Page editor views">
-          <button v-for="view in editorViews" :key="view.id" type="button" :aria-pressed="editorView === view.id" @click="editorView = view.id">{{ view.label }}</button>
+        <nav class="editor-views" :aria-label="message(&quot;Page editor views&quot;)">
+          <button v-for="view in editorViews" :key="view.id" type="button" :aria-pressed="editorView === view.id" @click="editorView = view.id">{{ message(view.label) }}</button>
         </nav>
-        <span class="save-state" role="status">{{ dirty ? 'Unsaved changes' : 'No unsaved changes' }}</span>
+        <span class="save-state" role="status">{{ dirty ? message('Unsaved changes') : message('No unsaved changes') }}</span>
       <div class="actions">
-        <button class="btn-secondary" :disabled="saving" @click="cancel">Cancel</button>
+        <button class="btn-secondary" :disabled="saving" @click="cancel">{{ message('Cancel') }}</button>
         <button class="btn-secondary" :disabled="saving" @click="previewPage">
-          {{ previewing ? 'Preparing…' : 'Preview' }}
+          {{ previewing ? message('Preparing…') : message('Preview') }}
         </button>
         <button class="btn-primary" :disabled="saving" @click="savePage">
-          {{ saving ? 'Saving…' : 'Save' }}
+          {{ saving ? message('Saving…') : message('Save') }}
         </button>
       </div>
 
@@ -54,22 +54,16 @@
         page that does not exist in that language yet, and saying so is what
         stops an editor believing their German text disappeared.
       -->
-      <p v-if="translationMissing" class="banner notice">
-        There is no {{ languageName(locale) }} version of this page yet. Fill this
-        in and save to create one — it is a separate document from
-        {{ languageName(defaultLocale) }} and is published on its own.
-        <button
+      <p v-if="translationMissing" class="banner notice"> {{ message('There is no') }} {{ message(languageName(locale)) }} {{ message('version of this page yet. Fill this in and save to create one — it is a separate document from') }} {{ message(languageName(defaultLocale)) }} {{ message('and is published on its own.') }} <button
           v-if="fallbackSource"
           type="button"
           class="inline-button"
           @click="copyFallbackSource"
-        >
-          Start from the {{ languageName(fallbackSourceLocale) }} text
-        </button>
+        > {{ message('Start from the') }} {{ message(languageName(fallbackSourceLocale)) }} {{ message('text') }} </button>
       </p>
 
       <div class="editor-layout">
-      <section class="editor-content" aria-label="Page editing">
+      <section class="editor-content" :aria-label="message(&quot;Page editing&quot;)">
       <div v-show="editorView === 'content'">
       <PageLanguages
         v-if="!isNew && siteLocales.length > 1"
@@ -87,7 +81,7 @@
           aria-controls="translation-compare-panel"
           @click="showTranslationCompare = !showTranslationCompare"
         >
-          {{ showTranslationCompare ? 'Hide translation comparison' : 'Compare translations' }}
+          {{ showTranslationCompare ? message('Hide translation comparison') : message('Compare translations') }}
         </button>
       </div>
       <TranslationCompare
@@ -106,32 +100,30 @@
       />
 
       <div class="form-group">
-        <label for="page-title">Title</label>
-        <input id="page-title" v-model="page.title" type="text" placeholder="Page title" />
+        <label for="page-title">{{ message('Title') }}</label>
+        <input id="page-title" v-model="page.title" type="text" :placeholder="message(&quot;Page title&quot;)" />
       </div>
 
       <div v-if="isNew" class="form-group">
-        <label for="page-slug">Slug</label>
-        <input id="page-slug" v-model="page.slug" type="text" placeholder="page-slug" />
-        <p class="field-help">The page address. Choose it before the first save.</p>
+        <label for="page-slug">{{ message('Slug') }}</label>
+        <input id="page-slug" v-model="page.slug" type="text" :placeholder="message(&quot;page-slug&quot;)" />
+        <p class="field-help">{{ message('The page address. Choose it before the first save.') }}</p>
       </div>
       <SectionEditor content-first v-model="page.sections" :errors="sectionErrors" :template-scope="templateScope" :can-manage-presets="can('sections.manage')" />
 
       </div>
       <div v-show="editorView === 'settings'" class="settings-view">
-        <h2>Page settings</h2>
+        <h2>{{ message('Page settings') }}</h2>
       <div v-if="!isNew" class="form-group">
-        <label for="page-slug">Slug</label>
+        <label for="page-slug">{{ message('Slug') }}</label>
         <input
           id="page-slug"
           v-model="page.slug"
           type="text"
-          placeholder="page-slug"
+          :placeholder="message(&quot;page-slug&quot;)"
           :disabled="!isNew"
         />
-        <p v-if="!isNew" class="field-help">
-          The slug is part of the page's address and cannot be changed here.
-        </p>
+        <p v-if="!isNew" class="field-help"> {{ message('The slug is part of the page\'s address and cannot be changed here.') }} </p>
       </div>
 
       <!--
@@ -142,33 +134,28 @@
         recognise untouched, so no new endpoint is needed.
       -->
       <details class="seo-group">
-        <summary class="seo-summary">Search &amp; social (SEO)</summary>
+        <summary class="seo-summary">{{ message('Search & social (SEO)') }}</summary>
 
         <div class="form-group">
-          <label for="seo-meta-title">Meta title</label>
+          <label for="seo-meta-title">{{ message('Meta title') }}</label>
           <input
             id="seo-meta-title"
             v-model="page.seo.metaTitle"
             type="text"
-            placeholder="Falls back to the page title"
+            :placeholder="message(&quot;Falls back to the page title&quot;)"
           />
-          <p class="field-help">
-            Shown in the browser tab and search results. Left empty, the page
-            title is used.
-          </p>
+          <p class="field-help"> {{ message('Shown in the browser tab and search results. Left empty, the page title is used.') }} </p>
         </div>
 
         <div class="form-group">
-          <label for="seo-description">Meta description</label>
+          <label for="seo-description">{{ message('Meta description') }}</label>
           <textarea
             id="seo-description"
             v-model="page.seo.description"
             rows="2"
-            placeholder="A sentence or two summarising the page"
+            :placeholder="message(&quot;A sentence or two summarising the page&quot;)"
           ></textarea>
-          <p class="field-help">
-            The snippet search engines and social cards show under the title.
-          </p>
+          <p class="field-help"> {{ message('The snippet search engines and social cards show under the title.') }} </p>
         </div>
 
         <!--
@@ -183,28 +170,25 @@
         />
 
         <div class="form-group">
-          <label for="seo-canonical">Canonical URL</label>
+          <label for="seo-canonical">{{ message('Canonical URL') }}</label>
           <input
             id="seo-canonical"
             v-model="page.seo.canonicalUrl"
             type="url"
             placeholder="https://example.com/this-page"
           />
-          <p class="field-help">
-            The preferred address for this page, when the same content is
-            reachable at more than one URL. Leave empty unless you need it.
-          </p>
+          <p class="field-help"> {{ message('The preferred address for this page, when the same content is reachable at more than one URL. Leave empty unless you need it.') }} </p>
         </div>
 
         <div class="form-group form-check">
           <input id="seo-noindex" v-model="page.seo.noindex" type="checkbox" />
-          <label for="seo-noindex">Hide this page from search engines (noindex)</label>
+          <label for="seo-noindex">{{ message('Hide this page from search engines (noindex)') }}</label>
         </div>
       </details>
 
       </div>
       <div v-show="editorView === 'activity'">
-        <h2>Activity</h2>
+        <h2>{{ message('Activity') }}</h2>
       <PageVersions
         v-if="!isNew"
         :versions="versions"
@@ -220,16 +204,14 @@
       />
 
       <CommentsPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" />
-      <details class="editor-disclosure" :open="comparisonOpen"><summary>Recovery and comparison</summary>
+      <details class="editor-disclosure" :open="comparisonOpen"><summary>{{ message('Recovery and comparison') }}</summary>
       <div class="editor-tools">
         <label class="recovery-opt-in">
-          <input v-model="recoveryEnabled" type="checkbox" />
-          Keep a local recovery copy on this device
-        </label>
-        <p class="field-help">Off by default. When enabled, unsaved text is stored in this browser for up to 7 days and removed when you save or discard.</p>
-        <p v-if="recoveryStorageError" class="field-help" role="alert">{{ recoveryStorageError }}</p>
-        <button v-if="dirty && !comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = true">Compare with saved page</button>
-        <button v-else-if="comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = false">Hide comparison</button>
+          <input v-model="recoveryEnabled" type="checkbox" /> {{ message('Keep a local recovery copy on this device') }} </label>
+        <p class="field-help">{{ message('Off by default. When enabled, unsaved text is stored in this browser for up to 7 days and removed when you save or discard.') }}</p>
+        <p v-if="recoveryStorageError" class="field-help" role="alert"><LocalizedError :message="recoveryStorageError" /></p>
+        <button v-if="dirty && !comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = true">{{ message('Compare with saved page') }}</button>
+        <button v-else-if="comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = false">{{ message('Hide comparison') }}</button>
         <DraftComparison
           v-if="comparisonOpen && comparisonBase"
           :before="comparisonBase"
@@ -247,30 +229,27 @@
         cannot swallow it.
       -->
       <div v-if="previewUrl" class="preview-link">
-        <p class="preview-link-title">Preview link ready</p>
-        <p class="field-help">
-          Anyone with this link can see the page as it stands now, until
-          {{ previewExpiry }}. It stops working after that.
-        </p>
+        <p class="preview-link-title">{{ message('Preview link ready') }}</p>
+        <p class="field-help"> {{ message('Anyone with this link can see the page as it stands now, until') }} {{ previewExpiry }}{{ message('. It stops working after that.') }} </p>
         <div class="preview-link-row">
-          <label class="visually-hidden" for="preview-url">Preview link</label>
+          <label class="visually-hidden" for="preview-url">{{ message('Preview link') }}</label>
           <input
             id="preview-url"
             :value="previewAbsoluteUrl"
             readonly
             @focus="$event.target.select()"
           />
-          <button class="btn-secondary" @click="copyPreviewLink">{{ copied ? 'Copied' : 'Copy' }}</button>
-          <a class="btn-secondary" :href="previewUrl" target="_blank" rel="noopener">Open</a>
+          <button class="btn-secondary" @click="copyPreviewLink">{{ copied ? message('Copied') : message('Copy') }}</button>
+          <a class="btn-secondary" :href="previewUrl" target="_blank" rel="noopener">{{ message('Open') }}</a>
         </div>
       </div>
 
-      <p v-if="previewError" class="banner error" role="alert">{{ previewError }}</p>
+      <p v-if="previewError" class="banner error" role="alert"><LocalizedError :message="previewError" /></p>
       <div v-if="can('content.preview')" class="live-preview-tools">
         <button type="button" class="btn-secondary" :disabled="previewBusy" @click="toggleLivePreview">
-          {{ livePreviewOpen ? 'Hide live preview' : 'Live preview' }}
+          {{ livePreviewOpen ? message('Hide live preview') : message('Live preview') }}
         </button>
-        <span class="field-help">Unsaved changes render in an isolated frame. Scripts and form submissions are disabled.</span>
+        <span class="field-help">{{ message('Unsaved changes render in an isolated frame. Scripts and form submissions are disabled.') }}</span>
       </div>
       <ResponsivePreview
         v-if="livePreviewOpen"
@@ -280,7 +259,7 @@
         @refresh="refreshLivePreview"
       />
       </section>
-      <aside class="editor-sidebar" aria-label="Publishing and review">
+      <aside class="editor-sidebar" :aria-label="message(&quot;Publishing and review&quot;)">
       <PagePublication
         :publication="publication"
         :pending-count="pendingCount"
@@ -297,7 +276,7 @@
       />
 
       <details v-if="!isNew && !translationMissing" class="editor-disclosure" :open="Boolean(schedule?.publishAt || schedule?.unpublishAt)">
-        <summary>{{ schedule?.publishAt || schedule?.unpublishAt ? 'Active publishing schedule' : 'Publishing schedule' }}</summary>
+        <summary>{{ schedule?.publishAt || schedule?.unpublishAt ? message('Active publishing schedule') : message('Publishing schedule') }}</summary>
       <PageSchedule
         v-if="!isNew && !translationMissing"
         :schedule="schedule"
@@ -307,9 +286,9 @@
         @clear="clearSchedule"
       />
       </details>
-      <p v-if="scheduleError" class="banner error" role="alert">{{ scheduleError }}</p>
+      <p v-if="scheduleError" class="banner error" role="alert"><LocalizedError :message="scheduleError" /></p>
       <details class="editor-disclosure" @click="navigateCheck">
-        <summary>Page checks</summary>
+        <summary>{{ message('Page checks') }}</summary>
         <PageQualityChecklist :page="page" :locales="siteLocales" :translations="translations" />
       </details>
       <ReviewPanel v-if="!isNew && storedSlug" :page="storedSlug" :locale="locale" :saved-revision="revision" :dirty="dirty" compact :can-request-review="can('content.edit.any') || can('content.edit.own')" />
@@ -320,6 +299,8 @@
 </template>
 
 <script setup>
+import { message, messageLanguage } from '../lib/messages.js';
+import LocalizedError from './LocalizedError.vue';
 import { nextTick, computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import SectionEditor from './SectionEditor.vue';
 import PresenceBar from './collaboration/PresenceBar.vue';
@@ -376,11 +357,11 @@ const emptySeo = () => ({ metaTitle: '', description: '', ogImage: '', canonical
 // be reused verbatim for the Open Graph image. displayWidth is 1200 because
 // that is the width social cards render at, so the picker's quality warning is
 // judged against the slot this image actually fills.
-const ogImageField = {
-  label: 'Open Graph image',
-  help: 'The image shown when this page is shared on social media.',
+const ogImageField = computed(() => ({
+  label: message('Open Graph image'),
+  help: message('The image shown when this page is shared on social media.'),
   displayWidth: 1200,
-};
+}));
 
 // Fill the SEO shape from whatever the API returned, ignoring anything that is
 // not the expected type. A stored payload can carry an array where a string is
@@ -454,18 +435,18 @@ const fallbackSource = ref(null);
 const fallbackSourceLocale = ref('');
 const showTranslationCompare = ref(false);
 
-const displayNames = (() => {
+const displayNames = computed(() => {
   try {
-    return new Intl.DisplayNames(undefined, { type: 'language' });
+    return new Intl.DisplayNames(messageLanguage.value, { type: 'language' });
   } catch {
     return null;
   }
-})();
+});
 
 const languageName = (code) => {
   if (!code) return 'the default language';
   try {
-    return displayNames?.of(code) || code;
+    return displayNames.value?.of(code) || code;
   } catch {
     return code;
   }
@@ -980,7 +961,7 @@ const clearSchedule = async () => {
 // Confirmation happens inside PageVersions, in the product's own voice, so
 // there is no second prompt here.
 const restoreVersion = async (version) => {
-  if (dirty.value && !window.confirm('Restore this version and discard your unsaved edits?')) return;
+  if (dirty.value && !window.confirm(message('Restore this version and discard your unsaved edits?'))) return;
   restoringId.value = version.id;
   versionsError.value = '';
   notice.value = '';
@@ -1014,8 +995,8 @@ const switchLocale = async (code) => {
   if (code === locale.value) return;
 
   if (dirty.value && !window.confirm(
-    `Switch to ${languageName(code)}? Unsaved changes to the `
-    + `${languageName(locale.value)} version will be lost.`
+    message(`Switch to ${languageName(code)}? Unsaved changes to the `
+    + `${languageName(locale.value)} version will be lost.`)
   )) {
     return;
   }
@@ -1038,7 +1019,7 @@ const switchLocale = async (code) => {
 };
 
 const confirmDiscard = (destination) => !dirty.value || window.confirm(
-  `Leave this page for ${destination}? Unsaved changes will be lost.`
+  message(`Leave this page for ${destination}? Unsaved changes will be lost.`)
 );
 
 const beforeUnload = (event) => {
@@ -1052,7 +1033,7 @@ const beforeNavigate = (event) => {
 };
 
 const reloadConflict = async () => {
-  if (!window.confirm('Reload the latest page? Your local edits will be discarded.')) return;
+  if (!window.confirm(message('Reload the latest page? Your local edits will be discarded.'))) return;
   conflictCompareSequence += 1;
   conflict.value = false;
   mergeBase.value = null;
@@ -1207,7 +1188,7 @@ const previewPage = async () => {
     }
 
     previewUrl.value = body.data.url;
-    previewExpiry.value = new Date(body.data.expiresAt * 1000).toLocaleString();
+    previewExpiry.value = new Date(body.data.expiresAt * 1000).toLocaleString(messageLanguage.value);
     await refreshPublication();
   } catch (e) {
     previewError.value = `Could not prepare a preview: ${e.message}`;

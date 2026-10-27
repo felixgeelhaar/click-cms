@@ -6,9 +6,9 @@
     </legend>
 
     <p v-if="field.help" class="repeater-help">{{ field.help }}</p>
-    <p v-if="error" class="repeater-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="repeater-error" role="alert"><LocalizedError :message="error" /></p>
 
-    <p v-if="rows.length === 0" class="repeater-empty">No entries yet.</p>
+    <p v-if="rows.length === 0" class="repeater-empty">{{ message('No entries yet.') }}</p>
 
     <ol v-else class="repeater-rows">
       <li
@@ -40,20 +40,20 @@
               type="button"
               class="icon-btn"
               :disabled="index === 0"
-              :aria-label="`Move entry ${index + 1} up`"
+              :aria-label="message('Move entry {0} up', [index + 1])"
               @click="move(index, -1)"
             >↑</button>
             <button
               type="button"
               class="icon-btn"
               :disabled="index === rows.length - 1"
-              :aria-label="`Move entry ${index + 1} down`"
+              :aria-label="message('Move entry {0} down', [index + 1])"
               @click="move(index, 1)"
             >↓</button>
             <button
               type="button"
               class="icon-btn danger"
-              :aria-label="`Remove entry ${index + 1}`"
+              :aria-label="message('Remove entry {0}', [index + 1])"
               @click="remove(index)"
             >✕</button>
           </div>
@@ -70,14 +70,15 @@
       </li>
     </ol>
 
-    <button type="button" class="btn-add" :disabled="atMax" @click="add">
-      + Add {{ singular }}
+    <button type="button" class="btn-add" :disabled="atMax" @click="add"> {{ message('+ Add') }} {{ singular }}
     </button>
-    <span v-if="atMax" class="limit-note">Maximum of {{ field.max }} reached.</span>
+    <span v-if="atMax" class="limit-note">{{ message('Maximum of') }} {{ field.max }} {{ message('reached.') }}</span>
   </fieldset>
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
+import LocalizedError from '../LocalizedError.vue';
 import { computed, ref, watch } from 'vue';
 import { leafComponent } from './leafComponent.js';
 import { moveItem, useDragReorder } from '../../lib/dragReorder.js';

@@ -1,24 +1,23 @@
 <template>
   <section class="comments" aria-labelledby="collaboration-comments-heading">
     <div class="comments-head">
-      <h2 id="collaboration-comments-heading" class="comments-title">Comments</h2>
+      <h2 id="collaboration-comments-heading" class="comments-title">{{ message('Comments') }}</h2>
       <button
         type="button"
         class="btn-sm"
         :disabled="loading"
-        aria-label="Reload comments for this document"
+        :aria-label="message(&quot;Reload comments for this document&quot;)"
         @click="load"
       >
-        {{ loading ? 'Loading…' : 'Refresh' }}
+        {{ loading ? message('Loading…') : message('Refresh') }}
       </button>
     </div>
 
-    <p v-if="error" class="comments-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="comments-error" role="alert"><LocalizedError :message="error" /></p>
 
-    <p v-if="loading && !comments.length" class="comments-empty">Loading…</p>
+    <p v-if="loading && !comments.length" class="comments-empty">{{ message('Loading…') }}</p>
 
-    <p v-else-if="!comments.length && !error" class="comments-empty">
-      No comments yet. Leave a note for whoever reviews this {{ kindLabel }}.
+    <p v-else-if="!comments.length && !error" class="comments-empty"> {{ message('No comments yet. Leave a note for whoever reviews this') }} {{ message(kindLabel) }}.
     </p>
 
     <!--
@@ -36,12 +35,12 @@
         :class="{ 'is-resolved': comment.resolved }"
       >
         <div class="comment-head">
-          <span class="comment-author">{{ comment.authorName || comment.author || 'Someone' }}</span>
+          <span class="comment-author">{{ comment.authorName || comment.author || message('Someone') }}</span>
           <span class="comment-when">{{ formatWhen(comment.postedAt) }}</span>
         </div>
         <p class="comment-body">{{ comment.body }}</p>
         <div class="comment-foot">
-          <span v-if="comment.resolved" class="comment-badge">Resolved</span>
+          <span v-if="comment.resolved" class="comment-badge">{{ message('Resolved') }}</span>
           <button
             v-else
             type="button"
@@ -49,25 +48,25 @@
             :disabled="busyId === comment.id"
             @click="resolve(comment)"
           >
-            {{ busyId === comment.id ? 'Resolving…' : 'Resolve' }}
+            {{ busyId === comment.id ? message('Resolving…') : message('Resolve') }}
           </button>
         </div>
       </li>
     </ol>
 
     <form class="comment-form" @submit.prevent="submit">
-      <label class="comment-form-label" for="collaboration-comment-body">Add a comment</label>
+      <label class="comment-form-label" for="collaboration-comment-body">{{ message('Add a comment') }}</label>
       <textarea
         id="collaboration-comment-body"
         v-model="draft"
         class="comment-input"
         rows="3"
-        :placeholder="`Leave a note for whoever reviews this ${kindLabel}…`"
+        :placeholder="message('Leave a note for whoever reviews this {0}…', [kindLabel])"
         :disabled="posting"
       ></textarea>
       <div class="comment-form-actions">
         <button type="submit" class="btn-primary" :disabled="posting || !draft.trim()">
-          {{ posting ? 'Posting…' : 'Comment' }}
+          {{ posting ? message('Posting…') : message('Comment') }}
         </button>
       </div>
     </form>
@@ -75,6 +74,8 @@
 </template>
 
 <script setup>
+import { message, messageLanguage } from "../../lib/messages.js";
+import LocalizedError from '../LocalizedError.vue';
 import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps({
@@ -183,7 +184,7 @@ const resolve = async (comment) => {
 
 const formatWhen = (value) => {
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString(messageLanguage.value);
 };
 
 // Follow the editor when they switch document or language.

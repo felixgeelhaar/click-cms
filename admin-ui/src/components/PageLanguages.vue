@@ -7,7 +7,7 @@
     stands, on the page being edited.
   -->
   <section class="langs" aria-labelledby="page-languages-heading">
-    <h2 id="page-languages-heading" class="langs-heading">Languages</h2>
+    <h2 id="page-languages-heading" class="langs-heading">{{ message('Languages') }}</h2>
 
     <ul class="langs-list">
       <li v-for="code in locales" :key="code">
@@ -16,31 +16,26 @@
           class="lang"
           :class="[stateOf(code), { current: code === current }]"
           :aria-pressed="code === current"
-          :aria-label="`${nameOf(code)} — ${labelOf(code)}${code === current ? ' (currently editing)' : ''}`"
+          :aria-label="`${nameOf(code)} — ${message(labelOf(code))}${code === current ? message(' (currently editing)') : ''}`"
           :disabled="busy"
           @click="$emit('select', code)"
         >
           <span class="lang-name">
             {{ nameOf(code) }}<span class="lang-code">{{ code }}</span>
           </span>
-          <span class="lang-state">{{ labelOf(code) }}</span>
+          <span class="lang-state">{{ message(labelOf(code)) }}</span>
         </button>
       </li>
     </ul>
 
-    <p v-if="untranslated.length" class="langs-note">
-      Not translated yet: {{ untranslated.map(nameOf).join(', ') }}. Switching to
-      one of these shows the fields empty — saving there creates that translation.
-    </p>
+    <p v-if="untranslated.length" class="langs-note"> {{ message('Not translated yet:') }} {{ untranslated.map(nameOf).join(', ') }}{{ message('. Switching to one of these shows the fields empty — saving there creates that translation.') }} </p>
 
-    <p v-if="stale.length" class="langs-note warn">
-      Live but out of date: {{ stale.map(nameOf).join(', ') }}. Those visitors are
-      reading an older version until each is published on its own.
-    </p>
+    <p v-if="stale.length" class="langs-note warn"> {{ message('Live but out of date:') }} {{ stale.map(nameOf).join(', ') }}{{ message('. Those visitors are reading an older version until each is published on its own.') }} </p>
   </section>
 </template>
 
 <script setup>
+import { message, messageLanguage } from "../lib/messages.js";
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -62,17 +57,17 @@ defineEmits(['select']);
 
 // Intl is in every browser this admin runs in, so language names cost no
 // dependency and no translation table to keep current.
-const displayNames = (() => {
+const displayNames = computed(() => {
   try {
-    return new Intl.DisplayNames(undefined, { type: 'language' });
+    return new Intl.DisplayNames(messageLanguage.value, { type: 'language' });
   } catch {
     return null;
   }
-})();
+});
 
 const nameOf = (code) => {
   try {
-    return displayNames?.of(code) || code;
+    return displayNames.value?.of(code) || code;
   } catch {
     return code;
   }

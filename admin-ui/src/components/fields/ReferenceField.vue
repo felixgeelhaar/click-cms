@@ -7,26 +7,26 @@
          and removed. Order is meaningful — "featured posts" render in the order
          set here — so the chips carry move controls, not just a remove. -->
     <div v-if="field.multiple" class="ref-multi">
-      <ul v-if="selected.length" class="ref-chips" :aria-label="`Chosen ${label}`">
+      <ul v-if="selected.length" class="ref-chips" :aria-label="message('Chosen {0}', [label])">
         <li v-for="(slug, index) in selected" :key="slug" class="ref-chip">
           <span class="ref-chip-order">
             <button
               type="button"
               class="ref-chip-move"
               :disabled="index === 0"
-              :aria-label="`Move ${titleFor(slug)} up`"
+              :aria-label="message('Move {0} up', [titleFor(slug)])"
               @click="move(index, index - 1)"
             >↑</button>
             <button
               type="button"
               class="ref-chip-move"
               :disabled="index === selected.length - 1"
-              :aria-label="`Move ${titleFor(slug)} down`"
+              :aria-label="message('Move {0} down', [titleFor(slug)])"
               @click="move(index, index + 1)"
             >↓</button>
           </span>
           <span class="ref-chip-label">{{ titleFor(slug) }}</span>
-          <button type="button" class="ref-chip-remove" :aria-label="`Remove ${titleFor(slug)}`" @click="remove(slug)">×</button>
+          <button type="button" class="ref-chip-remove" :aria-label="message('Remove {0}', [titleFor(slug)])" @click="remove(slug)">×</button>
         </li>
       </ul>
       <!-- The wrapper's <label for> points at `inputId`, which in multiple mode
@@ -35,12 +35,12 @@
            rather than leaving a nameless combo box. -->
       <select
         class="reference-select"
-        :aria-label="`Add ${label}`"
+        :aria-label="message('Add {0}', [label])"
         :aria-describedby="describedBy"
         :disabled="loading"
         @change="addFromEvent($event)"
       >
-        <option value="">{{ loading ? 'Loading…' : (available.length ? '+ Add…' : emptyLabel) }}</option>
+        <option value="">{{ loading ? message('Loading…') : (available.length ? message('+ Add…') : message(emptyLabel)) }}</option>
         <option v-for="opt in available" :key="opt.slug" :value="opt.slug">{{ opt.title }}</option>
       </select>
     </div>
@@ -54,14 +54,15 @@
       :aria-describedby="describedBy"
       @change="$emit('update:modelValue', $event.target.value || null)"
     >
-      <option value="">{{ loading ? 'Loading…' : (options.length ? '— none —' : emptyLabel) }}</option>
+      <option value="">{{ loading ? message('Loading…') : (options.length ? message('— none —') : message(emptyLabel)) }}</option>
       <option v-for="opt in options" :key="opt.slug" :value="opt.slug">{{ opt.title }}</option>
-      <option v-if="danglingSlug" :value="danglingSlug">{{ danglingSlug }} (missing)</option>
+      <option v-if="danglingSlug" :value="danglingSlug">{{ danglingSlug }} {{ message('(missing)') }}</option>
     </select>
   </div>
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
 import { ref, computed, onMounted } from 'vue';
 
 const props = defineProps({

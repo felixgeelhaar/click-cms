@@ -4,7 +4,7 @@
       <div class="login-header">
         <div class="logo">click</div>
         <h1>Click CMS</h1>
-        <p>Sign in to your account</p>
+        <p>{{ message('Sign in to your account') }}</p>
       </div>
       <!-- Labels carry `for`, and the inputs carry the matching `id`. A
            placeholder is not a label: it is announced inconsistently and it
@@ -21,24 +21,24 @@
       -->
       <template v-if="!needsCode && sso.enabled">
         <a class="btn-sso" :href="ssoHref">{{ sso.label }}</a>
-        <p v-if="sso.passwordLogin" class="divider"><span>or</span></p>
+        <p v-if="sso.passwordLogin" class="divider"><span>{{ message('or') }}</span></p>
       </template>
 
-      <p v-if="ssoError" class="error" role="alert">{{ ssoError }}</p>
+      <p v-if="ssoError" class="error" role="alert"><LocalizedError :message="ssoError" /></p>
 
       <form v-if="!needsCode && sso.passwordLogin" @submit.prevent="handleLogin">
         <div class="form-group">
-          <label for="login-username">Username</label>
-          <input id="login-username" v-model="credentials.username" type="text" autocomplete="username" placeholder="Enter your username" required :disabled="loading" />
+          <label for="login-username">{{ message('Username') }}</label>
+          <input id="login-username" v-model="credentials.username" type="text" autocomplete="username" :placeholder="message(&quot;Enter your username&quot;)" required :disabled="loading" />
         </div>
         <div class="form-group">
-          <label for="login-password">Password</label>
-          <input id="login-password" v-model="credentials.password" type="password" autocomplete="current-password" placeholder="Enter your password" required :disabled="loading" />
+          <label for="login-password">{{ message('Password') }}</label>
+          <input id="login-password" v-model="credentials.password" type="password" autocomplete="current-password" :placeholder="message(&quot;Enter your password&quot;)" required :disabled="loading" />
         </div>
         <!-- A refused sign-in is the whole outcome of this screen, and it is
              rendered without moving focus, so it has to announce itself. -->
-        <div v-if="error" class="error" role="alert">{{ error }}</div>
-        <button type="submit" class="btn-primary" :disabled="loading">{{ loading ? 'Signing in...' : 'Sign In' }}</button>
+        <div v-if="error" class="error" role="alert"><LocalizedError :message="error" /></div>
+        <button type="submit" class="btn-primary" :disabled="loading">{{ loading ? message('Signing in...') : message('Sign In') }}</button>
       </form>
 
       <!--
@@ -50,7 +50,7 @@
       -->
       <form v-else @submit.prevent="handleCode">
         <div class="form-group">
-          <label for="login-code">Authentication code</label>
+          <label for="login-code">{{ message('Authentication code') }}</label>
           <input
             id="login-code"
             ref="codeField"
@@ -58,30 +58,27 @@
             type="text"
             inputmode="numeric"
             autocomplete="one-time-code"
-            placeholder="6-digit code"
+            :placeholder="message(&quot;6-digit code&quot;)"
             required
             :disabled="loading"
           />
-          <p class="hint">
-            From your authenticator app. If you cannot reach it, type one of your
-            recovery codes instead.
-          </p>
+          <p class="hint"> {{ message('From your authenticator app. If you cannot reach it, type one of your recovery codes instead.') }} </p>
         </div>
-        <div v-if="error" class="error" role="alert">{{ error }}</div>
+        <div v-if="error" class="error" role="alert"><LocalizedError :message="error" /></div>
         <button type="submit" class="btn-primary" :disabled="loading">
-          {{ loading ? 'Checking…' : 'Continue' }}
+          {{ loading ? message('Checking…') : message('Continue') }}
         </button>
-        <button type="button" class="btn-text" :disabled="loading" @click="startOver">
-          Start again
-        </button>
+        <button type="button" class="btn-text" :disabled="loading" @click="startOver"> {{ message('Start again') }} </button>
       </form>
 
-      <p v-if="!needsCode" class="demo">Demo credentials: admin / admin</p>
+      <p v-if="!needsCode" class="demo">{{ message('Demo credentials: admin / admin') }}</p>
     </div>
   </div>
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
+import LocalizedError from './LocalizedError.vue';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { setCsrfToken } from '../lib/api.js';
 import { withBase } from '../lib/base.js';

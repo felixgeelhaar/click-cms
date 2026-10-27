@@ -1,17 +1,17 @@
 <template>
   <div class="entry-edit">
-    <h1 class="page-title">{{ isNew ? `New ${type.label} entry` : `Edit ${type.label} entry` }}</h1>
+    <h1 class="page-title">{{ isNew ? message('New {0} entry', [type.label]) : message('Edit {0} entry', [type.label]) }}</h1>
 
-    <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
-    <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
+    <p v-if="loadError" class="banner error" role="alert"><LocalizedError :message="loadError" /></p>
+    <p v-if="saveError" class="banner error" role="alert"><LocalizedError :message="saveError" /></p>
 <p v-if="conflict" class="banner error" role="alert">
-      This entry changed remotely. Your edits are still here. Reload to review the latest version.
-      <button type="button" class="btn-reload-conflict" @click="reloadConflict">Reload to review</button>
+      {{ message('This entry changed remotely. Your edits are still here. Reload to review the latest version.') }}
+      <button type="button" class="btn-reload-conflict" @click="reloadConflict">{{ message('Reload to review') }}</button>
     </p>
-    <p v-if="publishError" class="banner" :class="publishErrorEditorial ? 'warning' : 'error'" role="alert">{{ publishError }}</p>
-    <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
+    <p v-if="publishError" class="banner" :class="publishErrorEditorial ? 'warning' : 'error'" role="alert"><LocalizedError :message="publishError" /></p>
+    <p v-if="notice" class="banner notice" role="status">{{ message(notice) }}</p>
 
-    <div v-if="loading" class="banner">Loading…</div>
+    <div v-if="loading" class="banner">{{ message('Loading…') }}</div>
 
     <div v-else class="edit-form">
       <!--
@@ -29,14 +29,11 @@
         @select="switchLocale"
       />
 
-      <p v-if="translationMissing" class="banner notice" role="status">
-        This entry is not translated into {{ languageName(locale) }} yet. The
-        fields are empty — saving here creates that translation.
-      </p>
+      <p v-if="translationMissing" class="banner notice" role="status"> {{ message('This entry is not translated into') }} {{ message(languageName(locale)) }} {{ message('yet. The fields are empty — saving here creates that translation.') }} </p>
 
       <!-- Publication only means something once the entry exists on disk. -->
       <div v-if="!isNew && !translationMissing" class="publication-bar">
-        <span :class="['status-badge', state]">{{ stateLabel(state) }}</span>
+        <span :class="['status-badge', state]">{{ message(stateLabel(state)) }}</span>
         <div class="pub-actions">
           <button
             v-if="canPublish"
@@ -44,26 +41,26 @@
             class="btn-secondary btn-publish"
             :disabled="!!busy"
             @click="publicationAction('publish')"
-          >{{ busy === 'publish' ? 'Publishing…' : (state === 'pending' ? 'Publish changes' : 'Publish') }}</button>
+          >{{ busy === 'publish' ? message('Publishing…') : (state === 'pending' ? message('Publish changes') : message('Publish')) }}</button>
           <button
             v-if="canUnpublish"
             type="button"
             class="btn-secondary btn-unpublish"
             :disabled="!!busy"
             @click="publicationAction('unpublish')"
-          >{{ busy === 'unpublish' ? 'Unpublishing…' : 'Unpublish' }}</button>
+          >{{ busy === 'unpublish' ? message('Unpublishing…') : message('Unpublish') }}</button>
         </div>
       </div>
 
       <!-- Slug is chosen only when creating; afterwards it is the entry's
            address and is not editable here, mirroring the page editor. -->
       <div v-if="isNew" class="form-group">
-        <label for="entry-slug">Slug</label>
+        <label for="entry-slug">{{ message('Slug') }}</label>
         <input
           id="entry-slug"
           v-model="slugInput"
           type="text"
-          placeholder="Optional — derived from the title if left blank"
+          :placeholder="message(&quot;Optional — derived from the title if left blank&quot;)"
         />
       </div>
 
@@ -89,45 +86,41 @@
         environment (or a reviewer) that has no account.
       -->
       <div v-if="previewUrl" class="preview-link">
-        <p class="preview-link-title">Preview link ready</p>
-        <p class="field-help">
-          This link returns the entry's current draft as delivery JSON — point a
-          front-end preview environment at it. Anyone with the link can read the
-          draft until {{ previewExpiry }}. It stops working after that.
-        </p>
+        <p class="preview-link-title">{{ message('Preview link ready') }}</p>
+        <p class="field-help"> {{ message('This link returns the entry\'s current draft as delivery JSON — point a front-end preview environment at it. Anyone with the link can read the draft until') }} {{ previewExpiry }}{{ message('. It stops working after that.') }} </p>
         <div class="preview-link-row">
-          <label class="visually-hidden" for="entry-preview-url">Preview link</label>
+          <label class="visually-hidden" for="entry-preview-url">{{ message('Preview link') }}</label>
           <input
             id="entry-preview-url"
             :value="previewAbsoluteUrl"
             readonly
             @focus="$event.target.select()"
           />
-          <button type="button" class="btn-secondary" @click="copyPreviewLink">{{ copied ? 'Copied' : 'Copy' }}</button>
-          <a class="btn-secondary" :href="previewUrl" target="_blank" rel="noopener">Open</a>
+          <button type="button" class="btn-secondary" @click="copyPreviewLink">{{ copied ? message('Copied') : message('Copy') }}</button>
+          <a class="btn-secondary" :href="previewUrl" target="_blank" rel="noopener">{{ message('Open') }}</a>
         </div>
       </div>
 
-      <p v-if="previewError" class="banner error" role="alert">{{ previewError }}</p>
+      <p v-if="previewError" class="banner error" role="alert"><LocalizedError :message="previewError" /></p>
 
       <div class="actions">
-        <button type="button" class="btn-secondary" :disabled="saving" @click="cancel">Cancel</button>
+        <button type="button" class="btn-secondary" :disabled="saving" @click="cancel">{{ message('Cancel') }}</button>
         <button
           v-if="!isNew && !translationMissing"
           type="button"
           class="btn-danger"
           :disabled="saving"
           @click="remove"
-        >Delete</button>
+        >{{ message('Delete') }}</button>
         <button
           v-if="canPreview && !isNew && !translationMissing"
           type="button"
           class="btn-secondary"
           :disabled="saving"
           @click="previewEntry"
-        >{{ previewing ? 'Preparing…' : 'Preview' }}</button>
+        >{{ previewing ? message('Preparing…') : message('Preview') }}</button>
         <button type="button" class="btn-primary" :disabled="saving" @click="save">
-          {{ saving ? 'Saving…' : 'Save' }}
+          {{ saving ? message('Saving…') : message('Save') }}
         </button>
       </div>
 
@@ -153,7 +146,7 @@
         when something points at it, to avoid an empty box on the common case.
       -->
       <section v-if="!isNew && !translationMissing && backReferences.length" class="backrefs" aria-labelledby="backrefs-heading">
-        <h2 id="backrefs-heading" class="backrefs-heading">Referenced by</h2>
+        <h2 id="backrefs-heading" class="backrefs-heading">{{ message('Referenced by') }}</h2>
         <ul class="backrefs-list">
           <li v-for="ref in backReferences" :key="`${ref.type}:${ref.slug}:${ref.field}`" class="backref">
             <span class="backref-title">{{ ref.title }}</span>
@@ -180,6 +173,8 @@
 </template>
 
 <script setup>
+import { message, messageLanguage } from '../../lib/messages.js';
+import LocalizedError from '../LocalizedError.vue';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import RepeaterField from '../fields/RepeaterField.vue';
 import { leafComponent } from '../fields/leafComponent.js';
@@ -240,18 +235,18 @@ const translations = ref({});
 // the form shows empty and a save creates the translation rather than a 404.
 const translationMissing = ref(false);
 
-const displayNames = (() => {
+const displayNames = computed(() => {
   try {
-    return new Intl.DisplayNames(undefined, { type: 'language' });
+    return new Intl.DisplayNames(messageLanguage.value, { type: 'language' });
   } catch {
     return null;
   }
-})();
+});
 
 const languageName = (code) => {
   if (!code) return 'the default language';
   try {
-    return displayNames?.of(code) || code;
+    return displayNames.value?.of(code) || code;
   } catch {
     return code;
   }
@@ -563,7 +558,7 @@ const publicationAction = async (action) => {
 
 // Confirmation happens inside PageVersions, in the product's own voice.
 const restoreVersion = async (version) => {
-  if (dirty.value && !window.confirm('Restore this version and discard your unsaved edits?')) return;
+  if (dirty.value && !window.confirm(message('Restore this version and discard your unsaved edits?'))) return;
   restoringId.value = version.id;
   versionsError.value = '';
   notice.value = '';
@@ -618,7 +613,7 @@ const previewEntry = async () => {
       return;
     }
     previewUrl.value = body.data.url;
-    previewExpiry.value = new Date(body.data.expiresAt * 1000).toLocaleString();
+    previewExpiry.value = new Date(body.data.expiresAt * 1000).toLocaleString(messageLanguage.value);
   } catch (e) {
     previewError.value = `Could not prepare a preview: ${e.message}`;
   } finally {
@@ -640,7 +635,7 @@ const copyPreviewLink = async () => {
 const switchLocale = async (code) => {
   if (code === locale.value) return;
   if (dirty.value && !window.confirm(
-    `Switch to ${languageName(code)}? Unsaved changes to the ${languageName(locale.value)} version will be lost.`
+    message(`Switch to ${languageName(code)}? Unsaved changes to the ${languageName(locale.value)} version will be lost.`)
   )) return;
   locale.value = code;
   notice.value = '';
@@ -651,7 +646,7 @@ const switchLocale = async (code) => {
 };
 
 const confirmDiscard = (destination) => !dirty.value || window.confirm(
-  `Leave this entry for ${destination}? Unsaved changes will be lost.`
+  message(`Leave this entry for ${destination}? Unsaved changes will be lost.`)
 );
 
 const beforeUnload = (event) => {
@@ -665,7 +660,7 @@ const beforeNavigate = (event) => {
 };
 
 const reloadConflict = async () => {
-  if (!window.confirm('Reload the latest entry? Your local edits will be discarded.')) return;
+  if (!window.confirm(message('Reload the latest entry? Your local edits will be discarded.'))) return;
   conflict.value = false;
   await reload();
 };
@@ -675,7 +670,7 @@ const cancel = () => {
 };
 
 const remove = async () => {
-  if (!window.confirm('Delete this entry? This cannot be undone.')) return;
+  if (!window.confirm(message('Delete this entry? This cannot be undone.'))) return;
   try {
     await fetch(entryUrl(localeQuery()), { method: 'DELETE' });
     emit('deleted', storedSlug.value);

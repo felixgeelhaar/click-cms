@@ -2,17 +2,17 @@
   <div class="reviews">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Reviews</h1>
-        <p class="page-subtitle">Pages and collection entries waiting on a review decision.</p>
+        <h1 class="page-title">{{ message('Reviews') }}</h1>
+        <p class="page-subtitle">{{ message('Pages and collection entries waiting on a review decision.') }}</p>
       </div>
       <button
         type="button"
         class="btn-sm"
         :disabled="loading"
-        aria-label="Reload open reviews"
+        :aria-label="message(&quot;Reload open reviews&quot;)"
         @click="load"
       >
-        {{ loading ? 'Loading…' : 'Refresh' }}
+        {{ loading ? message('Loading…') : message('Refresh') }}
       </button>
     </div>
 
@@ -20,46 +20,38 @@
       v-if="!error && (loaded || reviews.length > 0)"
       class="filter-tabs"
       role="group"
-      aria-label="Filter open reviews"
+      :aria-label="message(&quot;Filter open reviews&quot;)"
     >
       <button
         type="button"
         :class="['tab', { active: filter === 'all' }]"
         :aria-pressed="filter === 'all'"
         @click="filter = 'all'"
-      >
-        All open
-      </button>
+      > {{ message('All open') }} </button>
       <button
         type="button"
         :class="['tab', { active: filter === 'mine' }]"
         :aria-pressed="filter === 'mine'"
         @click="filter = 'mine'"
-      >
-        Requested by me
-      </button>
+      > {{ message('Requested by me') }} </button>
     </div>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
 
-    <p v-if="loading && !loaded" class="loading">Loading…</p>
-    <p v-else-if="!error && reviews.length === 0" class="empty">
-      No open reviews. When someone asks for a look at a page or entry, it shows up here.
-    </p>
-    <p v-else-if="!error && filter === 'mine' && visibleReviews.length === 0" class="empty">
-      None of the open reviews were requested by you. Switch to All open to see every waiting review.
-    </p>
+    <p v-if="loading && !loaded" class="loading">{{ message('Loading…') }}</p>
+    <p v-else-if="!error && reviews.length === 0" class="empty"> {{ message('No open reviews. When someone asks for a look at a page or entry, it shows up here.') }} </p>
+    <p v-else-if="!error && filter === 'mine' && visibleReviews.length === 0" class="empty"> {{ message('None of the open reviews were requested by you. Switch to All open to see every waiting review.') }} </p>
     <div v-else-if="!error" class="table-wrap">
       <table class="review-table">
         <thead>
           <tr>
-            <th>Content</th>
-            <th>Type</th>
-            <th>Locale</th>
-            <th>State</th>
-            <th>Requester</th>
-            <th>Assignee</th>
-            <th>Requested</th>
+            <th>{{ message('Content') }}</th>
+            <th>{{ message('Type') }}</th>
+            <th>{{ message('Locale') }}</th>
+            <th>{{ message('State') }}</th>
+            <th>{{ message('Requester') }}</th>
+            <th>{{ message('Assignee') }}</th>
+            <th>{{ message('Requested') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -74,7 +66,7 @@
             <td>{{ typeLabel(item) }}</td>
             <td>{{ item.locale || '—' }}</td>
             <td>
-              <span class="review-badge" :class="`is-${stateKey(item)}`">{{ stateLabel(item) }}</span>
+              <span class="review-badge" :class="`is-${stateKey(item)}`">{{ message(stateLabel(item)) }}</span>
             </td>
             <td>{{ requester(item) }}</td>
             <td>{{ assignee(item) }}</td>
@@ -90,6 +82,8 @@
 </template>
 
 <script setup>
+import { message, messageLanguage } from "../../lib/messages.js";
+import LocalizedError from '../LocalizedError.vue';
 import { ref, computed, onMounted } from 'vue';
 import { withBase } from '../../lib/base.js';
 import { contentEditorHref } from '../../lib/contentHref.js';
@@ -137,7 +131,7 @@ const stateLabel = (item) => STATE_LABELS[item.state] ?? (item.state || '—');
 
 const typeLabel = (item) => {
   const type = item?.type || 'page';
-  return type === 'page' ? 'Page' : type;
+  return type === 'page' ? message('Page') : type;
 };
 
 const requester = (item) => item.requestedByName || item.requestedBy || '—';
@@ -158,7 +152,7 @@ const go = (event, href) => {
 
 const formatWhen = (value) => {
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString(messageLanguage.value);
 };
 
 const load = async () => {

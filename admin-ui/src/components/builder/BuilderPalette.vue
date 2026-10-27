@@ -1,13 +1,13 @@
 <template>
   <div class="palette">
-    <h2 class="panel-title">Add</h2>
+    <h2 class="panel-title">{{ message('Add') }}</h2>
     <!--
       Where a new node lands depends on the selection, so say what the selection
       is: an editor who does not know a section is selected cannot predict that
       "Add text" nests rather than appends. The controller resolves the actual
       placement; this only names it.
     -->
-    <p class="palette-hint">{{ hint }}</p>
+    <p class="palette-hint">{{ message(hint) }}</p>
     <div class="palette-grid">
       <button
         v-for="type in types"
@@ -15,16 +15,16 @@
         type="button"
         class="palette-button"
         @click="ctx.addNode(type)"
-      >{{ type }}</button>
+      >{{ message(type) }}</button>
     </div>
 
     <!--
       Snapshot-only paste templates. Inserting deep-copies with new ids; editing
       a saved block never rewrites pages that already used it.
     -->
-    <h2 class="panel-title blocks-title">Saved blocks</h2>
-    <p v-if="ctx.blocksError.value" class="palette-hint palette-error">{{ ctx.blocksError.value }}</p>
-    <p v-else-if="!ctx.blocks.value.length" class="palette-hint">No saved blocks yet.</p>
+    <h2 class="panel-title blocks-title">{{ message('Saved blocks') }}</h2>
+    <p v-if="ctx.blocksError.value" class="palette-hint palette-error"><LocalizedError :message="ctx.blocksError.value" /></p>
+    <p v-else-if="!ctx.blocks.value.length" class="palette-hint">{{ message('No saved blocks yet.') }}</p>
     <ul v-else class="blocks-list">
       <li v-for="block in ctx.blocks.value" :key="block.id" class="blocks-row">
         <span class="blocks-name">{{ block.name }}</span>
@@ -33,7 +33,7 @@
           class="palette-button blocks-insert"
           :disabled="ctx.blocksBusy.value"
           @click="ctx.insertBlock(block)"
-        >Insert</button>
+        >{{ message('Insert') }}</button>
       </li>
     </ul>
     <button
@@ -42,11 +42,13 @@
       class="palette-button save-block"
       :disabled="ctx.blocksBusy.value"
       @click="ctx.saveBlock()"
-    >Save selection as block</button>
+    >{{ message('Save selection as block') }}</button>
   </div>
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
+import LocalizedError from '../LocalizedError.vue';
 import { computed, inject } from 'vue';
 import { NODE_TYPES, isContainer } from './model.js';
 
