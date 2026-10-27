@@ -10,7 +10,7 @@ from pathlib import Path
 parser = argparse.ArgumentParser()
 parser.add_argument('--image', default='click-cms:ci')
 args = parser.parse_args()
-source = Path(__file__).resolve().parents[1] / 'public/admin/.htaccess'
+source = Path(__file__).resolve().parents[1] / 'admin-ui/public/.htaccess'
 name = 'click-routing-' + uuid.uuid4().hex[:10]
 with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)
