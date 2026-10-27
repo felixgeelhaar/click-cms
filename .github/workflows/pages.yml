@@ -46,6 +46,7 @@ on:
       - 'docs/**'
       - 'README.md'
       - 'scripts/docs/**'
+      - 'admin-ui/src/styles/editorial.css'
       - '.github/workflows/pages.yml'
   schedule:
     - cron: '23 4 * * 1'   # Mondays, 04:23 UTC — off the hour, so not in the stampede
