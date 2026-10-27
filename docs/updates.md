@@ -278,7 +278,7 @@ caught before it reaches anybody.
 
 ### Known issue: a Pages deploy made from a release run is never served
 
-Worked around, not cured. [Issue #26][issue-26] has the full investigation.
+Click resolves this on its supported publication path by requiring an independent dispatch and removing the release-context fallback. The upstream Pages defect is not claimed fixed. [Issue #26][issue-26] has the full investigation; [site publication](site-publication.md) describes the current safeguards.
 
 [issue-26]: https://github.com/felixgeelhaar/click-cms/issues/26
 
@@ -307,8 +307,8 @@ was ruled out by an experiment rather than by argument.
 
 **Two things still protect you**, because a workaround is not a cure:
 
-- `pages.yml` fetches the feed back after deploying and fails if the site is not
-  serving what it built. That check is what caught this in the first place.
+- `pages.yml` checks every generated file after deploying, including documentation,
+  the feed and its detached signature. Stale or missing files fail publication.
 - The release job waits on the dispatched run rather than firing and forgetting,
   so a release cannot go green over a feed nobody is serving.
 
@@ -468,7 +468,7 @@ PHP restart needs an explicitly managed transition.
 
 ### Isolated TurboScience rehearsal
 
-With PHP/Zip/OpenSSL, Python 3.10+, Node 22.13+ and the admin development
+With PHP/Zip/OpenSSL, Python 3.10+, Node 24 LTS and the admin development
 dependencies installed, run:
 
 ```sh

@@ -229,7 +229,9 @@ final class SiteBuilder
             $prefix === '' ? './' : $prefix,
             $navigation,
             $contents,
-            $document->html,
+            str_ends_with($page->source, '-de.md')
+                ? '<div lang="de">' . $document->html . '</div>'
+                : $document->html,
             $sourceUrl,
         );
     }

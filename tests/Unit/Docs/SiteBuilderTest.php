@@ -294,6 +294,18 @@ final class SiteBuilderTest extends TestCase
         }
     }
 
+    public function testGermanArticleDeclaresItsLanguageInsideEnglishNavigation(): void
+    {
+        $this->fixture();
+        file_put_contents($this->workspace . '/repo/docs/editor-de.md', "# Webseite bearbeiten\n\nText ändern.\n");
+        $this->build();
+        $html = $this->read('editor-de/index.html');
+        $this->assertStringContainsString('<html lang="en">', $html);
+        $this->assertStringContainsString('<div lang="de">', $html);
+        $this->assertStringContainsString('Webseite bearbeiten', $html);
+        $this->assertStringNotContainsString('<div lang="de">', $this->read('core/index.html'));
+    }
+
     /**
      * A level-2 heading above the page's own level-1 would break the document
      * outline. The sidebar labels are paragraphs for exactly that reason, and

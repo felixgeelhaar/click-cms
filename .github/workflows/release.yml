@@ -188,7 +188,7 @@ jobs:
   # own — see docs/updates.md.
   #
   # A secret cannot be read in a job-level `if`, so it is turned into an output
-  # here and the two paths below gate on that.
+  # here; a missing token fails before attempting publication.
   decide:
     name: Decide how to publish the feed
     needs: package
@@ -204,7 +204,8 @@ jobs:
             echo "dispatch=true" >> "$GITHUB_OUTPUT"
           else
             echo "dispatch=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::PAGES_DISPATCH_TOKEN is not set, so the feed is published from inside this run — the path that does not take effect on a release. Expect the deploy to fail its own verification; republish with: gh workflow run pages.yml --ref main. See docs/updates.md."
+            echo "::error::PAGES_DISPATCH_TOKEN is required. Refusing the known-broken release-context Pages path. Configure the token and rerun; see docs/site-publication.md."
+            exit 1
           fi
 
   publish-by-dispatch:
@@ -219,6 +220,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PAGES_DISPATCH_TOKEN }}
           REPO: ${{ github.repository }}
           RELEASE_VERSION: ${{ needs.package.outputs.version }}
+          RELEASE_SHA256: ${{ needs.package.outputs.sha256 }}
           # The default branch, deliberately, and not GITHUB_REF_NAME — on a
           # release event that is the *tag*. Dispatching on a tag would build
           # the site from whatever that tag points at, so a release cut from an
@@ -274,24 +276,6 @@ jobs:
           # A successful Pages deployment must actually offer this release.
           feed="https://${REPO%%/*}.github.io/${REPO#*/}/feed.json"
           curl -fsS --retry 3 "$feed?release=${RELEASE_VERSION}" -o /tmp/published-feed.json
-          jq -e --arg version "$RELEASE_VERSION" \
-            'any(.releases[]; .version == $version)' /tmp/published-feed.json >/dev/null
+          jq -e --arg version "$RELEASE_VERSION" --arg sha256 "$RELEASE_SHA256" \
+            'any(.releases[]; .version == $version and .sha256 == $sha256)' /tmp/published-feed.json >/dev/null
           echo "Feed published by ${url}; release ${RELEASE_VERSION} is offered"
-
-  # The old path, kept only for an installation with no dispatching token — a
-  # fork, or this repository before the secret is added. It is known not to take
-  # effect on a release, and `pages.yml`'s own verification step fails loudly
-  # when it does not, so this degrades noisily rather than silently. That is the
-  # whole reason it is still here instead of being an error.
-  publish-in-run:
-    name: Publish the site and feed (no dispatch token)
-    needs: [package, decide]
-    if: needs.decide.outputs.dispatch == 'false'
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: ./.github/workflows/pages.yml
-    # The called workflow declares its own permissions; secrets have to be
-    # passed down explicitly or UPDATE_PRIVATE_KEY is not visible to it.
-    secrets: inherit

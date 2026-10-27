@@ -41,7 +41,7 @@ technical knowledge at all.
   uploads still work; they are simply stored at the size they arrived.
 - **`pdo_sqlite`, `pdo_mysql` or `pdo_pgsql`**, only if you choose that storage
   backend. The default needs none of them.
-- **Node 20+**, only to build the admin UI from source. The Docker image and a
+- **Node 24 LTS**, only to build the admin UI from source. The Docker image and a
   release archive already contain it built.
 
 No database, no long-running process, no build step at deploy time. This runs on
