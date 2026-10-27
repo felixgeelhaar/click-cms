@@ -66,6 +66,8 @@ Diese Aufgabe ist für Administratoren. Für normale Inhaltsänderungen müssen 
 3. Öffnen Sie **Plugins**. Mit **Aktivieren** schalten Sie ein installiertes Plugin ein, mit **Deaktivieren** aus. Lesen Sie angezeigte Fehler: Abhängigkeiten oder eine Bereitstellungsrichtlinie können die Änderung verhindern. Bei einem übersprungenen Plugin-Ordner muss der Betreiber dessen Dateien prüfen.
 4. Laden Sie die Administration neu und testen Sie die Funktion auf der tatsächlichen Website oder über die API. Die Installation allein legt keine Inhalte an und richtet eine getrennte SPA nicht automatisch für die Darstellung ein.
 
+Externe Plugins werden auf denselben Wegen installiert. Bei Downloads aus dem Verzeichnis werden signierte Angaben und Paket-Prüfsummen kontrolliert; ZIP-Uploads sind nicht verifiziert. Eine Plugin-ZIP muss `plugin.json` und `bootstrap.php` enthalten. Die Prüfung bestätigt den Herausgeber, aber nicht die Kompatibilität. Prüfen Sie, ob das Plugin Ihre Click-Version unterstützt. Bei durch die Bereitstellung verwalteten Installationen ist die Installation im Marketplace gesperrt; bitten Sie den Betreiber, das Plugin in die Bereitstellung aufzunehmen. REST und Speicherfunktionen sind bereits in Click enthalten und benötigen keine alten Plugins.
+
 Installieren Sie nur vertrauenswürdige Plugins: Ihr PHP-Code läuft mit den Zugriffsrechten des CMS. Deaktivieren entfernt keine Dateien. Sichern Sie Plugin-Daten und prüfen Sie abhängige Funktionen vor Änderungen an der öffentlichen Website.
 
 ## Administration und Sicherheit

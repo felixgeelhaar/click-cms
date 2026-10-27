@@ -288,8 +288,10 @@ final class SectionRenderer
             }).then(function (r) { return r.json().catch(function () { return {}; }); })
               .then(function (body) {
                 if (body && body.success) {
-                  form.innerHTML = '<p class="cms-form-thanks">' +
-                    (form.getAttribute('data-confirmation') || 'Thank you.') + '</p>';
+                  var thanks = document.createElement('p');
+                  thanks.className = 'cms-form-thanks';
+                  thanks.textContent = form.getAttribute('data-confirmation') || 'Thank you.';
+                  form.replaceChildren(thanks);
                 } else {
                   if (status) { status.textContent = (body && body.error) || 'Something went wrong. Please try again.'; }
                   if (button) { button.disabled = false; }

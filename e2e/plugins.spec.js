@@ -74,3 +74,50 @@ test('bundled plugins retain activation and expose working features', async ({ p
   }
   expect(errors).toEqual([]);
 });
+
+test('external ZIP stays inactive until activated and survives a reload', async ({ page }) => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { execFileSync } = await import('node:child_process');
+  const directory = mkdtempSync(join(tmpdir(), 'click-external-e2e-'));
+  const id = `external-check-${Date.now()}`;
+  const name = id.replaceAll('-', ' ');
+  const archive = join(directory, 'plugin.zip');
+  const bootstrap = `<?php
+require_once __DIR__ . '/../../src/Application/Plugin/BasePlugin.php';
+class Plugin_${id.replaceAll('-', '_')} extends \\Click\\Cms\\Application\\Plugin\\BasePlugin {
+ public function getPluginId(): string { return '${id}'; }
+ public function getPluginName(): string { return '${name}'; }
+ public function hook_api_routes(array $params): array {
+   return ['GET /api/${id}' => fn(): array => ['data' => ['message' => 'External plugin works']]];
+ }
+}`;
+  execFileSync('php', ['-r', '$z=new ZipArchive();$z->open($argv[1],ZipArchive::CREATE);$z->addFromString("plugin/plugin.json",$argv[2]);$z->addFromString("plugin/bootstrap.php",$argv[3]);$z->close();', archive,
+    JSON.stringify({ name, version: '1.0.0', dependencies: [], hooks: ['api.routes'] }), bootstrap]);
+  try {
+    await page.goto('/admin/');
+    await page.locator('#login-username').fill(process.env.CLICK_E2E_USER || 'admin');
+    await page.locator('#login-password').fill(process.env.CLICK_E2E_PASS || 'admin-demo-pass-99');
+    await page.locator('button[type=submit]').click();
+    await expect(page.locator('.admin-app .main-content')).toBeVisible();
+    await page.goto('/admin/marketplace');
+    await page.locator('input[type=file]').setInputFiles(archive);
+    await expect(page.locator('.banner.success')).toContainText(`${name} uploaded`);
+    const session = await (await page.request.get('/api/auth/check')).json();
+    const headers = { 'X-Click-CSRF': session.data.csrfToken };
+    expect((await page.request.get(`/api/${id}`)).status()).toBe(404);
+    const activate = await page.request.post(`/api/plugins/${id}/activate`, { headers });
+    expect(activate.ok()).toBe(true);
+    try {
+      await page.reload();
+      expect((await (await page.request.get(`/api/${id}`)).json()).data.message).toBe('External plugin works');
+    } finally {
+      const deactivate = await page.request.post(`/api/plugins/${id}/deactivate`, { headers });
+      expect(deactivate.ok()).toBe(true);
+    }
+    expect((await page.request.get(`/api/${id}`)).status()).toBe(404);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
