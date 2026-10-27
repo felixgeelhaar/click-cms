@@ -326,7 +326,7 @@ const getRouteComponent = () => {
   if (path === '/admin/release') return hasRelease.value ? Release : Dashboard;
   if (path.startsWith('/admin/pages/edit/')) return can('content.edit.any') || can('content.edit.own') ? PageEdit : Dashboard;
   if (path === '/admin/pages/new') return can('content.create') ? PageEdit : Dashboard;
-  if (path.startsWith('/admin/plugins/')) return PluginDetail;
+  if (path.startsWith('/admin/plugins/')) return can('settings.manage') && can('plugins.manage') ? PluginDetail : Dashboard;
   return Dashboard;
 };
 
@@ -365,7 +365,7 @@ const getRouteProps = () => {
     }
     return { initialTypeId: typeId, initialSlug: null, initialCreating: false, initialLocale: locale };
   }
-  if (path.startsWith('/admin/plugins/') && path !== '/admin/plugins') return { id: path.replace('/admin/plugins/', '') };
+  if (path.startsWith('/admin/plugins/') && path !== '/admin/plugins') return { id: path.replace('/admin/plugins/', '').split('/')[0] };
   if (path === '/admin/users') return { userRole: currentUser.value?.role, currentUsername: currentUser.value?.username };
   if (path === '/admin/reviews') return { currentUsername: currentUser.value?.username ?? '', canReview: can('content.publish') };
   if (path === '/admin/plugins') return { userRole: currentUser.value?.role };

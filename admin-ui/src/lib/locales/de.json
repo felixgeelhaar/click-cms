@@ -1019,5 +1019,10 @@
   "Too many test emails. Please wait ten minutes before trying again.": "Zu viele Test-E-Mails. Warte bitte zehn Minuten, bevor du es erneut versuchst.",
   "Save valid recipient and sender email addresses before sending a test.": "Speichere gültige Empfänger- und Absenderadressen, bevor du einen Test sendest.",
   "The server could not send the test email. Your settings are saved. Ask your hosting provider to check email sending.": "Der Server konnte die Test-E-Mail nicht senden. Deine Einstellungen sind gespeichert. Bitte deinen Hosting-Anbieter, den E-Mail-Versand zu prüfen.",
-  "Could not connect. Please check your connection and try again.": "Keine Verbindung möglich. Prüfe deine Internetverbindung und versuche es erneut."
+  "Could not connect. Please check your connection and try again.": "Keine Verbindung möglich. Prüfe deine Internetverbindung und versuche es erneut.",
+  "Back to plugins": "Zurück zu Plugins",
+  "Activate this plugin to configure its settings.": "Aktiviere dieses Plugin, um seine Einstellungen zu ändern.",
+  "This plugin has no settings screen.": "Dieses Plugin hat keine Einstellungsseite.",
+  "This plugin has an invalid settings definition.": "Die Einstellungen dieses Plugins sind fehlerhaft definiert.",
+  "Settings saved.": "Einstellungen gespeichert."
 }

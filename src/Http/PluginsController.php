@@ -55,7 +55,7 @@ final class PluginsController
     {
         return [
             'data' => array_map(
-                static fn ($p): array => [
+                fn ($p): array => [
                     'id' => $p->id->value,
                     'name' => $p->name,
                     'description' => $p->description ?? '',
@@ -64,6 +64,7 @@ final class PluginsController
                     'state' => $p->state->value,
                     'dependencies' => $p->dependencies ?? [],
                     'hooks' => $p->hooks ?? [],
+                    'settings' => $this->settingsSchema($p->path),
                 ],
                 $this->plugins->all()
             ),
@@ -94,10 +95,18 @@ final class PluginsController
             'state' => $plugin->state->value,
             'dependencies' => $plugin->dependencies ?? [],
             'hooks' => $plugin->hooks ?? [],
+            'settings' => $this->settingsSchema($plugin->path),
             'changelog' => $this->fileOrNull($dir . '/CHANGELOG.md'),
             'signature' => $this->fileOrNull($dir . '/signature.txt'),
             'manifest' => $this->jsonFileOrNull($dir . '/manifest.json'),
         ]];
+    }
+
+    /** Declarative UI only; plugin endpoints retain validation and authorization. */
+    private function settingsSchema(string $directory): ?array
+    {
+        $metadata = $this->jsonFileOrNull($directory . '/plugin.json');
+        return is_array($metadata['settings'] ?? null) ? $metadata['settings'] : null;
     }
 
     /**

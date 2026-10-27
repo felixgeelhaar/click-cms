@@ -90,11 +90,26 @@ class Plugin_${id.replaceAll('-', '_')} extends \\Click\\Cms\\Application\\Plugi
  public function getPluginId(): string { return '${id}'; }
  public function getPluginName(): string { return '${name}'; }
  public function hook_api_routes(array $params): array {
-   return ['GET /api/${id}' => fn(): array => ['data' => ['message' => 'External plugin works']]];
+   return [
+     'GET /api/${id}' => fn(): array => ['data' => ['message' => 'External plugin works']],
+     'GET /api/${id}/settings' => fn(): array => $this->settings(false),
+     'PUT /api/${id}/settings' => fn(): array => $this->settings(true),
+   ];
+ }
+ public function settings(bool $write): array {
+   $user = (new \\Click\\Cms\\Application\\Authentication\\SessionStore($this->pluginManager->getDataPath() . '/sessions'))->user();
+   if (($user['role'] ?? null) !== 'admin') return ['status' => 403, 'error' => 'Forbidden'];
+   $path = $this->pluginManager->getDataPath() . '/${id}.json';
+   if ($write) {
+     $input = json_decode(file_get_contents('php://input'), true);
+     if (!is_string($input['label'] ?? null)) return ['status' => 422, 'error' => 'Invalid label'];
+     file_put_contents($path, json_encode(['label' => $input['label']]));
+   }
+   return ['data' => is_file($path) ? json_decode(file_get_contents($path), true) : ['label' => 'Initial label']];
  }
 }`;
   execFileSync('php', ['-r', '$z=new ZipArchive();$z->open($argv[1],ZipArchive::CREATE);$z->addFromString("plugin/plugin.json",$argv[2]);$z->addFromString("plugin/bootstrap.php",$argv[3]);$z->close();', archive,
-    JSON.stringify({ name, version: '1.0.0', dependencies: [], hooks: ['api.routes'] }), bootstrap]);
+    JSON.stringify({ name, version: '1.0.0', dependencies: [], hooks: ['api.routes'], settings: { title: 'External plugin settings', endpoint: `/api/${id}/settings`, fields: [{ name: 'label', type: 'text', label: 'Plugin label', default: '' }] } }), bootstrap]);
   try {
     await page.goto('/admin/');
     await page.locator('#login-username').fill(process.env.CLICK_E2E_USER || 'admin');
@@ -112,6 +127,14 @@ class Plugin_${id.replaceAll('-', '_')} extends \\Click\\Cms\\Application\\Plugi
     try {
       await page.reload();
       expect((await (await page.request.get(`/api/${id}`)).json()).data.message).toBe('External plugin works');
+      await page.goto('/admin/plugins');
+      const card = page.locator('.plugin-card').filter({ has: page.getByRole('heading', { name, exact: true }) });
+      await card.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page.getByLabel('Plugin label', { exact: true }).fill('External settings saved');
+      await page.locator('.plugin-settings button[type=submit]').click();
+      await expect(page.locator('.plugin-settings [role=status]')).toHaveText('Settings saved.');
+      await page.reload();
+      await expect(page.getByLabel('Plugin label', { exact: true })).toHaveValue('External settings saved');
     } finally {
       const deactivate = await page.request.post(`/api/plugins/${id}/deactivate`, { headers });
       expect(deactivate.ok()).toBe(true);

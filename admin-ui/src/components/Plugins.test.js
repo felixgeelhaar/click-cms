@@ -24,6 +24,18 @@ const mountPlugins = async (body) => {
 };
 
 describe('the plugin list', () => {
+  it('offers settings only for active plugins that declare them', async () => {
+    const wrapper = await mountPlugins({ data: [
+      { id: 'forms', name: 'Forms', state: 'activated', settings: { endpoint: '/api/forms/email-settings' } },
+      { id: 'search', name: 'Search', state: 'activated' },
+      { id: 'other', name: 'Other', state: 'deactivated', settings: {} },
+    ] });
+    const settings = wrapper.findAll('button').filter(button => button.text() === 'Settings');
+    expect(settings).toHaveLength(1);
+    await settings[0].trigger('click');
+    expect(wrapper.emitted('navigate')[0]).toEqual(['/admin/plugins/forms/settings']);
+  });
+
   it('renders installed plugins', async () => {
     const wrapper = await mountPlugins({
       data: [
