@@ -6,5 +6,67 @@
   "dependencies": [],
   "hooks": [
     "api.routes"
-  ]
+  ],
+  "settings": {
+    "title": "Form email alerts",
+    "description": "Get an email when someone sends a contact form. Messages are always saved under Submissions, even if an email fails.",
+    "endpoint": "/api/forms/email-settings",
+    "saveLabel": "Save email settings",
+    "savedMessage": "Email settings saved.",
+    "fields": [
+      {
+        "name": "enabled",
+        "type": "checkbox",
+        "label": "Enable email alerts",
+        "default": false
+      },
+      {
+        "name": "to",
+        "type": "email",
+        "label": "Send alerts to",
+        "help": "The person who should be notified about new messages.",
+        "default": "",
+        "requiredWhen": "enabled",
+        "maxLength": 254
+      },
+      {
+        "name": "from",
+        "type": "email",
+        "label": "Sender email address",
+        "help": "Use an address your website is allowed to send from. Your hosting provider can confirm this.",
+        "default": "",
+        "requiredWhen": "enabled",
+        "maxLength": 254
+      },
+      {
+        "name": "locale",
+        "type": "select",
+        "label": "Email language",
+        "default": "en",
+        "options": [
+          {
+            "value": "en",
+            "label": "English"
+          },
+          {
+            "value": "de",
+            "label": "Deutsch"
+          }
+        ]
+      }
+    ],
+    "privacyHelp": "Alerts contain a reference to the saved message, without the visitor’s personal details.",
+    "action": {
+      "endpoint": "/api/forms/email-test",
+      "label": "Send test email",
+      "busyLabel": "Sending…",
+      "requires": [
+        "to",
+        "from"
+      ],
+      "dirtyHelp": "Save your changes before sending a test email.",
+      "successMessage": "The mail server accepted the test email. Check the recipient’s inbox and spam folder to confirm delivery."
+    },
+    "help": "After sending a test, check the recipient’s inbox and spam folder. If it does not arrive, ask your hosting provider to check email sending."
+  }
 }

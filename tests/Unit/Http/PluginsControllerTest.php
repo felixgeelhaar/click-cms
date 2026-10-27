@@ -56,13 +56,17 @@ final class PluginsControllerTest extends TestCase
         file_put_contents($dir . '/plugin.json', json_encode([
             'name' => 'Search API', 'version' => '1.0.0', 'description' => 'Search',
             'author' => 'Click', 'dependencies' => [], 'hooks' => [],
+            'settings' => ['title' => 'Search preferences', 'endpoint' => '/api/search-api/settings', 'fields' => []],
         ]));
         file_put_contents($dir . '/CHANGELOG.md', '# Search changes');
         file_put_contents($dir . '/signature.txt', 'signature');
         file_put_contents($dir . '/manifest.json', '{"release":"1.0.0"}');
         $manager = new PluginManager($this->base . '/plugins', $this->base . '/data');
         $manager->discover();
-        $result = (new PluginsController($manager))->get('search-api');
+        $controller = new PluginsController($manager);
+        $result = $controller->get('search-api');
+        $this->assertSame('Search preferences', $result['data']['settings']['title']);
+        $this->assertSame($result['data']['settings'], array_values($controller->list()['data'])[0]['settings']);
 
         $this->assertSame('# Search changes', $result['data']['changelog']);
         $this->assertSame('signature', $result['data']['signature']);

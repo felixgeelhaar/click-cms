@@ -57,7 +57,7 @@ Administrators use **Menus** to add published destinations and order navigation.
 
 **Submissions** contains form responses when the relevant forms are configured. Limit access, avoid storing unnecessary personal information and establish a retention policy. **Builder**, **Themes**, **Plugins** and **Marketplace** affect design or functionality; try changes on a copy before applying them to the live site. The [admin tour](admin-tour.md) explains each screen.
 
-Form responses stay in **Submissions**. Optional email alerts contain only a reference; the inbox shows whether the mail server accepted the alert or sending failed. An administrator can configure alerts under **Settings → Form email alerts** and send a test email. No file editing is needed. [Contact form setup and limits](forms.md).
+Form responses stay in **Submissions**. Optional email alerts contain only a reference; the inbox shows whether the mail server accepted the alert or sending failed. An administrator can configure alerts under **Plugins → Forms → Settings** and send a test email. No file editing is needed. [Contact form setup and limits](forms.md).
 
 ## Add or manage plugins
 

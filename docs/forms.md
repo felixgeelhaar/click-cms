@@ -19,7 +19,7 @@ Submissions stay in Click even if an email alert fails. Email alerts are off by 
 An administrator can set them up without editing files:
 
 1. Enable **Forms** under **Plugins**.
-2. Open **Settings → Form email alerts**.
+2. Open **Plugins → Forms → Settings**.
 3. Enter the recipient under **Send alerts to**.
 4. Enter a **Sender email address** your website is allowed to send from. Your hosting provider can confirm this address.
 5. Choose English or German for the emails and click **Save email settings**.
@@ -35,3 +35,13 @@ Settings are stored privately under the site's writable `data/forms/` directory 
 The inbox distinguishes alerts accepted by the mail server, failed alerts and alerts that are off. Acceptance by the mail server does not prove delivery to the recipient. Failed alerts are not automatically retried; the saved message remains available in the inbox. A visitor sees success only after their submission has been stored, regardless of alert delivery.
 
 Limit inbox access, document retention and deletion practices, and include the form and any mail provider in your site's privacy documentation. Backups also contain saved submissions. No third-party service is contacted until an operator explicitly enables email alerts.
+
+## Plugin settings for developers
+
+The Forms package declares its settings UI in the `settings` object of `plugin.json`. The CMS exposes that declaration on the plugin list and detail APIs and renders it at `/admin/plugins/{id}/settings` for administrators. Deactivated plugins show no settings controls. Global Settings contains only CMS-wide preferences.
+
+Other plugins can use the same entry point without modifying the admin UI. Declare `title`, `description`, `endpoint`, and a `fields` array. Fields support `text`, `email`, `checkbox`, and `select`, with `name`, `label`, `default`, optional `help`, `required`, `requiredWhen`, and `maxLength`. Select fields provide `options` with `value` and `label`. Optional `saveLabel`, `savedMessage`, `privacyHelp` and `help` customize the text. Forms' manifest is a complete example.
+
+The settings endpoint must be under `/api/{plugin-id}/`. It returns `{ "data": { ...values } }` on GET and accepts the same values on PUT, returning what was saved. An optional `action` declares an endpoint under the same plugin prefix, `label`, `successMessage`, and a `requires` array of nonempty saved field names. The CMS issues an explicit POST to that action. Unsaved changes disable the action.
+
+Declarations contain data only: labels are escaped, no scripts or HTML are executed, and cross-origin or unrelated API targets are refused. The plugin must implement its endpoints, enforce the appropriate capability on reads and writes, validate input, report persistence failures, bound side effects, and store preferences in its private site-specific data directory. The kernel's authentication and CSRF gates still apply. UI visibility is not an API authorization boundary. Existing plugins without a settings declaration remain unchanged.

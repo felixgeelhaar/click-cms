@@ -28,6 +28,7 @@
         </div>
         <p v-if="pluginError.id === plugin.id" class="banner error" role="alert"><LocalizedError :message="pluginError.message" /></p>
         <div class="plugin-actions">
+          <button v-if="plugin.state === 'activated' && plugin.settings" class="btn-sm btn-secondary" @click="emit('navigate', `/admin/plugins/${plugin.id}/settings`)">{{ message('Settings') }}</button>
           <span :class="['status', plugin.state]">{{ message(plugin.state) }}</span>
           <button v-if="plugin.state === 'activated'" class="btn-sm btn-secondary" :disabled="!!pending" :aria-busy="pending === plugin.id" @click="deactivatePlugin(plugin.id)">{{ message('Deactivate') }}</button>
           <button v-else class="btn-sm btn-primary" :disabled="!!pending" :aria-busy="pending === plugin.id" @click="activatePlugin(plugin.id)">{{ message('Activate') }}</button>
@@ -42,6 +43,7 @@ import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 
+const emit = defineEmits(['navigate']);
 const plugins = ref([]);
 const issues = ref([]);
 const loading = ref(true);
@@ -120,7 +122,7 @@ onMounted(loadPlugins);
 .plugin-card { padding: 1.5rem; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); }
 .plugin-info h2 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; }
 .plugin-info p { color: var(--app-text-muted); font-size: 0.875rem; }
-.plugin-actions { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
+.plugin-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
 .status { font-size: 0.75rem; text-transform: uppercase; font-weight: 500; }
 /* --color-success-500 is a fill: as 12px lettering on a white card it measures
    2.3:1. --color-success-text is the same green at a legible weight, and is
