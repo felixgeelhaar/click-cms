@@ -17,3 +17,5 @@ The screenshot suite requires a seeded isolated site, an administrator with a co
 The documentation builder reads the light/dark token blocks directly from `admin-ui/src/styles/editorial.css` and includes them in its standalone stylesheet. This keeps surfaces, indigo links, focus colors and local/system typography aligned without importing admin layout rules. `scripts/docs/assets/site.css` owns the reading measure, navigation rail, tables and responsive layout. Dark mode follows the reader's system preference. The site needs no JavaScript or third-party font requests.
 
 Build with `php scripts/docs/build-site.php /tmp/click-docs`. Check the homepage, English/German editor guides, long tables and code examples at desktop and narrow widths in both color schemes. The Pages verifier checks the published stylesheet along with all other public artifact files.
+
+Translated guides appear once in navigation. On a translated page, the header’s English / Deutsch switch opens the equivalent guide; the sidebar keeps that language for other translated guides. Untranslated documents remain available, and existing language-specific URLs stay valid.

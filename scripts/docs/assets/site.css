@@ -673,3 +673,36 @@ figure.image figcaption {
     color: #000;
   }
 }
+
+/* A page-level language switch keeps translated guides out of duplicate menus. */
+.languages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-inline-start: auto;
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+}
+
+.languages a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 5px;
+  text-decoration: none;
+}
+
+.languages a[aria-current="page"] {
+  background: var(--sidebar-active);
+  color: var(--sidebar-active-text);
+  font-weight: 550;
+}
+
+.languages a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 47.999rem) {
+  .languages { margin-inline-start: 0; }
+}

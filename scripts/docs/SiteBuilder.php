@@ -191,6 +191,12 @@ final class SiteBuilder
      * page renamed or written on a branch cannot break a build from here.
      */
     private const LABELS = [
+        'editor-en' => 'Editor guide',
+        'editor-de' => 'Editor guide',
+        'handbook-en' => 'Handbook',
+        'handbook-de' => 'Handbook',
+        'demos-en' => 'Demos',
+        'demos-de' => 'Demos',
         'sso' => 'SSO',
         'multi-site' => 'Multi-site',
         'two-factor' => 'Two-factor',
@@ -233,6 +239,7 @@ final class SiteBuilder
                 ? '<div lang="de">' . $document->html . '</div>'
                 : $document->html,
             $sourceUrl,
+            $this->languageSwitch($page, $pages, $prefix),
         );
     }
 
@@ -252,6 +259,18 @@ final class SiteBuilder
      */
     private function navigation(array $pages, ?string $currentSource, callable $href): string
     {
+        // Keep one entry per translated document, in the current guide language.
+        // A document without a translation always remains reachable.
+        $language = str_ends_with($currentSource ?? '', '-de.md') ? 'de' : 'en';
+        $sources = array_fill_keys(array_map(static fn (Page $page): string => $page->source, $pages), true);
+        $pages = array_filter($pages, static function (Page $page) use ($language, $sources): bool {
+            if (!preg_match('/-(en|de)\.md$/', $page->source, $match) || $match[1] === $language) {
+                return true;
+            }
+            $preferred = substr($page->source, 0, -6) . '-' . $language . '.md';
+
+            return !isset($sources[$preferred]);
+        });
         $slugger = new Slugger();
         $html = "<nav class=\"pages\" aria-label=\"Documentation pages\">\n";
         $group = null;
@@ -285,6 +304,36 @@ final class SiteBuilder
         return $html . '</nav>';
     }
 
+    /** @param list<Page> $pages */
+    private function languageSwitch(Page $current, array $pages, string $prefix): string
+    {
+        if (!preg_match('/-(en|de)\.md$/', $current->source)) {
+            return '';
+        }
+        $base = substr($current->source, 0, -6);
+        $translations = [];
+        foreach ($pages as $page) {
+            foreach (['en' => 'English', 'de' => 'Deutsch'] as $language => $label) {
+                if ($page->source === $base . '-' . $language . '.md') {
+                    $translations[$language] = sprintf(
+                        '<a href="%s" lang="%s" hreflang="%s"%s>%s</a>',
+                        $this->escape($prefix . $page->url),
+                        $language,
+                        $language,
+                        $page->source === $current->source ? ' aria-current="page"' : '',
+                        $label,
+                    );
+                }
+            }
+        }
+        if (count($translations) < 2) {
+            return '';
+        }
+
+        return '<nav class="languages" aria-label="Language">'
+            . $translations['en'] . $translations['de'] . '</nav>';
+    }
+
     private function tableOfContents(RenderedDocument $document): string
     {
         $outline = $document->outline();
@@ -315,6 +364,7 @@ final class SiteBuilder
         string $contents,
         string $body,
         ?string $sourceUrl,
+        string $languages = '',
     ): string {
         $source = $sourceUrl !== null
             ? '<p><a href="' . $this->escape($sourceUrl) . '">Read this page as Markdown on GitHub</a></p>'
@@ -334,6 +384,7 @@ final class SiteBuilder
         <header class="masthead">
         <a class="wordmark" href="{$homeHref}">Click&nbsp;CMS</a>
         <p class="strapline">A flat-file CMS that requires PHP and nothing else</p>
+        {$languages}
         </header>
         <div class="shell">
         <div class="sidebar">

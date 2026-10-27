@@ -1,8 +1,10 @@
 # Click CMS
 
-**For editors:** [Simple English guide](docs/editor-en.md) · [Einfache Anleitung auf Deutsch](docs/editor-de.md)
+**For editors:** [Editor guide](docs/editor-en.md)
 
-**Documentation:** [English handbook](docs/handbook-en.md) · [Deutsches Handbuch](docs/handbook-de.md) · [English demos](docs/demos-en.md) · [Deutsche Demos](docs/demos-de.md)
+**Documentation:** [Handbook](docs/handbook-en.md) · [Demos](docs/demos-en.md)
+
+Each guide is available in English and German. Use **English / Deutsch** at the top of the website to switch languages. On GitHub, follow the language link inside each guide.
 
 A modern PHP CMS with plugin architecture, Vue admin UI, Visual Builder, and marketplace.
 
