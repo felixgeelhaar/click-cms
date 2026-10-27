@@ -3,8 +3,8 @@
 # client can route it. Without this, the request falls through to PHP and
 # the editor never loads.
 #
-# Keep the rewrite relative to this directory so nested installations retain
-# their URL prefix after a self-update; do not hard-code RewriteBase /admin/.
+# Derive the URL prefix from the request, including on hosts whose document
+# root is an Alias or symlink. A filesystem-relative rewrite loses that prefix.
 #
 # Pair with the <base> tag in AdminLayout: relative ./_astro assets still
 # resolve to /admin/_astro/… after a deep-link refresh.
@@ -12,5 +12,6 @@
   RewriteEngine On
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . index.html [L]
+  RewriteCond %{REQUEST_URI} ^(/(?:[^/]+/)*?admin)/
+  RewriteRule . %1/index.html [END]
 </IfModule>

@@ -5,6 +5,12 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [1.12.2] — 2026-10-27
+
+### Aliased shared-host administration
+- Derive the administration URL prefix from the request instead of the filesystem. This preserves direct editor URLs on shared hosts using an Apache Alias or symlink for their document root.
+- Extend real Apache regression coverage to aliased installation directories.
+
 ## [1.12.1] — 2026-10-27
 
 ### Subdirectory administration routing
