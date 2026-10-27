@@ -59,6 +59,65 @@ final class FormsSubmissionTest extends TestCase
         $this->removeTree($this->base);
     }
 
+    private function emailAdmin(string $role = 'admin'): void
+    {
+        @mkdir($this->base . '/data/sessions', 0700, true);
+        $id = bin2hex(random_bytes(32));
+        file_put_contents($this->base . '/data/sessions/' . $id . '.json', json_encode([
+            'expiresAt' => time() + 3600, 'lastActivity' => time(),
+            'user' => ['username' => 'tester', 'role' => $role],
+        ]));
+        $_COOKIE[\Click\Cms\Application\Authentication\SessionStore::COOKIE] = $id;
+    }
+
+    public function testEmailConfigurationIsAdminOnlyIncludingDirectCalls(): void
+    {
+        self::assertSame(403, $this->plugin->handleEmailSettings('GET')['status']);
+        self::assertSame(403, $this->plugin->handleEmailTest()['status']);
+        $this->emailAdmin('editor');
+        self::assertSame(403, $this->plugin->handleEmailSettings('PUT')['status']);
+        self::assertSame(403, $this->plugin->handleEmailTest()['status']);
+        $this->emailAdmin();
+        self::assertFalse($this->plugin->handleEmailSettings('GET')['data']['enabled']);
+    }
+
+    public function testEmailSettingsPersistOutsideReleaseFilesAndTakePrecedenceOverLegacy(): void
+    {
+        $this->emailAdmin();
+        mkdir($this->base . '/config');
+        file_put_contents($this->base . '/config/forms.json', json_encode(['notifications' => [
+            'enabled' => true, 'to' => 'legacy@example.invalid', 'from' => 'cms@example.invalid', 'locale' => 'de',
+        ]]));
+        self::assertSame('legacy@example.invalid', $this->plugin->handleEmailSettings('GET')['data']['to']);
+        $_POST = ['enabled' => false, 'to' => 'new@example.invalid', 'from' => 'cms@example.invalid', 'locale' => 'en'];
+        self::assertSame($_POST, $this->plugin->handleEmailSettings('PUT')['data']);
+        self::assertFalse($this->plugin->handleEmailSettings('GET')['data']['enabled']);
+        self::assertFileExists($this->base . '/data/forms/email-settings.json');
+        self::assertSame(0600, fileperms($this->base . '/data/forms/email-settings.json') & 0777);
+        self::assertTrue($this->submit(['name' => 'A', 'email' => 'a@example.invalid', 'message' => 'Saved'])['success']);
+        self::assertSame('disabled', $this->storedSubmissions()[0]['notification']);
+    }
+
+    public function testInvalidEmailSettingsAndStorageFailuresAreReportedWithoutFalseSuccess(): void
+    {
+        $this->emailAdmin();
+        $_POST = ['enabled' => true, 'to' => "a@example.invalid\r\nBcc: victim@example.invalid", 'from' => 'cms@example.invalid', 'locale' => 'en'];
+        self::assertSame(422, $this->plugin->handleEmailSettings('PUT')['status']);
+        self::assertFileDoesNotExist($this->base . '/data/forms/email-settings.json');
+        $_POST['to'] = 'valid@example.invalid';
+        file_put_contents($this->base . '/data/forms', 'unwritable directory');
+        self::assertSame(503, $this->plugin->handleEmailSettings('PUT')['status']);
+    }
+
+    public function testTestEmailRequiresSavedAddressesAndHasPersistentAbuseLimit(): void
+    {
+        $this->emailAdmin();
+        for ($i = 0; $i < 5; $i++) {
+            self::assertSame(422, $this->plugin->handleEmailTest()['status']);
+        }
+        self::assertSame(429, $this->plugin->handleEmailTest()['status']);
+    }
+
     private function removeTree(string $path): void
     {
         if (!is_dir($path)) {

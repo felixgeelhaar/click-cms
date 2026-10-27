@@ -57,7 +57,7 @@ Administratoren pflegen über **Menus** die Navigation und ihre Reihenfolge. Ein
 
 **Submissions** enthält Formularantworten, sofern entsprechende Formulare eingerichtet sind. Begrenzen Sie den Zugriff, speichern Sie nur notwendige personenbezogene Daten und legen Sie Löschfristen fest. **Builder**, **Themes**, **Plugins** und **Marketplace** verändern Gestaltung oder Funktionen. Testen Sie Änderungen zuerst auf einer Kopie. Der [Rundgang auf Englisch](admin-tour.md) erläutert die Bereiche.
 
-Formularantworten bleiben unter **Submissions** gespeichert. Optionale E-Mail-Hinweise enthalten nur eine Referenz. Im Posteingang sehen Sie, ob der Mailserver den Hinweis angenommen hat oder der Versand fehlgeschlagen ist. Bitten Sie den Betreiber, Hinweise einzurichten und zu testen. [Einrichtung und Grenzen auf Englisch](forms.md).
+Formularantworten bleiben unter **Submissions** gespeichert. Optionale E-Mail-Hinweise enthalten nur eine Referenz. Im Posteingang sehen Sie, ob der Mailserver den Hinweis angenommen hat oder der Versand fehlgeschlagen ist. Administratoren können Hinweise unter **Einstellungen → E-Mail-Benachrichtigungen für Formulare** einrichten und eine Test-E-Mail senden. Dateien müssen dafür nicht bearbeitet werden. [Einrichtung und Grenzen auf Englisch](forms.md).
 
 ## Plugins hinzufügen oder verwalten
 

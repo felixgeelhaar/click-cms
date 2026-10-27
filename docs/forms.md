@@ -14,22 +14,23 @@ The limiter stores keyed address hashes rather than raw IP addresses, discards c
 
 ## Optional email alerts
 
-Submissions stay in Click even if an email alert fails. Email alerts are off by default. An operator can create the private, site-specific `config/forms.json` file:
+Submissions stay in Click even if an email alert fails. Email alerts are off by default.
 
-```json
-{
-  "notifications": {
-    "enabled": true,
-    "to": "editor@example.com",
-    "from": "cms@example.com",
-    "locale": "de"
-  }
-}
-```
+An administrator can set them up without editing files:
 
-Use an address your mail provider permits for `from`. The server must have PHP `mail()` connected to a working local mail transport. Click does not provide an SMTP service. Test this configuration on the actual host before relying on alerts. Disable alerts by setting `enabled` to `false` or removing this file.
+1. Enable **Forms** under **Plugins**.
+2. Open **Settings → Form email alerts**.
+3. Enter the recipient under **Send alerts to**.
+4. Enter a **Sender email address** your website is allowed to send from. Your hosting provider can confirm this address.
+5. Choose English or German for the emails and click **Save email settings**.
+6. Click **Send test email**, then check the recipient’s inbox and spam folder. You can test while automatic alerts are still off.
+7. Select **Enable email alerts** and save when the test arrives.
 
-Recipients and sender are controlled only by the private configuration. Visitor input cannot set mail headers. The alert contains a reference and a request to open the inbox; it does not copy the visitor's name, email address or message into email. `locale` selects English or German alert wording.
+If a test fails, the screen explains what to do. Settings and submissions remain saved. If the server accepts a test but it does not arrive, ask your hosting provider to check delivery. Click uses the host’s PHP mail service; it does not supply an email service itself. Test emails are limited to five attempts per site in each ten-minute window.
+
+Only administrators can change addresses or send tests. Alerts contain a reference and a request to open the inbox; they do not copy the visitor’s name, email address or message into email. Visitor input cannot set mail headers.
+
+Settings are stored privately under the site's writable `data/forms/` directory and survive CMS upgrades. Existing `config/forms.json` settings remain readable until an administrator saves preferences in the CMS. CMS preferences then take precedence, including when alerts are turned off. No file editing is needed.
 
 The inbox distinguishes alerts accepted by the mail server, failed alerts and alerts that are off. Acceptance by the mail server does not prove delivery to the recipient. Failed alerts are not automatically retried; the saved message remains available in the inbox. A visitor sees success only after their submission has been stored, regardless of alert delivery.
 

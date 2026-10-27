@@ -76,12 +76,14 @@
         </label>
       </div>
     </section>
+    <FormEmailSettings />
   </div>
 </template>
 
 <script setup>
 import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
+import FormEmailSettings from './FormEmailSettings.vue';
 import { onMounted, ref } from 'vue';
 
 const emit = defineEmits(['settings-updated']);
