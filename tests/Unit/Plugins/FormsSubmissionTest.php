@@ -110,6 +110,76 @@ final class FormsSubmissionTest extends TestCase
         ], $overrides);
     }
 
+    public function testOversizedFieldsAreNotStored(): void
+    {
+        foreach (['name' => 201, 'email' => 255, 'message' => 10001] as $field => $length) {
+            $response = $this->submit($this->validFields([$field => str_repeat('x', $length)]));
+            self::assertSame(413, $response['status']);
+        }
+        self::assertCount(0, $this->storedSubmissions());
+    }
+
+    public function testOversizedBodyIsRejectedBeforeStorage(): void
+    {
+        $_SERVER['CONTENT_LENGTH'] = '32769';
+        $_SERVER['HTTP_ACCEPT_LANGUAGE'] = 'de-DE';
+        try {
+            $response = $this->submit($this->validFields());
+            self::assertSame(413, $response['status']);
+            self::assertStringContainsString('zu lang', $response['error']);
+            self::assertCount(0, $this->storedSubmissions());
+        } finally {
+            unset($_SERVER['CONTENT_LENGTH'], $_SERVER['HTTP_ACCEPT_LANGUAGE']);
+        }
+    }
+
+    public function testGermanValidationAndConfirmationFollowTheFormLocale(): void
+    {
+        $response = $this->submit($this->validFields(['locale' => 'de-CH', 'email' => 'bad']));
+        self::assertSame('Bitte geben Sie eine gültige E-Mail-Adresse ein.', $response['error']);
+        $response = $this->submit($this->validFields(['locale' => 'de']));
+        self::assertSame('Vielen Dank. Ihre Nachricht ist eingegangen.', $response['message']);
+    }
+
+    public function testRateLimitSurvivesASecondPluginInstanceAndDoesNotStoreExcessMessages(): void
+    {
+        for ($i = 0; $i < 5; $i++) {
+            self::assertTrue($this->submit($this->validFields())['success']);
+        }
+        $manager = new PluginManager($this->base . '/plugins', $this->base . '/data');
+        $manager->setContentService($this->content);
+        $this->plugin = new \Plugin_forms($manager);
+        $response = $this->submit($this->validFields(['locale' => 'de']));
+        self::assertSame(429, $response['status']);
+        self::assertStringContainsString('Zu viele', $response['error']);
+        self::assertCount(5, $this->storedSubmissions());
+    }
+
+    public function testUnwritableRateStorageFailsClosed(): void
+    {
+        file_put_contents($this->base . '/data/forms', 'blocked');
+        $response = $this->submit($this->validFields(['locale' => 'de']));
+        self::assertSame(503, $response['status']);
+        self::assertCount(0, $this->storedSubmissions());
+    }
+
+    public function testNotificationFailureKeepsTheMessageAndShowsItsStatus(): void
+    {
+        mkdir($this->base . '/config');
+        file_put_contents($this->base . '/config/forms.json', json_encode([
+            'notifications' => ['enabled' => true, 'to' => "admin@example.com\r\nBcc: other@example.com", 'from' => 'cms@example.com'],
+        ]));
+        self::assertTrue($this->submit($this->validFields())['success']);
+        self::assertCount(1, $this->storedSubmissions());
+        self::assertSame('failed', $this->storedSubmissions()[0]['notification']);
+    }
+
+    public function testEmailAlertsAreOffUntilConfigured(): void
+    {
+        self::assertTrue($this->submit($this->validFields())['success']);
+        self::assertSame('disabled', $this->storedSubmissions()[0]['notification']);
+    }
+
     /* -------------------------------------------------- a valid submission -- */
 
     public function testAValidSubmissionIsStored(): void

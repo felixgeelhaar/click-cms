@@ -39,6 +39,7 @@
           </p>
         </div>
 
+        <p class="submission-notification">{{ message(notificationLabel(entry.notification)) }}</p>
         <dl class="submission-fields">
           <div v-for="field in fieldsOf(entry)" :key="field.name" class="submission-field">
             <dt>{{ field.label }}</dt>
@@ -65,6 +66,12 @@ const error = ref('');
  * depending on the section's editor-facing labels, which a reader here has no
  * access to.
  */
+const notificationLabel = (status) => ({
+  submitted: 'Email alert accepted by the mail server',
+  failed: 'Email alert failed. The message is saved here.',
+  pending: 'Email alert status pending. The message is saved here.',
+}[status] || 'Stored in Click. Email alerts are off.');
+
 const FIELD_LABELS = { name: 'Name', email: 'Email', message: 'Message' };
 
 const load = async () => {

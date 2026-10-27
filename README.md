@@ -112,7 +112,7 @@ that is the test of whether the line between core and plugin is drawn honestly.
 | `visual-builder` | Drag-and-drop page builder with responsive layouts |
 | `graphql` | A GraphQL endpoint for content |
 | `search` | Full-text search over published pages, at `GET /api/search` |
-| `forms` | Contact forms; stores submissions and lists them for editors |
+| `forms` | [Contact forms](docs/forms.md); protected submissions, editor inbox and optional email alerts |
 | `collaboration` | Presence and page comments, for review before publishing |
 | `backup` | A ZIP export of content, media and drafts |
 | `webhooks` | Signed HTTP deliveries when content changes, queued and retried |

@@ -1,7 +1,7 @@
 {
   "name": "Forms",
-  "description": "Contact forms: stores visitor submissions as content and lists them for editors",
-  "version": "1.0.0",
+  "description": "Contact forms with protected submissions and optional email alerts",
+  "version": "1.1.0",
   "author": "Click CMS",
   "dependencies": [],
   "hooks": [

@@ -57,6 +57,8 @@ Administrators use **Menus** to add published destinations and order navigation.
 
 **Submissions** contains form responses when the relevant forms are configured. Limit access, avoid storing unnecessary personal information and establish a retention policy. **Builder**, **Themes**, **Plugins** and **Marketplace** affect design or functionality; try changes on a copy before applying them to the live site. The [admin tour](admin-tour.md) explains each screen.
 
+Form responses stay in **Submissions**. Optional email alerts contain only a reference; the inbox shows whether the mail server accepted the alert or sending failed. Ask your operator to configure and test alerts. [Contact form setup and limits](forms.md).
+
 ## Add or manage plugins
 
 This task is for administrators. Ordinary content editing does not require changing plugins.

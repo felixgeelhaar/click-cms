@@ -44,6 +44,16 @@ beforeEach(() => {
 });
 
 describe('form submissions list', () => {
+  it('distinguishes mail-server acceptance from failure while retaining the saved message', async () => {
+    const first = { ...submission('a', 'contact', 'Ada', 'ada@example.com', 'Saved lead', '2026-07-01'), notification: 'failed' };
+    const second = { ...submission('b', 'contact', 'Ben', 'ben@example.com', 'Another saved lead', '2026-07-01'), notification: 'submitted' };
+    const wrapper = await mountList([first, second]);
+    expect(wrapper.text()).toContain('Email alert failed. The message is saved here.');
+    expect(wrapper.text()).toContain('Email alert accepted by the mail server');
+    expect(wrapper.text()).toContain('Saved lead');
+    expect(wrapper.text()).not.toContain('delivered');
+  });
+
   it('renders each submission with its page, name, email and message', async () => {
     const wrapper = await mountList([
       submission('a', 'contact', 'Ada Lovelace', 'ada@example.com', 'Hello there', '2026-07-01T10:00:00.000000+00:00'),
