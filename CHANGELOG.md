@@ -5,6 +5,19 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [1.12.0] — 2026-10-27
+
+### English and German administration
+- Switch the complete administration interface between English and German, including navigation, editing, publishing, settings, security and updates.
+- Remember the interface preference independently of the content language. Preserve authored content, account names, filenames and save payloads.
+- Translate errors and confirmations, with safe technical details for unknown diagnostics.
+- Wrap longer editor controls to accommodate German labels.
+
+### Validation
+- Pass 780 admin tests and production-build browser checks covering 22 administration routes.
+- Pass PHP, minimum-version, container, browser, Nox and dependency audit checks.
+- This is a compatible stable feature release, eligible for automatic updates under the minor policy.
+
 ## [1.11.0] — 2026-10-26
 
 ### A clearer page editor
