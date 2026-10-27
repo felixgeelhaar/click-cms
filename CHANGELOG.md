@@ -5,6 +5,12 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Documentation and publication
+- Publish simple English/German editor guides, handbooks and hands-on demos in the README and public documentation navigation.
+- Document current Node 24 LTS build requirements and dependency maintenance.
+- Restrict Pages publication to branch pushes, schedules and independent dispatches. Verify every published file, including the signed feed and documentation, before reporting success.
+- Keep Node on the maintained LTS line; review major container upgrades when they enter LTS.
+
 ## [1.12.2] — 2026-10-27
 
 ### Aliased shared-host administration

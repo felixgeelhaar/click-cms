@@ -47,6 +47,12 @@ final class Navigation
     private const GROUPS = [
         'Start here' => [
             'README.md',
+            'docs/editor-en.md',
+            'docs/editor-de.md',
+            'docs/handbook-en.md',
+            'docs/handbook-de.md',
+            'docs/demos-en.md',
+            'docs/demos-de.md',
         ],
         // Written for whoever maintains the content, in the admin panel, with no
         // interest in how any of it works. In the order someone new to the panel
@@ -75,6 +81,7 @@ final class Navigation
             'docs/backup.md',
             'docs/sso.md',
             'docs/multi-site.md',
+            'docs/site-publication.md',
         ],
         'Building on it' => [
             'docs/core.md',
@@ -82,6 +89,7 @@ final class Navigation
             'docs/webhooks.md',
             'docs/collaboration.md',
             'docs/practices.md',
+            'docs/dependencies.md',
             'docs/roadmap.md',
             'docs/backlog.md',
         ],

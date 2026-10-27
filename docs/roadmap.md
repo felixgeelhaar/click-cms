@@ -23,7 +23,7 @@ Every item here holds the lines v1 was built on, because they are the product:
 
 1. ~~**Continuous integration for the test suites.**~~ *(small)* **Done.** A
    `ci.yml` workflow runs the PHP suite (on PHP 8.5, the runtime version), the
-   admin suite (on Node 22), a job that proves the project still runs on PHP 8.1
+   admin suite (on Node 24 LTS), a job that proves the project still runs on PHP 8.1
    — the floor `composer.json` and every entry in the update feed promise — and a
    container smoke test that builds the image and polls `/health.php`, on every
    push and pull request. Jobs are independent and fail in isolation; in-flight

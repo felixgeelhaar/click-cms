@@ -42,3 +42,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Keep the build on the maintained LTS line. Review a new Node major when
+    # it enters LTS rather than following the Current release automatically.
+    ignore:
+      - dependency-name: node
+        update-types: [version-update:semver-major]

@@ -8,14 +8,14 @@ use PHPUnit\Framework\TestCase;
 
 final class ReleaseWorkflowTest extends TestCase
 {
-    private function metadataScript(): string
+    private function metadataScript(string $workflow = 'release.yml', string $step = 'Work out what this release is'): string
     {
-        $lines = file(dirname(__DIR__, 3) . '/.github/workflows/release.yml');
+        $lines = file(dirname(__DIR__, 3) . '/.github/workflows/' . $workflow);
         $inStep = false;
         $inScript = false;
         $script = '';
         foreach ($lines as $line) {
-            if (str_contains($line, '- name: Work out what this release is')) {
+            if (str_contains($line, '- name: ' . $step)) {
                 $inStep = true;
                 continue;
             }
@@ -85,4 +85,30 @@ final class ReleaseWorkflowTest extends TestCase
             unlink($output);
         }
     }
+    public function testPagesRejectsReleaseContextButAcceptsIndependentTriggers(): void
+    {
+        $script = $this->metadataScript('pages.yml', 'Reject release-context publication');
+        foreach (['push' => 0, 'schedule' => 0, 'workflow_dispatch' => 0, 'release' => 1, 'pull_request' => 1] as $event => $expected) {
+            $process = proc_open(['bash', '-eu', '-c', $script], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, [
+                'PATH' => getenv('PATH'), 'PUBLISH_EVENT' => $event,
+            ]);
+            stream_get_contents($pipes[1]);
+            stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            self::assertSame($expected, proc_close($process), $event);
+        }
+    }
+
+    public function testReleaseHasNoKnownBrokenReusablePagesFallback(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $release = file_get_contents($root . '/.github/workflows/release.yml');
+        $pages = file_get_contents($root . '/.github/workflows/pages.yml');
+        self::assertStringNotContainsString('uses: ./.github/workflows/pages.yml', $release);
+        self::assertStringNotContainsString('workflow_call:', $pages);
+        self::assertStringContainsString('exit 1', substr($release, strpos($release, 'PAGES_DISPATCH_TOKEN is required')));
+        self::assertStringContainsString('.sha256 == $sha256', $release);
+    }
+
 }

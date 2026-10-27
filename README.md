@@ -1,5 +1,9 @@
 # Click CMS
 
+**For editors:** [Simple English guide](docs/editor-en.md) · [Einfache Anleitung auf Deutsch](docs/editor-de.md)
+
+**Documentation:** [English handbook](docs/handbook-en.md) · [Deutsches Handbuch](docs/handbook-de.md) · [English demos](docs/demos-en.md) · [Deutsche Demos](docs/demos-de.md)
+
 A modern PHP CMS with plugin architecture, Vue admin UI, Visual Builder, and marketplace.
 
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?style=flat&logo=php)
@@ -163,6 +167,8 @@ cd admin-ui && npm run build   # build the admin UI
 - [Single sign-on](docs/sso.md) — OpenID Connect setup, and what is checked
 - [Webhooks](docs/webhooks.md) — the payload, the signature, verifying it
 - [More than one site](docs/multi-site.md) — shared code, separate content
+- [Dependency maintenance](docs/dependencies.md) — tested tooling, supported versions and update checks
+- [Site publication](docs/site-publication.md) — deployment verification and release-feed delivery
 - [Practices](docs/practices.md) — how this codebase is worked on
 
 ## License
