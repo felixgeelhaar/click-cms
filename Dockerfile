@@ -65,6 +65,8 @@ RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
 COPY admin-ui/ ./
 COPY themes/ /repo/themes/
+# Settings tests exercise the declaration shipped by Forms.
+COPY plugins/forms/plugin.json /repo/plugins/forms/plugin.json
 
 # Tests before the build, so a component that misreads the API cannot reach an
 # image. Four such defects shipped before this ran: the page list and the
