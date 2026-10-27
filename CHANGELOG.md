@@ -5,6 +5,12 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [1.12.1] — 2026-10-27
+
+### Subdirectory administration routing
+- Keep Apache admin deep links relative to the installed directory. Self-updates now retain working editor and settings URLs under prefixes such as `/2026/cms2/admin/` without a host-specific RewriteBase patch.
+- Includes the complete English/German interface from 1.12.0.
+
 ## [1.12.0] — 2026-10-27
 
 ### English and German administration
