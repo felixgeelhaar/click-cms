@@ -14,7 +14,7 @@ A modern PHP CMS with plugin architecture, Vue admin UI, Visual Builder, and mar
 
 ## Features
 
-- **Plugin Architecture** - Eight plugins ship with it; the CMS boots with none
+- **Plugin Architecture** - Seven supported plugins ship with it; the CMS boots with none
 - **Visual Builder** - Drag-and-drop page builder with responsive layouts
 - **Modern Admin UI** - Vue 3 + Astro with collapsible sidebar, theme toggle
 - **REST & GraphQL APIs** - Headless content management
@@ -104,12 +104,11 @@ Switching the setting does not move existing content; move it first with
 
 ## Plugins
 
-Eight ship with the project. The CMS boots with `plugins/` deleted entirely —
+Seven supported plugins ship with the project. The CMS boots with `plugins/` deleted entirely —
 that is the test of whether the line between core and plugin is drawn honestly.
 
 | Plugin | What it does |
 |---|---|
-| `admin-ui` | The web admin panel |
 | `visual-builder` | Drag-and-drop page builder with responsive layouts |
 | `graphql` | A GraphQL endpoint for content |
 | `search` | Full-text search over published pages, at `GET /api/search` |
@@ -117,6 +116,12 @@ that is the test of whether the line between core and plugin is drawn honestly.
 | `collaboration` | Presence and page comments, for review before publishing |
 | `backup` | A ZIP export of content, media and drafts |
 | `webhooks` | Signed HTTP deliveries when content changes, queued and retried |
+
+The admin interface is part of core. The legacy `plugins/admin-ui` directory is excluded by default; it is not an additional supported plugin.
+
+Administrators can install external plugins under **Marketplace**, either from a configured signed registry or by uploading a trusted ZIP containing `plugin.json` and `bootstrap.php`. Registry signatures and package checksums are verified; uploaded ZIPs are unverified code. Then activate the plugin under **Plugins** and test its feature on an isolated copy. Deployment-managed installations disable Marketplace installs, and an execution allowlist may restrict activation.
+
+The plugin name determines its ID (for example, `GraphQL API` becomes `graphql-api`); a signed manifest must use the same ID as its package. A valid signature verifies the publisher, not compatibility with the installed Click version. Do not install legacy REST or storage packages to enable those features: they are already part of core. See the [English handbook](docs/handbook-en.md#add-or-manage-plugins) or [German handbook](docs/handbook-de.md#plugins-hinzufügen-oder-verwalten).
 
 Authentication (including two-step sign-in and single sign-on), languages,
 media, redirects, menus, version history, preview, scheduled publishing and the
@@ -133,7 +138,7 @@ click/
 │   ├── Domain/             # Domain models, no I/O
 │   ├── Http/               # Kernel, controllers, renderers
 │   └── Infrastructure/     # Storage, media, adapters
-├── plugins/                # The eight bundled plugins
+├── plugins/                # Bundled plugins and legacy admin-ui directory
 ├── admin-ui/               # Vue 3 + Astro admin
 ├── themes/                 # Public themes
 ├── config/                 # Core settings, section and collection types

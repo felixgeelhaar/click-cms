@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Click\Cms\Application\Plugin;
 
+use Click\Cms\Domain\ValueObjects\PluginId;
+
 class PluginMarketplace
 {
     // A plugin archive is small. These caps turn a zip bomb — a tiny archive
@@ -174,9 +176,19 @@ class PluginMarketplace
         }
 
         $targetDir = $this->pluginsPath . '/' . $pluginId;
-        if (is_dir($targetDir)) {
+        $this->pluginManager->discover();
+        if (is_dir($targetDir) || $this->pluginManager->get(PluginId::fromString($pluginId)) !== null) {
             $this->cleanup($tempDir);
             return ['success' => false, 'error' => 'Plugin already exists'];
+        }
+
+        try {
+            // Gate execution before publishing the directory: a concurrent web
+            // request must never auto-activate newly uploaded PHP code.
+            $this->pluginManager->prepareExternalInstallation(PluginId::fromString($pluginId));
+        } catch (\Throwable $e) {
+            $this->cleanup($tempDir);
+            return ['success' => false, 'error' => 'Could not persist plugin activation state.'];
         }
 
         if (!@rename(dirname($pluginJsonPath), $targetDir)) {

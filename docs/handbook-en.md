@@ -66,6 +66,8 @@ This task is for administrators. Ordinary content editing does not require chang
 3. Open **Plugins**. Use **Activate** to enable an installed plugin or **Deactivate** to turn it off. Read any error shown: a dependency or deployment policy may prevent the change. A skipped-folder warning means the operator needs to check that plugin’s files.
 4. Reload the admin and test the plugin’s feature on the actual website or API. Installing a plugin alone does not add its content or configure a separate SPA to display it.
 
+External plugins use the same installation paths. Registry downloads have verified manifests and package checksums; ZIP uploads are unverified. A plugin ZIP must contain `plugin.json` and `bootstrap.php`. Verification identifies the publisher; it does not guarantee compatibility. Check that the plugin supports your Click version. In deployment-managed installations, Marketplace installation is disabled; ask the operator to include the plugin in the deployment. REST and storage are already built into Click and do not need legacy plugins.
+
 Only install plugins you trust: their PHP code runs with the CMS’s access. Turning off a plugin does not uninstall its files. Back up plugin data and check dependent features before making changes on the live site.
 
 ## Administration and security

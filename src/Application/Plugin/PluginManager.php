@@ -287,6 +287,15 @@ class PluginManager
         return ['success' => true, 'plugin' => $this->plugins[$id->value]];
     }
 
+    /** Persist the activation gate before external plugin files become visible.
+     * This deliberately never loads the uploaded bootstrap.
+     */
+    public function prepareExternalInstallation(PluginId $id): void
+    {
+        $this->state[$id->value] = ['activated' => false, 'uploaded_at' => date('c')];
+        $this->saveState();
+    }
+
     public function install(PluginId $id): array
     {
         $plugin = $this->get($id);
@@ -658,7 +667,9 @@ class PluginManager
             mkdir($dir, 0755, true);
         }
         
-        file_put_contents($this->stateFile, json_encode($this->state, JSON_PRETTY_PRINT));
+        if (@file_put_contents($this->stateFile, json_encode($this->state, JSON_PRETTY_PRINT), LOCK_EX) === false) {
+            throw new \RuntimeException('Could not persist plugin activation state.');
+        }
     }
 
     private function dispatchEvent(string $name, array $payload = []): void

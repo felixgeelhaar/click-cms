@@ -76,6 +76,50 @@ final class PluginMarketplaceTest extends TestCase
         $this->assertFileExists($this->base . '/plugins/sample-plugin/bootstrap.php');
     }
 
+    public function testUploadedCodeStaysInactiveAcrossBootsUntilExplicitActivation(): void
+    {
+        $zip = $this->base . '/data/pkg.zip';
+        $marker = $this->base . '/bootstrap-executed';
+        $this->makeZip($zip, [
+            'sample/plugin.json' => json_encode(['name' => 'Sample Plugin', 'version' => '1.0.0']),
+            'sample/bootstrap.php' => '<?php file_put_contents(' . var_export($marker, true) . ', "ran");',
+        ]);
+        self::assertTrue($this->marketplace->installFromZip($zip)['success']);
+        $manager = new PluginManager($this->base . '/plugins', $this->base . '/data');
+        foreach ($manager->discover() as $plugin) {
+            self::assertTrue($manager->isDeactivated($plugin->id));
+            if (!$manager->isDeactivated($plugin->id)) {
+                $manager->activate($plugin->id);
+            }
+        }
+        self::assertFileDoesNotExist($marker);
+        self::assertTrue($manager->activate(\Click\Cms\Domain\ValueObjects\PluginId::fromString('sample-plugin'))['success']);
+        self::assertFileExists($marker);
+    }
+
+    public function testFailedActivationGateDoesNotPublishUploadedCode(): void
+    {
+        mkdir($this->base . '/data/plugin-state.json');
+        $zip = $this->base . '/data/pkg.zip';
+        $this->validPluginZip($zip);
+        $result = $this->marketplace->installFromZip($zip);
+        self::assertFalse($result['success']);
+        self::assertSame('Could not persist plugin activation state.', $result['error']);
+        self::assertDirectoryDoesNotExist($this->base . '/plugins/sample-plugin');
+    }
+
+    public function testRefusesAnExistingIdEvenWhenItsFolderHasADifferentName(): void
+    {
+        mkdir($this->base . '/plugins/legacy-folder');
+        file_put_contents($this->base . '/plugins/legacy-folder/plugin.json', json_encode([
+            'name' => 'Sample Plugin', 'version' => '1.0.0',
+        ]));
+        $zip = $this->base . '/data/pkg.zip';
+        $this->validPluginZip($zip);
+        self::assertFalse($this->marketplace->installFromZip($zip)['success']);
+        self::assertDirectoryDoesNotExist($this->base . '/plugins/sample-plugin');
+    }
+
     public function testRefusesToOverwriteAnExistingPlugin(): void
     {
         $zip = $this->base . '/data/pkg.zip';
