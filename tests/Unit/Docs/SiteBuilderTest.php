@@ -294,6 +294,42 @@ final class SiteBuilderTest extends TestCase
         }
     }
 
+    public function testTranslatedGuidesHaveOneNavigationEntryAndReciprocalLanguageLinks(): void
+    {
+        $this->fixture();
+        foreach (['editor', 'handbook', 'demos'] as $guide) {
+            foreach (['en', 'de'] as $language) {
+                file_put_contents($this->workspace . "/repo/docs/{$guide}-{$language}.md", "# Guide\n\nText.\n");
+            }
+        }
+        $this->build();
+        foreach (['en', 'de'] as $language) {
+            $html = $this->read("editor-{$language}/index.html");
+            preg_match('/<nav class="pages".*?<\/nav>/s', $html, $navigation);
+            foreach (['editor' => 'Editor guide', 'handbook' => 'Handbook', 'demos' => 'Demos'] as $guide => $label) {
+                $this->assertSame(1, substr_count($navigation[0], '>' . $label . '</a>'));
+                $this->assertStringContainsString('href="../' . $guide . '-' . $language . '/"', $navigation[0]);
+            }
+            $this->assertStringContainsString('<nav class="languages" aria-label="Language">', $html);
+            $this->assertStringContainsString('href="../editor-en/" lang="en" hreflang="en"', $html);
+            $this->assertStringContainsString('href="../editor-de/" lang="de" hreflang="de"', $html);
+            $this->assertStringContainsString('hreflang="' . $language . '" aria-current="page"', $html);
+        }
+        $home = $this->read('index.html');
+        $this->assertStringContainsString('href="editor-en/">Editor guide', $home);
+        $this->assertStringNotContainsString('href="editor-de/"', $home);
+        $this->assertStringNotContainsString('class="languages"', $home);
+    }
+
+    public function testAGuideWithNoTranslationRemainsReachableWithoutAnEmptySwitch(): void
+    {
+        $this->fixture();
+        file_put_contents($this->workspace . '/repo/docs/editor-de.md', "# Guide\n\nText.\n");
+        $this->build();
+        $this->assertStringContainsString('href="editor-de/">Editor guide', $this->read('index.html'));
+        $this->assertStringNotContainsString('class="languages"', $this->read('editor-de/index.html'));
+    }
+
     public function testGermanArticleDeclaresItsLanguageInsideEnglishNavigation(): void
     {
         $this->fixture();

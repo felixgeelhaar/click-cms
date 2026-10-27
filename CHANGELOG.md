@@ -6,6 +6,8 @@ All notable changes to click-cms are documented here. This project adheres to
 ## [Unreleased]
 
 ### Documentation and publication
+
+- Show translated guides once in website navigation, with an English / Deutsch switch linking equivalent pages.
 - Align the public Click website with the Editorial design system, using the admin’s shared light/dark palette and typography tokens.
 - Publish simple English/German editor guides, handbooks and hands-on demos in the README and public documentation navigation.
 - Document current Node 24 LTS build requirements and dependency maintenance.
