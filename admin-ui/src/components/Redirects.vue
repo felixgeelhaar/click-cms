@@ -8,7 +8,7 @@
       <button class="btn-primary" @click="addRule">+ Add redirect</button>
     </div>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
     <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
 
     <p v-if="!loading && rules.length === 0" class="empty">
@@ -50,6 +50,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 
 const rules = ref([]);

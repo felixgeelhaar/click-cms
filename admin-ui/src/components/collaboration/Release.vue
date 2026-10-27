@@ -16,7 +16,7 @@
       </button>
     </div>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
     <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
 
     <p v-if="loading && !loaded" class="loading">Loading…</p>
@@ -164,7 +164,7 @@
             <strong>{{ itemLabel(item) }}</strong>
           </a>
           <span v-if="item.locale"> ({{ item.locale }})</span>
-          — {{ item.reason }}
+          — <LocalizedError :message="item.reason" />
         </li>
       </ul>
     </div>
@@ -189,7 +189,7 @@
             <strong>{{ itemLabel(item) }}</strong>
           </a>
           <span v-if="item.locale"> ({{ item.locale }})</span>
-          — {{ item.reason }}
+          — <LocalizedError :message="item.reason" />
         </li>
       </ul>
     </div>
@@ -197,6 +197,7 @@
 </template>
 
 <script setup>
+import LocalizedError from '../LocalizedError.vue';
 import { ref, computed, onMounted } from 'vue';
 import { withBase } from '../../lib/base.js';
 import { contentEditorHref } from '../../lib/contentHref.js';

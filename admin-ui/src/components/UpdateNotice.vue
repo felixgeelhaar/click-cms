@@ -1,4 +1,5 @@
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 /**
  * Tells an administrator, on sign-in, that a release is waiting — and offers to
  * install it.
@@ -91,7 +92,7 @@ const install = async () => {
       <span v-else>You are running {{ state.currentVersion }}.</span>
     </div>
 
-    <p v-if="error" class="notice__error" role="alert">{{ error }}</p>
+    <p v-if="error" class="notice__error" role="alert"><LocalizedError :message="error" /></p>
 
     <div class="notice__actions">
       <button class="btn-primary" :disabled="installing" @click="install">

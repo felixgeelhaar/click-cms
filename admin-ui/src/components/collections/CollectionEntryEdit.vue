@@ -2,13 +2,13 @@
   <div class="entry-edit">
     <h1 class="page-title">{{ isNew ? `New ${type.label} entry` : `Edit ${type.label} entry` }}</h1>
 
-    <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
-    <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
+    <p v-if="loadError" class="banner error" role="alert"><LocalizedError :message="loadError" /></p>
+    <p v-if="saveError" class="banner error" role="alert"><LocalizedError :message="saveError" /></p>
 <p v-if="conflict" class="banner error" role="alert">
-      This entry changed remotely. Your edits are still here. Reload to review the latest version.
-      <button type="button" class="btn-reload-conflict" @click="reloadConflict">Reload to review</button>
+      {{ message("This entry changed remotely. Your edits are still here. Reload to review the latest version.") }}
+      <button type="button" class="btn-reload-conflict" @click="reloadConflict">{{ message("Reload to review") }}</button>
     </p>
-    <p v-if="publishError" class="banner" :class="publishErrorEditorial ? 'warning' : 'error'" role="alert">{{ publishError }}</p>
+    <p v-if="publishError" class="banner" :class="publishErrorEditorial ? 'warning' : 'error'" role="alert"><LocalizedError :message="publishError" /></p>
     <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
 
     <div v-if="loading" class="banner">Loading…</div>
@@ -108,7 +108,7 @@
         </div>
       </div>
 
-      <p v-if="previewError" class="banner error" role="alert">{{ previewError }}</p>
+      <p v-if="previewError" class="banner error" role="alert"><LocalizedError :message="previewError" /></p>
 
       <div class="actions">
         <button type="button" class="btn-secondary" :disabled="saving" @click="cancel">Cancel</button>
@@ -180,6 +180,8 @@
 </template>
 
 <script setup>
+import { message } from '../../lib/messages.js';
+import LocalizedError from '../LocalizedError.vue';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import RepeaterField from '../fields/RepeaterField.vue';
 import { leafComponent } from '../fields/leafComponent.js';

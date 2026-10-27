@@ -15,13 +15,10 @@
       deliveries would queue, and none of them would ever move.
     -->
     <p v-if="canSend === false" class="banner error" role="alert">
-      This installation cannot make outbound HTTP requests: the curl extension
-      is not loaded and <code>allow_url_fopen</code> is off. Webhooks can be
-      configured here but nothing will be delivered until one of those is
-      enabled.
+      {{ message("This installation cannot make outbound HTTP requests. Webhooks will not be delivered until the administration enables curl or allow_url_fopen.") }}
     </p>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
     <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
 
     <!--
@@ -139,6 +136,8 @@
 </template>
 
 <script setup>
+import { message } from '../lib/messages.js';
+import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 
 /**

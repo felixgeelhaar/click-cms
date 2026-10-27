@@ -23,7 +23,7 @@
       the display half of the contract the plugin holds at rest: it stores the
       bytes as data, this shows them as data.
     -->
-    <p v-if="error" class="submissions-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="submissions-error" role="alert"><LocalizedError :message="error" /></p>
 
     <p v-if="loading && !submissions.length" class="submissions-empty">Loading…</p>
 
@@ -53,6 +53,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 
 const submissions = ref([]);

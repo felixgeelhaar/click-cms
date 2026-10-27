@@ -3,7 +3,7 @@
     <h1 class="page-title">Updates</h1>
     <p class="page-subtitle">Keep the CMS itself current.</p>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
     <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
 
     <!-- A non-administrator gets the reason rather than an empty page: updating
@@ -40,7 +40,7 @@
 
         <!-- Why the feed gave nothing, when it did — otherwise a broken key or a
              wrong URL reads as "you are up to date" forever. -->
-        <p v-else-if="feedError" class="muted">{{ feedError }}</p>
+        <p v-else-if="feedError" class="muted"><LocalizedError :message="feedError" /></p>
 
         <div v-else-if="hasUpdate" class="offer">
           <p class="offer-head">
@@ -65,7 +65,7 @@
             <span :class="['result', entry.ok ? 'ok' : 'failed']">{{ entry.ok ? 'Installed' : 'Failed' }}</span>
             <span class="entry-version">{{ entry.from }} → {{ entry.to }}</span>
             <span class="entry-at">{{ entry.at }}</span>
-            <span v-if="entry.error" class="entry-error">{{ entry.error }}</span>
+            <span v-if="entry.error" class="entry-error"><LocalizedError :message="entry.error" /></span>
           </li>
         </ul>
       </section>
@@ -74,6 +74,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { computed, onMounted, ref } from 'vue';
 
 const POLICY_LABELS = {

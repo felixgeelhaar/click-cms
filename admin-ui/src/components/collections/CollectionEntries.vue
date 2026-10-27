@@ -9,7 +9,7 @@
       <button type="button" class="btn-primary btn-new" @click="$emit('new')">+ New entry</button>
     </div>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }} <button v-if="loadFailed" type="button" class="btn-retry" @click="loadEntries">Retry</button></p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /> <button v-if="loadFailed" type="button" class="btn-retry" @click="loadEntries">Retry</button></p>
 
     <div v-if="loading" class="loading">Loading…</div>
 
@@ -47,6 +47,7 @@
 </template>
 
 <script setup>
+import LocalizedError from '../LocalizedError.vue';
 import { ref, onMounted, watch } from 'vue';
 
 const props = defineProps({

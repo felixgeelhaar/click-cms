@@ -8,7 +8,7 @@
         published in the documentation. Set your own before continuing.
       </p>
 
-      <p v-if="error" class="message error" role="alert">{{ error }}</p>
+      <p v-if="error" class="message error" role="alert"><LocalizedError :message="error" /></p>
       <p v-else-if="done" class="message success">Password changed.</p>
 
       <form @submit.prevent="submit">
@@ -28,7 +28,7 @@
 
         <label for="confirm">Repeat new password</label>
         <input id="confirm" v-model="confirm" type="password" autocomplete="new-password" required />
-        <p v-if="mismatch" class="hint mismatch">The two entries do not match.</p>
+        <p v-if="mismatch" class="hint mismatch">{{ message('The two entries do not match.') }}</p>
 
         <button class="btn-primary" type="submit" :disabled="saving || mismatch">
           {{ saving ? 'Saving…' : 'Set password' }}
@@ -39,6 +39,8 @@
 </template>
 
 <script setup>
+import { message } from '../lib/messages.js';
+import LocalizedError from './LocalizedError.vue';
 import { computed, ref } from 'vue';
 
 const props = defineProps({

@@ -8,7 +8,7 @@
       <button class="btn-primary" @click="startCreate">+ New user</button>
     </div>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
     <p v-if="loading" class="banner">Loading…</p>
 
     <form v-if="draft" class="editor" @submit.prevent="save">
@@ -76,6 +76,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps({ userRole: String, currentUsername: String });

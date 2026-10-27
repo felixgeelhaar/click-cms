@@ -13,7 +13,7 @@
       </button>
     </div>
 
-    <p v-if="error" class="review-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="review-error" role="alert"><LocalizedError :message="error" /></p>
 
     <p v-if="loading && !loaded" class="review-empty">Loading…</p>
 
@@ -23,7 +23,7 @@
         <span class="review-badge" :class="`is-${stateKey}`">{{ stateLabel }}</span>
       </p>
 
-      <p v-if="review.stale" class="review-error" role="status">The page changed after this review. Request review again for the current saved version.</p>
+      <p v-if="review.stale" class="review-error" role="status">{{ message("The page changed after this review. Request review again for the current saved version.") }}</p>
       <p v-if="gateEnabled" class="review-note">Approval is required before publishing.</p>
       <details class="review-options" :open="!compact">
       <summary>Review options</summary>
@@ -152,6 +152,8 @@
 </template>
 
 <script setup>
+import { message } from '../../lib/messages.js';
+import LocalizedError from '../LocalizedError.vue';
 import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps({

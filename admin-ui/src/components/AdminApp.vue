@@ -1,5 +1,11 @@
 <template>
   <div class="admin-app">
+    <div class="message-language">
+      <label for="message-language">Hinweise / Messages</label>
+      <select id="message-language" :value="messageLanguage" @change="setMessageLanguage($event.target.value)">
+        <option value="en">English</option><option value="de">Deutsch</option>
+      </select>
+    </div>
     <div v-if="!isLoggedIn" class="login-screen">
       <Login @loggedIn="handleLoginSuccess" />
     </div>
@@ -80,6 +86,7 @@
 </template>
 
 <script setup>
+import { messageLanguage, setMessageLanguage } from '../lib/messages.js';
 import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue';
 import Sidebar from './Sidebar.vue';
 import UpdateNotice from './UpdateNotice.vue';
@@ -478,6 +485,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.message-language { display: flex; justify-content: flex-end; align-items: center; gap: .5rem; padding: .35rem 1rem; background: var(--app-surface); color: var(--app-text); font-size: .8rem; }
+.message-language select { font: inherit; color: inherit; background: var(--app-surface); border: 1px solid var(--control-border); border-radius: 4px; padding: .2rem; }
+.message-language select:focus-visible { outline: 2px solid var(--focus-ring); }
+
 .site-chip {
   margin-left: 0.75rem;
   padding: 0.2rem 0.6rem;

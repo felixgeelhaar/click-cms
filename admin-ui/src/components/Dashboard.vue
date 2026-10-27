@@ -9,7 +9,7 @@
     </div>
 
     <p v-if="error" class="banner error" role="alert">
-      {{ error }}
+      <LocalizedError :message="error" />
       <button type="button" class="linkish" @click="load">Try again</button>
     </p>
 
@@ -62,6 +62,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { computed, ref, onMounted } from 'vue';
 import StatCard from './StatCard.vue';
 import { withBase } from '../lib/base.js';

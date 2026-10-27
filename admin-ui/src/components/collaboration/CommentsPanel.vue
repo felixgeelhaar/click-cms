@@ -13,7 +13,7 @@
       </button>
     </div>
 
-    <p v-if="error" class="comments-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="comments-error" role="alert"><LocalizedError :message="error" /></p>
 
     <p v-if="loading && !comments.length" class="comments-empty">Loading…</p>
 
@@ -75,6 +75,7 @@
 </template>
 
 <script setup>
+import LocalizedError from '../LocalizedError.vue';
 import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps({

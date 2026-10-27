@@ -9,7 +9,7 @@
 
 
 
-    <p v-if="typesError" class="banner error" role="alert">{{ typesError }}</p>
+    <p v-if="typesError" class="banner error" role="alert"><LocalizedError :message="typesError" /></p>
 
     <p v-else-if="loadingTypes" class="banner">Loading section types…</p>
 
@@ -20,9 +20,9 @@
     <!-- Warnings surface malformed definitions instead of hiding them, so an
          author notices a typo rather than wondering where a type went. -->
     <div v-if="Object.keys(typeWarnings).length" class="banner warning">
-      <strong>Some section types could not be loaded:</strong>
+      <strong>{{ message("Some section types could not be loaded:") }}</strong>
       <ul>
-        <li v-for="(message, file) in typeWarnings" :key="file">{{ file }} — {{ message }}</li>
+        <li v-for="(message, file) in typeWarnings" :key="file">{{ file }} — <LocalizedError :message="message" /></li>
       </ul>
     </div>
 
@@ -152,15 +152,15 @@
             {{ index + 1 }}. {{ labelFor(section.type) }}
           </li>
         </ul>
-        <p v-if="selectedSnapshotError" class="template-notice" role="alert">{{ selectedSnapshotError }}</p>
+        <p v-if="selectedSnapshotError" class="template-notice" role="alert"><LocalizedError :message="selectedSnapshotError" /></p>
       </div>
       <p v-if="newerVersionAvailable" class="template-notice" role="status">Your adopted v{{ appliedSharedVersions[selectedTemplate.id] }} is older. Select v{{ selectedTemplate.currentVersion }} above, then Append or Replace to adopt it.</p>
-      <p v-if="selectedSnapshot && !selectedSnapshot.compatible" class="template-notice" role="alert">This snapshot no longer matches the site's section schema and cannot be adopted. {{ Object.values(selectedSnapshot.compatibilityErrors ?? {}).join(' ') }}</p>
+      <p v-if="selectedSnapshot && !selectedSnapshot.compatible" class="template-notice" role="alert">{{ message("This snapshot no longer matches the site's section schema and cannot be adopted.") }} <LocalizedError :message="Object.values(selectedSnapshot.compatibilityErrors ?? {}).join(' ')" /></p>
       <div class="template-row">
         <span class="template-help">Shared library</span>
         <button type="button" data-testid="refresh-shared-presets" :disabled="loadingSharedPresets" @click="loadSharedPresets">{{ loadingSharedPresets ? 'Refreshing…' : 'Refresh library' }}</button>
       </div>
-      <p v-if="sharedPresetError" class="template-notice" role="status">{{ sharedPresetError }}</p>
+      <p v-if="sharedPresetError" class="template-notice" role="status"><LocalizedError :message="sharedPresetError" /></p>
       <form v-if="canManagePresets" class="template-row" @submit.prevent="selectedTemplate?.source === 'shared' && selectedTemplate.editable !== false ? updateSharedPreset() : createSharedPreset()">
         <label class="sr-only" for="shared-preset-name">Shared preset name</label>
         <input id="shared-preset-name" v-model="sharedPresetName" maxlength="80" placeholder="Name a shared preset" required>
@@ -191,6 +191,8 @@
 </template>
 
 <script setup>
+import { message } from '../lib/messages.js';
+import LocalizedError from './LocalizedError.vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import RepeaterField from './fields/RepeaterField.vue';
 import { leafComponent } from './fields/leafComponent.js';

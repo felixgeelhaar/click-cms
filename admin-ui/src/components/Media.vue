@@ -19,13 +19,11 @@
     </div>
 
     <p v-if="!capabilities.resizingAvailable && !loading" class="banner warning">
-      Image resizing is unavailable on this server, so uploads are stored at their
-      original size only. Install the PHP <code>gd</code> extension to generate
-      responsive versions.
+      {{ message("Image resizing is unavailable on this server, so uploads are stored at their original size only. Install the PHP gd extension to generate responsive versions.") }}
     </p>
 
     <ul v-if="errors.length" class="banner error" role="alert">
-      <li v-for="(message, i) in errors" :key="i">{{ message }}</li>
+      <li v-for="(message, i) in errors" :key="i"><LocalizedError :message="message" /></li>
     </ul>
 
     <!-- Search and folder grouping: a library of hundreds is unusable without a
@@ -207,7 +205,7 @@
             class="card-quality"
             :class="item.quality.level"
           >
-            {{ item.quality.message }}
+            {{ imageQualityMessage(item.quality) }}
           </p>
 
           <label class="alt-label" :for="`alt-${item.id}`">Description</label>
@@ -232,6 +230,8 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
+import { message, imageQualityMessage } from '../lib/messages.js';
 import { computed, onMounted, ref } from 'vue';
 
 const items = ref([]);

@@ -3,7 +3,7 @@
     <h1 class="page-title">Plugins</h1>
     <p class="page-subtitle">Extend your CMS functionality</p>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
 
     <!-- Discovery problems used to be silent skips. An invalid plugin.json or a
          bootstrap without a manifest left the list looking healthy while the
@@ -37,6 +37,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 
 const plugins = ref([]);

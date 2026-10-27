@@ -46,7 +46,7 @@
     </div>
 
     <div v-if="localeError" class="notice" role="alert">
-      <p>{{ localeError }}</p>
+      <p><LocalizedError :message="localeError" /></p>
       <button type="button" class="btn-sm btn-secondary" @click="loadPages" :disabled="loading">Retry</button>
     </div>
 
@@ -109,6 +109,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { ref, computed, onMounted, watch } from 'vue';
 import { withBase } from '../lib/base.js';
 

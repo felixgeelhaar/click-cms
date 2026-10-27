@@ -6,7 +6,7 @@
     </legend>
 
     <p v-if="field.help" class="repeater-help">{{ field.help }}</p>
-    <p v-if="error" class="repeater-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="repeater-error" role="alert"><LocalizedError :message="error" /></p>
 
     <p v-if="rows.length === 0" class="repeater-empty">No entries yet.</p>
 
@@ -78,6 +78,7 @@
 </template>
 
 <script setup>
+import LocalizedError from '../LocalizedError.vue';
 import { computed, ref, watch } from 'vue';
 import { leafComponent } from './leafComponent.js';
 import { moveItem, useDragReorder } from '../../lib/dragReorder.js';

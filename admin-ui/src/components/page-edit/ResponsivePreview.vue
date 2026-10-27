@@ -11,7 +11,7 @@
       </div>
     </div>
     <div class="preview-stage">
-      <p v-if="error" class="preview-error" role="alert">{{ error }}</p>
+      <p v-if="error" class="preview-error" role="alert"><LocalizedError :message="error" /></p>
       <iframe v-else-if="html" :srcdoc="html" title="Rendered page preview" sandbox="" :style="{ width: widths[width] }" />
       <p v-else class="preview-empty">{{ busy ? 'Rendering preview…' : 'Waiting for preview…' }}</p>
     </div>
@@ -19,6 +19,7 @@
 </template>
 
 <script setup>
+import LocalizedError from '../LocalizedError.vue';
 import { ref } from 'vue';
 
 defineProps({ html: { type: String, default: '' }, busy: { type: Boolean, default: false }, error: { type: String, default: '' } });

@@ -11,11 +11,11 @@
     </div>
 
     <p v-if="unavailable" class="review-message">Review workflow is not available on this site.</p>
-    <p v-else-if="error" class="review-message error" role="alert">{{ error }}</p>
+    <p v-else-if="error" class="review-message error" role="alert"><LocalizedError :message="error" /></p>
     <p v-else-if="loading" class="review-message">Loading review status…</p>
     <template v-else>
       <p v-if="review.state === 'in_review' && review.stale" class="review-message error">
-        The page changed after this review was requested. Refresh the request for the current saved version.
+        {{ message("The page changed after this review was requested. Refresh the request for the current saved version.") }}
       </p>
       <p v-else-if="review.state === 'in_review'" class="review-message">
         Waiting for {{ review.reviewer || 'a reviewer' }}. Requested by {{ review.requestedByName || review.requestedBy }}.
@@ -24,10 +24,10 @@
         {{ review.decidedByName || 'A reviewer' }} asked for changes. Update this page, then request another review.
       </p>
       <p v-else-if="review.state === 'approved' && review.stale" class="review-message error">
-        The page changed after approval. Save the current version and request another review.
+        {{ message("The page changed after approval. Save the current version and request another review.") }}
       </p>
       <p v-else-if="review.state === 'published' && review.stale" class="review-message error">
-        The page changed after the review was completed. Save the current version and request another review.
+        {{ message("The page changed after the review was completed. Save the current version and request another review.") }}
       </p>
       <p v-else-if="review.state === 'approved'" class="review-message">
         Approved by {{ review.decidedByName || 'a reviewer' }}. Publishing remains a separate action.
@@ -56,6 +56,8 @@
 </template>
 
 <script setup>
+import { message } from '../../lib/messages.js';
+import LocalizedError from '../LocalizedError.vue';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps({

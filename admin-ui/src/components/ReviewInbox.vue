@@ -9,7 +9,7 @@
       <button type="button" class="btn-secondary" :disabled="loading" @click="load">Refresh</button>
     </header>
 
-    <p v-if="error" class="notice error" role="alert">{{ error }}</p>
+    <p v-if="error" class="notice error" role="alert"><LocalizedError :message="error" /></p>
     <p v-if="notice" class="notice" role="status">{{ notice }}</p>
     <p v-if="loading && !reviews.length" class="empty">Loading reviews…</p>
     <p v-else-if="!reviews.length" class="empty">No reviews are waiting.</p>
@@ -52,6 +52,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 
 const props = defineProps({

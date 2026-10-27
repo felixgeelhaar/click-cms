@@ -24,7 +24,7 @@
         <p v-if="sso.passwordLogin" class="divider"><span>or</span></p>
       </template>
 
-      <p v-if="ssoError" class="error" role="alert">{{ ssoError }}</p>
+      <p v-if="ssoError" class="error" role="alert"><LocalizedError :message="ssoError" /></p>
 
       <form v-if="!needsCode && sso.passwordLogin" @submit.prevent="handleLogin">
         <div class="form-group">
@@ -37,7 +37,7 @@
         </div>
         <!-- A refused sign-in is the whole outcome of this screen, and it is
              rendered without moving focus, so it has to announce itself. -->
-        <div v-if="error" class="error" role="alert">{{ error }}</div>
+        <div v-if="error" class="error" role="alert"><LocalizedError :message="error" /></div>
         <button type="submit" class="btn-primary" :disabled="loading">{{ loading ? 'Signing in...' : 'Sign In' }}</button>
       </form>
 
@@ -67,7 +67,7 @@
             recovery codes instead.
           </p>
         </div>
-        <div v-if="error" class="error" role="alert">{{ error }}</div>
+        <div v-if="error" class="error" role="alert"><LocalizedError :message="error" /></div>
         <button type="submit" class="btn-primary" :disabled="loading">
           {{ loading ? 'Checking…' : 'Continue' }}
         </button>
@@ -82,6 +82,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { setCsrfToken } from '../lib/api.js';
 import { withBase } from '../lib/base.js';

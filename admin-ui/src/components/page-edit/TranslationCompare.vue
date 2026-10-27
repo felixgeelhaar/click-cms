@@ -28,7 +28,7 @@
       <section class="compare-side" :aria-label="`Source: ${nameOf(sourceLocale)}`">
         <h3>{{ nameOf(sourceLocale) }} <span>{{ sourcePublication }}</span></h3>
         <p v-if="sourceBusy" class="compare-message" role="status">Loading source translation…</p>
-        <p v-else-if="sourceError" class="compare-message error" role="alert">{{ sourceError }}</p>
+        <p v-else-if="sourceError" class="compare-message error" role="alert"><LocalizedError :message="sourceError" /></p>
         <p v-else-if="sourceMissing" class="compare-message" role="status">No saved translation exists in {{ nameOf(sourceLocale) }}.</p>
         <dl v-if="sourcePage" class="field-values">
           <template v-for="field in fieldsFor(sourcePage)" :key="`source-${field.path}`">
@@ -39,7 +39,7 @@
       <section class="compare-side" :aria-label="`Target: ${nameOf(targetLocale)}`">
         <h3>{{ nameOf(targetLocale) }} <span>{{ targetPublication }}</span></h3>
         <p v-if="targetBusy" class="compare-message" role="status">Loading target translation…</p>
-        <p v-else-if="targetError" class="compare-message error" role="alert">{{ targetError }}</p>
+        <p v-else-if="targetError" class="compare-message error" role="alert"><LocalizedError :message="targetError" /></p>
         <p v-else-if="targetMissing" class="compare-message" role="status">No saved translation exists in {{ nameOf(targetLocale) }}.</p>
         <p v-else-if="targetLocale === currentLocale" class="compare-message">Showing your current editor fields, including unsaved changes.</p>
         <dl v-if="targetPage" class="field-values">
@@ -68,13 +68,13 @@
 
     <div v-if="!sameLanguage && !busy && sourcePage && targetPage" class="freshness-panel" aria-live="polite">
       <p v-if="freshnessBusy" role="status">Checking saved translation review…</p>
-      <p v-else-if="freshnessError" class="compare-message error" role="alert">{{ freshnessError }}</p>
-      <p v-else-if="snapshotMismatch" class="compare-message error" role="status">Saved translations changed while the comparison loaded. Reload to compare the current saved versions.</p>
+      <p v-else-if="freshnessError" class="compare-message error" role="alert"><LocalizedError :message="freshnessError" /></p>
+      <p v-else-if="snapshotMismatch" class="compare-message error" role="status">{{ message("Saved translations changed while the comparison loaded. Reload to compare the current saved versions.") }}</p>
       <template v-else-if="freshness">
         <p v-if="freshness.freshness === 'unknown'" role="status">Not yet reviewed against this source.</p>
         <p v-else-if="freshness.freshness === 'reviewed'" role="status">Reviewed against current source by {{ freshness.reviewedBy }} on {{ formatDate(freshness.reviewedAt) }}.</p>
-        <p v-else-if="freshness.staleReasons?.includes('source_changed')" class="compare-message error" role="status">Source changed since this review. Review the saved comparison again.</p>
-        <p v-else class="compare-message error" role="status">Target changed since this review. Review the saved comparison again.</p>
+        <p v-else-if="freshness.staleReasons?.includes('source_changed')" class="compare-message error" role="status">{{ message("Source changed since this review. Review the saved comparison again.") }}</p>
+        <p v-else class="compare-message error" role="status">{{ message("Target changed since this review. Review the saved comparison again.") }}</p>
       </template>
       <button
         v-if="mayMarkTarget"
@@ -90,6 +90,8 @@
 </template>
 
 <script setup>
+import { message } from '../../lib/messages.js';
+import LocalizedError from '../LocalizedError.vue';
 import { computed, ref, watch } from 'vue';
 import { comparePageDrafts } from './pageComparison.js';
 

@@ -5,7 +5,7 @@
       Install plugins from the configured registry, or upload one you already have.
     </p>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
     <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
 
     <!-- Stated plainly, because the two paths are not equally trusted and the
@@ -58,6 +58,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 
 const available = ref([]);

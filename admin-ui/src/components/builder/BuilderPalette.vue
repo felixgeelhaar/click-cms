@@ -23,7 +23,7 @@
       a saved block never rewrites pages that already used it.
     -->
     <h2 class="panel-title blocks-title">Saved blocks</h2>
-    <p v-if="ctx.blocksError.value" class="palette-hint palette-error">{{ ctx.blocksError.value }}</p>
+    <p v-if="ctx.blocksError.value" class="palette-hint palette-error"><LocalizedError :message="ctx.blocksError.value" /></p>
     <p v-else-if="!ctx.blocks.value.length" class="palette-hint">No saved blocks yet.</p>
     <ul v-else class="blocks-list">
       <li v-for="block in ctx.blocks.value" :key="block.id" class="blocks-row">
@@ -47,6 +47,7 @@
 </template>
 
 <script setup>
+import LocalizedError from '../LocalizedError.vue';
 import { computed, inject } from 'vue';
 import { NODE_TYPES, isContainer } from './model.js';
 

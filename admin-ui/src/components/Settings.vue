@@ -3,7 +3,7 @@
     <h1 class="page-title">Settings</h1>
     <p class="page-subtitle">How this instance behaves. Changes take effect immediately.</p>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
     <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
 
     <section class="panel">
@@ -103,6 +103,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 
 const emit = defineEmits(['settings-updated']);

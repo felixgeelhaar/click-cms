@@ -8,7 +8,7 @@
     </header>
 
     <div v-if="error" class="notice error" role="alert">
-      <p>{{ error }}</p>
+      <p><LocalizedError :message="error" /></p>
       <button class="btn-sm btn-secondary" type="button" :disabled="loading" @click="load">Retry</button>
     </div>
     <p v-if="loading" class="loading" role="status">Checking configuration…</p>
@@ -33,6 +33,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 import { withBase } from '../lib/base.js';
 

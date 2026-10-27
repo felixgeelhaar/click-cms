@@ -36,7 +36,7 @@
         </div>
       </div>
 
-      <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+      <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
 
       <div v-if="loading" class="loading">Loading…</div>
 
@@ -63,6 +63,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { ref, watch, onMounted } from 'vue';
 import CollectionEntries from './collections/CollectionEntries.vue';
 import CollectionEntryEdit from './collections/CollectionEntryEdit.vue';

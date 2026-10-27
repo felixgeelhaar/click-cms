@@ -11,8 +11,8 @@
       </div>
     </header>
 
-    <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
-    <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
+    <p v-if="loadError" class="banner error" role="alert"><LocalizedError :message="loadError" /></p>
+    <p v-if="saveError" class="banner error" role="alert"><LocalizedError :message="saveError" /></p>
     <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
 
     <!--
@@ -50,6 +50,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { computed, onMounted, provide, ref } from 'vue';
 import BuilderNode from './builder/BuilderNode.vue';
 import BuilderPalette from './builder/BuilderPalette.vue';

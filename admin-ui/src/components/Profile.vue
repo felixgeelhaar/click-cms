@@ -18,7 +18,7 @@
         {{ saving ? 'Saving…' : 'Save Changes' }}
       </button>
 
-      <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+      <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
       <p v-else-if="saved" class="banner ok" role="status">Your details have been saved.</p>
     </div>
 
@@ -34,7 +34,7 @@
         account.
       </p>
 
-      <p v-if="twoFactorError" class="banner error" role="alert">{{ twoFactorError }}</p>
+      <p v-if="twoFactorError" class="banner error" role="alert"><LocalizedError :message="twoFactorError" /></p>
 
       <!-- Setting up: the secret, then proof that it was scanned. -->
       <div v-if="enrolment" class="enrolment">
@@ -88,6 +88,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 
 const props = defineProps({ user: Object });

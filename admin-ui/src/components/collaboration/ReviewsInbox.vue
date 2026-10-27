@@ -40,7 +40,7 @@
       </button>
     </div>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
 
     <p v-if="loading && !loaded" class="loading">Loading…</p>
     <p v-else-if="!error && reviews.length === 0" class="empty">
@@ -90,6 +90,7 @@
 </template>
 
 <script setup>
+import LocalizedError from '../LocalizedError.vue';
 import { ref, computed, onMounted } from 'vue';
 import { withBase } from '../../lib/base.js';
 import { contentEditorHref } from '../../lib/contentHref.js';

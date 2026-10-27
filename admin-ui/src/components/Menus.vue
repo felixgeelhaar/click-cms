@@ -45,7 +45,7 @@
     <p v-if="loading" class="loading">Loading…</p>
 
     <div v-else-if="loadFailed" class="banner error" role="alert">
-      <p>{{ error }}</p>
+      <p><LocalizedError :message="error" /></p>
       <button type="button" class="btn-secondary" @click="loadMenus">Retry</button>
     </div>
     <form v-else class="editor" @submit.prevent="save">
@@ -124,13 +124,14 @@
         <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save menu' }}</button>
       </div>
 
-      <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+      <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
       <p v-else-if="savedNotice" class="banner ok" role="status">{{ savedNotice }}</p>
     </form>
   </div>
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 import LinkField from './fields/LinkField.vue';
 

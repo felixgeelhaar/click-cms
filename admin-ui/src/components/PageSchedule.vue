@@ -48,7 +48,7 @@
         Times are in {{ zoneName }} — the same clock you are reading now.
       </p>
 
-      <p v-if="error" class="sch-error" role="alert">{{ error }}</p>
+      <p v-if="error" class="sch-error" role="alert"><LocalizedError :message="error" /></p>
 
       <div class="sch-actions">
         <button type="button" class="btn-schedule" :disabled="busy" @click="save">
@@ -73,6 +73,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps({

@@ -12,16 +12,16 @@
       />
     </div>
 
-    <p v-if="loadError" class="banner error" role="alert">{{ loadError }}</p>
-    <p v-if="saveError" class="banner error" role="alert">{{ saveError }}</p>
+    <p v-if="loadError" class="banner error" role="alert"><LocalizedError :message="loadError" /></p>
+    <p v-if="saveError" class="banner error" role="alert"><LocalizedError :message="saveError" /></p>
 <p v-if="conflict" class="banner error" role="alert">
-      This page changed remotely. Your edits are still here. Compare and combine them with the latest saved version, or reload to review it.
-      <button type="button" class="btn-reload-conflict" @click="compareConflict">Compare with saved version</button>
-      <button type="button" class="btn-reload-conflict" @click="reloadConflict">Reload to review</button>
+      {{ message("This page changed remotely. Your edits are still here. Compare and combine them with the latest saved version, or reload to review it.") }}
+      <button type="button" class="btn-reload-conflict" @click="compareConflict">{{ message("Compare with saved version") }}</button>
+      <button type="button" class="btn-reload-conflict" @click="reloadConflict">{{ message("Reload to review") }}</button>
     </p>
-    <p v-if="mergeError" class="banner error" role="alert">{{ mergeError }}</p>
+    <p v-if="mergeError" class="banner error" role="alert"><LocalizedError :message="mergeError" /></p>
     <DraftMerge v-if="conflict && mergeBase && mergeServer" :base="mergeBase" :local="page" :server="mergeServer" :server-revision="mergeRevision" @apply="applyMergedDraft" />
-    <p v-if="publishError" class="banner" :class="publishErrorEditorial ? 'warning' : 'error'" role="alert">{{ publishError }}</p>
+    <p v-if="publishError" class="banner" :class="publishErrorEditorial ? 'warning' : 'error'" role="alert"><LocalizedError :message="publishError" /></p>
     <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
     <section v-if="recoveryCandidate" class="banner recovery-banner" role="status">
       <strong>A local recovery copy is available.</strong>
@@ -227,7 +227,7 @@
           Keep a local recovery copy on this device
         </label>
         <p class="field-help">Off by default. When enabled, unsaved text is stored in this browser for up to 7 days and removed when you save or discard.</p>
-        <p v-if="recoveryStorageError" class="field-help" role="alert">{{ recoveryStorageError }}</p>
+        <p v-if="recoveryStorageError" class="field-help" role="alert"><LocalizedError :message="recoveryStorageError" /></p>
         <button v-if="dirty && !comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = true">Compare with saved page</button>
         <button v-else-if="comparisonOpen" type="button" class="btn-secondary" @click="comparisonOpen = false">Hide comparison</button>
         <DraftComparison
@@ -265,7 +265,7 @@
         </div>
       </div>
 
-      <p v-if="previewError" class="banner error" role="alert">{{ previewError }}</p>
+      <p v-if="previewError" class="banner error" role="alert"><LocalizedError :message="previewError" /></p>
       <div v-if="can('content.preview')" class="live-preview-tools">
         <button type="button" class="btn-secondary" :disabled="previewBusy" @click="toggleLivePreview">
           {{ livePreviewOpen ? 'Hide live preview' : 'Live preview' }}
@@ -307,7 +307,7 @@
         @clear="clearSchedule"
       />
       </details>
-      <p v-if="scheduleError" class="banner error" role="alert">{{ scheduleError }}</p>
+      <p v-if="scheduleError" class="banner error" role="alert"><LocalizedError :message="scheduleError" /></p>
       <details class="editor-disclosure" @click="navigateCheck">
         <summary>Page checks</summary>
         <PageQualityChecklist :page="page" :locales="siteLocales" :translations="translations" />
@@ -320,6 +320,8 @@
 </template>
 
 <script setup>
+import { message } from '../lib/messages.js';
+import LocalizedError from './LocalizedError.vue';
 import { nextTick, computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import SectionEditor from './SectionEditor.vue';
 import PresenceBar from './collaboration/PresenceBar.vue';

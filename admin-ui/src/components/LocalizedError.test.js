@@ -1,0 +1,21 @@
+import { mount } from '@vue/test-utils';
+import { afterEach, expect, it } from 'vitest';
+import LocalizedError from './LocalizedError.vue';
+import { messageLanguage } from '../lib/messages.js';
+afterEach(() => {messageLanguage.value='en';});
+it('updates visible errors on language change and escapes diagnostic HTML', async () => {
+  const wrapper=mount(LocalizedError,{props:{message:'Invalid credentials'}});
+  expect(wrapper.text()).toBe('Invalid credentials');
+  messageLanguage.value='de';
+  await wrapper.vm.$nextTick();
+  expect(wrapper.text()).toContain('Benutzername');
+  await wrapper.setProps({message:'<img src=x onerror=alert(1)>'});
+  expect(wrapper.find('img').exists()).toBe(false);
+  expect(wrapper.text()).not.toContain('<img');
+  await wrapper.get('button').trigger('click');
+  expect(wrapper.text()).toContain('<img');
+  expect(wrapper.find('img').exists()).toBe(false);
+  expect(wrapper.get('button').attributes('aria-expanded')).toBe('true');
+  await wrapper.setProps({message:'Another diagnostic'});
+  expect(wrapper.get('button').attributes('aria-expanded')).toBe('false');
+});

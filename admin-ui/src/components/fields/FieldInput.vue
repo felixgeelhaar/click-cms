@@ -105,12 +105,13 @@
       @input="emitValue($event.target.value)"
     />
 
-    <p v-if="error" :id="`${inputId}-error`" class="field-message error-message">{{ error }}</p>
+    <p v-if="error" :id="`${inputId}-error`" class="field-message error-message"><LocalizedError :message="error" /></p>
     <p v-else-if="field.help" :id="`${inputId}-help`" class="field-message help-message">{{ field.help }}</p>
   </div>
 </template>
 
 <script setup>
+import LocalizedError from '../LocalizedError.vue';
 import { computed, useId } from 'vue';
 import RichTextField from './RichTextField.vue';
 import LinesField from './LinesField.vue';

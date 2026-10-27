@@ -31,7 +31,7 @@
       to show anything else rather than offer to restore German text from an
       English version. That constraint is gone.
     -->
-    <p v-if="error" class="versions-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="versions-error" role="alert"><LocalizedError :message="error" /></p>
 
     <p v-if="loading && !versions.length" class="versions-empty">Loading…</p>
 
@@ -112,7 +112,7 @@
               <button type="button" class="btn-sm" @click="closeComparison">Close comparison</button>
             </div>
             <p v-if="loadingComparison === version.id" class="diff-message">Loading saved version…</p>
-            <p v-else-if="comparisonError" class="versions-error" role="alert">Could not load this version: {{ comparisonError }}. Refresh the history and try again.</p>
+            <p v-else-if="comparisonError" class="versions-error" role="alert">{{ message('Could not load this version:') }} <LocalizedError :message="comparisonError" /> {{ message('Refresh the history and try again.') }}</p>
             <p v-else-if="!diffRows.length" class="diff-message">No content differences. The public page and working copy match this version.</p>
             <ul v-else class="diff-list">
               <li v-for="row in diffRows" :key="row.path" class="diff-row">
@@ -128,6 +128,8 @@
 </template>
 
 <script setup>
+import { message } from '../lib/messages.js';
+import LocalizedError from './LocalizedError.vue';
 import { computed, ref } from 'vue';
 
 const confirming = ref('');

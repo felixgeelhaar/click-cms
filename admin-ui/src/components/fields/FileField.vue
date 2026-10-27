@@ -25,32 +25,31 @@
           {{ formatOf(selected) }} · {{ formatBytes(selected.bytes) }}
         </p>
         <p v-if="heavy(selected)" class="selected-warning">
-          This is a large file to send to a visitor. Nothing downloads until they
-          press play, but under about 20&nbsp;MB is kinder on a phone.
+          {{ message('This is a large file to send to a visitor. Nothing downloads until they press play, but under about 20 MB is kinder on a phone.') }}
         </p>
       </div>
-      <button type="button" class="btn-sm" @click="clear">Remove</button>
+      <button type="button" class="btn-sm" @click="clear">{{ message('Remove') }}</button>
     </div>
 
     <!-- A reference the library does not know still shows, so a value pasted in
          before this picker existed is recognisable rather than silently blank. -->
     <p v-else-if="modelValue" class="unknown" data-test="file-unknown">
-      Using <code>{{ modelValue }}</code>, which is not in the media library.
-      <button type="button" class="link-btn" @click="clear">Clear</button>
+      {{ message("This reference is not in the media library. Choose a file from the library to replace it.") }} <code>{{ modelValue }}</code>
+      <button type="button" class="link-btn" @click="clear">{{ message('Clear') }}</button>
     </p>
 
     <div class="picker">
       <button type="button" class="btn-sm" :disabled="loading" @click="open = !open">
-        {{ open ? 'Close library' : (selected ? 'Change video' : 'Choose video') }}
+        {{ open ? message('Close library') : (selected ? message('Change video') : message('Choose video')) }}
       </button>
-      <span v-if="loading" class="hint">Loading library…</span>
+      <span v-if="loading" class="hint">{{ message('Loading library…') }}</span>
       <!-- A request that failed is not an empty library: telling somebody to go
            and upload a film they already uploaded hides the real problem. -->
       <span v-else-if="failed" class="hint hint-error" data-test="library-failed">
-        The library could not be loaded. Reload the page to try again.
+        {{ message('The library could not be loaded. Reload the page to try again.') }}
       </span>
       <span v-else-if="!items.length" class="hint">
-        No video in the library — upload one on the Media page first.
+        {{ message('No video in the library — upload one on the Media page first.') }}
       </span>
     </div>
 
@@ -69,12 +68,14 @@
       </li>
     </ul>
 
-    <p v-if="error" class="field-message error-message">{{ error }}</p>
+    <p v-if="error" class="field-message error-message"><LocalizedError :message="error" /></p>
     <p v-else-if="field.help" class="field-message help-message">{{ field.help }}</p>
   </div>
 </template>
 
 <script setup>
+import { message, imageQualityMessage } from '../../lib/messages.js';
+import LocalizedError from '../LocalizedError.vue';
 import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps({

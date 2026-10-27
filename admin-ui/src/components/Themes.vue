@@ -17,7 +17,7 @@
       </label>
     </div>
 
-    <p v-if="error" class="banner error" role="alert">{{ error }}</p>
+    <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
     <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
 
     <p class="upload-hint muted">
@@ -55,6 +55,7 @@
 </template>
 
 <script setup>
+import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 
 const themes = ref([]);
