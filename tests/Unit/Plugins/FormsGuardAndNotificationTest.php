@@ -68,6 +68,26 @@ final class FormsGuardAndNotificationTest extends TestCase
         self::assertStringNotContainsString('Reply-To', json_encode($notification->captured));
     }
 
+    public function testExplicitTestEmailWorksWhileAlertsAreDisabledAndUsesTestWording(): void
+    {
+        $config = $this->root . '/forms.json';
+        file_put_contents($config, json_encode(['notifications' => [
+            'enabled' => false, 'to' => 'editor@example.invalid', 'from' => 'cms@example.invalid', 'locale' => 'de',
+        ]]));
+        $notification = new class($config) extends \FormsNotification {
+            public string $body = '';
+            protected function deliver(string $to, string $subject, string $body, array $headers): bool
+            {
+                $this->body = $body;
+                return true;
+            }
+        };
+        self::assertSame('disabled', $notification->send('not-sent'));
+        self::assertSame('submitted', $notification->sendTest());
+        self::assertStringContainsString('Test-E-Mail', $notification->body);
+        self::assertStringNotContainsString('not-sent', $notification->body);
+    }
+
     public function testTransportFailureIsReported(): void
     {
         $config = $this->root . '/forms.json';

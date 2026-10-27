@@ -9,6 +9,16 @@ class FormsNotification
 
     public function send(string $reference): string
     {
+        return $this->dispatch($reference, false);
+    }
+
+    public function sendTest(): string
+    {
+        return $this->dispatch('', true);
+    }
+
+    private function dispatch(string $reference, bool $test): string
+    {
         if (!is_file($this->configPath)) {
             return 'disabled';
         }
@@ -17,7 +27,7 @@ class FormsNotification
             if (!is_array($config)) {
                 return 'failed';
             }
-            if (($config['notifications']['enabled'] ?? false) !== true) {
+            if (!$test && ($config['notifications']['enabled'] ?? false) !== true) {
                 return 'disabled';
             }
             $settings = $config['notifications'];
@@ -31,6 +41,12 @@ class FormsNotification
                 ? "Eine neue Formularnachricht ist in Click gespeichert. Melden Sie sich im CMS an und öffnen Sie Formulareingänge.\nReferenz: "
                 : "A new contact form submission is stored in Click. Sign in to the CMS and open Form submissions.\nReference: ") . $reference . "\n";
             $subject = $german ? 'Click CMS: neue Formularnachricht' : 'Click CMS: new form submission';
+            if ($test) {
+                $subject = $german ? 'Click CMS: Test-E-Mail' : 'Click CMS: test email';
+                $body = $german
+                    ? 'Dies ist eine Test-E-Mail aus Click CMS. Ihre E-Mail-Einstellungen funktionieren, wenn Sie diese Nachricht erhalten.'
+                    : 'This is a test email from Click CMS. Your email settings work if you receive this message.';
+            }
             return $this->deliver($settings['to'], $subject, $body, [
                 'From' => $settings['from'], 'Content-Type' => 'text/plain; charset=UTF-8',
             ]) ? 'submitted' : 'failed';

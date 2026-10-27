@@ -60,6 +60,23 @@ final class ApiGuardTest extends TestCase
         return $id;
     }
 
+    public function testEmailSettingsAndTestRemainAdministratorOnly(): void
+    {
+        foreach (['forms/email-settings', 'forms/email-test'] as $path) {
+            self::assertFalse($this->guard->isPublic($path, 'GET'));
+            self::assertSame(401, $this->guard->enforceAuth($path, 'GET')['status']);
+        }
+        $this->signIn('editor');
+        self::assertSame(403, $this->guard->enforceAuth('forms/email-settings', 'PUT')['status']);
+        self::assertSame(403, $this->guard->enforceAuth('forms/email-test', 'POST')['status']);
+        $this->signIn('admin');
+        $this->guard = new ApiGuard(new SessionStore($this->base . '/sessions', 1800));
+        self::assertNull($this->guard->enforceAuth('forms/email-settings', 'PUT'));
+        self::assertNull($this->guard->enforceAuth('forms/email-test', 'POST'));
+        self::assertSame(403, $this->guard->enforceCsrf('forms/email-test', 'POST', [])['status']);
+        self::assertNull($this->guard->enforceCsrf('forms/email-test', 'POST', ['HTTP_X_CLICK_CSRF' => 'the-real-token']));
+    }
+
     /* ------------------------------------------------ public paths -- */
 
     public function testPublishedContentIsPublicToRead(): void

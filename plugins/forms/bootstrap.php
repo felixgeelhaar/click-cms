@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../src/Application/Plugin/BasePlugin.php';
 
 require_once __DIR__ . '/SubmissionGuard.php';
 require_once __DIR__ . '/Notification.php';
+require_once __DIR__ . '/EmailSettings.php';
 
 use Click\Cms\Application\Forms\FormMessages;
 use Click\Cms\Application\Authentication\SessionStore;
@@ -113,7 +114,83 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
             // Management: the collected leads. Deny-by-default keeps anonymous
             // callers out; the handler narrows it to editors and above.
             'GET /api/forms/submissions' => [$this, 'handleSubmissions'],
+            'GET /api/forms/email-settings' => fn (): array => $this->handleEmailSettings('GET'),
+            'PUT /api/forms/email-settings' => fn (): array => $this->handleEmailSettings('PUT'),
+            'POST /api/forms/email-test' => [$this, 'handleEmailTest'],
         ];
+    }
+
+    public function handleEmailSettings(string $method): array
+    {
+        if (!$this->mayManageEmail()) {
+            return ['status' => 403, 'error' => 'You do not have permission to change email settings.'];
+        }
+        try {
+            if ($method === 'GET') {
+                return ['data' => $this->emailSettings()->read()];
+            }
+            if ($method !== 'PUT') {
+                return ['status' => 405, 'error' => 'Method not allowed'];
+            }
+            $input = $this->readBody();
+            $value = [];
+            if (!is_bool($input['enabled'] ?? null) || !in_array($input['locale'] ?? null, ['en', 'de'], true)) {
+                return ['status' => 422, 'error' => 'Choose whether alerts are enabled and select an email language.'];
+            }
+            $value['enabled'] = $input['enabled'];
+            foreach (['to', 'from'] as $key) {
+                $address = $input[$key] ?? null;
+                if (!is_string($address) || strlen($address) > 254 || preg_match('/[\r\n]/', $address)) {
+                    return ['status' => 422, 'error' => 'Enter valid recipient and sender email addresses.'];
+                }
+                $address = trim($address);
+                if (($value['enabled'] || $address !== '') && filter_var($address, FILTER_VALIDATE_EMAIL) === false) {
+                    return ['status' => 422, 'error' => 'Enter valid recipient and sender email addresses.'];
+                }
+                $value[$key] = $address;
+            }
+            $value['locale'] = $input['locale'];
+            $this->emailSettings()->save($value);
+            return ['data' => $value];
+        } catch (\Throwable) {
+            return ['status' => 503, 'error' => 'Email settings could not be read or saved. Please try again or contact your website administrator.'];
+        }
+    }
+
+    public function handleEmailTest(): array
+    {
+        if (!$this->mayManageEmail()) {
+            return ['status' => 403, 'error' => 'You do not have permission to change email settings.'];
+        }
+        try {
+            if (!(new FormsSubmissionGuard($this->pluginManager->getDataPath() . '/forms/email-tests'))->allow('site')) {
+                return ['status' => 429, 'error' => 'Too many test emails. Please wait ten minutes before trying again.'];
+            }
+            $settings = $this->emailSettings()->read();
+            if (!filter_var($settings['to'], FILTER_VALIDATE_EMAIL) || !filter_var($settings['from'], FILTER_VALIDATE_EMAIL)) {
+                return ['status' => 422, 'error' => 'Save valid recipient and sender email addresses before sending a test.'];
+            }
+            if ($this->notification()->sendTest() !== 'submitted') {
+                return ['status' => 503, 'error' => 'The server could not send the test email. Your settings are saved. Ask your hosting provider to check email sending.'];
+            }
+            return ['success' => true];
+        } catch (\Throwable) {
+            return ['status' => 503, 'error' => 'The server could not send the test email. Your settings are saved. Ask your hosting provider to check email sending.'];
+        }
+    }
+
+    private function mayManageEmail(): bool
+    {
+        $user = (new SessionStore($this->pluginManager->getDataPath() . '/sessions'))->user();
+        return $user !== null && Role::fromName($user['role'] ?? null)->can(Capability::ManageSettings);
+    }
+
+    private function emailSettings(): FormsEmailSettings
+    {
+        return new FormsEmailSettings(
+            $this->pluginManager->getDataPath() . '/forms/email-settings.json',
+            $this->pluginManager->getSiteRoot() . '/config/forms.json',
+        );
     }
 
     /**
@@ -385,7 +462,8 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
      */
     protected function notification(): FormsNotification
     {
-        return new FormsNotification($this->pluginManager->getSiteRoot() . '/config/forms.json');
+        $saved = $this->pluginManager->getDataPath() . '/forms/email-settings.json';
+        return new FormsNotification(is_file($saved) ? $saved : $this->pluginManager->getSiteRoot() . '/config/forms.json');
     }
 
     private function language(string $locale): string

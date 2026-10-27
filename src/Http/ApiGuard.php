@@ -173,6 +173,10 @@ final class ApiGuard
             return ['status' => 403, 'error' => 'You do not have permission to preview this page.'];
         }
 
+        if (in_array($path, ['forms/email-settings', 'forms/email-test'], true) && !$role->can(Capability::ManageSettings)) {
+            return $this->fault(403, 'You do not have permission to change email settings.');
+        }
+
         if ($path === 'security/health' && !$role->can(Capability::ManageSettings)) {
             return ['status' => 403, 'error' => 'You do not have permission to view security health.'];
         }
