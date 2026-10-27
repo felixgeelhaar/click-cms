@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Click\Cms\Http;
 
 use Click\Cms\Domain\Content\Content;
+use Click\Cms\Application\Forms\FormMessages;
 use Click\Cms\Domain\Content\RichTextSanitizer;
 use Click\Cms\Application\Collection\EntryListings;
 use Click\Cms\Application\Media\MediaService;
@@ -229,10 +230,11 @@ final class SectionRenderer
         $slug = $this->escape($page->slug());
         $locale = $this->escape($page->locale()->code);
 
+        $text = fn (string $key): string => FormMessages::text($key, $page->locale()->code);
         $confirmation = isset($values['confirmation']) && is_scalar($values['confirmation'])
             && (string) $values['confirmation'] !== ''
             ? (string) $values['confirmation']
-            : 'Thank you. Your message has been received.';
+            : $text('received');
 
         return '<section class="cms-section cms-section--form">'
             . $heading . $intro
@@ -240,21 +242,22 @@ final class SectionRenderer
             // form so the enhancement script below can show it without a second
             // round trip. Escaped: it is editor text landing in an attribute.
             . '<form class="cms-form" method="POST" action="' . $this->urlBase->url('/api/forms/submit') . '"'
+            . ' data-sending="' . $this->escape($text('sending')) . '" data-error="' . $this->escape($text('failed')) . '"'
             . ' data-confirmation="' . $this->escape($confirmation) . '">'
             . '<input type="hidden" name="page" value="' . $slug . '">'
             . '<input type="hidden" name="locale" value="' . $locale . '">'
             // The honeypot: positioned off-screen and hidden from assistive tech,
             // so a person never sees it and a bot that fills every field does.
             . '<div class="cms-form-hp" aria-hidden="true" style="position:absolute;left:-9999px" >'
-            . '<label>Leave this empty<input type="text" name="website" tabindex="-1" autocomplete="off"></label>'
+            . '<label>' . $this->escape($text('honeypot')) . '<input type="text" name="website" tabindex="-1" autocomplete="off"></label>'
             . '</div>'
-            . '<p class="cms-form-field"><label for="cf-name">' . $label('nameLabel', 'Your name') . '</label>'
-            . '<input id="cf-name" type="text" name="name" required></p>'
-            . '<p class="cms-form-field"><label for="cf-email">' . $label('emailLabel', 'Email address') . '</label>'
-            . '<input id="cf-email" type="email" name="email" required></p>'
-            . '<p class="cms-form-field"><label for="cf-message">' . $label('messageLabel', 'Message') . '</label>'
-            . '<textarea id="cf-message" name="message" required></textarea></p>'
-            . '<button type="submit">' . $label('submitLabel', 'Send message') . '</button>'
+            . '<p class="cms-form-field"><label for="cf-name">' . $label('nameLabel', $text('name')) . '</label>'
+            . '<input id="cf-name" type="text" name="name" maxlength="200" required></p>'
+            . '<p class="cms-form-field"><label for="cf-email">' . $label('emailLabel', $text('email_label')) . '</label>'
+            . '<input id="cf-email" type="email" name="email" maxlength="254" required></p>'
+            . '<p class="cms-form-field"><label for="cf-message">' . $label('messageLabel', $text('message')) . '</label>'
+            . '<textarea id="cf-message" name="message" maxlength="10000" required></textarea></p>'
+            . '<button type="submit">' . $label('submitLabel', $text('submit')) . '</button>'
             . '<p class="cms-form-status" role="status" aria-live="polite"></p>'
             . '</form>'
             // Progressive enhancement. Without JavaScript the form posts normally
@@ -280,10 +283,10 @@ final class SectionRenderer
             e.preventDefault();
             var button = form.querySelector('button[type=submit]');
             if (button) { button.disabled = true; }
-            if (status) { status.textContent = 'Sending…'; }
+            if (status) { status.textContent = form.getAttribute('data-sending'); }
             fetch(form.action, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'Accept-Language': form.querySelector('[name=locale]').value },
               body: JSON.stringify(Object.fromEntries(new FormData(form)))
             }).then(function (r) { return r.json().catch(function () { return {}; }); })
               .then(function (body) {
@@ -293,11 +296,11 @@ final class SectionRenderer
                   thanks.textContent = form.getAttribute('data-confirmation') || 'Thank you.';
                   form.replaceChildren(thanks);
                 } else {
-                  if (status) { status.textContent = (body && body.error) || 'Something went wrong. Please try again.'; }
+                  if (status) { status.textContent = (body && body.code && body.error) || form.getAttribute('data-error'); }
                   if (button) { button.disabled = false; }
                 }
               }).catch(function () {
-                if (status) { status.textContent = 'Could not send. Please try again.'; }
+                if (status) { status.textContent = form.getAttribute('data-error'); }
                 if (button) { button.disabled = false; }
               });
           });

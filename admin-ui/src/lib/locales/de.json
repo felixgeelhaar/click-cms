@@ -991,5 +991,9 @@
   "Plugin blocked by deployment policy": "Die Bereitstellungsrichtlinie erlaubt dieses Plugin nicht.",
   "Activation failed": "Die Aktivierung ist fehlgeschlagen.",
   "Plugin not activated": "Das Plugin ist nicht aktiviert.",
-  "Plugin already activated": "Das Plugin ist bereits aktiviert."
+  "Plugin already activated": "Das Plugin ist bereits aktiviert.",
+  "Email alert accepted by the mail server": "E-Mail-Hinweis vom Mailserver angenommen",
+  "Email alert failed. The message is saved here.": "E-Mail-Hinweis fehlgeschlagen. Die Nachricht ist hier gespeichert.",
+  "Email alert status pending. The message is saved here.": "Status des E-Mail-Hinweises offen. Die Nachricht ist hier gespeichert.",
+  "Stored in Click. Email alerts are off.": "In Click gespeichert. E-Mail-Hinweise sind ausgeschaltet."
 }

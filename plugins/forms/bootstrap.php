@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../src/Application/Plugin/BasePlugin.php';
 
+require_once __DIR__ . '/SubmissionGuard.php';
+require_once __DIR__ . '/Notification.php';
+
+use Click\Cms\Application\Forms\FormMessages;
 use Click\Cms\Application\Authentication\SessionStore;
 use Click\Cms\Domain\Content\Content;
 use Click\Cms\Domain\Identity\Capability;
@@ -34,12 +38,13 @@ use Click\Cms\Domain\ValueObjects\ContentKey;
  *    parallel store nothing else can see. The write path is deliberately the
  *    boring one.
  *
- *  - **Spam is met with a honeypot, not a dependency.** A hidden field a human
+ *  - **Spam is met with persistent limits and a honeypot.** A hidden field a human
  *    never sees and a bot fills in reflexively. When it is filled the submission
  *    is accepted with an ordinary success response and then dropped — the bot is
  *    given no signal it was caught, because a bot told it failed simply retries
  *    with the trap avoided. Zero third-party services, per the no-dependency
- *    rule.
+ *    rule. Request and field sizes are bounded, and a locked local counter
+ *    limits attempts per client and per site across requests.
  *
  *  - **Reading is asymmetric with writing.** Submitting is public — that is the
  *    point, an anonymous visitor does it — so `/api/forms/submit` is on the
@@ -123,13 +128,31 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
      */
     public function handleSubmit(): array
     {
-        $input = $this->readBody();
+        $locale = is_scalar($_POST['locale'] ?? null) ? (string) $_POST['locale'] : '';
+        if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 32768) {
+            return $this->refused(413, 'size', $locale);
+        }
+        try {
+            $input = $this->readBody();
+        } catch (\LengthException) {
+            return $this->refused(413, 'size', $locale);
+        }
+        $locale = is_scalar($input['locale'] ?? null) ? (string) $input['locale'] : '';
+        // Use the browser's preferred language when an oversized JSON body could
+        // not be parsed. Normal forms always provide their content locale.
+        try {
+            if (!(new FormsSubmissionGuard($this->pluginManager->getDataPath() . '/forms'))->allow((string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'))) {
+                return $this->refused(429, 'rate', $locale);
+            }
+        } catch (\Throwable) {
+            return $this->refused(503, 'unavailable', $locale);
+        }
 
         // The honeypot is checked before validation, so a bot that also happens
         // to send a malformed payload still gets the neutral success response
         // rather than a 400 that would teach it the field is a trap.
-        if (trim((string) ($input[self::HONEYPOT_FIELD] ?? '')) !== '') {
-            return $this->accepted();
+        if (!is_scalar($input[self::HONEYPOT_FIELD] ?? '') || trim((string) ($input[self::HONEYPOT_FIELD] ?? '')) !== '') {
+            return $this->accepted($locale);
         }
 
         $values = [];
@@ -143,16 +166,28 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
 
         $error = $this->validate($values);
         if ($error !== null) {
-            return ['status' => 400, 'error' => $error];
+            return $this->refused($error === 'size' ? 413 : 400, $error, $locale);
         }
 
-        $this->store(
-            page: is_scalar($input['page'] ?? null) ? (string) $input['page'] : '',
-            locale: is_scalar($input['locale'] ?? null) ? (string) $input['locale'] : '',
-            values: $values,
-        );
+        try {
+            $stored = $this->store(
+                page: is_scalar($input['page'] ?? null) ? (string) $input['page'] : '',
+                locale: $locale,
+                values: $values,
+            );
+        } catch (\Throwable) {
+            return $this->refused(503, 'unavailable', $locale);
+        }
+        // Accept only after durable storage. Mail failure must not lose a lead
+        // or invite the visitor to submit an already stored message again.
+        $notification = $this->notification()->send($stored->slug());
+        try {
+            $this->pluginManager->getContentService()->save($stored->update(['notification' => $notification]));
+        } catch (\Throwable) {
+            error_log('Click Forms: could not record notification status for ' . $stored->slug());
+        }
 
-        return $this->accepted();
+        return $this->accepted($locale);
     }
 
     /**
@@ -199,9 +234,9 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
      *
      * @return array<string, mixed>
      */
-    private function accepted(): array
+    private function accepted(string $locale): array
     {
-        return ['success' => true, 'message' => 'Thank you. Your message has been received.'];
+        return ['success' => true, 'message' => FormMessages::text('received', $this->language($locale))];
     }
 
     /**
@@ -209,9 +244,12 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
      */
     private function validate(array $values): ?string
     {
-        foreach (self::MESSAGE_FIELDS as $field) {
+        foreach (['name' => 200, 'email' => 254, 'message' => 10000] as $field => $maximum) {
+            if (strlen($values[$field]) > $maximum) {
+                return 'size';
+            }
             if ($values[$field] === '') {
-                return ucfirst($field) . ' is required.';
+                return 'required_' . $field;
             }
         }
 
@@ -219,7 +257,7 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
         // reliable way to reject addresses that are valid and accept ones that
         // are not.
         if (filter_var($values['email'], FILTER_VALIDATE_EMAIL) === false) {
-            return 'That email address does not look valid.';
+            return 'email';
         }
 
         return null;
@@ -230,7 +268,7 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
      *
      * @param array<string, string> $values
      */
-    private function store(string $page, string $locale, array $values): void
+    private function store(string $page, string $locale, array $values): Content
     {
         $contentService = $this->pluginManager->getContentService();
 
@@ -241,7 +279,7 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
 
         $key = ContentKey::fromString(self::SUBMISSION_TYPE . ':' . $this->slug($now));
 
-        $contentService->save(Content::create($key, [
+        $document = Content::create($key, [
             // The source page's slug, so an editor reading a lead knows which
             // form it came from. Sanitised to the same segment shape a slug is
             // allowed to have — a submission cannot dictate a path or carry
@@ -253,7 +291,10 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
             // escaping is the display layer's job and doing it at rest would
             // corrupt the stored data for every reader that is not HTML.
             'fields' => $values,
-        ]));
+            'notification' => 'pending',
+        ]);
+        $contentService->save($document);
+        return $document;
     }
 
     /**
@@ -267,6 +308,7 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
 
         return [
             'id' => $content->slug(),
+            'notification' => $data['notification'] ?? 'disabled',
             'page' => is_string($data['page'] ?? null) ? $data['page'] : '',
             'locale' => is_string($data['locale'] ?? null) ? $data['locale'] : '',
             'submittedAt' => is_string($data['submittedAt'] ?? null) ? $data['submittedAt'] : '',
@@ -295,14 +337,14 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
     {
         $page = trim($page);
 
-        return preg_match('/^[A-Za-z0-9._-]+$/', $page) === 1 ? $page : '';
+        return strlen($page) <= 200 && preg_match('/^[A-Za-z0-9._-]+$/', $page) === 1 ? $page : '';
     }
 
     private function safeLocaleRef(string $locale): string
     {
         $locale = trim($locale);
 
-        return preg_match('/^[A-Za-z0-9_-]+$/', $locale) === 1 ? $locale : '';
+        return strlen($locale) <= 32 && preg_match('/^[A-Za-z0-9_-]+$/', $locale) === 1 ? $locale : '';
     }
 
     /**
@@ -341,10 +383,28 @@ class Plugin_forms extends \Click\Cms\Application\Plugin\BasePlugin
      *
      * @return array<string, mixed>
      */
+    protected function notification(): FormsNotification
+    {
+        return new FormsNotification($this->pluginManager->getSiteRoot() . '/config/forms.json');
+    }
+
+    private function language(string $locale): string
+    {
+        return $locale !== '' ? $locale : (string) ($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'en');
+    }
+
+    private function refused(int $status, string $code, string $locale): array
+    {
+        return ['status' => $status, 'code' => $code, 'error' => FormMessages::text($code, $this->language($locale))];
+    }
+
     private function readBody(): array
     {
-        $raw = (string) file_get_contents('php://input');
+        $raw = (string) file_get_contents('php://input', false, null, 0, 32769);
 
+        if (strlen($raw) > 32768) {
+            throw new \LengthException('Form body too large');
+        }
         if ($raw !== '') {
             $decoded = json_decode($raw, true);
             if (is_array($decoded)) {
