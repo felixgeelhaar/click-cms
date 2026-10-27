@@ -38,7 +38,7 @@ dependency or deployment is free of vulnerabilities.
 
 Install [Warden](https://github.com/klarlabs-studio/warden) and
 [Nox](https://github.com/Nox-HQ/nox) before contributing. The checked configuration
-uses Warden 0.45.0 and Nox 1.48.1; CI pins Nox's action and binary version.
+uses Warden 0.46.0 and Nox 1.54.0; CI pins Nox's action and binary version.
 PHP/Composer, Node/npm and Python 3.9+ are also needed for the configured checks.
 From the repository root:
 

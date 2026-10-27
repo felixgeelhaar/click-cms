@@ -84,3 +84,6 @@ demo/
 docker-compose.turboscience.yml
 test-results/
 playwright-report/
+
+# TypeScript SDK compiler output.
+sdk/typescript/dist/

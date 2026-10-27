@@ -80,10 +80,10 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           coverage: none
@@ -289,22 +289,13 @@ jobs:
             echo "sha256=" >> "$GITHUB_OUTPUT"
           fi
 
-      # These two are deliberately NOT on the latest major, while every other
-      # action in this repository was bumped off the deprecated Node 20 runtime.
-      # They are the component #26 is an open investigation into: a deployment
-      # accepted, reported successful, and never served. The evidence there is a
-      # table of eleven deploys compared against each other, and changing the
-      # version mid-investigation would reset that baseline — a later failure
-      # could no longer be told apart from a regression in the new major.
-      #
-      # Bump both to `upload-pages-artifact@v5` / `deploy-pages@v5` once #26 is
-      # closed, or sooner if Node 20 stops being merely deprecated. Until then
-      # the stale pin buys a comparable baseline, which is worth more.
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      # Keep Pages actions current together. Issue #26 remains guarded by the
+      # dispatch path and the live feed digest verification below.
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
 
-      - uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
         id: deployment
 
       # ---------------------------------------------------- verification --
