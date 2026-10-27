@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import SectionEditor from './SectionEditor.vue';
 
@@ -33,6 +33,8 @@ const lastEmit = (wrapper) => {
 beforeEach(() => {
   vi.restoreAllMocks();
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('SectionEditor reordering', () => {
   it('reorders by dragging a section onto a later position', async () => {
@@ -157,11 +159,11 @@ describe('SectionEditor when the design catalogue cannot be loaded', () => {
 
 describe('SectionEditor starter templates', () => {
   it('saves and applies a reusable snapshot of the current page sections', async () => {
-    global.localStorage = {
+    vi.stubGlobal('localStorage', {
       value: null,
       getItem() { return this.value; },
       setItem(key, value) { this.value = value; },
-    };
+    });
     const wrapper = await mountEditor();
     await wrapper.get('#section-template-name').setValue('Campaign landing');
     await wrapper.get('form.template-row').trigger('submit');

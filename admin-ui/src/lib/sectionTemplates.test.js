@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   listSectionTemplates,
   saveSectionTemplate,
@@ -15,7 +15,9 @@ const memoryStorage = () => {
   };
 };
 
-beforeEach(() => { global.localStorage = memoryStorage(); });
+beforeEach(() => { vi.stubGlobal('localStorage', memoryStorage()); });
+
+afterEach(() => vi.unstubAllGlobals());
 
 const accountOne = { account: 'alice', site: 'https://cms.test/primary' };
 
