@@ -430,7 +430,18 @@ final class SiteBuilder
             throw new RuntimeException("Could not read the stylesheet at {$path}.");
         }
 
-        return $css;
+        // The admin owns the palette. Publish only its token blocks, never its
+        // reset or application selectors, so documentation stays self-contained.
+        $source = file_get_contents(__DIR__ . '/../../admin-ui/src/styles/editorial.css');
+        if ($source === false
+            || !preg_match('/^:root \{(.*?)^\}/ms', $source, $light)
+            || !preg_match('/^\[data-theme="dark"\] \{(.*?)^\}/ms', $source, $dark)) {
+            throw new RuntimeException('Editorial light and dark design tokens are required.');
+        }
+
+        return ":root {" . $light[1] . "}\n"
+            . "@media (prefers-color-scheme: dark) {\n:root {" . $dark[1] . "}\n}\n"
+            . $css;
     }
 
     private function escape(string $text): string

@@ -6,6 +6,7 @@ All notable changes to click-cms are documented here. This project adheres to
 ## [Unreleased]
 
 ### Documentation and publication
+- Align the public Click website with the Editorial design system, using the admin’s shared light/dark palette and typography tokens.
 - Publish simple English/German editor guides, handbooks and hands-on demos in the README and public documentation navigation.
 - Document current Node 24 LTS build requirements and dependency maintenance.
 - Restrict Pages publication to branch pushes, schedules and independent dispatches. Verify every published file, including the signed feed and documentation, before reporting success.
