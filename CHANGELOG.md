@@ -5,6 +5,17 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [1.13.0] — 2026-10-27
+
+### Forms and plugin settings
+
+- Configure Forms email alerts under **Plugins → Forms → Settings**, without editing files. Save the recipient, sender and email language, then explicitly send a test email.
+- Store email settings privately per site, retain saved submissions when notification delivery fails, and distinguish mail-server acceptance from confirmed delivery.
+- Apply persistent submission and test-email rate limits, bound public payload sizes, and translate form errors and confirmations into English and German.
+- Let external plugins declare their own settings fields and actions through a reusable settings screen. Restrict settings requests to the plugin's API prefix and retain server-side authentication, authorization and CSRF protection.
+- Keep uploaded external plugins inactive until explicitly activated, reject duplicate plugin IDs, and display submission confirmations as text.
+
+
 ### Plugin management
 
 - Show activation/deactivation refusals and connection failures, prevent duplicate requests, and translate known plugin errors into German.
@@ -19,6 +30,12 @@ All notable changes to click-cms are documented here. This project adheres to
 - Document current Node 24 LTS build requirements and dependency maintenance.
 - Restrict Pages publication to branch pushes, schedules and independent dispatches. Verify every published file, including the signed feed and documentation, before reporting success.
 - Keep Node on the maintained LTS line; review major container upgrades when they enter LTS.
+
+### Validation
+
+- Verify Forms settings and an installed external plugin end to end, including persistence, German error feedback and mobile administration.
+- Pass 797 admin UI tests, the full PHP suite, container and minimum-PHP checks, browser tests, Nox and dependency audits.
+- This is a compatible stable feature release. Installations receive it according to their configured update policy.
 
 ## [1.12.2] — 2026-10-27
 
