@@ -57,6 +57,17 @@ Administratoren pflegen über **Menus** die Navigation und ihre Reihenfolge. Ein
 
 **Submissions** enthält Formularantworten, sofern entsprechende Formulare eingerichtet sind. Begrenzen Sie den Zugriff, speichern Sie nur notwendige personenbezogene Daten und legen Sie Löschfristen fest. **Builder**, **Themes**, **Plugins** und **Marketplace** verändern Gestaltung oder Funktionen. Testen Sie Änderungen zuerst auf einer Kopie. Der [Rundgang auf Englisch](admin-tour.md) erläutert die Bereiche.
 
+## Plugins hinzufügen oder verwalten
+
+Diese Aufgabe ist für Administratoren. Für normale Inhaltsänderungen müssen Sie keine Plugins ändern.
+
+1. Sichern Sie die Website und probieren Sie Änderungen zuerst auf einer Testkopie aus.
+2. Unter **Marketplace** können Sie Plugins aus dem eingerichteten Verzeichnis installieren oder eine Plugin-ZIP-Datei aus vertrauenswürdiger Quelle hochladen. Ohne eingerichtetes Verzeichnis gibt es keinen Katalog; bereits installierte Plugins sind deshalb nicht defekt.
+3. Öffnen Sie **Plugins**. Mit **Aktivieren** schalten Sie ein installiertes Plugin ein, mit **Deaktivieren** aus. Lesen Sie angezeigte Fehler: Abhängigkeiten oder eine Bereitstellungsrichtlinie können die Änderung verhindern. Bei einem übersprungenen Plugin-Ordner muss der Betreiber dessen Dateien prüfen.
+4. Laden Sie die Administration neu und testen Sie die Funktion auf der tatsächlichen Website oder über die API. Die Installation allein legt keine Inhalte an und richtet eine getrennte SPA nicht automatisch für die Darstellung ein.
+
+Installieren Sie nur vertrauenswürdige Plugins: Ihr PHP-Code läuft mit den Zugriffsrechten des CMS. Deaktivieren entfernt keine Dateien. Sichern Sie Plugin-Daten und prüfen Sie abhängige Funktionen vor Änderungen an der öffentlichen Website.
+
 ## Administration und Sicherheit
 
 Legen Sie unter **Users** persönliche Konten mit der jeweils erforderlichen Rolle an. Entfernen Sie Zugänge ausgeschiedener Personen. **Profile** enthält persönliche Kontoeinstellungen. Aktivieren Sie verfügbare Zwei-Faktor-Authentifizierung und bewahren Sie Wiederherstellungsinformationen vertraulich auf. Passwörter werden als Hash gespeichert und können nicht ausgelesen werden. Bei Verlust ist ein kontrolliertes Zurücksetzen durch den Betreiber erforderlich.

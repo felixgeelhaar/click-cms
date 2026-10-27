@@ -26,10 +26,11 @@
           <h2>{{ plugin.name }}</h2>
           <p>{{ plugin.description || message('No description') }}</p>
         </div>
+        <p v-if="pluginError.id === plugin.id" class="banner error" role="alert"><LocalizedError :message="pluginError.message" /></p>
         <div class="plugin-actions">
           <span :class="['status', plugin.state]">{{ message(plugin.state) }}</span>
-          <button v-if="plugin.state === 'activated'" class="btn-sm btn-secondary" @click="deactivatePlugin(plugin.id)">{{ message('Deactivate') }}</button>
-          <button v-else class="btn-sm btn-primary" @click="activatePlugin(plugin.id)">{{ message('Activate') }}</button>
+          <button v-if="plugin.state === 'activated'" class="btn-sm btn-secondary" :disabled="!!pending" :aria-busy="pending === plugin.id" @click="deactivatePlugin(plugin.id)">{{ message('Deactivate') }}</button>
+          <button v-else class="btn-sm btn-primary" :disabled="!!pending" :aria-busy="pending === plugin.id" @click="activatePlugin(plugin.id)">{{ message('Activate') }}</button>
         </div>
       </div>
     </div>
@@ -45,6 +46,8 @@ const plugins = ref([]);
 const issues = ref([]);
 const loading = ref(true);
 const error = ref('');
+const pending = ref('');
+const pluginError = ref({ id: '', message: '' });
 
 const loadPlugins = async () => {
   loading.value = true;
@@ -69,15 +72,28 @@ const loadPlugins = async () => {
   }
 };
 
-const activatePlugin = async (id) => {
-  await fetch(`/api/plugins/${id}/activate`, { method: 'POST' });
-  loadPlugins();
+const changePluginState = async (id, action) => {
+  if (pending.value) return;
+  pending.value = id;
+  pluginError.value = { id: '', message: '' };
+  const fallback = action === 'activate' ? 'Could not activate plugin.' : 'Could not deactivate plugin.';
+  try {
+    const res = await fetch(`/api/plugins/${id}/${action}`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      pluginError.value = { id, message: data.error || fallback };
+      return;
+    }
+    await loadPlugins();
+  } catch {
+    pluginError.value = { id, message: fallback };
+  } finally {
+    pending.value = '';
+  }
 };
 
-const deactivatePlugin = async (id) => {
-  await fetch(`/api/plugins/${id}/deactivate`, { method: 'POST' });
-  loadPlugins();
-};
+const activatePlugin = (id) => changePluginState(id, 'activate');
+const deactivatePlugin = (id) => changePluginState(id, 'deactivate');
 
 onMounted(loadPlugins);
 </script>

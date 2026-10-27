@@ -57,6 +57,17 @@ Administrators use **Menus** to add published destinations and order navigation.
 
 **Submissions** contains form responses when the relevant forms are configured. Limit access, avoid storing unnecessary personal information and establish a retention policy. **Builder**, **Themes**, **Plugins** and **Marketplace** affect design or functionality; try changes on a copy before applying them to the live site. The [admin tour](admin-tour.md) explains each screen.
 
+## Add or manage plugins
+
+This task is for administrators. Ordinary content editing does not require changing plugins.
+
+1. Back up the site and try the change on a test copy first.
+2. Open **Marketplace** to install from your configured registry or upload a plugin ZIP from a trusted source. An unconfigured registry means no catalogue is available; it does not mean installed plugins are broken.
+3. Open **Plugins**. Use **Activate** to enable an installed plugin or **Deactivate** to turn it off. Read any error shown: a dependency or deployment policy may prevent the change. A skipped-folder warning means the operator needs to check that plugin’s files.
+4. Reload the admin and test the plugin’s feature on the actual website or API. Installing a plugin alone does not add its content or configure a separate SPA to display it.
+
+Only install plugins you trust: their PHP code runs with the CMS’s access. Turning off a plugin does not uninstall its files. Back up plugin data and check dependent features before making changes on the live site.
+
 ## Administration and security
 
 Create individual accounts under **Users**, give each the least powerful suitable role, and remove access when someone leaves. Use **Profile** for personal account settings and configure two-factor authentication where available. Keep recovery material private. Passwords are stored as hashes and cannot be read back; ask the site operator for a controlled reset if credentials are lost.

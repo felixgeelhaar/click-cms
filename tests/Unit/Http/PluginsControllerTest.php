@@ -49,6 +49,26 @@ final class PluginsControllerTest extends TestCase
         @rmdir($path);
     }
 
+    public function testMetadataComesFromTheDiscoveredFolderRatherThanTheGeneratedId(): void
+    {
+        $dir = $this->base . '/plugins/search';
+        mkdir($dir);
+        file_put_contents($dir . '/plugin.json', json_encode([
+            'name' => 'Search API', 'version' => '1.0.0', 'description' => 'Search',
+            'author' => 'Click', 'dependencies' => [], 'hooks' => [],
+        ]));
+        file_put_contents($dir . '/CHANGELOG.md', '# Search changes');
+        file_put_contents($dir . '/signature.txt', 'signature');
+        file_put_contents($dir . '/manifest.json', '{"release":"1.0.0"}');
+        $manager = new PluginManager($this->base . '/plugins', $this->base . '/data');
+        $manager->discover();
+        $result = (new PluginsController($manager))->get('search-api');
+
+        $this->assertSame('# Search changes', $result['data']['changelog']);
+        $this->assertSame('signature', $result['data']['signature']);
+        $this->assertSame(['release' => '1.0.0'], $result['data']['manifest']);
+    }
+
     public function testAMissingPluginIsNotFound(): void
     {
         $result = $this->plugins->get('does-not-exist');

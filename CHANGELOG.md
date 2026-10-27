@@ -5,6 +5,12 @@ All notable changes to click-cms are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Plugin management
+
+- Show activation/deactivation refusals and connection failures, prevent duplicate requests, and translate known plugin errors into German.
+- Read plugin metadata from its discovered directory even when its name generates a different ID.
+- Explain plugin installation, activation and verification in the English and German handbooks.
+
 ### Documentation and publication
 
 - Show translated guides once in website navigation, with an English / Deutsch switch linking equivalent pages.

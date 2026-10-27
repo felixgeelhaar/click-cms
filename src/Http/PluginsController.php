@@ -83,7 +83,7 @@ final class PluginsController
             return ApiFault::of(404, 'Plugin not found', 'not_found');
         }
 
-        $dir = $this->plugins->getBasePath() . '/plugins/' . $plugin->id->value;
+        $dir = $plugin->path;
 
         return ['data' => [
             'id' => $plugin->id->value,
