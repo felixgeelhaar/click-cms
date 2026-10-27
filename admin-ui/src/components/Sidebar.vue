@@ -1,5 +1,5 @@
 <template>
-  <nav class="sidebar" :class="{ collapsed }" aria-label="Admin navigation">
+  <nav class="sidebar" :class="{ collapsed }" :aria-label="message(&quot;Admin navigation&quot;)">
     <div v-for="group in navGroups" :key="group.id" class="nav-group">
       <!-- A collapsible group's heading is a real button so it can be reached by
            keyboard and announces its expanded state. When the rail is collapsed
@@ -12,7 +12,7 @@
         :aria-expanded="isOpen(group.id)"
         @click="toggleGroup(group.id)"
       >
-        <span class="nav-group-label">{{ group.label }}</span>
+        <span class="nav-group-label">{{ message(group.label) }}</span>
         <svg class="caret" :class="{ open: isOpen(group.id) }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M6 9l6 6 6-6" />
         </svg>
@@ -35,7 +35,7 @@
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path v-for="(d, i) in iconPaths[item.icon]" :key="i" :d="d" />
             </svg>
-            <span class="label">{{ item.label }}</span>
+            <span class="label">{{ message(item.label) }}</span>
           </a>
         </li>
       </ul>
@@ -44,6 +44,7 @@
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import { computed, ref } from 'vue';
 import { withBase } from '../lib/base.js';
 const props = defineProps({ activeRoute: String, userRole: String, capabilities: { type: Array, default: () => [] }, collapsed: Boolean, showBuilder: Boolean, showWebhooks: Boolean, showReviews: Boolean, showRelease: Boolean });

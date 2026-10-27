@@ -1,41 +1,37 @@
 <template>
   <div class="updates">
-    <h1 class="page-title">Updates</h1>
-    <p class="page-subtitle">Keep the CMS itself current.</p>
+    <h1 class="page-title">{{ message('Updates') }}</h1>
+    <p class="page-subtitle">{{ message('Keep the CMS itself current.') }}</p>
 
     <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
-    <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
+    <p v-if="notice" class="banner success" role="status">{{ message(notice) }}</p>
 
     <!-- A non-administrator gets the reason rather than an empty page: updating
          is the same privilege as installing a plugin, and saying so is more use
          than a blank screen. -->
-    <p v-if="forbidden" class="muted">
-      You do not have permission to update this site. Ask an administrator.
-    </p>
+    <p v-if="forbidden" class="muted"> {{ message('You do not have permission to update this site. Ask an administrator.') }} </p>
 
     <template v-else>
       <section class="panel">
         <div class="row">
           <div>
-            <p class="label">Running</p>
+            <p class="label">{{ message('Running') }}</p>
             <p class="version">{{ currentVersion || '—' }}</p>
           </div>
           <div>
-            <p class="label">Policy</p>
-            <p class="policy">{{ policyLabel }}</p>
+            <p class="label">{{ message('Policy') }}</p>
+            <p class="policy">{{ message(policyLabel) }}</p>
           </div>
           <button class="btn-secondary" :disabled="checking" @click="check">
-            {{ checking ? 'Checking…' : 'Check now' }}
+            {{ checking ? message('Checking…') : message('Check now') }}
           </button>
         </div>
       </section>
 
       <section class="panel">
-        <p v-if="loading" class="muted">Loading…</p>
+        <p v-if="loading" class="muted">{{ message('Loading…') }}</p>
 
-        <p v-else-if="!configured" class="muted">
-          No update feed is configured. Set <code>core.updates.feedUrl</code> and its public key in
-          <code>config/core.json</code>.
+        <p v-else-if="!configured" class="muted"> {{ message('No update feed is configured. Set') }} <code>core.updates.feedUrl</code> {{ message('and its public key in') }} <code>config/core.json</code>.
         </p>
 
         <!-- Why the feed gave nothing, when it did — otherwise a broken key or a
@@ -45,24 +41,24 @@
         <div v-else-if="hasUpdate" class="offer">
           <p class="offer-head">
             <span class="offer-version">{{ release.version }}</span>
-            <span class="step">{{ step }}</span>
-            <span v-if="release.security" class="badge security">Security</span>
+            <span class="step">{{ message(step) }}</span>
+            <span v-if="release.security" class="badge security">{{ message('Security') }}</span>
           </p>
           <p v-if="release.notes" class="notes">{{ release.notes }}</p>
           <button class="btn-primary" :disabled="installing" @click="apply">
-            {{ installing ? 'Installing…' : 'Install this update' }}
+            {{ installing ? message('Installing…') : message('Install this update') }}
           </button>
         </div>
 
-        <p v-else class="muted">{{ reason || 'Already up to date.' }}</p>
+        <p v-else class="muted">{{ message(reason || 'Already up to date.') }}</p>
       </section>
 
       <section class="panel">
-        <h2 class="panel-title">History</h2>
-        <p v-if="!history.length" class="muted">Nothing has been installed yet.</p>
+        <h2 class="panel-title">{{ message('History') }}</h2>
+        <p v-if="!history.length" class="muted">{{ message('Nothing has been installed yet.') }}</p>
         <ul v-else class="list">
           <li v-for="(entry, i) in history" :key="i" class="entry">
-            <span :class="['result', entry.ok ? 'ok' : 'failed']">{{ entry.ok ? 'Installed' : 'Failed' }}</span>
+            <span :class="['result', entry.ok ? 'ok' : 'failed']">{{ entry.ok ? message('Installed') : message('Failed') }}</span>
             <span class="entry-version">{{ entry.from }} → {{ entry.to }}</span>
             <span class="entry-at">{{ entry.at }}</span>
             <span v-if="entry.error" class="entry-error"><LocalizedError :message="entry.error" /></span>
@@ -74,6 +70,7 @@
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { computed, onMounted, ref } from 'vue';
 

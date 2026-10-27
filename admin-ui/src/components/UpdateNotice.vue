@@ -1,4 +1,5 @@
 <script setup>
+import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 /**
  * Tells an administrator, on sign-in, that a release is waiting — and offers to
@@ -80,25 +81,25 @@ const install = async () => {
        changed underneath, and a page that reloads itself mid-sentence is
        startling. -->
   <div v-if="done !== null" class="notice notice--done" role="status">
-    <strong>Updated to {{ done }}.</strong>
-    <span>Reload to use the new version.</span>
-    <button class="btn" @click="reload">Reload</button>
+    <strong>{{ message('Updated to') }} {{ message(done) }}.</strong>
+    <span>{{ message('Reload to use the new version.') }}</span>
+    <button class="btn" @click="reload">{{ message('Reload') }}</button>
   </div>
 
   <div v-else-if="show" class="notice" role="status">
     <div class="notice__text">
-      <strong>Version {{ release.version }} is available.</strong>
-      <span v-if="release.security" class="notice__security">Security release</span>
-      <span v-else>You are running {{ state.currentVersion }}.</span>
+      <strong>Version {{ release.version }} {{ message('is available.') }}</strong>
+      <span v-if="release.security" class="notice__security">{{ message('Security release') }}</span>
+      <span v-else>{{ message('You are running') }} {{ state.currentVersion }}.</span>
     </div>
 
     <p v-if="error" class="notice__error" role="alert"><LocalizedError :message="error" /></p>
 
     <div class="notice__actions">
       <button class="btn-primary" :disabled="installing" @click="install">
-        {{ installing ? 'Installing…' : 'Install now' }}
+        {{ installing ? message('Installing…') : message('Install now') }}
       </button>
-      <button class="btn" :disabled="installing" @click="dismissed = true">Not now</button>
+      <button class="btn" :disabled="installing" @click="dismissed = true">{{ message('Not now') }}</button>
     </div>
   </div>
 </template>

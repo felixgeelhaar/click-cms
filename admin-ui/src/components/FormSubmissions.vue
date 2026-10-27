@@ -2,17 +2,17 @@
   <section class="submissions" aria-labelledby="form-submissions-heading">
     <div class="submissions-head">
       <div>
-        <h1 id="form-submissions-heading" class="submissions-title">Form submissions</h1>
-        <p class="submissions-subtitle">Messages visitors have sent through a contact form.</p>
+        <h1 id="form-submissions-heading" class="submissions-title">{{ message('Form submissions') }}</h1>
+        <p class="submissions-subtitle">{{ message('Messages visitors have sent through a contact form.') }}</p>
       </div>
       <button
         type="button"
         class="btn-sm"
         :disabled="loading"
-        aria-label="Reload the list of form submissions"
+        :aria-label="message(&quot;Reload the list of form submissions&quot;)"
         @click="load"
       >
-        {{ loading ? 'Loading…' : 'Refresh' }}
+        {{ loading ? message('Loading…') : message('Refresh') }}
       </button>
     </div>
 
@@ -25,11 +25,9 @@
     -->
     <p v-if="error" class="submissions-error" role="alert"><LocalizedError :message="error" /></p>
 
-    <p v-if="loading && !submissions.length" class="submissions-empty">Loading…</p>
+    <p v-if="loading && !submissions.length" class="submissions-empty">{{ message('Loading…') }}</p>
 
-    <p v-else-if="!submissions.length && !error" class="submissions-empty">
-      No submissions yet. When a visitor sends a contact form, it appears here.
-    </p>
+    <p v-else-if="!submissions.length && !error" class="submissions-empty"> {{ message('No submissions yet. When a visitor sends a contact form, it appears here.') }} </p>
 
     <ol v-else class="submissions-list">
       <li v-for="entry in submissions" :key="entry.id" class="submission">
@@ -53,6 +51,7 @@
 </template>
 
 <script setup>
+import { message, messageLanguage } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 
@@ -104,7 +103,7 @@ const displayName = (entry) => (entry.fields?.name || 'Anonymous');
 
 const formatWhen = (value) => {
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? String(value ?? '') : parsed.toLocaleString(messageLanguage.value);
 };
 
 onMounted(load);

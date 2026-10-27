@@ -3,17 +3,17 @@
     <!-- The toolbar is buttons, not links, and every one has an aria-label:
          the glyphs alone say nothing to a screen reader. type="button" keeps a
          click from submitting the surrounding page form. -->
-    <div class="rt-toolbar" role="toolbar" aria-label="Text formatting">
-      <button type="button" class="rt-btn" aria-label="Bold" title="Bold" @mousedown.prevent @click="wrapInline('strong')"><b>B</b></button>
-      <button type="button" class="rt-btn" aria-label="Italic" title="Italic" @mousedown.prevent @click="wrapInline('em')"><i>I</i></button>
-      <button type="button" class="rt-btn" aria-label="Link" title="Add a link" @mousedown.prevent @click="addLink">🔗</button>
+    <div class="rt-toolbar" role="toolbar" :aria-label="message(&quot;Text formatting&quot;)">
+      <button type="button" class="rt-btn" :aria-label="message(&quot;Bold&quot;)" :title="message(&quot;Bold&quot;)" @mousedown.prevent @click="wrapInline('strong')"><b>B</b></button>
+      <button type="button" class="rt-btn" :aria-label="message(&quot;Italic&quot;)" :title="message(&quot;Italic&quot;)" @mousedown.prevent @click="wrapInline('em')"><i>I</i></button>
+      <button type="button" class="rt-btn" aria-label="Link" :title="message(&quot;Add a link&quot;)" @mousedown.prevent @click="addLink">🔗</button>
       <span class="rt-sep" aria-hidden="true"></span>
-      <button type="button" class="rt-btn" aria-label="Heading 2" title="Heading" @mousedown.prevent @click="formatBlock('h2')">H2</button>
-      <button type="button" class="rt-btn" aria-label="Heading 3" title="Subheading" @mousedown.prevent @click="formatBlock('h3')">H3</button>
-      <button type="button" class="rt-btn" aria-label="Paragraph" title="Paragraph" @mousedown.prevent @click="formatBlock('p')">¶</button>
+      <button type="button" class="rt-btn" :aria-label="message(&quot;Heading 2&quot;)" :title="message(&quot;Heading&quot;)" @mousedown.prevent @click="formatBlock('h2')">H2</button>
+      <button type="button" class="rt-btn" :aria-label="message(&quot;Heading 3&quot;)" :title="message(&quot;Subheading&quot;)" @mousedown.prevent @click="formatBlock('h3')">H3</button>
+      <button type="button" class="rt-btn" :aria-label="message(&quot;Paragraph&quot;)" :title="message(&quot;Paragraph&quot;)" @mousedown.prevent @click="formatBlock('p')">¶</button>
       <span class="rt-sep" aria-hidden="true"></span>
-      <button type="button" class="rt-btn" aria-label="Bullet list" title="Bulleted list" @mousedown.prevent @click="makeList('ul')">•</button>
-      <button type="button" class="rt-btn" aria-label="Numbered list" title="Numbered list" @mousedown.prevent @click="makeList('ol')">1.</button>
+      <button type="button" class="rt-btn" :aria-label="message(&quot;Bullet list&quot;)" :title="message(&quot;Bulleted list&quot;)" @mousedown.prevent @click="makeList('ul')">•</button>
+      <button type="button" class="rt-btn" :aria-label="message(&quot;Numbered list&quot;)" :title="message(&quot;Numbered list&quot;)" @mousedown.prevent @click="makeList('ol')">1.</button>
     </div>
 
     <!-- contenteditable holds HTML. It is populated from the model imperatively
@@ -32,7 +32,7 @@
       role="textbox"
       aria-multiline="true"
       :aria-labelledby="labelledby"
-      :aria-label="labelledby ? undefined : 'Rich text'"
+      :aria-label="labelledby ? undefined : message('Rich text')"
       :aria-describedby="describedby"
       :aria-invalid="invalid ? 'true' : undefined"
       @input="onInput"
@@ -42,6 +42,7 @@
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
 import { onMounted, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -173,7 +174,7 @@ const addLink = () => {
   const range = currentRange();
   if (!range || range.collapsed) return;
 
-  const url = window.prompt('Link URL (https://…)');
+  const url = window.prompt(message('Link URL (https://…)'));
   const href = safeHref(url);
   // A refused or empty URL leaves the text untouched rather than making a dead
   // or dangerous link.

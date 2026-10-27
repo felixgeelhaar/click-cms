@@ -1,26 +1,22 @@
 <template>
   <div class="section-editor" :class="{ 'content-first': contentFirst }">
     <div class="editor-head">
-      <h2 class="editor-title">Sections</h2>
-      <p class="editor-subtitle">
-        Add sections to build the page. Each one uses a design the site provides.
-      </p>
+      <h2 class="editor-title">{{ message('Sections') }}</h2>
+      <p class="editor-subtitle"> {{ message('Add sections to build the page. Each one uses a design the site provides.') }} </p>
     </div>
 
 
 
     <p v-if="typesError" class="banner error" role="alert"><LocalizedError :message="typesError" /></p>
 
-    <p v-else-if="loadingTypes" class="banner">Loading section types…</p>
+    <p v-else-if="loadingTypes" class="banner">{{ message('Loading section types…') }}</p>
 
-    <p v-else-if="types.length === 0" class="banner">
-      This site has not declared any section types yet, so there is nothing to add.
-    </p>
+    <p v-else-if="types.length === 0" class="banner"> {{ message('This site has not declared any section types yet, so there is nothing to add.') }} </p>
 
     <!-- Warnings surface malformed definitions instead of hiding them, so an
          author notices a typo rather than wondering where a type went. -->
     <div v-if="Object.keys(typeWarnings).length" class="banner warning">
-      <strong>{{ message("Some section types could not be loaded:") }}</strong>
+      <strong>{{ message('Some section types could not be loaded:') }}</strong>
       <ul>
         <li v-for="(message, file) in typeWarnings" :key="file">{{ file }} — <LocalizedError :message="message" /></li>
       </ul>
@@ -59,37 +55,32 @@
                 told an editor their page's design "is no longer declared" when
                 nothing was wrong with it but a request.
               -->
-              <p v-if="!typeFor(section.type) && catalogueKnown" class="section-missing">
-                Unknown section type “{{ section.type }}” — its design is no longer declared.
-              </p>
-              <p v-else-if="!typeFor(section.type)" class="section-unavailable">
-                The fields for this section cannot be shown until the section
-                designs load. Your content is safe — reload the page to try again.
-              </p>
+              <p v-if="!typeFor(section.type) && catalogueKnown" class="section-missing"> {{ message('Unknown section type “') }}{{ section.type }}{{ message('” — its design is no longer declared.') }} </p>
+              <p v-else-if="!typeFor(section.type)" class="section-unavailable"> {{ message('The fields for this section cannot be shown until the section designs load. Your content is safe — reload the page to try again.') }} </p>
             </div>
           </div>
 
           <div class="section-controls">
             <button
               type="button" class="icon-btn" :disabled="index === 0"
-              :aria-label="`Move section ${index + 1} up`" @click="move(index, -1)"
+              :aria-label="message('Move section {0} up', [index + 1])" @click="move(index, -1)"
             >↑</button>
             <button
               type="button" class="icon-btn" :disabled="index === sections.length - 1"
-              :aria-label="`Move section ${index + 1} down`" @click="move(index, 1)"
+              :aria-label="message('Move section {0} down', [index + 1])" @click="move(index, 1)"
             >↓</button>
             <button
               type="button" class="icon-btn"
-              :aria-label="`${section._collapsed ? 'Expand' : 'Collapse'} section ${index + 1}`"
+              :aria-label="message('{0} section {1}', [message(section._collapsed ? 'Expand' : 'Collapse'), index + 1])"
               @click="toggle(index)"
             >{{ section._collapsed ? '▸' : '▾' }}</button>
             <details v-if="contentFirst" class="section-options">
-              <summary :aria-label="`Options for section ${index + 1}`">Options</summary>
-              <button type="button" class="icon-btn danger" :aria-label="`Remove section ${index + 1}`" @click="remove(index)">Remove section</button>
+              <summary :aria-label="message('Options for section {0}', [index + 1])">{{ message('Options') }}</summary>
+              <button type="button" class="icon-btn danger" :aria-label="message('Remove section {0}', [index + 1])" @click="remove(index)">{{ message('Remove section') }}</button>
             </details>
             <button v-else
               type="button" class="icon-btn danger"
-              :aria-label="`Remove section ${index + 1}`" @click="remove(index)"
+              :aria-label="message('Remove section {0}', [index + 1])" @click="remove(index)"
             >✕</button>
           </div>
         </header>
@@ -116,74 +107,72 @@
       </li>
     </ol>
 
-    <details class="starter-disclosure" :open="sections.length === 0"><summary>Starter templates and shared presets</summary>
-    <section class="template-tools" aria-label="Starter templates">
-      <label for="section-template-picker">Starter template</label>
+    <details class="starter-disclosure" :open="sections.length === 0"><summary>{{ message('Starter templates and shared presets') }}</summary>
+    <section class="template-tools" :aria-label="message(&quot;Starter templates&quot;)">
+      <label for="section-template-picker">{{ message('Starter template') }}</label>
       <div class="template-row">
         <select id="section-template-picker" v-model="selectedTemplateId" :disabled="templates.length === 0">
-          <option value="">{{ templates.length ? 'Choose a saved starter…' : 'No saved starters yet' }}</option>
+          <option value="">{{ templates.length ? message('Choose a saved starter…') : message('No saved starters yet') }}</option>
           <option v-for="template in templates" :key="template.selectionId" :value="template.selectionId">
-            {{ template.name }}{{ template.source === 'shared' ? ` · shared · v${template.currentVersion}` : template.source === 'starter' ? ` · approved starter · v${template.currentVersion}` : '' }}
+            {{ template.name }}{{ template.source === 'shared' ? message(' · shared · v{0}', [template.currentVersion]) : template.source === 'starter' ? message(' · approved starter · v{0}', [template.currentVersion]) : '' }}
           </option>
         </select>
-        <button type="button" data-testid="replace-shared-preset" :disabled="!adoptableTemplate" @click="applyTemplate('replace')">Replace sections</button>
-        <button type="button" data-testid="append-shared-preset" :disabled="!adoptableTemplate" @click="applyTemplate('append')">Append sections</button>
+        <button type="button" data-testid="replace-shared-preset" :disabled="!adoptableTemplate" @click="applyTemplate('replace')">{{ message('Replace sections') }}</button>
+        <button type="button" data-testid="append-shared-preset" :disabled="!adoptableTemplate" @click="applyTemplate('append')">{{ message('Append sections') }}</button>
         <button
           type="button" class="icon-btn danger"
           :disabled="busySharedPreset || !selectedTemplate || selectedTemplate.source === 'builtin' || selectedTemplate.source === 'starter' || (selectedTemplate.source === 'shared' && !canManagePresets)"
-          :aria-label="`Delete starter ${selectedTemplate?.name ?? ''}`" @click="removeTemplate"
-        >Delete</button>
+          :aria-label="message('Delete starter {0}', [selectedTemplate?.name ?? ''])" @click="removeTemplate"
+        >{{ message('Delete') }}</button>
       </div>
       <p v-if="isSharedPreset(selectedTemplate)" class="template-help">
-        Version {{ selectedTemplate.currentVersion }} · {{ selectedTemplate.versions?.length ?? 1 }} retained versions.
-        Adoption copies these sections into this page; later preset edits do not change this page.
-      </p>
+        Version {{ selectedTemplate.currentVersion }} · {{ selectedTemplate.versions?.length ?? 1 }} {{ message('retained versions. Adoption copies these sections into this page; later preset edits do not change this page.') }} </p>
       <div v-if="isSharedPreset(selectedTemplate)" class="template-history">
-        <label for="shared-preset-version">Adopt retained version</label>
+        <label for="shared-preset-version">{{ message('Adopt retained version') }}</label>
         <select id="shared-preset-version" v-model.number="selectedPresetVersion" :disabled="loadingPresetVersion || busySharedPreset">
           <option v-for="version in [...(selectedTemplate.versions ?? [])].reverse()" :key="version.version" :value="version.version">
             v{{ version.version }} · {{ version.updatedAt }} · {{ version.updatedBy }}
           </option>
         </select>
-        <p v-if="loadingPresetVersion" class="template-help">Loading version…</p>
-        <p v-else-if="selectedSnapshot" class="template-help">Preview of v{{ selectedSnapshot.version }}: {{ selectedSnapshot.sections.length }} sections.</p>
-        <ul v-if="selectedSnapshot" class="template-preview" aria-label="Selected preset version preview">
+        <p v-if="loadingPresetVersion" class="template-help">{{ message('Loading version…') }}</p>
+        <p v-else-if="selectedSnapshot" class="template-help">{{ message('Preview of v') }}{{ selectedSnapshot.version }}: {{ selectedSnapshot.sections.length }} {{ message('sections.') }}</p>
+        <ul v-if="selectedSnapshot" class="template-preview" :aria-label="message(&quot;Selected preset version preview&quot;)">
           <li v-for="(section, index) in selectedSnapshot.sections" :key="`${index}-${section.type}`">
             {{ index + 1 }}. {{ labelFor(section.type) }}
           </li>
         </ul>
         <p v-if="selectedSnapshotError" class="template-notice" role="alert"><LocalizedError :message="selectedSnapshotError" /></p>
       </div>
-      <p v-if="newerVersionAvailable" class="template-notice" role="status">Your adopted v{{ appliedSharedVersions[selectedTemplate.id] }} is older. Select v{{ selectedTemplate.currentVersion }} above, then Append or Replace to adopt it.</p>
-      <p v-if="selectedSnapshot && !selectedSnapshot.compatible" class="template-notice" role="alert">{{ message("This snapshot no longer matches the site's section schema and cannot be adopted.") }} <LocalizedError :message="Object.values(selectedSnapshot.compatibilityErrors ?? {}).join(' ')" /></p>
+      <p v-if="newerVersionAvailable" class="template-notice" role="status">{{ message('Your adopted v') }}{{ appliedSharedVersions[selectedTemplate.id] }} {{ message('is older. Select v') }}{{ selectedTemplate.currentVersion }} {{ message('above, then Append or Replace to adopt it.') }}</p>
+      <p v-if="selectedSnapshot && !selectedSnapshot.compatible" class="template-notice" role="alert">{{ message('This snapshot no longer matches the site\'s section schema and cannot be adopted.') }} <LocalizedError :message="Object.values(selectedSnapshot.compatibilityErrors ?? {}).join(' ')" /></p>
       <div class="template-row">
-        <span class="template-help">Shared library</span>
-        <button type="button" data-testid="refresh-shared-presets" :disabled="loadingSharedPresets" @click="loadSharedPresets">{{ loadingSharedPresets ? 'Refreshing…' : 'Refresh library' }}</button>
+        <span class="template-help">{{ message('Shared library') }}</span>
+        <button type="button" data-testid="refresh-shared-presets" :disabled="loadingSharedPresets" @click="loadSharedPresets">{{ loadingSharedPresets ? message('Refreshing…') : message('Refresh library') }}</button>
       </div>
       <p v-if="sharedPresetError" class="template-notice" role="status"><LocalizedError :message="sharedPresetError" /></p>
       <form v-if="canManagePresets" class="template-row" @submit.prevent="selectedTemplate?.source === 'shared' && selectedTemplate.editable !== false ? updateSharedPreset() : createSharedPreset()">
-        <label class="sr-only" for="shared-preset-name">Shared preset name</label>
-        <input id="shared-preset-name" v-model="sharedPresetName" maxlength="80" placeholder="Name a shared preset" required>
-        <button v-if="selectedTemplate?.source === 'shared' && selectedTemplate.editable !== false" type="submit" data-testid="update-shared-preset" :disabled="busySharedPreset || !sections.length">Save new version</button>
-        <button v-else type="submit" data-testid="create-shared-preset" :disabled="busySharedPreset || !sections.length">Create shared preset</button>
+        <label class="sr-only" for="shared-preset-name">{{ message('Shared preset name') }}</label>
+        <input id="shared-preset-name" v-model="sharedPresetName" maxlength="80" :placeholder="message(&quot;Name a shared preset&quot;)" required>
+        <button v-if="selectedTemplate?.source === 'shared' && selectedTemplate.editable !== false" type="submit" data-testid="update-shared-preset" :disabled="busySharedPreset || !sections.length">{{ message('Save new version') }}</button>
+        <button v-else type="submit" data-testid="create-shared-preset" :disabled="busySharedPreset || !sections.length">{{ message('Create shared preset') }}</button>
       </form>
       <form class="template-row" @submit.prevent="saveTemplate">
-        <label class="sr-only" for="section-template-name">Save current sections as a starter</label>
-        <input id="section-template-name" v-model="templateName" maxlength="80" placeholder="Name this page starter" required>
-        <button type="submit" :disabled="sections.length === 0 || !templateScope?.account || !templateScope?.site">Save personal starter</button>
+        <label class="sr-only" for="section-template-name">{{ message('Save current sections as a starter') }}</label>
+        <input id="section-template-name" v-model="templateName" maxlength="80" :placeholder="message(&quot;Name this page starter&quot;)" required>
+        <button type="submit" :disabled="sections.length === 0 || !templateScope?.account || !templateScope?.site">{{ message('Save personal starter') }}</button>
       </form>
-      <p class="template-help">Personal starters stay in this browser and are scoped to your account and site. Shared presets are versioned for this site.</p>
-      <p v-if="templateNotice" class="template-notice" role="status">{{ templateNotice }}</p>
+      <p class="template-help">{{ message('Personal starters stay in this browser and are scoped to your account and site. Shared presets are versioned for this site.') }}</p>
+      <p v-if="templateNotice" class="template-notice" role="status">{{ message(templateNotice) }}</p>
     </section>
     </details>
     <div class="add-row">
-      <label class="add-label" for="section-type-picker">Add a section</label>
+      <label class="add-label" for="section-type-picker">{{ message('Add a section') }}</label>
       <div class="add-controls">
         <select id="section-type-picker" v-model="pendingType" :disabled="types.length === 0">
-          <option value="">Choose a design…</option>
+          <option value="">{{ message('Choose a design…') }}</option>
           <option v-for="type in types" :key="type.id" :value="type.id">{{ type.label }}</option>
         </select>
-        <button type="button" class="btn-primary" :disabled="!pendingType" @click="add">Add</button>
+        <button type="button" class="btn-primary" :disabled="!pendingType" @click="add">{{ message('Add') }}</button>
       </div>
       <p v-if="pendingDescription" class="add-description">{{ pendingDescription }}</p>
     </div>
@@ -345,7 +334,7 @@ const add = () => {
 };
 
 const remove = (index) => {
-  if (props.contentFirst && !window.confirm(`Remove section ${index + 1}? You can cancel the page edit to discard this change before saving.`)) return;
+  if (props.contentFirst && !window.confirm(message(`Remove section ${index + 1}? You can cancel the page edit to discard this change before saving.`))) return;
   sections.value.splice(index, 1);
   commit();
 };
@@ -535,12 +524,12 @@ onMounted(async () => {
 .section-editor { margin-top: 2rem; }
 .template-tools { display: grid; gap: 0.5rem; padding: 0.9rem; border: 1px solid var(--app-border); border-radius: 10px; }
 .template-tools > label { font-weight: 600; }
-.template-row { display: flex; gap: 0.5rem; align-items: center; }
+.template-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .template-history { display: grid; gap: 0.35rem; padding: 0.65rem; border: 1px solid var(--app-border); border-radius: 8px; }
 .template-history > label { font-weight: 600; }
 .template-history select { width: 100%; padding: 0.5rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .template-preview { margin: 0; padding-left: 1.25rem; color: var(--app-text-muted); font-size: 0.875rem; }
-.template-row select, .template-row input { flex: 1; min-width: 0; padding: 0.55rem 0.65rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
+.template-row select, .template-row input { flex: 1 1 12rem; min-width: 0; max-width: 100%; padding: 0.55rem 0.65rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); font: inherit; }
 .template-row button { padding: 0.55rem 0.8rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--app-surface); color: var(--app-text); cursor: pointer; }
 .template-row button:disabled { opacity: 0.5; cursor: not-allowed; }
 .template-notice { margin: 0; color: var(--app-text-muted); font-size: 0.875rem; }

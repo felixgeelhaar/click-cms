@@ -2,12 +2,7 @@
   <div class="webhooks">
     <h1 class="page-title">Webhooks</h1>
 
-    <p class="intro">
-      Tell another system when something here changes — a static front end that
-      needs to rebuild, a search index, a chat channel. Each webhook is a URL
-      this site posts to, signed so the receiver can tell the delivery came from
-      here.
-    </p>
+    <p class="intro"> {{ message('Tell another system when something here changes — a static front end that needs to rebuild, a search index, a chat channel. Each webhook is a URL this site posts to, signed so the receiver can tell the delivery came from here.') }} </p>
 
     <!--
       Said plainly and at the top, because without a way to make outbound
@@ -15,11 +10,11 @@
       deliveries would queue, and none of them would ever move.
     -->
     <p v-if="canSend === false" class="banner error" role="alert">
-      {{ message("This installation cannot make outbound HTTP requests. Webhooks will not be delivered until the administration enables curl or allow_url_fopen.") }}
+      {{ message('This installation cannot make outbound HTTP requests. Webhooks will not be delivered until the administration enables curl or allow_url_fopen.') }}
     </p>
 
     <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
-    <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
+    <p v-if="notice" class="banner notice" role="status">{{ message(notice) }}</p>
 
     <!--
       The secret is returned exactly once, when the endpoint is created. Shown
@@ -28,23 +23,20 @@
       to delete the webhook and make another.
     -->
     <div v-if="newSecret" class="secret" role="alert">
-      <p class="secret-title">Copy this signing secret now</p>
-      <p class="secret-detail">
-        It is not shown again. The receiver needs it to verify that deliveries
-        came from this site.
-      </p>
+      <p class="secret-title">{{ message('Copy this signing secret now') }}</p>
+      <p class="secret-detail"> {{ message('It is not shown again. The receiver needs it to verify that deliveries came from this site.') }} </p>
       <div class="secret-row">
-        <label class="visually-hidden" for="new-secret">Signing secret</label>
+        <label class="visually-hidden" for="new-secret">{{ message('Signing secret') }}</label>
         <input id="new-secret" :value="newSecret" readonly @focus="$event.target.select()" />
         <button type="button" class="btn-secondary" @click="copySecret">
-          {{ copied ? 'Copied' : 'Copy' }}
+          {{ copied ? message('Copied') : message('Copy') }}
         </button>
-        <button type="button" class="btn-secondary" @click="newSecret = ''">Done</button>
+        <button type="button" class="btn-secondary" @click="newSecret = ''">{{ message('Done') }}</button>
       </div>
     </div>
 
     <section class="panel">
-      <h2>Add a webhook</h2>
+      <h2>{{ message('Add a webhook') }}</h2>
 
       <div class="form-row">
         <label class="field">
@@ -53,34 +45,32 @@
         </label>
 
         <label class="field">
-          <span>Description</span>
-          <input v-model="draft.description" type="text" placeholder="What this is for" />
+          <span>{{ message('Description') }}</span>
+          <input v-model="draft.description" type="text" :placeholder="message(&quot;What this is for&quot;)" />
         </label>
       </div>
 
       <fieldset class="events">
-        <legend>Send when</legend>
+        <legend>{{ message('Send when') }}</legend>
         <label v-for="event in EVENTS" :key="event.name" class="event">
           <input v-model="draft.events" type="checkbox" :value="event.name" />
           <span>
-            <strong>{{ event.label }}</strong>
-            <em>{{ event.detail }}</em>
+            <strong>{{ message(event.label) }}</strong>
+            <em>{{ message(event.detail) }}</em>
           </span>
         </label>
       </fieldset>
 
       <button type="button" class="btn-primary" :disabled="busy" @click="create">
-        {{ busy ? 'Adding…' : 'Add webhook' }}
+        {{ busy ? message('Adding…') : message('Add webhook') }}
       </button>
     </section>
 
     <section class="panel">
       <h2>Webhooks</h2>
 
-      <p v-if="loading" class="empty">Loading…</p>
-      <p v-else-if="endpoints.length === 0" class="empty">
-        None yet. Nothing is being sent anywhere.
-      </p>
+      <p v-if="loading" class="empty">{{ message('Loading…') }}</p>
+      <p v-else-if="endpoints.length === 0" class="empty"> {{ message('None yet. Nothing is being sent anywhere.') }} </p>
 
       <ul v-else class="endpoint-list">
         <li v-for="endpoint in endpoints" :key="endpoint.id" class="endpoint">
@@ -92,34 +82,31 @@
 
           <div class="endpoint-actions">
             <span class="state" :class="endpoint.active ? 'on' : 'off'">
-              {{ endpoint.active ? 'Active' : 'Off' }}
+              {{ endpoint.active ? message('Active') : message('Off') }}
             </span>
             <button type="button" class="btn-secondary" @click="toggle(endpoint)">
-              {{ endpoint.active ? 'Switch off' : 'Switch on' }}
+              {{ endpoint.active ? message('Switch off') : message('Switch on') }}
             </button>
-            <button type="button" class="btn-danger" @click="remove(endpoint)">Delete</button>
+            <button type="button" class="btn-danger" @click="remove(endpoint)">{{ message('Delete') }}</button>
           </div>
         </li>
       </ul>
     </section>
 
     <section class="panel">
-      <h2>Recent deliveries</h2>
+      <h2>{{ message('Recent deliveries') }}</h2>
 
-      <p class="panel-help">
-        The answer to "did my webhook fire?". A failed delivery is retried with
-        a growing gap for about two hours before it is given up on.
-      </p>
+      <p class="panel-help"> {{ message('The answer to "did my webhook fire?". A failed delivery is retried with a growing gap for about two hours before it is given up on.') }} </p>
 
-      <p v-if="deliveries.length === 0" class="empty">Nothing sent yet.</p>
+      <p v-if="deliveries.length === 0" class="empty">{{ message('Nothing sent yet.') }}</p>
 
       <table v-else class="deliveries">
         <thead>
           <tr>
-            <th scope="col">Event</th>
+            <th scope="col">{{ message('Event') }}</th>
             <th scope="col">Status</th>
-            <th scope="col">Tries</th>
-            <th scope="col">Detail</th>
+            <th scope="col">{{ message('Tries') }}</th>
+            <th scope="col">{{ message('Detail') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -127,7 +114,7 @@
             <td>{{ delivery.event }}</td>
             <td><span class="pill" :class="delivery.status">{{ delivery.status }}</span></td>
             <td>{{ delivery.attempts }}</td>
-            <td class="detail">{{ delivery.lastError || delivery.lastStatus || '—' }}</td>
+            <td class="detail"><LocalizedError v-if="delivery.lastError" :message="delivery.lastError" /><span v-else>{{ delivery.lastStatus || '—' }}</span></td>
           </tr>
         </tbody>
       </table>
@@ -255,9 +242,9 @@ const remove = async (endpoint) => {
   // Deleting an endpoint discards whatever is still queued for it, so the
   // confirmation says so rather than asking a bare "are you sure".
   if (!window.confirm(
-    `Delete the webhook for ${endpoint.url}?\n\n`
+    message(`Delete the webhook for ${endpoint.url}?\n\n`
     + 'Anything still waiting to be sent to it will be discarded, and the '
-    + 'signing secret cannot be recovered.'
+    + 'signing secret cannot be recovered.')
   )) {
     return;
   }

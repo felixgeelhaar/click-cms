@@ -2,52 +2,48 @@
   <section class="page-review" aria-labelledby="page-review-title">
     <div class="review-heading">
       <div>
-        <h2 id="page-review-title">Review</h2>
-        <p class="review-state" :class="`state-${review.state || 'none'}`">{{ stateLabel }}</p>
+        <h2 id="page-review-title">{{ message('Review') }}</h2>
+        <p class="review-state" :class="`state-${review.state || 'none'}`">{{ message(stateLabel) }}</p>
       </div>
       <button v-if="review.history?.length" type="button" class="history-toggle" @click="showHistory = !showHistory">
-        {{ showHistory ? 'Hide history' : `History (${review.history.length})` }}
+        {{ showHistory ? message('Hide history') : message('History ({0})', [review.history.length]) }}
       </button>
     </div>
 
-    <p v-if="unavailable" class="review-message">Review workflow is not available on this site.</p>
+    <p v-if="unavailable" class="review-message">{{ message('Review workflow is not available on this site.') }}</p>
     <p v-else-if="error" class="review-message error" role="alert"><LocalizedError :message="error" /></p>
-    <p v-else-if="loading" class="review-message">Loading review status…</p>
+    <p v-else-if="loading" class="review-message">{{ message('Loading review status…') }}</p>
     <template v-else>
       <p v-if="review.state === 'in_review' && review.stale" class="review-message error">
-        {{ message("The page changed after this review was requested. Refresh the request for the current saved version.") }}
+        {{ message('The page changed after this review was requested. Refresh the request for the current saved version.') }}
       </p>
-      <p v-else-if="review.state === 'in_review'" class="review-message">
-        Waiting for {{ review.reviewer || 'a reviewer' }}. Requested by {{ review.requestedByName || review.requestedBy }}.
+      <p v-else-if="review.state === 'in_review'" class="review-message"> {{ message('Waiting for') }} {{ review.reviewer || message('a reviewer') }}{{ message('. Requested by') }} {{ review.requestedByName || review.requestedBy }}.
       </p>
       <p v-else-if="review.state === 'changes_requested'" class="review-message">
-        {{ review.decidedByName || 'A reviewer' }} asked for changes. Update this page, then request another review.
-      </p>
+        {{ review.decidedByName || message('A reviewer') }} {{ message('asked for changes. Update this page, then request another review.') }} </p>
       <p v-else-if="review.state === 'approved' && review.stale" class="review-message error">
-        {{ message("The page changed after approval. Save the current version and request another review.") }}
+        {{ message('The page changed after approval. Save the current version and request another review.') }}
       </p>
       <p v-else-if="review.state === 'published' && review.stale" class="review-message error">
-        {{ message("The page changed after the review was completed. Save the current version and request another review.") }}
+        {{ message('The page changed after the review was completed. Save the current version and request another review.') }}
       </p>
-      <p v-else-if="review.state === 'approved'" class="review-message">
-        Approved by {{ review.decidedByName || 'a reviewer' }}. Publishing remains a separate action.
-      </p>
-      <p v-else-if="review.state === 'published'" class="review-message">This review cycle has been published.</p>
-      <p v-if="review.note" class="request-note">Request: {{ review.note }}</p>
-      <p v-if="review.decisionNote" class="request-note">Reviewer: {{ review.decisionNote }}</p>
+      <p v-else-if="review.state === 'approved'" class="review-message"> {{ message('Approved by') }} {{ review.decidedByName || message('a reviewer') }}{{ message('. Publishing remains a separate action.') }} </p>
+      <p v-else-if="review.state === 'published'" class="review-message">{{ message('This review cycle has been published.') }}</p>
+      <p v-if="review.note" class="request-note">{{ message('Request:') }} {{ review.note }}</p>
+      <p v-if="review.decisionNote" class="request-note">{{ message('Reviewer:') }} {{ review.decisionNote }}</p>
 
       <form v-if="canRequest && (review.state !== 'in_review' || review.stale) && (review.state !== 'approved' || review.stale)" class="request-form" @submit.prevent="requestReview">
-        <label :for="`review-note-${slug}`">Ask for review <span>(optional note)</span></label>
-        <textarea :id="`review-note-${slug}`" data-testid="review-note" v-model="note" maxlength="2000" rows="2" placeholder="What should the reviewer focus on?"></textarea>
-        <label :for="`reviewer-id-${slug}`">Reviewer username <span>(optional)</span></label>
-        <input :id="`reviewer-id-${slug}`" data-testid="reviewer-id" v-model="reviewer" maxlength="120" autocomplete="off" placeholder="Leave blank for the review inbox">
-        <button type="submit" class="request-button" data-testid="request-review" :disabled="busy || dirty || !savedRevision">{{ busy ? 'Sending…' : review.state === 'changes_requested' || review.stale ? 'Request review again' : 'Request review' }}</button>
-        <p v-if="dirty || !savedRevision" class="save-first">Save the page before requesting a review.</p>
+        <label :for="`review-note-${slug}`">{{ message('Ask for review') }} <span>{{ message('(optional note)') }}</span></label>
+        <textarea :id="`review-note-${slug}`" data-testid="review-note" v-model="note" maxlength="2000" rows="2" :placeholder="message(&quot;What should the reviewer focus on?&quot;)"></textarea>
+        <label :for="`reviewer-id-${slug}`">{{ message('Reviewer username') }} <span>(optional)</span></label>
+        <input :id="`reviewer-id-${slug}`" data-testid="reviewer-id" v-model="reviewer" maxlength="120" autocomplete="off" :placeholder="message(&quot;Leave blank for the review inbox&quot;)">
+        <button type="submit" class="request-button" data-testid="request-review" :disabled="busy || dirty || !savedRevision">{{ busy ? message('Sending…') : review.state === 'changes_requested' || review.stale ? message('Request review again') : message('Request review') }}</button>
+        <p v-if="dirty || !savedRevision" class="save-first">{{ message('Save the page before requesting a review.') }}</p>
       </form>
 
       <ol v-if="showHistory" class="review-history">
         <li v-for="(event, index) in review.history" :key="`${event.at}-${index}`">
-          <strong>{{ labelFor(event.state) }}</strong> · {{ event.byName || event.by || 'unknown' }} · {{ formatWhen(event.at) }}
+          <strong>{{ message(labelFor(event.state)) }}</strong> · {{ event.byName || event.by || message('unknown') }} · {{ formatWhen(event.at) }}
           <p v-if="event.note">{{ event.note }}</p>
         </li>
       </ol>
@@ -56,7 +52,7 @@
 </template>
 
 <script setup>
-import { message } from '../../lib/messages.js';
+import { message, messageLanguage } from '../../lib/messages.js';
 import LocalizedError from '../LocalizedError.vue';
 import { computed, ref, watch } from 'vue';
 
@@ -86,7 +82,7 @@ const labelFor = (state) => stateNames[state] || state || 'Review updated';
 const stateLabel = computed(() => loading.value ? 'Loading…' : labelFor(review.value.state));
 const formatWhen = (value) => {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(messageLanguage.value);
 };
 
 const load = async () => {

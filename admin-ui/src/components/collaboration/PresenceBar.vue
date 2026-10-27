@@ -10,9 +10,9 @@
   <section
     v-if="others.length"
     class="presence"
-    aria-label="Editors currently on this page"
+    :aria-label="message(&quot;Editors currently on this page&quot;)"
   >
-    <span class="presence-label">Editing now</span>
+    <span class="presence-label">{{ message('Editing now') }}</span>
     <ul class="presence-list">
       <li v-for="editor in others" :key="editor.user" class="presence-editor" :title="editor.name">
         <span class="presence-avatar" aria-hidden="true">{{ initial(editor.name) }}</span>
@@ -23,6 +23,7 @@
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 
 const props = defineProps({

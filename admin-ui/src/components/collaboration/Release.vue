@@ -2,28 +2,28 @@
   <div class="release">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Release</h1>
-        <p class="page-subtitle">Publish a chosen set of pages and collection entries together.</p>
+        <h1 class="page-title">{{ message('Release') }}</h1>
+        <p class="page-subtitle">{{ message('Publish a chosen set of pages and collection entries together.') }}</p>
       </div>
       <button
         type="button"
         class="btn-sm"
         :disabled="loading"
-        aria-label="Reload pages, entries, and review readiness"
+        :aria-label="message(&quot;Reload pages, entries, and review readiness&quot;)"
         @click="load"
       >
-        {{ loading ? 'Loading…' : 'Refresh' }}
+        {{ loading ? message('Loading…') : message('Refresh') }}
       </button>
     </div>
 
     <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
-    <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
+    <p v-if="notice" class="banner notice" role="status">{{ message(notice) }}</p>
 
-    <p v-if="loading && !loaded" class="loading">Loading…</p>
+    <p v-if="loading && !loaded" class="loading">{{ message('Loading…') }}</p>
 
     <template v-else-if="!error || pages.length > 0 || entries.length > 0">
       <div class="locale-row">
-        <label class="locale-label" for="release-locale">Locale</label>
+        <label class="locale-label" for="release-locale">{{ message('Locale') }}</label>
         <input
           id="release-locale"
           v-model="locale"
@@ -33,28 +33,24 @@
           spellcheck="false"
           aria-describedby="release-locale-hint"
         >
-        <p id="release-locale-hint" class="locale-hint">
-          Defaults to the site language. Publishing uses this locale for every selected item.
-        </p>
+        <p id="release-locale-hint" class="locale-hint"> {{ message('Defaults to the site language. Publishing uses this locale for every selected item.') }} </p>
       </div>
 
-      <p v-if="pages.length === 0 && entries.length === 0" class="empty">
-        Nothing to release yet. Create pages or collection entries first, then choose which ones to publish together.
-      </p>
+      <p v-if="pages.length === 0 && entries.length === 0" class="empty"> {{ message('Nothing to release yet. Create pages or collection entries first, then choose which ones to publish together.') }} </p>
 
       <template v-else>
         <section v-if="pages.length > 0" class="release-section" aria-labelledby="release-pages-heading">
-          <h2 id="release-pages-heading" class="section-title">Pages</h2>
+          <h2 id="release-pages-heading" class="section-title">{{ message('Pages') }}</h2>
           <div class="table-wrap">
             <table class="release-table">
               <thead>
                 <tr>
                   <th scope="col" class="col-check">
-                    <span class="visually-hidden">Include</span>
+                    <span class="visually-hidden">{{ message('Include') }}</span>
                   </th>
-                  <th scope="col">Page</th>
-                  <th scope="col">Title</th>
-                  <th scope="col">Readiness</th>
+                  <th scope="col">{{ message('Page') }}</th>
+                  <th scope="col">{{ message('Title') }}</th>
+                  <th scope="col">{{ message('Readiness') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -80,8 +76,8 @@
                       v-if="page.review"
                       class="review-badge"
                       :class="`is-${page.review.state || 'none'}`"
-                    >{{ stateLabel(page.review) }}</span>
-                    <span v-else class="review-badge is-ready">Ready</span>
+                    >{{ message(stateLabel(page.review)) }}</span>
+                    <span v-else class="review-badge is-ready">{{ message('Ready') }}</span>
                   </td>
                 </tr>
               </tbody>
@@ -90,18 +86,18 @@
         </section>
 
         <section v-if="entries.length > 0" class="release-section" aria-labelledby="release-entries-heading">
-          <h2 id="release-entries-heading" class="section-title">Collection entries</h2>
+          <h2 id="release-entries-heading" class="section-title">{{ message('Collection entries') }}</h2>
           <div class="table-wrap">
             <table class="release-table">
               <thead>
                 <tr>
                   <th scope="col" class="col-check">
-                    <span class="visually-hidden">Include</span>
+                    <span class="visually-hidden">{{ message('Include') }}</span>
                   </th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Entry</th>
-                  <th scope="col">Title</th>
-                  <th scope="col">Readiness</th>
+                  <th scope="col">{{ message('Type') }}</th>
+                  <th scope="col">{{ message('Entry') }}</th>
+                  <th scope="col">{{ message('Title') }}</th>
+                  <th scope="col">{{ message('Readiness') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -128,8 +124,8 @@
                       v-if="entry.review"
                       class="review-badge"
                       :class="`is-${entry.review.state || 'none'}`"
-                    >{{ stateLabel(entry.review) }}</span>
-                    <span v-else class="review-badge is-ready">Ready</span>
+                    >{{ message(stateLabel(entry.review)) }}</span>
+                    <span v-else class="review-badge is-ready">{{ message('Ready') }}</span>
                   </td>
                 </tr>
               </tbody>
@@ -137,10 +133,7 @@
           </div>
         </section>
 
-        <p class="readiness-note">
-          Ready means this item is not in an open review. Publish may still refuse for other
-          reasons — the response will explain.
-        </p>
+        <p class="readiness-note"> {{ message('Ready means this item is not in an open review. Publish may still refuse for other reasons — the response will explain.') }} </p>
 
         <div class="actions">
           <button
@@ -149,15 +142,15 @@
             :disabled="busy || selectionCount === 0"
             @click="publish"
           >
-            {{ busy ? 'Publishing…' : 'Publish together' }}
+            {{ busy ? message('Publishing…') : message('Publish together') }}
           </button>
         </div>
       </template>
     </template>
 
     <div v-if="blockers.length > 0" class="result blockers" role="alert">
-      <h2 class="result-title">Editorial blockers</h2>
-      <p class="result-detail">Nothing was published. Fix these, then try again.</p>
+      <h2 class="result-title">{{ message('Editorial blockers') }}</h2>
+      <p class="result-detail">{{ message('Nothing was published. Fix these, then try again.') }}</p>
       <ul class="result-list">
         <li v-for="(item, i) in blockers" :key="`block-${i}`">
           <a class="page-link" :href="withBase(resultHref(item))" @click="go($event, resultHref(item))">
@@ -170,7 +163,7 @@
     </div>
 
     <div v-if="published.length > 0" class="result success" role="status">
-      <h2 class="result-title">Published</h2>
+      <h2 class="result-title">{{ message('Published') }}</h2>
       <ul class="result-list">
         <li v-for="(item, i) in published" :key="`pub-${i}`">
           <a class="page-link" :href="withBase(resultHref(item))" @click="go($event, resultHref(item))">
@@ -182,7 +175,7 @@
     </div>
 
     <div v-if="failed.length > 0" class="result blockers" role="alert">
-      <h2 class="result-title">Could not publish</h2>
+      <h2 class="result-title">{{ message('Could not publish') }}</h2>
       <ul class="result-list">
         <li v-for="(item, i) in failed" :key="`fail-${i}`">
           <a class="page-link" :href="withBase(resultHref(item))" @click="go($event, resultHref(item))">
@@ -197,6 +190,7 @@
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
 import LocalizedError from '../LocalizedError.vue';
 import { ref, computed, onMounted } from 'vue';
 import { withBase } from '../../lib/base.js';

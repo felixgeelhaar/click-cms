@@ -2,18 +2,18 @@
   <div class="builder">
     <header class="builder-head">
       <div>
-        <h1 class="page-title">Visual Builder</h1>
-        <p class="page-subtitle">Compose a page from sections, grids and content blocks.</p>
+        <h1 class="page-title">{{ message('Visual Builder') }}</h1>
+        <p class="page-subtitle">{{ message('Compose a page from sections, grids and content blocks.') }}</p>
       </div>
       <div v-if="builder" class="builder-actions">
-        <button class="btn-secondary" :disabled="saving" @click="reset">Discard changes</button>
-        <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</button>
+        <button class="btn-secondary" :disabled="saving" @click="reset">{{ message('Discard changes') }}</button>
+        <button class="btn-primary" :disabled="saving" @click="save">{{ saving ? message('Saving…') : message('Save') }}</button>
       </div>
     </header>
 
     <p v-if="loadError" class="banner error" role="alert"><LocalizedError :message="loadError" /></p>
     <p v-if="saveError" class="banner error" role="alert"><LocalizedError :message="saveError" /></p>
-    <p v-if="notice" class="banner notice" role="status">{{ notice }}</p>
+    <p v-if="notice" class="banner notice" role="status">{{ message(notice) }}</p>
 
     <!--
       /admin/builder is reached with no page in hand, so the first thing to do is
@@ -21,12 +21,12 @@
       starts a fresh one when it has none.
     -->
     <div class="page-picker">
-      <label for="builder-page">Page</label>
+      <label for="builder-page">{{ message('Page') }}</label>
       <select id="builder-page" :value="activeSlug" :disabled="loading || saving" @change="onPick($event.target.value)">
-        <option value="">Select a page…</option>
+        <option value="">{{ message('Select a page…') }}</option>
         <option v-for="page in pageList" :key="page.slug" :value="page.slug">{{ page.title }}</option>
       </select>
-      <span v-if="loading" class="picker-status">Loading…</span>
+      <span v-if="loading" class="picker-status">{{ message('Loading…') }}</span>
     </div>
 
     <div v-if="builder" class="builder-workspace">
@@ -44,12 +44,13 @@
     </div>
 
     <div v-else-if="!loading" class="builder-empty">
-      <p>Select a page above to start building.</p>
+      <p>{{ message('Select a page above to start building.') }}</p>
     </div>
   </div>
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { computed, onMounted, provide, ref } from 'vue';
 import BuilderNode from './builder/BuilderNode.vue';
@@ -165,7 +166,7 @@ const ctx = {
     if (!builder.value || !selectedId.value || selectedId.value === builder.value.root) {
       return null;
     }
-    const name = window.prompt('Name for this block');
+    const name = window.prompt(message('Name for this block'));
     if (name === null) return null;
     const trimmed = String(name).trim();
     if (!trimmed) {

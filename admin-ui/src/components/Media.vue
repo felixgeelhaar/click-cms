@@ -2,11 +2,11 @@
   <div class="media">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Media</h1>
-        <p class="page-subtitle">{{ subtitle }}</p>
+        <h1 class="page-title">{{ message('Media') }}</h1>
+        <p class="page-subtitle">{{ message(subtitle) }}</p>
       </div>
       <label class="btn-primary upload-button">
-        {{ uploading ? 'Uploading…' : '+ Upload' }}
+        {{ uploading ? message('Uploading…') : message('+ Upload') }}
         <input
           ref="fileInput"
           type="file"
@@ -19,7 +19,7 @@
     </div>
 
     <p v-if="!capabilities.resizingAvailable && !loading" class="banner warning">
-      {{ message("Image resizing is unavailable on this server, so uploads are stored at their original size only. Install the PHP gd extension to generate responsive versions.") }}
+      {{ message('Image resizing is unavailable on this server, so uploads are stored at their original size only. Install the PHP gd extension to generate responsive versions.') }}
     </p>
 
     <ul v-if="errors.length" class="banner error" role="alert">
@@ -35,20 +35,20 @@
         type="search"
         class="search-input"
         data-test="media-search"
-        placeholder="Search by filename…"
-        aria-label="Search media by filename"
+        :placeholder="message(&quot;Search by filename…&quot;)"
+        :aria-label="message(&quot;Search media by filename&quot;)"
         @input="onSearchInput"
       />
       <select
         v-model="folder"
         class="folder-select"
         data-test="media-folder"
-        aria-label="Filter media by folder"
+        :aria-label="message(&quot;Filter media by folder&quot;)"
         @change="load"
       >
-        <option value="">All folders</option>
+        <option value="">{{ message('All folders') }}</option>
         <option v-for="name in folders" :key="name || '__root'" :value="name || ROOT">
-          {{ name || 'Ungrouped' }}
+          {{ name || message('Ungrouped') }}
         </option>
       </select>
     </div>
@@ -56,10 +56,8 @@
     <!-- The bulk bar only appears once something is selected, so the common case
          (browsing, single actions) is uncluttered. -->
     <div v-if="selectedIds.length" class="bulk-bar" data-test="bulk-bar">
-      <span class="bulk-count">{{ selectedIds.length }} selected</span>
-      <button type="button" class="btn-sm" data-test="bulk-clear" @click="clearSelection">
-        Clear
-      </button>
+      <span class="bulk-count">{{ selectedIds.length }} {{ message('selected') }}</span>
+      <button type="button" class="btn-sm" data-test="bulk-clear" @click="clearSelection"> {{ message('Clear') }} </button>
       <button
         type="button"
         class="btn-sm danger"
@@ -67,7 +65,7 @@
         :disabled="deleting"
         @click="bulkDelete"
       >
-        {{ deleting ? 'Deleting…' : `Delete ${selectedIds.length}` }}
+        {{ deleting ? message('Deleting…') : message('Delete {0}', [selectedIds.length]) }}
       </button>
     </div>
 
@@ -77,20 +75,13 @@
       @dragover.prevent="dragging = true"
       @dragleave.prevent="dragging = false"
       @drop.prevent="onDrop"
-    >
-      Drag pictures or video here, or use the Upload button.
-    </div>
+    > {{ message('Drag pictures or video here, or use the Upload button.') }} </div>
 
-    <p v-if="loading" class="banner">Loading…</p>
+    <p v-if="loading" class="banner">{{ message('Loading…') }}</p>
 
-    <p v-else-if="items.length === 0 && filtering" class="banner" data-test="no-matches">
-      Nothing matches your search. Clear the filters to see the whole library.
-    </p>
+    <p v-else-if="items.length === 0 && filtering" class="banner" data-test="no-matches"> {{ message('Nothing matches your search. Clear the filters to see the whole library.') }} </p>
 
-    <p v-else-if="items.length === 0" class="banner">
-      Nothing here yet. Whatever you upload appears in this library, and can then
-      be picked from any picture or video field without copying a reference.
-    </p>
+    <p v-else-if="items.length === 0" class="banner"> {{ message('Nothing here yet. Whatever you upload appears in this library, and can then be picked from any picture or video field without copying a reference.') }} </p>
 
     <ul v-else class="grid">
       <li
@@ -106,11 +97,11 @@
              naming this box — and a title is a tooltip, announced by some
              screen readers and no braille display. The name goes on the control
              itself, where the accessible name calculation looks first. -->
-        <label class="select-box" :title="`Select ${item.originalName}`">
+        <label class="select-box" :title="message('Select {0}', [item.originalName])">
           <input
             type="checkbox"
             data-test="select-item"
-            :aria-label="`Select ${item.originalName}`"
+            :aria-label="message('Select {0}', [item.originalName])"
             :checked="isSelected(item)"
             @change="toggleSelected(item)"
           />
@@ -167,18 +158,18 @@
                pixel readout would be an empty "×". Say what it is instead. -->
           <p class="card-meta">
             <span v-if="isVideo(item)">
-              {{ (item.extension || '').toUpperCase() || 'Video' }} · {{ formatBytes(item.bytes) }}
+              {{ (item.extension || '').toUpperCase() || message('Video') }} · {{ formatBytes(item.bytes) }}
             </span>
-            <span v-else-if="isVector(item)">Scalable vector · {{ formatBytes(item.bytes) }}</span>
+            <span v-else-if="isVector(item)">{{ message('Scalable vector ·') }} {{ formatBytes(item.bytes) }}</span>
             <span v-else>{{ item.width }}×{{ item.height }} · {{ formatBytes(item.bytes) }}</span>
           </p>
           <p class="card-variants">
             <!-- "no resized versions" is true of every video and reads as a
                  fault. It is how video works here, so say that instead. -->
-            <span v-if="isVideo(item)" class="muted">served as uploaded</span>
-            <span v-else-if="isVector(item)" class="muted">scales to any size</span>
+            <span v-if="isVideo(item)" class="muted">{{ message('served as uploaded') }}</span>
+            <span v-else-if="isVector(item)" class="muted">{{ message('scales to any size') }}</span>
             <span v-else-if="item.variants.length">{{ item.variants.join(', ') }}</span>
-            <span v-else class="muted">no resized versions</span>
+            <span v-else class="muted">{{ message('no resized versions') }}</span>
           </p>
 
           <!-- Declared art-directed crops already exist as files; showing them
@@ -188,10 +179,10 @@
             v-if="cropList(item).length"
             class="crop-previews"
             data-test="crop-previews"
-            :aria-label="`Art-directed crops for ${item.originalName}`"
+            :aria-label="message('Art-directed crops for {0}', [item.originalName])"
           >
             <li v-for="crop in cropList(item)" :key="crop.name" class="crop-preview">
-              <img :src="crop.url" :alt="`${crop.name} crop`" loading="lazy" />
+              <img :src="crop.url" :alt="message('{0} crop', [crop.name])" loading="lazy" />
               <span class="crop-name">{{ crop.name }}</span>
               <span class="crop-size">{{ crop.width }}×{{ crop.height }}</span>
             </li>
@@ -208,20 +199,20 @@
             {{ imageQualityMessage(item.quality) }}
           </p>
 
-          <label class="alt-label" :for="`alt-${item.id}`">Description</label>
+          <label class="alt-label" :for="`alt-${item.id}`">{{ message('Description') }}</label>
           <input
             :id="`alt-${item.id}`"
             :value="item.alt"
             class="alt-input"
-            :placeholder="isVideo(item) ? 'Describe this video' : 'Describe the image'"
+            :placeholder="isVideo(item) ? message('Describe this video') : message('Describe the image')"
             @change="saveAlt(item, $event.target.value)"
           />
 
           <div class="card-actions">
             <button type="button" class="btn-sm" @click="copyId(item)">
-              {{ copiedId === item.id ? 'Copied' : 'Copy reference' }}
+              {{ copiedId === item.id ? message('Copied') : message('Copy reference') }}
             </button>
-            <button type="button" class="btn-sm danger" @click="remove(item)">Delete</button>
+            <button type="button" class="btn-sm danger" @click="remove(item)">{{ message('Delete') }}</button>
           </div>
         </div>
       </li>
@@ -275,16 +266,16 @@ const subtitle = computed(() => {
   const videos = count - pictures;
 
   const parts = [];
-  if (pictures || !videos) parts.push(`${pictures} ${pictures === 1 ? 'picture' : 'pictures'}`);
-  if (videos) parts.push(`${videos} ${videos === 1 ? 'video' : 'videos'}`);
-  const counted = parts.join(' and ');
+  if (pictures || !videos) parts.push(message(pictures === 1 ? '1 picture' : '{0} pictures', [pictures]));
+  if (videos) parts.push(message(videos === 1 ? '1 video' : '{0} videos', [videos]));
+  const counted = parts.join(message(' and '));
 
   const sizes = capabilities.value.variants.map((v) => v.name).join(', ');
   if (!sizes) return `${counted}.`;
 
   return videos
-    ? `${counted}. Each picture is resized to: ${sizes}. Video is served as uploaded.`
-    : `${counted}. Each upload is resized to: ${sizes}.`;
+    ? message('{0}. Each picture is resized to: {1}. Video is served as uploaded.', [counted, sizes])
+    : message('{0}. Each upload is resized to: {1}.', [counted, sizes]);
 });
 
 // An SVG is resolution-independent: no width, no variant ladder, no focal crop.
@@ -385,7 +376,7 @@ const bulkDelete = async () => {
   const ids = [...selectedIds.value];
   if (!ids.length) return;
 
-  if (!window.confirm(`Delete ${ids.length} selected image${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) {
+  if (!window.confirm(message(`Delete ${ids.length} selected image${ids.length === 1 ? '' : 's'}? This cannot be undone.`))) {
     return;
   }
 
@@ -480,9 +471,7 @@ const markerStyle = (item) => {
 const focalLabel = (item) => {
   const { x, y } = focalOf(item);
   return (
-    `Focal point for ${item.originalName}: ${Math.round(x * 100)}% across, ` +
-    `${Math.round(y * 100)}% down. Click the image or use the arrow keys to move ` +
-    `the point that stays visible when the image is cropped.`
+    message('Focal point for {0}: {1}% across, {2}% down. Click the image or use the arrow keys to move the point that stays visible when the image is cropped.', [item.originalName, Math.round(x * 100), Math.round(y * 100)])
   );
 };
 

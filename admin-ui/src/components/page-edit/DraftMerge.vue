@@ -1,42 +1,32 @@
 <template>
   <section class="draft-merge" aria-labelledby="draft-merge-title">
-    <h2 id="draft-merge-title">Combine your edits with the latest saved version</h2>
-    <p class="merge-intro">
-      Unchanged fields are taken from the side that changed them. Choose which
-      value to keep for each conflict, then apply the result to your editor.
-      Nothing is saved or published by applying it.
-    </p>
+    <h2 id="draft-merge-title">{{ message('Combine your edits with the latest saved version') }}</h2>
+    <p class="merge-intro"> {{ message('Unchanged fields are taken from the side that changed them. Choose which value to keep for each conflict, then apply the result to your editor. Nothing is saved or published by applying it.') }} </p>
 
-    <p v-if="conflicts.length === 0" class="merge-ready" role="status">
-      The changes do not overlap. Review the result, then apply it to the editor.
-    </p>
+    <p v-if="conflicts.length === 0" class="merge-ready" role="status"> {{ message('The changes do not overlap. Review the result, then apply it to the editor.') }} </p>
     <fieldset v-for="conflict in conflicts" :key="conflict.path" class="merge-conflict">
       <legend>{{ conflict.path }}</legend>
-      <p class="conflict-base"><strong>Previously saved:</strong> {{ display(conflict.base) }}</p>
+      <p class="conflict-base"><strong>{{ message('Previously saved:') }}</strong> {{ display(conflict.base) }}</p>
       <label>
-        <input type="radio" :name="radioName(conflict.path)" value="local" :checked="choices.get(conflict.path) === 'local'" @change="setChoice(conflict.path, 'local')" />
-        Keep your edit: {{ display(conflict.local) }}
+        <input type="radio" :name="radioName(conflict.path)" value="local" :checked="choices.get(conflict.path) === 'local'" @change="setChoice(conflict.path, 'local')" /> {{ message('Keep your edit:') }} {{ display(conflict.local) }}
       </label>
       <label>
-        <input type="radio" :name="radioName(conflict.path)" value="server" :checked="choices.get(conflict.path) === 'server'" @change="setChoice(conflict.path, 'server')" />
-        Use latest saved: {{ display(conflict.server) }}
+        <input type="radio" :name="radioName(conflict.path)" value="server" :checked="choices.get(conflict.path) === 'server'" @change="setChoice(conflict.path, 'server')" /> {{ message('Use latest saved:') }} {{ display(conflict.server) }}
       </label>
     </fieldset>
 
     <p v-if="conflicts.length" class="merge-count" role="status">
-      {{ resolvedCount }} of {{ conflicts.length }} conflicts resolved.
-    </p>
+      {{ resolvedCount }} {{ message('of') }} {{ conflicts.length }} {{ message('conflicts resolved.') }} </p>
     <details class="merge-preview">
-      <summary>Preview the combined draft values</summary>
+      <summary>{{ message('Preview the combined draft values') }}</summary>
       <pre>{{ format(preview) }}</pre>
     </details>
-    <button type="button" data-testid="apply-merge" :disabled="!canApply" @click="applyMerge">
-      Apply merged draft to editor
-    </button>
+    <button type="button" data-testid="apply-merge" :disabled="!canApply" @click="applyMerge"> {{ message('Apply merged draft to editor') }} </button>
   </section>
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
 import { computed, reactive, watch } from 'vue';
 import { mergeThreeWay, resolveThreeWayMerge } from './threeWayMerge.js';
 

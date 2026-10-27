@@ -1,21 +1,18 @@
 <template>
   <div class="change-password">
     <div class="card">
-      <h1 class="title">{{ forced ? 'Choose a password' : 'Change password' }}</h1>
+      <h1 class="title">{{ forced ? message('Choose a password') : message('Change password') }}</h1>
 
-      <p v-if="forced" class="intro">
-        This account still uses the password it was installed with, which is
-        published in the documentation. Set your own before continuing.
-      </p>
+      <p v-if="forced" class="intro"> {{ message('This account still uses the password it was installed with, which is published in the documentation. Set your own before continuing.') }} </p>
 
       <p v-if="error" class="message error" role="alert"><LocalizedError :message="error" /></p>
-      <p v-else-if="done" class="message success">Password changed.</p>
+      <p v-else-if="done" class="message success">{{ message('Password changed.') }}</p>
 
       <form @submit.prevent="submit">
-        <label for="current">Current password</label>
+        <label for="current">{{ message('Current password') }}</label>
         <input id="current" v-model="current" type="password" autocomplete="current-password" required />
 
-        <label for="next">New password</label>
+        <label for="next">{{ message('New password') }}</label>
         <input
           id="next"
           v-model="next"
@@ -24,14 +21,14 @@
           :minlength="minLength"
           required
         />
-        <p class="hint">At least {{ minLength }} characters.</p>
+        <p class="hint">{{ message('At least') }} {{ minLength }} {{ message('characters.') }}</p>
 
-        <label for="confirm">Repeat new password</label>
+        <label for="confirm">{{ message('Repeat new password') }}</label>
         <input id="confirm" v-model="confirm" type="password" autocomplete="new-password" required />
         <p v-if="mismatch" class="hint mismatch">{{ message('The two entries do not match.') }}</p>
 
         <button class="btn-primary" type="submit" :disabled="saving || mismatch">
-          {{ saving ? 'Saving…' : 'Set password' }}
+          {{ saving ? message('Saving…') : message('Set password') }}
         </button>
       </form>
     </div>

@@ -2,8 +2,8 @@
   <div class="menus">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Menus</h1>
-        <p class="page-subtitle">Build the navigation the site renders — a header nav, a footer nav.</p>
+        <h1 class="page-title">{{ message('Menus') }}</h1>
+        <p class="page-subtitle">{{ message('Build the navigation the site renders — a header nav, a footer nav.') }}</p>
       </div>
     </div>
 
@@ -13,52 +13,50 @@
            language. Hidden on a single-language site, where the choice is not a
            choice. -->
       <div v-if="locales.length > 1" class="menu-picker">
-        <label class="picker-label" for="menu-locale">Language</label>
+        <label class="picker-label" for="menu-locale">{{ message('Language') }}</label>
         <select id="menu-locale" v-model="activeLocale" class="picker-select" :disabled="loading" @change="selectMenu(selectedId)">
           <option v-for="code in locales" :key="code" :value="code">{{ code.toUpperCase() }}</option>
         </select>
       </div>
 
       <div class="menu-picker">
-        <label class="picker-label" for="menu-select">Menu</label>
+        <label class="picker-label" for="menu-select">{{ message('Menu') }}</label>
         <select id="menu-select" v-model="selectedId" class="picker-select" :disabled="loading" @change="selectMenu(selectedId)">
           <option v-for="m in menus" :key="m.id" :value="m.id">{{ m.name || m.id }}</option>
         </select>
       </div>
 
       <form class="new-menu" @submit.prevent="createMenu">
-        <label class="picker-label" for="new-menu-id">New menu</label>
+        <label class="picker-label" for="new-menu-id">{{ message('New menu') }}</label>
         <input
           id="new-menu-id"
           v-model="newId"
           class="picker-input"
           type="text"
-          placeholder="e.g. footer"
+          :placeholder="message(&quot;e.g. footer&quot;)"
           autocomplete="off"
           aria-describedby="new-menu-hint"
         />
-        <button type="submit" class="btn-secondary" :disabled="!newId.trim()">Create</button>
-        <span id="new-menu-hint" class="visually-hidden">Lowercase letters, digits and hyphens.</span>
+        <button type="submit" class="btn-secondary" :disabled="!newId.trim()">{{ message('Create') }}</button>
+        <span id="new-menu-hint" class="visually-hidden">{{ message('Lowercase letters, digits and hyphens.') }}</span>
       </form>
     </div>
 
-    <p v-if="loading" class="loading">Loading…</p>
+    <p v-if="loading" class="loading">{{ message('Loading…') }}</p>
 
     <div v-else-if="loadFailed" class="banner error" role="alert">
       <p><LocalizedError :message="error" /></p>
-      <button type="button" class="btn-secondary" @click="loadMenus">Retry</button>
+      <button type="button" class="btn-secondary" @click="loadMenus">{{ message('Retry') }}</button>
     </div>
     <form v-else class="editor" @submit.prevent="save">
       <div class="name-row">
-        <label class="field-label" for="menu-name">Display name</label>
-        <input id="menu-name" v-model="menuName" class="text-input" type="text" placeholder="Main navigation" />
+        <label class="field-label" for="menu-name">{{ message('Display name') }}</label>
+        <input id="menu-name" v-model="menuName" class="text-input" type="text" :placeholder="message(&quot;Main navigation&quot;)" />
       </div>
 
-      <h2 class="items-title">Items</h2>
+      <h2 class="items-title">{{ message('Items') }}</h2>
 
-      <p v-if="items.length === 0" class="empty-state">
-        This menu has no items yet — that is a valid, empty nav. Add one below.
-      </p>
+      <p v-if="items.length === 0" class="empty-state"> {{ message('This menu has no items yet — that is a valid, empty nav. Add one below.') }} </p>
 
       <ol v-else class="item-list">
         <li v-for="(item, i) in items" :key="item._uid" class="item">
@@ -66,11 +64,11 @@
             <span class="item-index">{{ i + 1 }}</span>
             <div class="item-fields">
               <div class="field">
-                <label class="field-label" :for="`item-${i}-label`">Label</label>
-                <input :id="`item-${i}-label`" v-model="item.label" class="text-input" type="text" placeholder="About us" />
+                <label class="field-label" :for="`item-${i}-label`">{{ message('Label') }}</label>
+                <input :id="`item-${i}-label`" v-model="item.label" class="text-input" type="text" :placeholder="message(&quot;About us&quot;)" />
               </div>
               <div class="field">
-                <label class="field-label" :for="`item-${i}-target`">Target</label>
+                <label class="field-label" :for="`item-${i}-target`">{{ message('Target') }}</label>
                 <LinkField
                   :input-id="`item-${i}-target`"
                   v-model="item.target"
@@ -79,27 +77,27 @@
                   :default-locale="defaultLocale"
                   :described-by="`item-${i}-target-hint`"
                 />
-                <span :id="`item-${i}-target-hint`" class="field-hint">One of this site's pages, an anchor on the current page (#contact), a section of a page (about#team), or an external http(s) address.</span>
+                <span :id="`item-${i}-target-hint`" class="field-hint">{{ message('One of this site\'s pages, an anchor on the current page (#contact), a section of a page (about#team), or an external http(s) address.') }}</span>
               </div>
             </div>
 
             <div class="item-controls">
-              <button type="button" class="icon-btn" :disabled="i === 0" :aria-label="`Move item ${i + 1} up`" @click="moveItem(i, -1)">↑</button>
-              <button type="button" class="icon-btn" :disabled="i === items.length - 1" :aria-label="`Move item ${i + 1} down`" @click="moveItem(i, 1)">↓</button>
-              <button type="button" class="icon-btn" :aria-label="`Add a sub-item under item ${i + 1}`" @click="addChild(i)">＋</button>
-              <button type="button" class="icon-btn danger" :aria-label="`Remove item ${i + 1}`" @click="removeItem(i)">✕</button>
+              <button type="button" class="icon-btn" :disabled="i === 0" :aria-label="message('Move item {0} up', [i + 1])" @click="moveItem(i, -1)">↑</button>
+              <button type="button" class="icon-btn" :disabled="i === items.length - 1" :aria-label="message('Move item {0} down', [i + 1])" @click="moveItem(i, 1)">↓</button>
+              <button type="button" class="icon-btn" :aria-label="message('Add a sub-item under item {0}', [i + 1])" @click="addChild(i)">＋</button>
+              <button type="button" class="icon-btn danger" :aria-label="message('Remove item {0}', [i + 1])" @click="removeItem(i)">✕</button>
             </div>
           </div>
 
-          <ol v-if="item.children.length" class="child-list" :aria-label="`Sub-items of item ${i + 1}`">
+          <ol v-if="item.children.length" class="child-list" :aria-label="message('Sub-items of item {0}', [i + 1])">
             <li v-for="(child, j) in item.children" :key="child._uid" class="child">
               <div class="item-fields">
                 <div class="field">
-                  <label class="field-label" :for="`item-${i}-${j}-label`">Sub-item label</label>
+                  <label class="field-label" :for="`item-${i}-${j}-label`">{{ message('Sub-item label') }}</label>
                   <input :id="`item-${i}-${j}-label`" v-model="child.label" class="text-input" type="text" />
                 </div>
                 <div class="field">
-                  <label class="field-label" :for="`item-${i}-${j}-target`">Sub-item target</label>
+                  <label class="field-label" :for="`item-${i}-${j}-target`">{{ message('Sub-item target') }}</label>
                   <LinkField
                     :input-id="`item-${i}-${j}-target`"
                     v-model="child.target"
@@ -110,9 +108,9 @@
                 </div>
               </div>
               <div class="item-controls">
-                <button type="button" class="icon-btn" :disabled="j === 0" :aria-label="`Move sub-item ${j + 1} of item ${i + 1} up`" @click="moveChild(i, j, -1)">↑</button>
-                <button type="button" class="icon-btn" :disabled="j === item.children.length - 1" :aria-label="`Move sub-item ${j + 1} of item ${i + 1} down`" @click="moveChild(i, j, 1)">↓</button>
-                <button type="button" class="icon-btn danger" :aria-label="`Remove sub-item ${j + 1} of item ${i + 1}`" @click="removeChild(i, j)">✕</button>
+                <button type="button" class="icon-btn" :disabled="j === 0" :aria-label="message('Move sub-item {0} of item {1} up', [j + 1, i + 1])" @click="moveChild(i, j, -1)">↑</button>
+                <button type="button" class="icon-btn" :disabled="j === item.children.length - 1" :aria-label="message('Move sub-item {0} of item {1} down', [j + 1, i + 1])" @click="moveChild(i, j, 1)">↓</button>
+                <button type="button" class="icon-btn danger" :aria-label="message('Remove sub-item {0} of item {1}', [j + 1, i + 1])" @click="removeChild(i, j)">✕</button>
               </div>
             </li>
           </ol>
@@ -120,17 +118,18 @@
       </ol>
 
       <div class="actions">
-        <button type="button" class="btn-secondary" @click="addItem">+ Add item</button>
-        <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save menu' }}</button>
+        <button type="button" class="btn-secondary" @click="addItem">{{ message('+ Add item') }}</button>
+        <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? message('Saving…') : message('Save menu') }}</button>
       </div>
 
       <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
-      <p v-else-if="savedNotice" class="banner ok" role="status">{{ savedNotice }}</p>
+      <p v-else-if="savedNotice" class="banner ok" role="status">{{ message(savedNotice) }}</p>
     </form>
   </div>
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 import LinkField from './fields/LinkField.vue';

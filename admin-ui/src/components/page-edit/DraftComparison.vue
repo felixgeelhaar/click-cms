@@ -1,7 +1,7 @@
 <template>
-  <section class="draft-comparison" aria-label="Draft comparison">
-    <h2>{{ heading }}</h2>
-    <p v-if="changes.length === 0">There are no differences.</p>
+  <section class="draft-comparison" :aria-label="message(&quot;Draft comparison&quot;)">
+    <h2>{{ message(heading) }}</h2>
+    <p v-if="changes.length === 0">{{ message('There are no differences.') }}</p>
     <ul v-else>
       <li v-for="change in changes" :key="change.path">
         <strong>{{ change.path }}</strong>
@@ -12,6 +12,7 @@
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
 import { computed } from 'vue';
 import { comparePageDrafts } from './pageComparison.js';
 

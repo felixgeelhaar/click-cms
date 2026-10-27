@@ -2,15 +2,15 @@
   <div class="pages">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Pages</h1>
-        <p class="page-subtitle">Manage your content pages</p>
+        <h1 class="page-title">{{ message('Pages') }}</h1>
+        <p class="page-subtitle">{{ message('Manage your content pages') }}</p>
       </div>
-      <a v-if="canCreate" class="btn-primary" :href="withBase(newPageHref)" @click="go($event, newPageHref)">+ New Page</a>
+      <a v-if="canCreate" class="btn-primary" :href="withBase(newPageHref)" @click="go($event, newPageHref)">{{ message('+ New Page') }}</a>
     </div>
 
     <div class="toolbar">
       <div v-if="locales.length > 1" class="locale-picker">
-        <label class="locale-label" for="pages-locale">Language</label>
+        <label class="locale-label" for="pages-locale">{{ message('Language') }}</label>
         <select id="pages-locale" v-model="activeLocale" class="locale-select">
           <option v-for="code in locales" :key="code" :value="code">
             {{ localeName(code) }}
@@ -19,19 +19,19 @@
       </div>
 
       <div class="page-search">
-        <label class="locale-label" for="pages-search">Search pages</label>
-        <input id="pages-search" v-model="search" type="search" placeholder="Title or slug" autocomplete="off">
+        <label class="locale-label" for="pages-search">{{ message('Search pages') }}</label>
+        <input id="pages-search" v-model="search" type="search" :placeholder="message(&quot;Title or slug&quot;)" autocomplete="off">
       </div>
       <div class="page-sort">
-        <label class="locale-label" for="pages-sort">Sort by</label>
+        <label class="locale-label" for="pages-sort">{{ message('Sort by') }}</label>
         <select id="pages-sort" v-model="sortBy" class="locale-select">
-          <option value="recent">Recently updated</option>
-          <option value="title">Title</option>
-          <option value="slug">Slug</option>
+          <option value="recent">{{ message('Recently updated') }}</option>
+          <option value="title">{{ message('Title') }}</option>
+          <option value="slug">{{ message('Slug') }}</option>
         </select>
       </div>
 
-      <div class="filter-tabs" role="group" aria-label="Filter pages by publication state">
+      <div class="filter-tabs" role="group" :aria-label="message(&quot;Filter pages by publication state&quot;)">
         <button
           v-for="tab in visibleTabs"
           :key="tab.value"
@@ -40,18 +40,18 @@
           :aria-pressed="currentTab === tab.value"
           @click="currentTab = tab.value"
         >
-          {{ tab.label }} ({{ tabCount(tab.value) }})
+          {{ message(tab.label) }} ({{ tabCount(tab.value) }})
         </button>
       </div>
     </div>
 
     <div v-if="localeError" class="notice" role="alert">
       <p><LocalizedError :message="localeError" /></p>
-      <button type="button" class="btn-sm btn-secondary" @click="loadPages" :disabled="loading">Retry</button>
+      <button type="button" class="btn-sm btn-secondary" @click="loadPages" :disabled="loading">{{ message('Retry') }}</button>
     </div>
 
-    <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="!loadFailed && !unavailableLocales.includes(activeLocale) && filteredPages.length === 0" class="empty-state">{{ emptyMessage }}</div>
+    <div v-if="loading" class="loading">{{ message('Loading...') }}</div>
+    <div v-else-if="!loadFailed && !unavailableLocales.includes(activeLocale) && filteredPages.length === 0" class="empty-state">{{ message(emptyMessage) }}</div>
     <div v-else-if="!loadFailed" class="page-list">
       <div v-for="page in filteredPages" :key="page.key" class="page-card">
         <div class="page-info">
@@ -62,26 +62,26 @@
           <p class="page-slug">/{{ slugOf(page) }}</p>
 
           <div class="state-row">
-            <span :class="['status-badge', stateOf(page)]">{{ stateLabel(stateOf(page)) }}</span>
-            <span v-if="publishedAt(page)" class="state-meta">Published {{ publishedAt(page) }}</span>
+            <span :class="['status-badge', stateOf(page)]">{{ message(stateLabel(stateOf(page))) }}</span>
+            <span v-if="publishedAt(page)" class="state-meta">{{ message('Published') }} {{ publishedAt(page) }}</span>
           </div>
 
-          <ul v-if="locales.length > 1" class="translations" :aria-label="`Languages for ${slugOf(page)}`">
+          <ul v-if="locales.length > 1" class="translations" :aria-label="message('Languages for {0}', [slugOf(page)])">
             <li v-for="code in locales" :key="code">
               <a
                 v-if="pageIn(code, slugOf(page))"
                 class="lang-chip"
                 :class="[stateOf(pageIn(code, slugOf(page))), { current: code === activeLocale }]"
                 :href="withBase(editHref(slugOf(page), code))"
-                :aria-label="`Edit ${page.data?.title || slugOf(page)} in ${localeName(code)} — ${stateLabel(stateOf(pageIn(code, slugOf(page))))}`"
+                :aria-label="message('Edit {0} in {1} — {2}', [page.data?.title || slugOf(page), localeName(code), message(stateLabel(stateOf(pageIn(code, slugOf(page)))))])"
                 @click="go($event, editHref(slugOf(page), code))"
               >
                 <span class="lang-code">{{ code }}</span>
-                <span class="lang-state">{{ stateLabel(stateOf(pageIn(code, slugOf(page)))) }}</span>
+                <span class="lang-state">{{ message(stateLabel(stateOf(pageIn(code, slugOf(page))))) }}</span>
               </a>
               <span v-else class="lang-chip missing">
                 <span class="lang-code">{{ code }}</span>
-                <span class="lang-state">{{ unavailableLocales.includes(code) ? 'Status unavailable' : 'Not translated' }}</span>
+                <span class="lang-state">{{ unavailableLocales.includes(code) ? message('Status unavailable') : message('Not translated') }}</span>
               </span>
             </li>
           </ul>
@@ -91,24 +91,25 @@
           <a v-if="canEditPage(page)"
             class="btn-sm btn-secondary"
             :href="withBase(editHref(slugOf(page), activeLocale))"
-            :aria-label="`Edit ${page.data?.title || slugOf(page)}`"
+            :aria-label="message('Edit {0}', [page.data?.title || slugOf(page)])"
             @click="go($event, editHref(slugOf(page), activeLocale))"
-          >Edit</a>
+          >{{ message('Edit') }}</a>
           <button v-if="canDeletePage(page)"
             type="button"
             class="btn-sm btn-danger"
-            :aria-label="`Delete ${page.data?.title || slugOf(page)}`"
+            :aria-label="message('Delete {0}', [page.data?.title || slugOf(page)])"
             :disabled="deleting !== ''"
             @click="deletePage(slugOf(page))"
-          >{{ deleting === slugOf(page) ? 'Deleting…' : 'Delete' }}</button>
+          >{{ deleting === slugOf(page) ? message('Deleting…') : message('Delete') }}</button>
         </div>
       </div>
     </div>
-    <p v-if="!loading && !loadFailed && !canEditAnything" class="notice" role="status">Read only: you can review pages, but your account cannot edit them.</p>
+    <p v-if="!loading && !loadFailed && !canEditAnything" class="notice" role="status">{{ message('Read only: you can review pages, but your account cannot edit them.') }}</p>
   </div>
 </template>
 
 <script setup>
+import { message, messageLanguage } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { ref, computed, onMounted, watch } from 'vue';
 import { withBase } from '../lib/base.js';
@@ -193,7 +194,7 @@ const publishedAt = (page) => {
   const at = page?.publication?.publishedAt;
   if (!at) return '';
   const date = new Date(at);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(messageLanguage.value);
 };
 
 // Without publication data there is nothing to filter on, so offer no filter
@@ -228,7 +229,7 @@ const emptyMessage = computed(() =>
     ? 'No pages match your search and filters.'
     : currentTab.value === 'all'
       ? 'No pages in this language yet.'
-      : `No pages are ${stateLabel(currentTab.value).toLowerCase()} in this language.`
+      : message('No pages are {0} in this language.', [message(stateLabel(currentTab.value)).toLocaleLowerCase(messageLanguage.value)])
 );
 
 watch([search, sortBy, currentTab, activeLocale], () => {
@@ -239,16 +240,16 @@ watch([search, sortBy, currentTab, activeLocale], () => {
 /** The same slug in another language, if it exists there. */
 const pageIn = (code, slug) => (byLocale.value[code] ?? []).find((p) => slugOf(p) === slug);
 
-const displayNames = (() => {
+const displayNames = computed(() => {
   try {
-    return new Intl.DisplayNames(undefined, { type: 'language' });
+    return new Intl.DisplayNames(messageLanguage.value, { type: 'language' });
   } catch {
     return null;
   }
-})();
+});
 
 const localeName = (code) => {
-  const name = displayNames?.of(code);
+  const name = displayNames.value?.of(code);
   return name && name !== code ? `${name} (${code})` : code.toUpperCase();
 };
 
@@ -308,7 +309,7 @@ const loadPages = async () => {
 };
 
 const deletePage = async (slug) => {
-  if (!confirm(`Delete "${slug}" in ${localeName(activeLocale.value)}? Other languages are not affected.`)) return;
+  if (!confirm(message(`Delete "${slug}" in ${localeName(activeLocale.value)}? Other languages are not affected.`))) return;
   deleting.value = slug;
   localeError.value = '';
   try {

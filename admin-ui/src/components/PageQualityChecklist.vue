@@ -1,19 +1,20 @@
 <template>
   <section class="quality-checklist" aria-labelledby="quality-checklist-heading">
-    <h2 id="quality-checklist-heading">Before you publish</h2>
-    <p v-if="!issues.length" class="quality-ready" role="status">No publishing checks need attention.</p>
+    <h2 id="quality-checklist-heading">{{ message('Before you publish') }}</h2>
+    <p v-if="!issues.length" class="quality-ready" role="status">{{ message('No publishing checks need attention.') }}</p>
     <ul v-else>
       <li v-for="issue in issues" :key="issue.key">
         <span class="issue-dot" aria-hidden="true">!</span>
-        <span>{{ issue.message }}</span>
-        <a :href="issue.href">{{ issue.action }}</a>
+        <span>{{ message(issue.message) }}</span>
+        <a :href="issue.href">{{ message(issue.action) }}</a>
       </li>
     </ul>
-    <p class="quality-note">These are editorial reminders, not publication blockers. Language status and media resolution warnings are also shown in their editors.</p>
+    <p class="quality-note">{{ message('These are editorial reminders, not publication blockers. Language status and media resolution warnings are also shown in their editors.') }}</p>
   </section>
 </template>
 
 <script setup>
+import { message, messageLanguage } from "../lib/messages.js";
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -23,7 +24,7 @@ const props = defineProps({
 });
 
 const languageName = (code) => {
-  try { return new Intl.DisplayNames(undefined, { type: 'language' }).of(code) || code; }
+  try { return new Intl.DisplayNames(messageLanguage.value, { type: 'language' }).of(code) || code; }
   catch { return code; }
 };
 const issues = computed(() => {

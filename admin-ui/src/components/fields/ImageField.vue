@@ -43,7 +43,7 @@
     <!-- A reference that is not in the library still shows, so content authored
          before the library existed keeps working and can be recognised. -->
     <p v-else-if="modelValue" class="unknown">
-      {{ message("This reference is not in the media library. Choose a file from the library to replace it.") }} <code>{{ modelValue }}</code>
+      {{ message('This reference is not in the media library. Choose a file from the library to replace it.') }} <code>{{ modelValue }}</code>
       <button type="button" class="link-btn" @click="clear">{{ message('Clear') }}</button>
     </p>
 

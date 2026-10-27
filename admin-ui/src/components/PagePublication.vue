@@ -11,15 +11,13 @@
   <section class="pub" :class="tone" role="status" aria-live="polite" :aria-busy="loading">
     <div class="pub-body">
       <p class="pub-headline">
-        <span class="pub-dot" aria-hidden="true"></span>{{ headline }}
+        <span class="pub-dot" aria-hidden="true"></span>{{ message(headline) }}
       </p>
-      <p class="pub-detail">{{ detail }}</p>
-      <p v-if="dirty" class="pub-detail">Save your changes before publishing. Saving does not change the live page.</p>
+      <p class="pub-detail">{{ message(detail) }}</p>
+      <p v-if="dirty" class="pub-detail">{{ message('Save your changes before publishing. Saving does not change the live page.') }}</p>
 
       <p v-if="livePath" class="pub-live">
-        <a :href="livePath" target="_blank" rel="noopener">
-          Open the live page in a new tab
-        </a>
+        <a :href="livePath" target="_blank" rel="noopener"> {{ message('Open the live page in a new tab') }} </a>
       </p>
     </div>
 
@@ -31,7 +29,7 @@
         :disabled="busy"
         @click="$emit('unpublish')"
       >
-        {{ busy === 'unpublish' ? 'Taking down…' : 'Take down' }}
+        {{ busy === 'unpublish' ? message('Taking down…') : message('Take down') }}
       </button>
 
       <button
@@ -41,7 +39,7 @@
         :disabled="Boolean(busy) || isNew || dirty"
         @click="$emit('publish')"
       >
-        {{ busy === 'publish' ? 'Publishing…' : publishLabel }}
+        {{ busy === 'publish' ? message('Publishing…') : message(publishLabel) }}
       </button>
     </div>
 
@@ -50,13 +48,12 @@
       a button that can only ever answer 403 teaches them the product is broken;
       saying who can do it tells them what to do next.
     -->
-    <p v-else-if="!loading" class="pub-no-permission">
-      Your account cannot publish. Ask an editor to put these changes live.
-    </p>
+    <p v-else-if="!loading" class="pub-no-permission"> {{ message('Your account cannot publish. Ask an editor to put these changes live.') }} </p>
   </section>
 </template>
 
 <script setup>
+import { message, messageLanguage } from "../lib/messages.js";
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -87,7 +84,7 @@ const publishedAt = computed(() => {
   const at = props.publication?.publishedAt;
   if (!at) return '';
   const parsed = new Date(at);
-  return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleString(messageLanguage.value);
 });
 
 /**
@@ -130,7 +127,7 @@ const tone = computed(() => {
 const changes = computed(() => {
   const n = props.pendingCount;
   if (n === null || n < 1) return '';
-  return n === 1 ? '1 change' : `${n} changes`;
+  return n === 1 ? message('1 change') : message('{0} changes', [n]);
 });
 
 const headline = computed(() => ({

@@ -2,11 +2,11 @@
   <div class="themes">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Themes</h1>
-        <p class="page-subtitle">The design your public pages wear. One is live at a time.</p>
+        <h1 class="page-title">{{ message('Themes') }}</h1>
+        <p class="page-subtitle">{{ message('The design your public pages wear. One is live at a time.') }}</p>
       </div>
       <label class="btn-primary upload-button" data-test="theme-upload">
-        {{ uploading ? 'Uploading…' : 'Upload ZIP' }}
+        {{ uploading ? message('Uploading…') : message('Upload ZIP') }}
         <input
           ref="fileInput"
           type="file"
@@ -18,18 +18,13 @@
     </div>
 
     <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
-    <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
+    <p v-if="notice" class="banner success" role="status">{{ message(notice) }}</p>
 
-    <p class="upload-hint muted">
-      A ZIP with a <code>theme.json</code> and its stylesheet. Uploads are not
-      signature-verified — install one only if you trust where it came from.
-      You can still copy a folder into <code>themes/</code> on disk, or ship one
-      inside a plugin under <code>plugins/&lt;id&gt;/themes/</code>.
+    <p class="upload-hint muted"> {{ message('A ZIP with a') }} <code>theme.json</code> {{ message('and its stylesheet. Uploads are not signature-verified — install one only if you trust where it came from. You can still copy a folder into') }} <code>themes/</code> {{ message('on disk, or ship one inside a plugin under') }} <code>plugins/&lt;id&gt;/themes/</code>.
     </p>
 
-    <div v-if="loading" class="loading">Loading...</div>
-    <p v-else-if="!themes.length" class="empty">
-      No themes are installed. Upload a ZIP or copy a theme folder into <code>themes/</code>.
+    <div v-if="loading" class="loading">{{ message('Loading...') }}</div>
+    <p v-else-if="!themes.length" class="empty"> {{ message('No themes are installed. Upload a ZIP or copy a theme folder into') }} <code>themes/</code>.
     </p>
     <div v-else class="theme-grid">
       <div v-for="theme in themes" :key="theme.id" :class="['theme-card', { active: theme.active }]">
@@ -39,15 +34,13 @@
           <p class="theme-meta">
             <span v-if="theme.version">v{{ theme.version }}</span>
             <span v-if="theme.author">{{ theme.author }}</span>
-            <span v-if="theme.source === 'plugin'" class="theme-source">From plugin {{ theme.pluginId }}</span>
+            <span v-if="theme.source === 'plugin'" class="theme-source">{{ message('From plugin') }} {{ theme.pluginId }}</span>
           </p>
-          <p>{{ theme.description || 'No description' }}</p>
+          <p>{{ theme.description || message('No description') }}</p>
         </div>
         <div class="theme-actions">
-          <span v-if="theme.active" class="status active">Active</span>
-          <button v-else class="btn-sm btn-primary" data-test="theme-activate" :disabled="switching" @click="activate(theme.id)">
-            Activate
-          </button>
+          <span v-if="theme.active" class="status active">{{ message('Active') }}</span>
+          <button v-else class="btn-sm btn-primary" data-test="theme-activate" :disabled="switching" @click="activate(theme.id)"> {{ message('Activate') }} </button>
         </div>
       </div>
     </div>
@@ -55,6 +48,7 @@
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 

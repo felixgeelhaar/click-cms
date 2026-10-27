@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import interfaceGerman from './locales/de.json';
 
 export function supportedLanguage(value) {
   return /^de(?:-|$)/i.test(String(value ?? '')) ? 'de' : 'en';
@@ -81,9 +82,37 @@ const german = {
   'Scalable vector (SVG)': 'Skalierbare Vektorgrafik (SVG)',
 };
 
-export function message(text) {
-  return messageLanguage.value === 'de' ? (german[text] ?? text) : text;
+// Parameterized messages keep filenames, titles and counts outside translation keys.
+const interfacePatterns = Object.entries(interfaceGerman)
+  .filter(([key]) => /\{\d+\}/.test(key))
+  .map(([key, translation]) => {
+    const slots = [];
+    const escaped = key.split(/(\{\d+\})/).map(part => {
+      if (/^\{\d+\}$/.test(part)) { slots.push(part); return '(.*?)'; }
+      return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }).join('');
+    return { expression: new RegExp('^' + escaped + '$', 's'), translation, slots };
+  });
+export function message(text, parameters) {
+  if (typeof text !== 'string') return text;
+  let result = text;
+  if (messageLanguage.value === 'de') {
+    result = interfaceGerman[text] ?? german[text];
+    if (result === undefined && !parameters) {
+      for (const { expression, translation, slots } of interfacePatterns) {
+        const match = text.match(expression);
+        if (match) {
+          const values = Object.fromEntries(slots.map((slot, index) => [slot, match[index + 1]]));
+          result = translation.replace(/\{\d+\}/g, slot => values[slot] ?? slot);
+          break;
+        }
+      }
+    }
+    result ??= text;
+  }
+  return parameters ? result.replace(/\{(\d+)\}/g, (slot, index) => String(parameters[index] ?? slot)) : result;
 }
+
 const patterns = [
   [/^(.+) is required\.$/, label => `Bitte „${label}“ ausfüllen.`],
   [/^(.+) must be at least (\d+) characters\.$/, (label, n) => `„${label}“ muss mindestens ${n} Zeichen enthalten.`],

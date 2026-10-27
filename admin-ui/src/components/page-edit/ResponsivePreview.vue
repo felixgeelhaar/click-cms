@@ -1,24 +1,25 @@
 <template>
-  <section class="responsive-preview" aria-label="Responsive page preview">
+  <section class="responsive-preview" :aria-label="message(&quot;Responsive page preview&quot;)">
     <div class="preview-toolbar">
       <div>
-        <h2>Page preview</h2>
-        <p>{{ busy ? 'Refreshing unsaved changes…' : 'Changes refresh here while you edit.' }}</p>
+        <h2>{{ message('Page preview') }}</h2>
+        <p>{{ busy ? message('Refreshing unsaved changes…') : message('Changes refresh here while you edit.') }}</p>
       </div>
-      <div class="device-controls" role="group" aria-label="Preview width">
-        <button v-for="device in devices" :key="device.id" type="button" :aria-pressed="width === device.id" @click="width = device.id">{{ device.label }}</button>
-        <button type="button" :disabled="busy" @click="$emit('refresh')">Refresh</button>
+      <div class="device-controls" role="group" :aria-label="message(&quot;Preview width&quot;)">
+        <button v-for="device in devices" :key="device.id" type="button" :aria-pressed="width === device.id" @click="width = device.id">{{ message(device.label) }}</button>
+        <button type="button" :disabled="busy" @click="$emit('refresh')">{{ message('Refresh') }}</button>
       </div>
     </div>
     <div class="preview-stage">
       <p v-if="error" class="preview-error" role="alert"><LocalizedError :message="error" /></p>
-      <iframe v-else-if="html" :srcdoc="html" title="Rendered page preview" sandbox="" :style="{ width: widths[width] }" />
-      <p v-else class="preview-empty">{{ busy ? 'Rendering preview…' : 'Waiting for preview…' }}</p>
+      <iframe v-else-if="html" :srcdoc="html" :title="message(&quot;Rendered page preview&quot;)" sandbox="" :style="{ width: widths[width] }" />
+      <p v-else class="preview-empty">{{ busy ? message('Rendering preview…') : message('Waiting for preview…') }}</p>
     </div>
   </section>
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
 import LocalizedError from '../LocalizedError.vue';
 import { ref } from 'vue';
 

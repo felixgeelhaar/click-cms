@@ -1,15 +1,15 @@
 <template>
   <div class="inspector">
-    <h2 class="panel-title">Inspector</h2>
+    <h2 class="panel-title">{{ message('Inspector') }}</h2>
 
-    <p v-if="!node" class="inspector-empty">Select a node on the canvas to edit it.</p>
+    <p v-if="!node" class="inspector-empty">{{ message('Select a node on the canvas to edit it.') }}</p>
 
     <template v-else>
-      <p class="inspector-type">{{ node.type }}</p>
+      <p class="inspector-type">{{ message(node.type) }}</p>
 
       <!-- ------------------------------------------- content (props) -- -->
       <fieldset class="inspector-group">
-        <legend>Content</legend>
+        <legend>{{ message('Content') }}</legend>
 
         <label v-if="node.type === 'text'" class="field">
           <span>Text</span>
@@ -18,34 +18,34 @@
 
         <template v-else-if="node.type === 'image'">
           <label class="field">
-            <span>Source URL</span>
+            <span>{{ message('Source URL') }}</span>
             <input type="text" :value="node.props.src" @input="prop('src', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Alt text</span>
+            <span>{{ message('Alt text') }}</span>
             <input type="text" :value="node.props.alt" @input="prop('alt', $event.target.value)" />
           </label>
         </template>
 
         <template v-else-if="node.type === 'button'">
           <label class="field">
-            <span>Label</span>
+            <span>{{ message('Label') }}</span>
             <input type="text" :value="node.props.label" @input="prop('label', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Link (href)</span>
+            <span>{{ message('Link (href)') }}</span>
             <input type="text" :value="node.props.href" @input="prop('href', $event.target.value)" />
           </label>
         </template>
 
         <label v-else-if="node.type === 'grid'" class="field">
-          <span>Columns</span>
+          <span>{{ message('Columns') }}</span>
           <input type="number" min="1" max="12" :value="node.props.columns" @input="prop('columns', clampInt($event.target.value, 1, 12))" />
         </label>
 
         <template v-else-if="node.type === 'columns'">
           <label class="field">
-            <span>Columns</span>
+            <span>{{ message('Columns') }}</span>
             <input
               type="number"
               min="1"
@@ -55,47 +55,47 @@
               @input="ctx.setColumnCount(node.id, $event.target.value)"
             />
           </label>
-          <p class="field-note">Reducing the count removes the last columns and anything inside them.</p>
+          <p class="field-note">{{ message('Reducing the count removes the last columns and anything inside them.') }}</p>
           <template v-if="ctx.breakpoints.value.length">
             <label class="field">
-              <span>Side by side from</span>
+              <span>{{ message('Side by side from') }}</span>
               <select :value="node.props.stackAt || 'sm'" @change="prop('stackAt', $event.target.value)">
                 <option v-for="bp in ctx.breakpoints.value" :key="bp.id" :value="bp.id">
                   {{ bp.label || bp.id }} ({{ bp.minWidth }}px)
                 </option>
               </select>
             </label>
-            <p class="field-note">Below that width the columns stack, one above the other.</p>
+            <p class="field-note">{{ message('Below that width the columns stack, one above the other.') }}</p>
           </template>
-          <p v-else class="field-note">This page declares no breakpoints, so the columns go side by side from 640px and stack below it.</p>
+          <p v-else class="field-note">{{ message('This page declares no breakpoints, so the columns go side by side from 640px and stack below it.') }}</p>
         </template>
 
         <template v-else-if="node.type === 'video'">
           <label class="field">
-            <span>Video URL</span>
+            <span>{{ message('Video URL') }}</span>
             <input type="text" placeholder="/media/clip.mp4" :value="node.props.src" @input="prop('src', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Poster image</span>
+            <span>{{ message('Poster image') }}</span>
             <input type="text" :value="node.props.poster" @input="prop('poster', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Captions (.vtt)</span>
+            <span>{{ message('Captions (.vtt)') }}</span>
             <input type="text" :value="node.props.captions" @input="prop('captions', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Description for screen readers</span>
+            <span>{{ message('Description for screen readers') }}</span>
             <input type="text" :value="node.props.label" @input="prop('label', $event.target.value)" />
           </label>
           <label class="field-check">
             <input type="checkbox" :checked="node.props.controls !== false" @change="prop('controls', $event.target.checked)" />
-            <span>Show controls</span>
+            <span>{{ message('Show controls') }}</span>
           </label>
           <label class="field-check">
             <input type="checkbox" :checked="!!node.props.autoplay" @change="prop('autoplay', $event.target.checked)" />
-            <span>Play automatically</span>
+            <span>{{ message('Play automatically') }}</span>
           </label>
-          <p v-if="node.props.autoplay" class="field-note">An autoplaying video is always muted and looped — browsers refuse to start one with sound.</p>
+          <p v-if="node.props.autoplay" class="field-note">{{ message('An autoplaying video is always muted and looped — browsers refuse to start one with sound.') }}</p>
         </template>
 
         <template v-else-if="node.type === 'embed'">
@@ -104,122 +104,122 @@
             <input type="text" placeholder="https://www.youtube.com/watch?v=…" :value="node.props.url" @input="prop('url', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Title (read out by screen readers)</span>
+            <span>{{ message('Title (read out by screen readers)') }}</span>
             <input type="text" :value="node.props.title" @input="prop('title', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Height in pixels (0 for 16:9)</span>
+            <span>{{ message('Height in pixels (0 for 16:9)') }}</span>
             <input type="number" min="0" max="2000" :value="node.props.height" @input="prop('height', clampInt($event.target.value, 0, 2000))" />
           </label>
-          <p class="field-note">YouTube, Vimeo, OpenStreetMap and Google Maps links become embeds. Anything else is published as a plain link.</p>
+          <p class="field-note">{{ message('YouTube, Vimeo, OpenStreetMap and Google Maps links become embeds. Anything else is published as a plain link.') }}</p>
         </template>
 
         <template v-else-if="node.type === 'list'">
           <label class="field-check">
             <input type="checkbox" :checked="!!node.props.ordered" @change="prop('ordered', $event.target.checked)" />
-            <span>Numbered list</span>
+            <span>{{ message('Numbered list') }}</span>
           </label>
           <label class="field">
-            <span>Items — one per line</span>
+            <span>{{ message('Items — one per line') }}</span>
             <textarea rows="4" :value="itemsText" @input="prop('items', parseItems($event.target.value))"></textarea>
           </label>
         </template>
 
         <template v-else-if="node.type === 'quote'">
           <label class="field">
-            <span>Quote</span>
+            <span>{{ message('Quote') }}</span>
             <textarea rows="3" :value="node.props.text" @input="prop('text', $event.target.value)"></textarea>
           </label>
           <label class="field">
-            <span>Attributed to</span>
+            <span>{{ message('Attributed to') }}</span>
             <input type="text" :value="node.props.attribution" @input="prop('attribution', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Source title</span>
+            <span>{{ message('Source title') }}</span>
             <input type="text" :value="node.props.source" @input="prop('source', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Source URL</span>
+            <span>{{ message('Source URL') }}</span>
             <input type="text" :value="node.props.cite" @input="prop('cite', $event.target.value)" />
           </label>
         </template>
 
         <template v-else-if="node.type === 'divider'">
           <label class="field">
-            <span>Line</span>
+            <span>{{ message('Line') }}</span>
             <select :value="node.props.lineStyle || 'solid'" @change="prop('lineStyle', $event.target.value)">
-              <option value="solid">Solid</option>
-              <option value="dashed">Dashed</option>
-              <option value="dotted">Dotted</option>
-              <option value="double">Double</option>
+              <option value="solid">{{ message('Solid') }}</option>
+              <option value="dashed">{{ message('Dashed') }}</option>
+              <option value="dotted">{{ message('Dotted') }}</option>
+              <option value="double">{{ message('Double') }}</option>
             </select>
           </label>
           <label class="field">
-            <span>Thickness in pixels</span>
+            <span>{{ message('Thickness in pixels') }}</span>
             <input type="number" min="1" max="20" :value="node.props.thickness" @input="prop('thickness', clampInt($event.target.value, 1, 20))" />
           </label>
           <label class="field">
-            <span>Colour</span>
+            <span>{{ message('Colour') }}</span>
             <input type="text" placeholder="currentColor" :value="node.props.color" @input="prop('color', $event.target.value)" />
           </label>
         </template>
 
         <template v-else-if="node.type === 'chart'">
           <label class="field">
-            <span>Chart type</span>
+            <span>{{ message('Chart type') }}</span>
             <select :value="node.props.chartType" @change="prop('chartType', $event.target.value)">
-              <option value="bar">Bar</option>
-              <option value="line">Line</option>
+              <option value="bar">{{ message('Bar') }}</option>
+              <option value="line">{{ message('Line') }}</option>
             </select>
           </label>
           <label class="field">
-            <span>Title</span>
+            <span>{{ message('Title') }}</span>
             <input type="text" :value="node.props.title" @input="prop('title', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Colour</span>
+            <span>{{ message('Colour') }}</span>
             <input type="text" :value="node.props.color" @input="prop('color', $event.target.value)" />
           </label>
           <label class="field">
-            <span>Data — one "Label, Value" per line</span>
+            <span>{{ message('Data — one "Label, Value" per line') }}</span>
             <textarea rows="4" :value="dataText" @input="prop('data', parseChartData($event.target.value))"></textarea>
           </label>
         </template>
 
-        <p v-else class="field-note">This node has no content of its own — arrange nodes inside it and style it below.</p>
+        <p v-else class="field-note">{{ message('This node has no content of its own — arrange nodes inside it and style it below.') }}</p>
       </fieldset>
 
       <!-- --------------------------------------------- basic styles -- -->
       <fieldset class="inspector-group">
-        <legend>Style</legend>
+        <legend>{{ message('Style') }}</legend>
 
         <label class="field">
-          <span>Background</span>
+          <span>{{ message('Background') }}</span>
           <input type="text" placeholder="#ffffff" :value="node.styles.background" @input="style('background', $event.target.value)" />
         </label>
         <label class="field">
-          <span>Text colour</span>
+          <span>{{ message('Text colour') }}</span>
           <input type="text" placeholder="#111827" :value="node.styles.color" @input="style('color', $event.target.value)" />
         </label>
         <label class="field">
-          <span>Padding</span>
+          <span>{{ message('Padding') }}</span>
           <input type="text" placeholder="24px" :value="node.styles.padding" @input="style('padding', $event.target.value)" />
         </label>
         <label class="field">
-          <span>Margin</span>
+          <span>{{ message('Margin') }}</span>
           <input type="text" placeholder="0" :value="node.styles.margin" @input="style('margin', $event.target.value)" />
         </label>
         <label v-if="node.type === 'spacer'" class="field">
-          <span>Height</span>
+          <span>{{ message('Height') }}</span>
           <input type="text" placeholder="32px" :value="node.styles.height" @input="style('height', $event.target.value)" />
         </label>
         <label class="field">
-          <span>Text align</span>
+          <span>{{ message('Text align') }}</span>
           <select :value="node.styles.textAlign || ''" @change="style('textAlign', $event.target.value)">
             <option value="">—</option>
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
+            <option value="left">{{ message('Left') }}</option>
+            <option value="center">{{ message('Center') }}</option>
+            <option value="right">{{ message('Right') }}</option>
           </select>
         </label>
       </fieldset>
@@ -228,6 +228,7 @@
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
 import { computed, inject } from 'vue';
 import { MAX_COLUMNS } from './model.js';
 

@@ -40,3 +40,12 @@ describe('editor messages', () => {
     expect(message('Change image')).toBe('Bild ändern');
   });
 });
+
+it('interpolates UI parameters without translating or interpreting authored values', () => {
+  const title = '<b>Save</b> {1}';
+  expect(message('Delete {0}', [title])).toBe('Delete ' + title);
+  messageLanguage.value = 'de';
+  expect(message('Delete {0}', [title])).toBe(title + ' löschen');
+  expect(message('Saved “My English title”.')).toBe('„My English title“ gespeichert.');
+  expect(message('unknown plugin label')).toBe('unknown plugin label');
+});

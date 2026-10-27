@@ -34,7 +34,7 @@
     <!-- A reference the library does not know still shows, so a value pasted in
          before this picker existed is recognisable rather than silently blank. -->
     <p v-else-if="modelValue" class="unknown" data-test="file-unknown">
-      {{ message("This reference is not in the media library. Choose a file from the library to replace it.") }} <code>{{ modelValue }}</code>
+      {{ message('This reference is not in the media library. Choose a file from the library to replace it.') }} <code>{{ modelValue }}</code>
       <button type="button" class="link-btn" @click="clear">{{ message('Clear') }}</button>
     </p>
 

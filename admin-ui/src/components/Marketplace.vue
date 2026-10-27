@@ -1,31 +1,25 @@
 <template>
   <div class="marketplace">
-    <h1 class="page-title">Marketplace</h1>
-    <p class="page-subtitle">
-      Install plugins from the configured registry, or upload one you already have.
-    </p>
+    <h1 class="page-title">{{ message('Marketplace') }}</h1>
+    <p class="page-subtitle"> {{ message('Install plugins from the configured registry, or upload one you already have.') }} </p>
 
     <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
-    <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
+    <p v-if="notice" class="banner success" role="status">{{ message(notice) }}</p>
 
     <!-- Stated plainly, because the two paths are not equally trusted and the
          person installing should know which one they are using. -->
     <div class="trust">
-      <p><strong>Registry installs are verified.</strong> The manifest is checked against the
-        configured public key before anything is written.</p>
-      <p><strong>Uploads are not verified.</strong> A plugin runs with the same access as the
-        CMS itself — install one only if you trust where it came from.</p>
+      <p><strong>{{ message('Registry installs are verified.') }}</strong> {{ message('The manifest is checked against the configured public key before anything is written.') }}</p>
+      <p><strong>{{ message('Uploads are not verified.') }}</strong> {{ message('A plugin runs with the same access as the CMS itself — install one only if you trust where it came from.') }}</p>
     </div>
 
     <section class="panel">
-      <h2 class="panel-title">From the registry</h2>
+      <h2 class="panel-title">{{ message('From the registry') }}</h2>
 
-      <p v-if="loading" class="muted">Loading…</p>
-      <p v-else-if="!registryConfigured" class="muted">
-        No registry is configured. Set <code>core.marketplace.registryUrl</code> and its public
-        key in <code>config/core.json</code>.
+      <p v-if="loading" class="muted">{{ message('Loading…') }}</p>
+      <p v-else-if="!registryConfigured" class="muted"> {{ message('No registry is configured. Set') }} <code>core.marketplace.registryUrl</code> {{ message('and its public key in') }} <code>config/core.json</code>.
       </p>
-      <p v-else-if="!available.length" class="muted">The registry has nothing on offer.</p>
+      <p v-else-if="!available.length" class="muted">{{ message('The registry has nothing on offer.') }}</p>
 
       <ul v-else class="grid">
         <li v-for="plugin in available" :key="plugin.id" class="card">
@@ -39,18 +33,18 @@
             :disabled="installing === plugin.id || plugin.installed"
             @click="install(plugin)"
           >
-            {{ plugin.installed ? 'Installed' : installing === plugin.id ? 'Installing…' : 'Install' }}
+            {{ plugin.installed ? message('Installed') : installing === plugin.id ? message('Installing…') : message('Install') }}
           </button>
         </li>
       </ul>
     </section>
 
     <section class="panel">
-      <h2 class="panel-title">Upload a plugin</h2>
-      <p class="muted">A ZIP containing a <code>plugin.json</code> and a <code>bootstrap.php</code>.</p>
+      <h2 class="panel-title">{{ message('Upload a plugin') }}</h2>
+      <p class="muted">{{ message('A ZIP containing a') }} <code>plugin.json</code> {{ message('and a') }} <code>bootstrap.php</code>.</p>
 
       <label class="btn-secondary upload">
-        {{ uploading ? 'Uploading…' : 'Choose a ZIP file' }}
+        {{ uploading ? message('Uploading…') : message('Choose a ZIP file') }}
         <input ref="fileInput" type="file" accept=".zip,application/zip" :disabled="uploading" @change="upload" />
       </label>
     </section>
@@ -58,6 +52,7 @@
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 

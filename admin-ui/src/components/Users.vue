@@ -2,44 +2,44 @@
   <div class="users">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Users</h1>
-        <p class="page-subtitle">{{ subtitle }}</p>
+        <h1 class="page-title">{{ message('Users') }}</h1>
+        <p class="page-subtitle">{{ message(subtitle) }}</p>
       </div>
-      <button class="btn-primary" @click="startCreate">+ New user</button>
+      <button class="btn-primary" @click="startCreate">{{ message('+ New user') }}</button>
     </div>
 
     <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
-    <p v-if="loading" class="banner">Loading…</p>
+    <p v-if="loading" class="banner">{{ message('Loading…') }}</p>
 
     <form v-if="draft" class="editor" @submit.prevent="save">
-      <h2 class="editor-title">{{ draft.isNew ? 'New user' : `Edit ${draft.username}` }}</h2>
+      <h2 class="editor-title">{{ draft.isNew ? message('New user') : message('Edit {0}', [draft.username]) }}</h2>
 
-      <label for="u-username">Username</label>
+      <label for="u-username">{{ message('Username') }}</label>
       <input id="u-username" v-model="draft.username" :disabled="!draft.isNew" required />
-      <p v-if="!draft.isNew" class="hint">The username identifies the account and cannot be changed.</p>
+      <p v-if="!draft.isNew" class="hint">{{ message('The username identifies the account and cannot be changed.') }}</p>
 
-      <label for="u-display">Display name</label>
+      <label for="u-display">{{ message('Display name') }}</label>
       <input id="u-display" v-model="draft.displayName" />
 
-      <label for="u-email">Email</label>
+      <label for="u-email">{{ message('Email') }}</label>
       <input id="u-email" v-model="draft.email" type="email" />
 
-      <label for="u-role">Role</label>
+      <label for="u-role">{{ message('Role') }}</label>
       <select id="u-role" v-model="draft.role">
-        <option v-for="r in roles" :key="r.value" :value="r.value">{{ r.label }}</option>
+        <option v-for="r in roles" :key="r.value" :value="r.value">{{ message(r.label) }}</option>
       </select>
-      <p class="hint">{{ roleHint }}</p>
+      <p class="hint">{{ message(roleHint) }}</p>
 
       <template v-if="draft.isNew">
-        <label for="u-password">Password</label>
+        <label for="u-password">{{ message('Password') }}</label>
         <input id="u-password" v-model="draft.password" type="password" minlength="8" required />
-        <p class="hint">At least 8 characters. They can change it after signing in.</p>
+        <p class="hint">{{ message('At least 8 characters. They can change it after signing in.') }}</p>
       </template>
 
       <div class="editor-actions">
-        <button type="button" class="btn-secondary" @click="draft = null">Cancel</button>
+        <button type="button" class="btn-secondary" @click="draft = null">{{ message('Cancel') }}</button>
         <button type="submit" class="btn-primary" :disabled="saving">
-          {{ saving ? 'Saving…' : 'Save' }}
+          {{ saving ? message('Saving…') : message('Save') }}
         </button>
       </div>
     </form>
@@ -51,31 +51,32 @@
           <div>
             <p class="name">
               {{ user.displayName || user.username }}
-              <span v-if="user.username === currentUsername" class="you">you</span>
+              <span v-if="user.username === currentUsername" class="you">{{ message('you') }}</span>
             </p>
             <p class="meta">{{ user.username }}<span v-if="user.email"> · {{ user.email }}</span></p>
           </div>
         </div>
 
-        <span class="role" :class="`role--${user.role}`">{{ roleLabel(user.role) }}</span>
+        <span class="role" :class="`role--${user.role}`">{{ message(roleLabel(user.role)) }}</span>
 
         <div class="row-actions">
-          <button class="btn-sm" @click="startEdit(user)">Edit</button>
+          <button class="btn-sm" @click="startEdit(user)">{{ message('Edit') }}</button>
           <button
             class="btn-sm danger"
             :disabled="user.username === currentUsername"
-            :title="user.username === currentUsername ? 'You cannot delete your own account' : ''"
+            :title="user.username === currentUsername ? message('You cannot delete your own account') : ''"
             @click="remove(user)"
-          >Delete</button>
+          >{{ message('Delete') }}</button>
         </div>
       </li>
     </ul>
 
-    <p v-else-if="!loading" class="banner">No users yet.</p>
+    <p v-else-if="!loading" class="banner">{{ message('No users yet.') }}</p>
   </div>
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { computed, onMounted, ref } from 'vue';
 

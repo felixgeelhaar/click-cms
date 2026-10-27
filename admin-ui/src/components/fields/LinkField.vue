@@ -12,17 +12,17 @@
       :aria-invalid="invalid || missing ? 'true' : undefined"
       @change="pick($event.target.value)"
     >
-      <option value="" :disabled="required">{{ promptLabel }}</option>
+      <option value="" :disabled="required">{{ message(promptLabel) }}</option>
       <option v-for="option in options" :key="option.key" :value="option.target">{{ option.label }}</option>
-      <option :value="EXTERNAL">External link…</option>
+      <option :value="EXTERNAL">{{ message('External link…') }}</option>
       <!-- A value this control does not recognise still gets an option, so the
            select can show it. Without one the browser shows nothing selected and
            the screen would read as empty while the stored value is untouched. -->
-      <option v-if="unrecognised" :value="UNRECOGNISED">{{ value }} — not a known page</option>
+      <option v-if="unrecognised" :value="UNRECOGNISED">{{ value }} {{ message('— not a known page') }}</option>
     </select>
 
     <div v-if="showExternal" class="link-external">
-      <label class="link-sub-label" :for="urlId">Web address</label>
+      <label class="link-sub-label" :for="urlId">{{ message('Web address') }}</label>
       <input
         :id="urlId"
         class="link-url"
@@ -33,7 +33,7 @@
         :aria-describedby="`${urlId}-hint`"
         @input="$emit('update:modelValue', $event.target.value)"
       />
-      <p :id="`${urlId}-hint`" class="link-hint">A full address starting with http:// or https://</p>
+      <p :id="`${urlId}-hint`" class="link-hint">{{ message('A full address starting with http:// or https://') }}</p>
     </div>
 
     <!--
@@ -43,16 +43,14 @@
       choice the editor just made.
     -->
     <div class="link-notices" aria-live="polite">
-      <p v-if="missing" :id="missingId" class="link-warning">
-        This points at a page that no longer exists. <code>{{ value }}</code> is still
-        saved exactly as it was — choose a page above, or an external link, to change it.
-      </p>
-      <p v-else-if="unpublishedNotice" :id="unpublishedId" class="link-caution">{{ unpublishedNotice }}</p>
+      <p v-if="missing" :id="missingId" class="link-warning"> {{ message('This points at a page that no longer exists.') }} <code>{{ value }}</code> {{ message('is still saved exactly as it was — choose a page above, or an external link, to change it.') }} </p>
+      <p v-else-if="unpublishedNotice" :id="unpublishedId" class="link-caution">{{ message(unpublishedNotice) }}</p>
     </div>
   </div>
 </template>
 
 <script setup>
+import { message } from "../../lib/messages.js";
 import { computed, onMounted, ref, useId } from 'vue';
 
 /**
@@ -146,7 +144,7 @@ const options = computed(() => {
       // The address is shown as a path in both formats, because that is what a
       // reader would see in the address bar — the storage shape is this
       // component's problem, not the editor's.
-      label: `${titleOf(row)} — ${pathOf(row)}${isPublished(row) ? '' : ' (not published)'}`,
+      label: `${titleOf(row)} — ${pathOf(row)}${isPublished(row) ? '' : message(' (not published)')}`,
     }))
     .filter((option) => (seen.has(option.target) ? false : seen.add(option.target)));
 

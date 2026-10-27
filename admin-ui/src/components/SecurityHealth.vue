@@ -2,37 +2,38 @@
   <section class="security-health">
     <header class="page-header">
       <div>
-        <h1>Security health</h1>
-        <p>Configuration checks with evidence and a next step for each finding.</p>
+        <h1>{{ message('Security health') }}</h1>
+        <p>{{ message('Configuration checks with evidence and a next step for each finding.') }}</p>
       </div>
     </header>
 
     <div v-if="error" class="notice error" role="alert">
       <p><LocalizedError :message="error" /></p>
-      <button class="btn-sm btn-secondary" type="button" :disabled="loading" @click="load">Retry</button>
+      <button class="btn-sm btn-secondary" type="button" :disabled="loading" @click="load">{{ message('Retry') }}</button>
     </div>
-    <p v-if="loading" class="loading" role="status">Checking configuration…</p>
+    <p v-if="loading" class="loading" role="status">{{ message('Checking configuration…') }}</p>
 
     <div v-else-if="checks.length" class="check-list">
       <article v-for="check in checks" :key="check.id" class="check-card">
         <div class="check-heading">
-          <h2>{{ check.label }}</h2>
-          <span :class="['status', check.status]">{{ statusLabel(check.status) }}</span>
+          <h2>{{ message(check.label) }}</h2>
+          <span :class="['status', check.status]">{{ message(statusLabel(check.status)) }}</span>
         </div>
-        <p class="check-value">{{ check.value }}</p>
-        <p>{{ check.detail }}</p>
+        <p class="check-value">{{ message(check.value) }}</p>
+        <p>{{ detailLabel(check) }}</p>
         <p class="next-step">
-          <strong>Next step:</strong>
-          <a v-if="check.href" :href="check.external ? check.href : withBase(check.href)" :target="check.external ? '_blank' : undefined" :rel="check.external ? 'noopener noreferrer' : undefined" @click="check.external ? undefined : navigate($event, check.href)">{{ check.action }}</a>
-          <span v-else>{{ check.action }}</span>
+          <strong>{{ message('Next step:') }}</strong>
+          <a v-if="check.href" :href="check.external ? check.href : withBase(check.href)" :target="check.external ? '_blank' : undefined" :rel="check.external ? 'noopener noreferrer' : undefined" @click="check.external ? undefined : navigate($event, check.href)">{{ message(check.action) }}</a>
+          <span v-else>{{ message(check.action) }}</span>
         </p>
       </article>
     </div>
-    <p v-else class="empty-state">No checks were returned.</p>
+    <p v-else class="empty-state">{{ message('No checks were returned.') }}</p>
   </section>
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { ref, onMounted } from 'vue';
 import { withBase } from '../lib/base.js';
@@ -42,6 +43,15 @@ const checks = ref([]);
 const loading = ref(true);
 const error = ref('');
 
+// PHP findings are returned as separate sentences joined by the API.
+const detailLabel = (check) => {
+  if (check.id === 'php-runtime') {
+    const translated = message(check.detail);
+    return translated !== check.detail ? translated : String(check.detail ?? '').split(/(?<=\.) /).map(text => message(text)).join(' ');
+  }
+  if (check.id === 'scheduled-backups') return message(String(check.detail ?? '').replace(' with media.', message(' with media') + '.').replace(' without media.', message(' without media') + '.'));
+  return message(check.detail);
+};
 const statusLabel = (status) => ({ good: 'Configured', review: 'Review', attention: 'Action needed' }[status] || 'Unverified');
 const navigate = (event, href) => {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;

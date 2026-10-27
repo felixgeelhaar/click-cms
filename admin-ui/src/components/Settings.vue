@@ -1,30 +1,28 @@
 <template>
   <div class="settings">
-    <h1 class="page-title">Settings</h1>
-    <p class="page-subtitle">How this instance behaves. Changes take effect immediately.</p>
+    <h1 class="page-title">{{ message('Settings') }}</h1>
+    <p class="page-subtitle">{{ message('How this instance behaves. Changes take effect immediately.') }}</p>
 
     <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
-    <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
+    <p v-if="notice" class="banner success" role="status">{{ message(notice) }}</p>
 
     <section class="panel">
       <div class="setting">
         <div class="setting-copy">
-          <h2 class="setting-title">Site name</h2>
-          <p class="setting-desc">
-            Shown as the brand in your site's header. Leave it empty for no brand.
-          </p>
+          <h2 class="setting-title">{{ message('Site name') }}</h2>
+          <p class="setting-desc"> {{ message('Shown as the brand in your site\'s header. Leave it empty for no brand.') }} </p>
           <form class="inline-form" @submit.prevent="saveSiteName">
-            <label class="visually-hidden" for="site-name">Site name</label>
+            <label class="visually-hidden" for="site-name">{{ message('Site name') }}</label>
             <input
               id="site-name"
               v-model="siteName"
               type="text"
               class="text-input"
-              placeholder="e.g. Acme Studio"
+              :placeholder="message(&quot;e.g. Acme Studio&quot;)"
               :disabled="loading || savingName"
             />
             <button type="submit" class="btn-primary" :disabled="loading || savingName">
-              {{ savingName ? 'Saving…' : 'Save' }}
+              {{ savingName ? message('Saving…') : message('Save') }}
             </button>
           </form>
         </div>
@@ -34,20 +32,10 @@
     <section class="panel">
       <div class="setting">
         <div class="setting-copy">
-          <h2 class="setting-title">Headless mode</h2>
-          <p class="setting-desc">
-            Off, this instance renders your website for visitors. On, it renders no
-            public pages of its own — your content is served only through the
-            <code>/api/pages</code> delivery API, for a separate front end to display.
-            The admin stays exactly as it is either way.
-          </p>
-          <p v-if="headless" class="setting-state warn">
-            The public site is off. Visitors to a page address get a “not found”;
-            your front end reads the API instead.
-          </p>
-          <p v-else class="setting-state">
-            The public site is on. Your pages render at their own addresses.
-          </p>
+          <h2 class="setting-title">{{ message('Headless mode') }}</h2>
+          <p class="setting-desc"> {{ message('Off, this instance renders your website for visitors. On, it renders no public pages of its own — your content is served only through the') }} <code>/api/pages</code> {{ message('delivery API, for a separate front end to display. The admin stays exactly as it is either way.') }} </p>
+          <p v-if="headless" class="setting-state warn"> {{ message('The public site is off. Visitors to a page address get a “not found”; your front end reads the API instead.') }} </p>
+          <p v-else class="setting-state"> {{ message('The public site is on. Your pages render at their own addresses.') }} </p>
         </div>
 
         <!--
@@ -62,7 +50,7 @@
             @change="toggle($event.target.checked)"
           />
           <span class="switch-track" aria-hidden="true"></span>
-          <span class="switch-label">{{ headless ? 'On' : 'Off' }}</span>
+          <span class="switch-label">{{ headless ? message('On') : message('Off') }}</span>
         </label>
       </div>
     </section>
@@ -70,21 +58,10 @@
     <section class="panel">
       <div class="setting">
         <div class="setting-copy">
-          <h2 class="setting-title">Free-form editing</h2>
-          <p class="setting-desc">
-            Off, editors work only with the section types this site declares —
-            the layout cannot be broken from the admin. On, accounts that hold
-            the free-form capability (administrators, by default) can also use
-            the visual builder. Existing free-form pages keep rendering either
-            way; this only controls who may change them.
-          </p>
-          <p v-if="!freeformEditing" class="setting-state warn">
-            Free-form editing is off. The Builder is hidden and the API refuses
-            free-form saves.
-          </p>
-          <p v-else class="setting-state">
-            Free-form editing is on for accounts that are allowed to use it.
-          </p>
+          <h2 class="setting-title">{{ message('Free-form editing') }}</h2>
+          <p class="setting-desc"> {{ message('Off, editors work only with the section types this site declares — the layout cannot be broken from the admin. On, accounts that hold the free-form capability (administrators, by default) can also use the visual builder. Existing free-form pages keep rendering either way; this only controls who may change them.') }} </p>
+          <p v-if="!freeformEditing" class="setting-state warn"> {{ message('Free-form editing is off. The Builder is hidden and the API refuses free-form saves.') }} </p>
+          <p v-else class="setting-state"> {{ message('Free-form editing is on for accounts that are allowed to use it.') }} </p>
         </div>
 
         <label class="switch">
@@ -95,7 +72,7 @@
             @change="toggleFreeform($event.target.checked)"
           />
           <span class="switch-track" aria-hidden="true"></span>
-          <span class="switch-label">{{ freeformEditing ? 'On' : 'Off' }}</span>
+          <span class="switch-label">{{ freeformEditing ? message('On') : message('Off') }}</span>
         </label>
       </div>
     </section>
@@ -103,6 +80,7 @@
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 

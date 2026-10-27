@@ -1,7 +1,7 @@
 <template>
-  <div class="admin-app">
+  <div class="admin-app" :lang="messageLanguage">
     <div class="message-language">
-      <label for="message-language">Hinweise / Messages</label>
+      <label for="message-language">{{ message('Interface language') }}</label>
       <select id="message-language" :value="messageLanguage" @change="setMessageLanguage($event.target.value)">
         <option value="en">English</option><option value="de">Deutsch</option>
       </select>
@@ -17,13 +17,13 @@
            a way past them, reaching the content by keyboard means tabbing
            through the lot on every page. The link is off-screen until focused,
            which is the first thing Tab reaches. -->
-      <a class="skip-link" href="#admin-main" @click="focusMain">Skip to main content</a>
+      <a class="skip-link" href="#admin-main" @click="focusMain">{{ message('Skip to main content') }}</a>
       <header class="topbar">
         <button
           class="icon-button"
           :aria-expanded="mobileNavOpen"
           aria-controls="admin-sidebar"
-          aria-label="Toggle navigation"
+          :aria-label="message(&quot;Toggle navigation&quot;)"
           @click="toggleSidebar"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -39,7 +39,7 @@
           editing the wrong client's homepage is a mistake with no warning and
           an audience.
         -->
-        <span v-if="site.multiSite" class="site-chip" :title="`You are editing ${site.title}`">
+        <span v-if="site.multiSite" class="site-chip" :title="message('You are editing {0}', [site.title])">
           {{ site.title }}
         </span>
         <div class="topbar-right">
@@ -49,20 +49,20 @@
           <button
             class="chip-button"
             :aria-pressed="theme === 'dark'"
-            :aria-label="`Dark theme${theme === 'dark' ? ' (on)' : ' (off)'}`"
+            :aria-label="message('Dark theme{0}', [message(theme === 'dark' ? ' (on)' : ' (off)')])"
             @click="toggleTheme"
-          >{{ theme === 'dark' ? 'Dark' : 'Light' }}</button>
+          >{{ theme === 'dark' ? message('Dark') : message('Light') }}</button>
           <!-- A single initial in a coloured square. The letter is decoration;
                what the control does is open the profile, and that is what it
                has to announce. -->
           <button
             class="profile-button"
-            :aria-label="`Profile — ${currentUser?.displayName || currentUser?.username || 'account'}`"
+            :aria-label="message('Profile — {0}', [currentUser?.displayName || currentUser?.username || message('account')])"
             @click="handleNavigate('/admin/profile')"
           >
             <span aria-hidden="true">{{ (currentUser?.displayName || currentUser?.username || 'U').slice(0, 1).toUpperCase() }}</span>
           </button>
-          <button class="text-button" @click="handleLogout">Logout</button>
+          <button class="text-button" @click="handleLogout">{{ message('Logout') }}</button>
         </div>
       </header>
       <div class="layout-body" :class="{ 'mobile-open': mobileNavOpen }">
@@ -86,6 +86,7 @@
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import { messageLanguage, setMessageLanguage } from '../lib/messages.js';
 import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue';
 import Sidebar from './Sidebar.vue';
@@ -141,7 +142,7 @@ const branding = ref({ name: '', primaryColor: '' });
 // password screen — the API enforces this too, so the UI is only the courtesy.
 const mustChangePassword = computed(() => currentUser.value?.mustChangePassword === true);
 
-const brandLabel = computed(() => branding.value.name || currentUser.value?.displayName || currentUser.value?.username || 'Workspace');
+const brandLabel = computed(() => branding.value.name || currentUser.value?.displayName || currentUser.value?.username || message('Workspace'));
 // Capability rather than role: the rules live on the server, and the UI asks
 // what this account may do rather than re-deriving it from a role name.
 const can = (capability) => (currentUser.value?.capabilities ?? []).includes(capability);
@@ -386,7 +387,7 @@ const screenTitles = new Map([
   [Media, 'Media'], [Users, 'Users'], [Profile, 'Profile'],
   [Settings, 'Settings'], [Redirects, 'Redirects'], [Menus, 'Menus'],
   [SecurityHealth, 'Security health'],
-  [ReviewInbox, 'Reviews'],
+  [ReviewInbox, 'Reviews'], [ReviewsInbox, 'Reviews'], [Release, 'Release'],
   [FormSubmissions, 'Form submissions'], [Webhooks, 'Webhooks'],
   [Plugins, 'Plugins'], [PluginDetail, 'Plugin details'],
   [Marketplace, 'Marketplace'], [Themes, 'Themes'], [Updates, 'Updates'],
@@ -400,7 +401,7 @@ watchEffect(() => {
   else if (currentComponent.value === PageEdit) {
     title = currentProps.value.slug ? 'Edit Page' : 'New Page';
   } else title = screenTitles.get(currentComponent.value) || 'Dashboard';
-  document.title = `${title} - Click CMS Admin`;
+  document.title = `${message(title)} - Click CMS Admin`;
 });
 
 // A newly saved page becomes bookmarkable without adding a stale creation

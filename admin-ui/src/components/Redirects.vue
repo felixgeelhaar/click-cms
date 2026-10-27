@@ -2,54 +2,53 @@
   <div class="redirects">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Redirects</h1>
-        <p class="page-subtitle">Send an old address to a new one. Checked when a page is not found.</p>
+        <h1 class="page-title">{{ message('Redirects') }}</h1>
+        <p class="page-subtitle">{{ message('Send an old address to a new one. Checked when a page is not found.') }}</p>
       </div>
-      <button class="btn-primary" @click="addRule">+ Add redirect</button>
+      <button class="btn-primary" @click="addRule">{{ message('+ Add redirect') }}</button>
     </div>
 
     <p v-if="error" class="banner error" role="alert"><LocalizedError :message="error" /></p>
-    <p v-if="notice" class="banner success" role="status">{{ notice }}</p>
+    <p v-if="notice" class="banner success" role="status">{{ message(notice) }}</p>
 
-    <p v-if="!loading && rules.length === 0" class="empty">
-      No redirects yet. Add one to send an old or changed address somewhere useful.
-    </p>
+    <p v-if="!loading && rules.length === 0" class="empty"> {{ message('No redirects yet. Add one to send an old or changed address somewhere useful.') }} </p>
 
     <ul v-else class="rule-list">
       <li v-for="(rule, i) in rules" :key="i" class="rule">
         <div class="rule-field">
-          <label :for="`from-${i}`">From</label>
-          <input :id="`from-${i}`" v-model="rule.from" type="text" placeholder="/old-page" />
+          <label :for="`from-${i}`">{{ message('From') }}</label>
+          <input :id="`from-${i}`" v-model="rule.from" type="text" :placeholder="message(&quot;/old-page&quot;)" />
         </div>
         <span class="arrow" aria-hidden="true">→</span>
         <div class="rule-field">
-          <label :for="`to-${i}`">To</label>
-          <input :id="`to-${i}`" v-model="rule.to" type="text" placeholder="/new-page or https://…" />
+          <label :for="`to-${i}`">{{ message('To') }}</label>
+          <input :id="`to-${i}`" v-model="rule.to" type="text" :placeholder="message(&quot;/new-page or https://…&quot;)" />
         </div>
         <div class="rule-field kind">
-          <label :for="`perm-${i}`">Type</label>
+          <label :for="`perm-${i}`">{{ message('Type') }}</label>
           <select :id="`perm-${i}`" v-model="rule.permanent">
-            <option :value="true">Permanent (301)</option>
-            <option :value="false">Temporary (302)</option>
+            <option :value="true">{{ message('Permanent (301)') }}</option>
+            <option :value="false">{{ message('Temporary (302)') }}</option>
           </select>
         </div>
         <button
           class="btn-sm danger"
-          :aria-label="`Remove the redirect from ${rule.from || 'this rule'}`"
+          :aria-label="message('Remove the redirect from {0}', [rule.from || 'this rule'])"
           @click="rules.splice(i, 1)"
-        >Remove</button>
+        >{{ message('Remove') }}</button>
       </li>
     </ul>
 
     <div class="actions">
       <button class="btn-primary" :disabled="saving" @click="save">
-        {{ saving ? 'Saving…' : 'Save redirects' }}
+        {{ saving ? message('Saving…') : message('Save redirects') }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
+import { message } from "../lib/messages.js";
 import LocalizedError from './LocalizedError.vue';
 import { onMounted, ref } from 'vue';
 
