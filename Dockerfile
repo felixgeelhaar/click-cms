@@ -12,7 +12,7 @@
 # is exactly equivalent to building it per architecture, and avoids running
 # Composer under emulation for the non-native half of a multi-arch build.
 # ---------------------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM composer:2@sha256:b6dcd72ca98fa19d0e5b8476de179859704891fad06dd9e0b96833d4c430a5fc AS vendor
+FROM --platform=$BUILDPLATFORM composer:2@sha256:ca11f643d7791ebdd90a34fc20caf11380d434007ae539a9ea75cd9212e13dca AS vendor
 
 WORKDIR /app
 COPY composer.json composer.lock ./
@@ -49,7 +49,7 @@ RUN composer install \
 # whatever the CPU. If this stage ever produces a native binary, this line has
 # to go.
 # ---------------------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS admin-ui
+FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS admin-ui
 
 # The repository layout is mirrored rather than flattened into /app. The
 # accessibility tests read the CSS they assert about out of the shipped files —
@@ -79,7 +79,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 3 — Runtime
 # ---------------------------------------------------------------------------
-FROM php:8.5-apache@sha256:7cd25eb48f9763dfeabe8fda3939897aca2001802fadeafa1b602f26c735ef96 AS runtime
+FROM php:8.5-apache@sha256:08af36df144462d84c7f16190557eec06cb9f656882685610b712a15eec54d46 AS runtime
 
 # gd is required to generate responsive image variants; without it the media
 # library can store an upload but not resize it.
