@@ -1,0 +1,1245 @@
+{
+  "schema_version": "1.0.0",
+  "entries": [
+    {
+      "fingerprint": "c8e03787adf458d77852ee4deacf62cc43c3dc2db5339ee2076b96b8d1cb89fa",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "COPY runs as root in build stages; in the runtime stage a following 'chown -R www-data:www-data /var/www/html' sets ownership (documented in the Dockerfile), and the hardened target re-owns files to root.",
+      "created_at": "2026-11-15T10:32:52.299718Z"
+    },
+    {
+      "fingerprint": "ca999676aebab8ea0d9a184e5b5fb23da0b6ef11205db3aa6199f4dd68fa2f6e",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "COPY runs as root in build stages; in the runtime stage a following 'chown -R www-data:www-data /var/www/html' sets ownership (documented in the Dockerfile), and the hardened target re-owns files to root.",
+      "created_at": "2026-11-15T10:32:52.299719Z"
+    },
+    {
+      "fingerprint": "d4b9e887c4a223006714e1cb3637896b252e11e389a38a4351176d9d4f7fd4d7",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "COPY runs as root in build stages; in the runtime stage a following 'chown -R www-data:www-data /var/www/html' sets ownership (documented in the Dockerfile), and the hardened target re-owns files to root.",
+      "created_at": "2026-11-15T10:32:52.29972Z"
+    },
+    {
+      "fingerprint": "026a610145049b1e922528f2d71cfb73713dda111ff9efd62e51cbd3ce25b4e6",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "COPY runs as root in build stages; in the runtime stage a following 'chown -R www-data:www-data /var/www/html' sets ownership (documented in the Dockerfile), and the hardened target re-owns files to root.",
+      "created_at": "2026-11-15T10:32:52.29972Z"
+    },
+    {
+      "fingerprint": "89097da1fe53197e4f15c0cb2770c3abd673e8f1af332b9d7722c4009219ea77",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "COPY runs as root in build stages; in the runtime stage a following 'chown -R www-data:www-data /var/www/html' sets ownership (documented in the Dockerfile), and the hardened target re-owns files to root.",
+      "created_at": "2026-11-15T10:32:52.29972Z"
+    },
+    {
+      "fingerprint": "0bee1a8e2f4bdfe83a241a71632cc3e83b03f26045453fec215d8d03c774e493",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "COPY runs as root in build stages; in the runtime stage a following 'chown -R www-data:www-data /var/www/html' sets ownership (documented in the Dockerfile), and the hardened target re-owns files to root.",
+      "created_at": "2026-11-15T10:32:52.299721Z"
+    },
+    {
+      "fingerprint": "8f551774db99732be622e2a3c5e443a2cf64f39a7d958f5f357275108b9e5ba2",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "COPY runs as root in build stages; in the runtime stage a following 'chown -R www-data:www-data /var/www/html' sets ownership (documented in the Dockerfile), and the hardened target re-owns files to root.",
+      "created_at": "2026-11-15T10:32:52.299722Z"
+    },
+    {
+      "fingerprint": "950950a207f915771a84bc9b1baf629aa727cf38b2bfaf0cae2458a059cff5a2",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "COPY runs as root in build stages; in the runtime stage a following 'chown -R www-data:www-data /var/www/html' sets ownership (documented in the Dockerfile), and the hardened target re-owns files to root.",
+      "created_at": "2026-11-15T10:32:52.299722Z"
+    },
+    {
+      "fingerprint": "dca5abfc3fa034966ce6dc271fca3289f7c2ee82b0d9ad2a6edb6d7137fab19d",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "COPY runs as root in build stages; in the runtime stage a following 'chown -R www-data:www-data /var/www/html' sets ownership (documented in the Dockerfile), and the hardened target re-owns files to root.",
+      "created_at": "2026-11-15T10:32:52.299723Z"
+    },
+    {
+      "fingerprint": "a234b069a4d666918f19839ab05495e49ef50e7bf016a7f2f6035b57a3e3f9f0",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "COPY runs as root in build stages; in the runtime stage a following 'chown -R www-data:www-data /var/www/html' sets ownership (documented in the Dockerfile), and the hardened target re-owns files to root.",
+      "created_at": "2026-11-15T10:32:52.299725Z"
+    },
+    {
+      "fingerprint": "5b0927ef24ec00c24fe9841adf6ae21a807280231934a5387b35af41042d4464",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Artifact is marketplace/registry.json, signed with the marketplace key inside the workflow and verified by clients; a transient hand-off, not a distributed release asset.",
+      "created_at": "2026-11-15T10:32:52.550872Z"
+    },
+    {
+      "fingerprint": "687a3bdb18df52f2d574daa81b6f5b6003ff6dcedac4663d22b50c5169d3c3eb",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "workflow_dispatch is intentional: the release workflow dispatches publish/deploy, and maintainers re-run by hand; permissions are least-privilege.",
+      "created_at": "2026-11-15T10:32:52.638629Z"
+    },
+    {
+      "fingerprint": "bcdd0567c9f97135c707488fc7505dd7d016d012f18233a308932ee5b90e2958",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "workflow_dispatch is intentional: the release workflow dispatches publish/deploy, and maintainers re-run by hand; permissions are least-privilege.",
+      "created_at": "2026-11-15T10:32:52.63863Z"
+    },
+    {
+      "fingerprint": "1bbea23c5f9c02f26c127af0a24ed08a80506dccff1dd54f8ea0caf3c113bd71",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "workflow_dispatch is intentional: the release workflow dispatches publish/deploy, and maintainers re-run by hand; permissions are least-privilege.",
+      "created_at": "2026-11-15T10:32:52.638631Z"
+    },
+    {
+      "fingerprint": "09d79998b5c7424a284b643b53815f6c9ba525b7adfd07bbadfde073aac67c21",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "workflow_dispatch is intentional: the release workflow dispatches publish/deploy, and maintainers re-run by hand; permissions are least-privilege.",
+      "created_at": "2026-11-15T10:32:52.638632Z"
+    },
+    {
+      "fingerprint": "e30dd01274149f21319aa44f87e0ef8250ecaafaac2e16bbdc8b7ab7b5fd6b9b",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "workflow_dispatch is intentional: the release workflow dispatches publish/deploy, and maintainers re-run by hand; permissions are least-privilege.",
+      "created_at": "2026-11-15T10:32:52.638633Z"
+    },
+    {
+      "fingerprint": "2fe6ff19f2bcf6bb78909689399d70449b0d7ed5a8a9204568672b0bca45989b",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "workflow_dispatch is intentional: the release workflow dispatches publish/deploy, and maintainers re-run by hand; permissions are least-privilege.",
+      "created_at": "2026-11-15T10:32:52.638634Z"
+    },
+    {
+      "fingerprint": "80faa8ed98a2175e396093d768285261113a338d973a39ac1f6b30aa30077bbe",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "workflow_dispatch is intentional: the release workflow dispatches publish/deploy, and maintainers re-run by hand; permissions are least-privilege.",
+      "created_at": "2026-11-15T10:32:52.638635Z"
+    },
+    {
+      "fingerprint": "1bf5ffaf4038a450a301180174f387e03abc28da49ffe4c9f9980cc06e41b413",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "workflow_dispatch is intentional: the release workflow dispatches publish/deploy, and maintainers re-run by hand; permissions are least-privilege.",
+      "created_at": "2026-11-15T10:32:52.638637Z"
+    },
+    {
+      "fingerprint": "cc3fd855f1a5badf59b08227135b4d796c3509913767ccdb34f1d3cebf0c8984",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "workflow_dispatch is intentional: the release workflow dispatches publish/deploy, and maintainers re-run by hand; permissions are least-privilege.",
+      "created_at": "2026-11-15T10:32:52.638638Z"
+    },
+    {
+      "fingerprint": "3dfb3e77a4d2a59d8978bd76dadc132ac0f42afee3b02f5ba5e57ba0e20368ac",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "workflow_dispatch is intentional: the release workflow dispatches publish/deploy, and maintainers re-run by hand; permissions are least-privilege.",
+      "created_at": "2026-11-15T10:32:52.638639Z"
+    },
+    {
+      "fingerprint": "75154021c2e07b0785f23e6341d64105430e759d890c80a136a26064751370dc",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Bind mounts are the point of this service: content/ and data/ hold the site's writable state, and admin-ui/ is the dev-profile source tree for the hot-reloading dev server.",
+      "created_at": "2026-11-15T10:32:52.711137Z"
+    },
+    {
+      "fingerprint": "db1dc6a5c19211ad6e24ab6bb286efac816860a6d3d021ec2a91ad8bbc6b7aab",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Bind mounts are the point of this service: content/ and data/ hold the site's writable state, and admin-ui/ is the dev-profile source tree for the hot-reloading dev server.",
+      "created_at": "2026-11-15T10:32:52.711142Z"
+    },
+    {
+      "fingerprint": "9c81f194192fb34e547b687decf99c7f0c44a70f414b9bc91c6d4d36aa487951",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Bind mounts are the point of this service: content/ and data/ hold the site's writable state, and admin-ui/ is the dev-profile source tree for the hot-reloading dev server.",
+      "created_at": "2026-11-15T10:32:52.711145Z"
+    },
+    {
+      "fingerprint": "42190e9a1e6eb547a6291cc2a2db355ec818a23b42fb779315b1630cbaaa5297",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Bind mounts are the point of this service: content/ and data/ hold the site's writable state, and admin-ui/ is the dev-profile source tree for the hot-reloading dev server.",
+      "created_at": "2026-11-15T10:32:52.711147Z"
+    },
+    {
+      "fingerprint": "c899f71dcb227f2f91d4154ed0fa2b56ed068b2b297d3908c08fdca36bed3fb6",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Bind mounts are the point of this service: content/ and data/ hold the site's writable state, and admin-ui/ is the dev-profile source tree for the hot-reloading dev server.",
+      "created_at": "2026-11-15T10:32:52.711151Z"
+    },
+    {
+      "fingerprint": "ba6d4862014f6ce0c10df45f4e79d1dc1eeb5f1774879cd7020d19b0577c9061",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "actions/deploy-pages requires id-token: write; the permission is scoped to the single Pages deploy workflow.",
+      "created_at": "2026-11-15T10:32:53.096466Z"
+    },
+    {
+      "fingerprint": "8c9a05e7d0c8a05b61d4c18aefce8e2dc91a85c3456246a1c92bea30dbb416d8",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "cancel-in-progress is intended: only the newest run for a ref matters for CI and security scans.",
+      "created_at": "2026-11-15T10:32:53.320411Z"
+    },
+    {
+      "fingerprint": "162a095592cae53b8ee25cadb877e2dd26172f5682b66569c434a5afe19aed4b",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "cancel-in-progress is intended: only the newest run for a ref matters for CI and security scans.",
+      "created_at": "2026-11-15T10:32:53.320412Z"
+    },
+    {
+      "fingerprint": "e37e2faa5f7d812400d1323a31d22e93b710b881ea06f3b656d724454d47a8f4",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Write permission is the job's purpose (attaching release assets / pushing the image to GHCR).",
+      "created_at": "2026-11-15T10:32:53.403426Z"
+    },
+    {
+      "fingerprint": "66027afa893750f6f13bb52aa101ff6944e20f65b9167b1759182c038be13f09",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Write permission is the job's purpose (attaching release assets / pushing the image to GHCR).",
+      "created_at": "2026-11-15T10:32:53.492237Z"
+    },
+    {
+      "fingerprint": "aeaed3f940f2f04d695904861ea759b70bd41bd7de48cb4d376d6398b60f8490",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Test fixture / screenshot-script credential for a throwaway local account; not a real secret.",
+      "created_at": "2026-11-15T10:32:53.939367Z"
+    },
+    {
+      "fingerprint": "8a8d8cdf6909d4a771fc14c7a89a63a6a722f7356909572b48a11d117573c1a3",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Test fixture / screenshot-script credential for a throwaway local account; not a real secret.",
+      "created_at": "2026-11-15T10:32:53.939369Z"
+    },
+    {
+      "fingerprint": "b287120de332f6d3786865d5bb2d13fb9b38e0f699f91b1cf381e16eabfa9c60",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Test fixture / screenshot-script credential for a throwaway local account; not a real secret.",
+      "created_at": "2026-11-15T10:32:53.939371Z"
+    },
+    {
+      "fingerprint": "e7f2add6ada58eeee193334f4b9d6bf933fca359e2bb788718776f4cdc4e2392",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Test fixture / screenshot-script credential for a throwaway local account; not a real secret.",
+      "created_at": "2026-11-15T10:32:54.011049Z"
+    },
+    {
+      "fingerprint": "11a3810a6371d74e80b5798313ccda09952532a17f244bd60dd3f34c702c44de",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127625Z"
+    },
+    {
+      "fingerprint": "1fe7fc10faaa36246868ed316d15db94999ea194192c3d439fa34fc219c0c778",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127627Z"
+    },
+    {
+      "fingerprint": "b4de03f51d37d6d8ebc84b79bebb7061b6527c5e759348b7a905157ac8d7e951",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.12763Z"
+    },
+    {
+      "fingerprint": "c852e7e167d57bedf257797f715f1d77497f0795b22f0259770a52052c09eb61",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127633Z"
+    },
+    {
+      "fingerprint": "139a08d79878fa1287655c9e244dabf3e423bfd3cfaa21e6c80fe58edf54947e",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127634Z"
+    },
+    {
+      "fingerprint": "18e54b276133a043fbd569fdc4e7791d980a4f789e7589dd94d9901f67e8f0c7",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127637Z"
+    },
+    {
+      "fingerprint": "1b1ab28f477177f4413c64548194e53d385fbd24d4726638e0aaaed995684afc",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127639Z"
+    },
+    {
+      "fingerprint": "9eb3677ece01b2c7a89ff1211fb09dccaba8d837ecad34e346f737078b161305",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127641Z"
+    },
+    {
+      "fingerprint": "b5f899b41c6aa25c91acbc9b5d230fff3ea296f81b9e696dadfd35bb3038881f",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127644Z"
+    },
+    {
+      "fingerprint": "d5a8c3532ce559e87b93d1815a21abf06214a61356ee45007de98c0d98e187b9",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127646Z"
+    },
+    {
+      "fingerprint": "e1986ec12ac72af70bddc86c7beec60302925879097f8da6bfc82a6410761a16",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127648Z"
+    },
+    {
+      "fingerprint": "e8721ce1ce985cb12f5ab7bbf5ba67b9be61897dd048ae62299cbd1273aa6d73",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.12765Z"
+    },
+    {
+      "fingerprint": "fc73f8770604ac95ea5743b76bf5bd89e300f82f5892c34987d2ee66d3101e31",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "PEM-encoded public verification keys (marketplace registry and update feed); public by design, not secrets.",
+      "created_at": "2026-11-15T10:32:54.127652Z"
+    },
+    {
+      "fingerprint": "f369c3424bed01bb20333362c3fb4087dc8bdb0d1e8cb50d8f23c4909a97281a",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "nox_check is a sibling module in scripts/security, imported by its own unit test.",
+      "created_at": "2026-11-15T10:32:54.32166Z"
+    },
+    {
+      "fingerprint": "599a7ebde9c0374496ad846961c4893af1811323c4630f8d5f20c9830e205be7",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "CLI output to a terminal by an admin tool, not an HTML response; no XSS context.",
+      "created_at": "2026-11-15T10:32:54.531568Z"
+    },
+    {
+      "fingerprint": "0e1f5c28f7939ecdaed9d9827aff12174fb1a791ccb6890e05817c61241ca005",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "CLI output to a terminal by an admin tool, not an HTML response; no XSS context.",
+      "created_at": "2026-11-15T10:32:54.531572Z"
+    },
+    {
+      "fingerprint": "95100a14287e292d6e5f9582ffea7812d06db883f29cef09871bb64747f46653",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "CLI output to a terminal by an admin tool, not an HTML response; no XSS context.",
+      "created_at": "2026-11-15T10:32:54.531575Z"
+    },
+    {
+      "fingerprint": "dc62a984df9313e159802fb129998820469fdf4806c36e4a7400069ca3f13183",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Intentional output of the CMS's rendered page/JSON response body; entry HTML comes from the renderer, which escapes content.",
+      "created_at": "2026-11-15T10:32:54.892505Z"
+    },
+    {
+      "fingerprint": "8e76201475e386418da912ff4f18028c32d834916179b153ea8fb040cb0abf21",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Intentional output of the CMS's rendered page/JSON response body; entry HTML comes from the renderer, which escapes content.",
+      "created_at": "2026-11-15T10:32:54.892509Z"
+    },
+    {
+      "fingerprint": "99898f02be5e1d27f64ea5387d2807a2ae0e8b5db006ac48f8fb54f8b5eaf522",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Path is not user-controlled: backup serves an archive generated server-side; media paths come from MediaService::pathForFile*, which validates the stored filename and resolves inside the upload directory.",
+      "created_at": "2026-11-15T10:32:55.197716Z"
+    },
+    {
+      "fingerprint": "a46f9186bab56c870d42091ed98a666f1820c3f986495afa4fa2c797f5680a89",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Path is not user-controlled: backup serves an archive generated server-side; media paths come from MediaService::pathForFile*, which validates the stored filename and resolves inside the upload directory.",
+      "created_at": "2026-11-15T10:32:55.197719Z"
+    },
+    {
+      "fingerprint": "68052125000cf2e8fb005557244d3af3190b9bd7b3d6f7866bfba3bbb812187b",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Path is not user-controlled: backup serves an archive generated server-side; media paths come from MediaService::pathForFile*, which validates the stored filename and resolves inside the upload directory.",
+      "created_at": "2026-11-15T10:32:55.197724Z"
+    },
+    {
+      "fingerprint": "3bce46ec189ef5f480960379f1ade2e39b66d552d89ab4528dab35d761b5e6a2",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Unit-test fixture: window.fetch is a vitest mock, no network request is made (see inline nox:ignore).",
+      "created_at": "2026-11-15T10:32:55.328269Z"
+    },
+    {
+      "fingerprint": "f5cf71ea48212dca5d462db9d0165fd868bed46aec4bda6c8b495396cd697ede",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Redirect target is set by server-side route handlers, not taken from the request.",
+      "created_at": "2026-11-15T10:32:55.805589Z"
+    },
+    {
+      "fingerprint": "0183cba45f059e547124885bd0d795730ea6f63992736d56b3cf83b7a2ee1422",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219871Z"
+    },
+    {
+      "fingerprint": "08e137d91b44974c9bce162933c973585a96187e7f7f75c8c1f6af76f9759f8a",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219877Z"
+    },
+    {
+      "fingerprint": "123e759fcbebb2aa534fdc59f7481fa33f284deac9cfda377ff76f5151c52640",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.21988Z"
+    },
+    {
+      "fingerprint": "1302d3aee31bf10e0f196289b428fec7690496459a1934dd3878670f84537e2f",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219883Z"
+    },
+    {
+      "fingerprint": "1708d2b071969e530ca38c56cf6614bfe38ec89718cb807fb8d59108a4e88e91",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219889Z"
+    },
+    {
+      "fingerprint": "1feb4b7bcd303f344d7abda2e8c0aff1ded8d18eec79f4192aa71ac64ac640ce",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219892Z"
+    },
+    {
+      "fingerprint": "23c90baa9f9ff3f610b8810af2404d6feaaf640ccba41bd7bd92014161bec17b",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219899Z"
+    },
+    {
+      "fingerprint": "2c1471a334cae866f282c3ed50ac530d7d5e145bfc15d05e15abc85798e1a608",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219906Z"
+    },
+    {
+      "fingerprint": "2ed17caff15cf30e25b1e31459621859d89165bb766698f54a9f09c824eedc09",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.21991Z"
+    },
+    {
+      "fingerprint": "2fc178c8a0901896a11cf371d42f8efa8f18a0d2ea9ccfa00144dfc5bba19e55",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219913Z"
+    },
+    {
+      "fingerprint": "3b2f2125420cac91df04f3d2cb5335b76eff0323dd513cd2750a8a80c5aa04cd",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219919Z"
+    },
+    {
+      "fingerprint": "415cdf110de18f5a597be8520532343c4e32da5b6bc4d6af7f297e3d93e9df94",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219923Z"
+    },
+    {
+      "fingerprint": "5ed0eb8c50cf2b0d447044ce989c276211586878ff632a2526cb62f1adcfdf66",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219926Z"
+    },
+    {
+      "fingerprint": "62ebb319e32f1117cce3aaa1e3ccad895202ddf98810502f93c3a7ee68abff62",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.21993Z"
+    },
+    {
+      "fingerprint": "634c66bf05f341ba5d266314104acfb532663c7e67788056a13a95b4c6b5eea0",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219934Z"
+    },
+    {
+      "fingerprint": "6a4af64335b66a4bf8e59f6314adaa313c8e8c4f1add94fe1b212e79ea41554e",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219938Z"
+    },
+    {
+      "fingerprint": "7094b53c3f24993d6e074a803e542079a762f820d42e154b6d2098f0b54cfb45",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219942Z"
+    },
+    {
+      "fingerprint": "74ffc198965e6c1ba259cbf24f85517574d92f9ef45e07620da86c26b5c6ec16",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.21996Z"
+    },
+    {
+      "fingerprint": "8019edd343946e51a8a0aa5686f84dcdd16170cc4ae000678a2c1ecdf91b2aab",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219964Z"
+    },
+    {
+      "fingerprint": "835009f5a58f0050079c5500ae630c21f2aadd7cf542d237cfe06f2815d5e650",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.21997Z"
+    },
+    {
+      "fingerprint": "8799e22d9507f0f6023a9ba139987b293933eca20f62c1fa0e16a3c5af5161ca",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219973Z"
+    },
+    {
+      "fingerprint": "970355f5506452b9a9490d248d9053c50498c2336d0cc724caf5238f299bdc69",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.219979Z"
+    },
+    {
+      "fingerprint": "a2f2d48665017e12a21e0d6e89ea78a09adb61832a81110920fd1d903bfffa75",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220009Z"
+    },
+    {
+      "fingerprint": "a68617428bcc239fb1a10487d6501a8cd4b309b216507a506e256f4a3015d237",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220013Z"
+    },
+    {
+      "fingerprint": "a8bc782e3eff3e074f3e577202b2faf02b71f92be1549aad517d0f58e491afb4",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220018Z"
+    },
+    {
+      "fingerprint": "a8eb3601f76460b6bfb864c4f3a245ea684af76c324ef46464daad2b2ad5b0c6",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220024Z"
+    },
+    {
+      "fingerprint": "b147689b26b2a28e5d486f878fd523289cfe309a25a09bb60f46fc8171e77c04",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220029Z"
+    },
+    {
+      "fingerprint": "b927fc883859602cbe41ab8cb0ddaba993531a30f538bc898815ce507e0e53fb",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220033Z"
+    },
+    {
+      "fingerprint": "c7ff70d409325cfaada10ef73bcd729bfd794b5327b302f5f9c3bf4e3ddbe3d0",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220039Z"
+    },
+    {
+      "fingerprint": "c9529a95a5e2c3a121d1029bd47d8909f7735ac2d97d736e98155808caa3df0d",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220043Z"
+    },
+    {
+      "fingerprint": "cf5dce65e6ae609936cb2836adb10e1539a7e525315d70acfec19591c8f852a4",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220048Z"
+    },
+    {
+      "fingerprint": "d9bd30f7eb4940b634a55ecf6973dd824395d933012484e990895de3cd52f746",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220053Z"
+    },
+    {
+      "fingerprint": "e193f6f256757ac4d1c0a2f56a19f1506efa5950585fa1a6b898d74754564f68",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220059Z"
+    },
+    {
+      "fingerprint": "ea37d520c3b389aebfc29f225ceca5f452a15c19a8dccca2821a54c8c7137360",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220064Z"
+    },
+    {
+      "fingerprint": "f07968167570ab8d7b1300e1baece2cc1ce14d0a4097b39505a36c61ca1dabd0",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220069Z"
+    },
+    {
+      "fingerprint": "f2df72df5deca1e69acea855939cf94958ad7377566401ed58174c5d7db53320",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220073Z"
+    },
+    {
+      "fingerprint": "41131eda8752e6de09401f8c4866ec55ec1e19705e88f31926584175a8567eb1",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220078Z"
+    },
+    {
+      "fingerprint": "a50f55477db5da5681fb4564764c66ab402ce8742dd7735477b735f1d4fcc88f",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220083Z"
+    },
+    {
+      "fingerprint": "af3ebc54e180f577f693164d1da656311c92035ac75c0496f1c97eeaefbcda7f",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220088Z"
+    },
+    {
+      "fingerprint": "cecabf24c03b0808fb65d01b3dda9227837a0350742ce0cbe1c3444aca4d73b6",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220093Z"
+    },
+    {
+      "fingerprint": "da757a242791bcffea46d83d8f8d7528a419d66066a43a14b665eee69636def6",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Package inside a build-stage-only base image (composer / node-alpine) that is discarded and never shipped in the runtime image; fix needs an upstream image rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.220098Z"
+    },
+    {
+      "fingerprint": "0243dedf8b70cf4ca887b9aadd91bc84a2320e4baa9d5539005200de05a58a16",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745932Z"
+    },
+    {
+      "fingerprint": "03526ed3c409688279d1a84017ba1c6d8d2d3739a5895c54bf7c43dde1236cd4",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745937Z"
+    },
+    {
+      "fingerprint": "04f66692f17e5b60d4c92ade969028236b3004bd4c371ba0dbfb2dfc4360ffe8",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745941Z"
+    },
+    {
+      "fingerprint": "0f70b8e2cfb0d6a1c781a38672a2496791dc887b4fca5bd2d49ba539afd8b077",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745944Z"
+    },
+    {
+      "fingerprint": "1383c3acc8609ba1528f52354d5c54c435696cc0e328cfe1b31d020204a55a69",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745948Z"
+    },
+    {
+      "fingerprint": "22258f81f2587884b307620ba4503688ef484eaa718395e70d49eaabddc8508e",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745952Z"
+    },
+    {
+      "fingerprint": "26e4c82835f60119ac20da03f766ec391c8643fc4d325ab21e288be213227ca8",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745956Z"
+    },
+    {
+      "fingerprint": "29aad5b81047c5e077bc0c99445d480ea741e2c234989f1f1174237374122512",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745961Z"
+    },
+    {
+      "fingerprint": "2bf2a6db252c7b35dda45b14e91cbda9f6a9b40132c30fb56f93dbbf15a03493",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745966Z"
+    },
+    {
+      "fingerprint": "394ecd0258c88c1eede5472abe4b478a0e0b5bad10505af4dc9d77d572fe1452",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.74597Z"
+    },
+    {
+      "fingerprint": "3c4f3db5eb71c87a878ee8776105e15f717fafe2cb99569501ed52119fbf40b1",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745974Z"
+    },
+    {
+      "fingerprint": "4131a42ebf8b7d63cb0c7c0d9fa6b63ef05b860809bc1c43e7bc7b8c19e67312",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745978Z"
+    },
+    {
+      "fingerprint": "43cb08ac3506520b6e650281c15fb7818c281ca02c2694a6643a5f04f1547ea4",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745982Z"
+    },
+    {
+      "fingerprint": "45576051edae65891b04a1ed85d173606b463c58a91a054d1817ff3fabeb888c",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745989Z"
+    },
+    {
+      "fingerprint": "45e8b9e899682d54b7983d05d97b29853ac3b816781d767e99a3c0ac1d276d2e",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745993Z"
+    },
+    {
+      "fingerprint": "47031e16c82e6096820cf9894627a476c6d78aad9d1c575b1b0f6c8858e17a90",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.745998Z"
+    },
+    {
+      "fingerprint": "4c639ac0b0e726d3cb4d36d00dd79cd03a8fe21eb188ac91ede95fdbd61796d5",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746002Z"
+    },
+    {
+      "fingerprint": "4c9f12a5a1733e93b858fe5078d5080d4ab0bd15abd5cb4e9639a7f0150b8875",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746007Z"
+    },
+    {
+      "fingerprint": "5173a9165b61937172300ded1ddf3edb4553757498c8a51f296d36da950f1733",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.74601Z"
+    },
+    {
+      "fingerprint": "5323dd57c8a7ef2019edb6b8adfd0f117ece88063b9d873571afeca9a8167237",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746014Z"
+    },
+    {
+      "fingerprint": "587eca1335f0097f1ffc471f95a8ea6e5af85fdec26716edd90229bb9d2fd501",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746019Z"
+    },
+    {
+      "fingerprint": "5a9e742e777ce0974ef92bb3a5665cb2a6391ab6f6d91c4a54d870a1b1fbeb75",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746023Z"
+    },
+    {
+      "fingerprint": "6213d42af9fa7ce90ccb35374e2a49184699d19ffb79681cfedeff82618cfa29",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746027Z"
+    },
+    {
+      "fingerprint": "6d766dfbf8ea74c98d62f6bbaf0d77b1ae4dd271d7e4c984ac222f4b722e4792",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746031Z"
+    },
+    {
+      "fingerprint": "755cb944b3f1cb4a99e81b2bcf3a37d5fd3ee843666893c27ef64952456d8a17",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746035Z"
+    },
+    {
+      "fingerprint": "8f46c6a78ed5065ed069ff3e9be26452d6121f6c9bbb84c3c0149cacdbdc18e8",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746039Z"
+    },
+    {
+      "fingerprint": "917d2246f66642c782865c592cb3e9f34f2b48b46486b34e113c8bfb6a570be6",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746044Z"
+    },
+    {
+      "fingerprint": "9d7f6f18478847c064d9e607a63d66fae3d8f4162a2d4fc4fe5ed808362622bd",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746048Z"
+    },
+    {
+      "fingerprint": "9e1791f705e1cf624cb6ba88153dc581344235988ea0ea749fa9edf3d4ab1f17",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746052Z"
+    },
+    {
+      "fingerprint": "a14aef1dcf94ccd7f01f726505cb5f9d41ac83ed36b8afc139a475b51afecdb3",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746057Z"
+    },
+    {
+      "fingerprint": "a1a82609d81bbfa4eed1afea4c7e56e3d0deca86397b042cafe2e96b1ab2e72f",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746062Z"
+    },
+    {
+      "fingerprint": "a3272838117bde48f5dcaaa34f1e603e8fd0c7e3a24c3ed87aa32d9a1c0f990b",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746066Z"
+    },
+    {
+      "fingerprint": "ac8135f3b5f1b175eda5441cbbaf742be6d210196e86030c045a0a0b8f51ac7a",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746071Z"
+    },
+    {
+      "fingerprint": "b17d875a76bdc862628b9ccf9d85dfcbc7a9892d0645cb0c3b86719cf4a8cbf8",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746076Z"
+    },
+    {
+      "fingerprint": "b4ed81878001b97deb980c3c0c4aefa05363aff496d0b3e4496775f7d1592bc0",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.74608Z"
+    },
+    {
+      "fingerprint": "be881ee886f2448ce269f99e9597f3282362c466af0d8600d554d69c1d695d78",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746085Z"
+    },
+    {
+      "fingerprint": "c199fc77ccb54c14372b2d0e05e8b13ee60ae644e9889d19eb4369f4577ffc31",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746089Z"
+    },
+    {
+      "fingerprint": "c432ede279fc47fbddbd170e96e0e8f94b59e8e9de8bda1c05b9230fbc1959d1",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746094Z"
+    },
+    {
+      "fingerprint": "ca064ace24ff657b5dc840b4a4af01dffae7ca689962ad66e3a0eda14d52b23d",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746099Z"
+    },
+    {
+      "fingerprint": "ce50ea3a8c1128c6fd974346dad0b0dfc271610ff777b278b40163ac73e488ed",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746103Z"
+    },
+    {
+      "fingerprint": "d18f832f05185eca1b939ceff93555753035e2fbdef4b6b2c57936e2fde6111c",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746108Z"
+    },
+    {
+      "fingerprint": "d27a06d275999a1a8ac33982159fdd6b925142bf01585fedabed0d33dfa7b19d",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746113Z"
+    },
+    {
+      "fingerprint": "dc092a9c1477c20aa2eba5f4ce4dcc79f97f9318250d4cddc0151371e92ef316",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746117Z"
+    },
+    {
+      "fingerprint": "e13efeacdfba6149586af290c5d3be6ee880a5f9ed67ef3840b8299da3876114",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746122Z"
+    },
+    {
+      "fingerprint": "e4092fd95821e8a191dc4cb027ad2d0355c52e96c2ec3ede8b95da8f312a01d4",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746127Z"
+    },
+    {
+      "fingerprint": "e85b5166e47a63f1c2226b7b5e448617b0bee5b7f8583b7456c2a50367b7a90c",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746132Z"
+    },
+    {
+      "fingerprint": "e8f1625c98e7500fd6589ae57fc2dfc2ea62e7524f7846e45ba3c43b6860a916",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746137Z"
+    },
+    {
+      "fingerprint": "ebfe4231a714e7e3f7287a5eba9b805d2da2ef811a14ff1d046dcb798af95af6",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746142Z"
+    },
+    {
+      "fingerprint": "eebf6c4fde2f8e26dd9afc43f2832f5d3165361c4d7d9ee055ea7d1104d01de0",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746147Z"
+    },
+    {
+      "fingerprint": "f252c6ad0f74cb7cf7ad09acfbd7206c54bb4c217618df264697f4162546eb82",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746152Z"
+    },
+    {
+      "fingerprint": "f67fbe9c3c9f6a1b27842327951495793a9690a9a360ef196882ca888ef36e00",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746157Z"
+    },
+    {
+      "fingerprint": "fec98bb270d68412d0a6ec415443ce9316528c55027cfb2f7328a605550c490a",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Debian packages inside the pinned php:8.5-apache runtime base image; a fixed version exists but is not yet in the published image. The runtime stage runs apt-get upgrade at build time to pick it up; the digest moves once Official Images rebuild. Tracked in felixgeelhaar/click-cms#71.",
+      "created_at": "2026-11-15T10:32:56.746162Z"
+    },
+    {
+      "fingerprint": "599a7ebde9c0374496ad846961c4893af1811323c4630f8d5f20c9830e205be7",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "CLI output to a terminal by an admin tool, not an HTML response; no XSS context.",
+      "created_at": "2026-11-15T10:32:54.531568Z"
+    },
+    {
+      "fingerprint": "dc62a984df9313e159802fb129998820469fdf4806c36e4a7400069ca3f13183",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "Intentional output of the CMS's rendered page/JSON response body; entry HTML comes from the renderer, which escapes content.",
+      "created_at": "2026-11-15T10:32:54.892505Z"
+    },
+    {
+      "fingerprint": "df5b5f3034c7cbc4e84ede14ce5ac9008f6a8f561582bf1070506ced3428f70a",
+      "rule_id": "",
+      "file_path": "",
+      "severity": "",
+      "reason": "The uploaded artifact is the scan report retained for 14 days for review; it is not a distributed release asset, so attestation adds nothing.",
+      "created_at": "2026-11-15T10:38:46.296933Z"
+    }
+  ]
+}
