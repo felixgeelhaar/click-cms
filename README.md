@@ -11,6 +11,7 @@ A modern PHP CMS with plugin architecture, Vue admin UI, Visual Builder, and mar
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?style=flat&logo=php)
 ![Vue](https://img.shields.io/badge/Vue-3-4FC08D?style=flat&logo=vuedotjs)
 ![Astro](https://img.shields.io/badge/Astro-FF5A03?style=flat&logo=astro)
+[![nox security grade](.github/nox-badge.svg)](.github/workflows/security.yml)
 
 ## Features
 
