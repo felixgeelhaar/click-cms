@@ -29,6 +29,9 @@ class ReportGateTest(unittest.TestCase):
     def test_suppressed_high_findings_remain_reportable(self):
         validate_report({**self.report(), "findings": [{"Severity": "high", "RuleID": "TEST-001", "Status": "suppressed"}]})
 
+    def test_baselined_high_findings_remain_reportable(self):
+        validate_report({**self.report(), "findings": [{"Severity": "high", "RuleID": "TEST-001", "Status": "baselined"}]})
+
     def test_medium_findings_remain_nonblocking(self):
         validate_report({**self.report(), "findings": [{"Severity": "medium", "RuleID": "TEST-001"}]})
 

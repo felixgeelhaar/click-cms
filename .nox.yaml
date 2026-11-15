@@ -1,8 +1,10 @@
 # Keep all rule families and severities in reports. High/critical findings
-# block the gate; medium/low findings remain visible for review. No baseline.
+# block the gate; medium/low findings remain visible for review. Reviewed
+# exceptions live in .nox-baseline.json, each with its reason.
 policy:
   fail_on: high
   warn_on: medium
+  baseline_path: .nox-baseline.json
 plugins:
   # Built-in analyzers only; scans must not silently install executable plugins.
   auto_install: false

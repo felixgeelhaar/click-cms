@@ -9,6 +9,11 @@ import sys
 import tempfile
 
 
+# "suppressed" is an inline nox:ignore; "baselined" is an entry in
+# .nox-baseline.json, which records the reviewed reason for each exception.
+ACCEPTED_STATUSES = ("suppressed", "baselined")
+
+
 def validate_report(report):
     if not isinstance(report, dict) or not isinstance(report.get("findings"), list):
         raise ValueError("Nox did not produce a findings report")
@@ -23,7 +28,7 @@ def validate_report(report):
             raise ValueError("Malformed Nox finding")
         # Enforce the repository's fail-on-high policy independently of the
         # scanner process/action exit status, including --report in CI.
-        if finding["Severity"] in ("high", "critical") and finding.get("Status") != "suppressed":
+        if finding["Severity"] in ("high", "critical") and finding.get("Status") not in ACCEPTED_STATUSES:
             raise ValueError("Blocking Nox finding: " + finding["RuleID"])
     degradations = meta.get("degradations", [])
     if not isinstance(degradations, list) or any(not isinstance(d, dict) for d in degradations):
