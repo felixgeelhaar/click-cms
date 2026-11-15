@@ -13,6 +13,7 @@
 # Composer under emulation for the non-native half of a multi-arch build.
 # ---------------------------------------------------------------------------
 FROM --platform=$BUILDPLATFORM composer:2@sha256:ca11f643d7791ebdd90a34fc20caf11380d434007ae539a9ea75cd9212e13dca AS vendor
+LABEL org.opencontainers.image.authors="Felix Geelhaar"
 
 WORKDIR /app
 COPY composer.json composer.lock ./
@@ -80,6 +81,7 @@ RUN npm run build
 # Stage 3 — Runtime
 # ---------------------------------------------------------------------------
 FROM php:8.5-apache@sha256:08af36df144462d84c7f16190557eec06cb9f656882685610b712a15eec54d46 AS runtime
+LABEL org.opencontainers.image.authors="Felix Geelhaar"
 
 # gd is required to generate responsive image variants; without it the media
 # library can store an upload but not resize it.
