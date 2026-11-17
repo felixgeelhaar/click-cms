@@ -27,7 +27,7 @@ jobs:
 
       - name: Scan source, secrets, dependencies and infrastructure
         id: nox
-        uses: Nox-HQ/nox@0b56bd883d8db126a4711ae9a5c1eb5c8ac45c4b # v1.54.0
+        uses: Nox-HQ/nox@8983bb0c789c5b9d711442ebfd141e0789af248a # v1.66.0
         with:
           version: '1.54.0'
           format: json,sarif
