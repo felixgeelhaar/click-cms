@@ -12,16 +12,16 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@astrojs/vue": "^7.1.5",
-    "astro": "^7.4.2",
-    "vue": "^3.5.45"
+    "@astrojs/vue": "^7.1.6",
+    "astro": "^7.4.13",
+    "vue": "^3.5.46"
   },
   "devDependencies": {
     "@vue/test-utils": "^2.5.1",
-    "axe-core": "^4.14.0",
+    "axe-core": "^4.14.1",
     "jsdom": "^30.1.3",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.0",
+    "vitest": "^5.1.1",
     "vitest-axe": "^0.1.0"
   },
   "overrides": {
